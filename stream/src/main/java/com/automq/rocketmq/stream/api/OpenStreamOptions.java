@@ -17,7 +17,7 @@
 
 package com.automq.rocketmq.stream.api;
 
-import kafka.log.es.utils.Arguments;
+import com.google.common.base.Preconditions;
 
 public class OpenStreamOptions {
     private WriteMode writeMode = WriteMode.SINGLE;
@@ -72,13 +72,13 @@ public class OpenStreamOptions {
         private final OpenStreamOptions options = new OpenStreamOptions();
 
         public Builder writeMode(WriteMode writeMode) {
-            Arguments.isNotNull(writeMode, "WriteMode should be set with SINGLE or MULTIPLE");
+            Preconditions.checkNotNull(writeMode, "WriteMode should be set with SINGLE or MULTIPLE");
             options.writeMode = writeMode;
             return this;
         }
 
         public Builder readMode(ReadMode readMode) {
-            Arguments.isNotNull(readMode, "ReadMode should be set with SINGLE or MULTIPLE");
+            Preconditions.checkNotNull(readMode, "ReadMode should be set with SINGLE or MULTIPLE");
             options.readMode = readMode;
             return this;
         }
