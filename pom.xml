@@ -42,10 +42,11 @@
         <protobuf.version>3.24.0</protobuf.version>
         <protoc.version>3.24.0</protoc.version>
         <rocksdb.version>8.5.3</rocksdb.version>
+        <guava.version>32.0.1-jre</guava.version>
         <slf4j.version>2.0.9</slf4j.version>
         <logback.version>1.4.11</logback.version>
+        <junit.version>5.10.0</junit.version>
         <etcd.version>0.7.6</etcd.version>
-        <guava.version>31.1-jre</guava.version>
 
         <!-- Compiler related -->
         <maven-checkstyle-plugin.version>3.2.0</maven-checkstyle-plugin.version>
@@ -96,13 +97,6 @@
             </dependency>
 
             <dependency>
-                <groupId>ch.qos.logback</groupId>
-                <artifactId>logback-classic</artifactId>
-                <version>${logback.version}</version>
-                <scope>test</scope>
-            </dependency>
-
-            <dependency>
                 <groupId>com.google.guava</groupId>
                 <artifactId>guava</artifactId>
                 <version>${guava.version}</version>
@@ -112,6 +106,20 @@
                         <artifactId>error_prone_annotations</artifactId>
                     </exclusion>
                 </exclusions>
+            </dependency>
+
+            <dependency>
+                <groupId>ch.qos.logback</groupId>
+                <artifactId>logback-classic</artifactId>
+                <version>${logback.version}</version>
+                <scope>test</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>org.junit.jupiter</groupId>
+                <artifactId>junit-jupiter-api</artifactId>
+                <version>${junit.version}</version>
+                <scope>test</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>
