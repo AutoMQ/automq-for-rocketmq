@@ -45,6 +45,7 @@
         <rocksdb.version>8.5.3</rocksdb.version>
         <slf4j.version>2.0.9</slf4j.version>
         <logback.version>1.4.11</logback.version>
+        <etcd.version>0.7.6</etcd.version>
 
         <!-- Compiler related -->
         <maven-checkstyle-plugin.version>3.2.0</maven-checkstyle-plugin.version>
@@ -67,6 +68,19 @@
                 <groupId>org.rocksdb</groupId>
                 <artifactId>rocksdbjni</artifactId>
                 <version>${rocksdb.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>io.etcd</groupId>
+                <artifactId>jetcd-core</artifactId>
+                <version>${etcd.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>io.etcd</groupId>
+                <artifactId>jetcd-test</artifactId>
+                <version>${etcd.version}</version>
+                <scope>test</scope>
             </dependency>
 
             <dependency>
