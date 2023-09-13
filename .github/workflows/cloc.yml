@@ -1,0 +1,13 @@
+name: Count Lines of Code (cloc)
+on:
+  push:
+    branches:
+      - 'main'
+jobs:
+  Counting_all_codes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Count Lines of Code (cloc)
+        uses: djdefi/cloc-action@5
+
