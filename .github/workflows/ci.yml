@@ -1,0 +1,22 @@
+name: Build with Maven
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+jobs:
+  dist-tar:
+    name: Build distribution tar
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+      - uses: actions/setup-java@v3
+        with:
+          distribution: "temurin"
+          java-version: "17"
+          cache: "maven"
+      - name: Build with Maven
+        run: mvn clean install
