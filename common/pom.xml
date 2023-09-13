@@ -26,17 +26,5 @@
         <version>5.1.3-automq-0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>rocketmq-store</artifactId>
-
-    <dependencies>
-        <dependency>
-            <groupId>${groupId}</groupId>
-            <artifactId>rocketmq-common</artifactId>
-            <version>${version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.rocksdb</groupId>
-            <artifactId>rocksdbjni</artifactId>
-        </dependency>
-    </dependencies>
+    <artifactId>rocketmq-common</artifactId>
 </project>
