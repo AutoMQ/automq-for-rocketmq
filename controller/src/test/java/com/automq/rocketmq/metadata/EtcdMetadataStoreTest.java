@@ -29,14 +29,14 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 public class EtcdMetadataStoreTest {
 
     @RegisterExtension
-    public static final EtcdClusterExtension clusterExtension = EtcdClusterExtension.builder().withNodes(1).build();
+    public static final EtcdClusterExtension CLUSTER_EXTENSION = EtcdClusterExtension.builder().withNodes(1).build();
 
     @Test
     public void testEtcdServer() throws Exception {
-        try (final EtcdCluster cluster = clusterExtension.cluster()) {
+        try (final EtcdCluster cluster = CLUSTER_EXTENSION.cluster()) {
             cluster.start();
             try (
-                Client client = Client.builder().endpoints(clusterExtension.clientEndpoints()).build()) {
+                Client client = Client.builder().endpoints(CLUSTER_EXTENSION.clientEndpoints()).build()) {
                 client.getKVClient().put(ByteSequence.from("key".getBytes()), ByteSequence.from("value".getBytes())).get();
                 GetResponse response = client.getKVClient().get(ByteSequence.from("key".getBytes())).get();
                 Assertions.assertEquals(1, response.getCount());
