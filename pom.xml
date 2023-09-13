@@ -4,11 +4,22 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.automq</groupId>
+    <groupId>com.automq.rocketmq</groupId>
     <artifactId>rocketmq-on-s3</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>5.1.3-automq-0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <modules>
+        <module>distribution</module>
+        <module>wal</module>
+        <module>s3stream</module>
+        <module>controller</module>
+        <module>proxy</module>
+        <module>store</module>
+        <module>broker</module>
+    </modules>
 
     <properties>
+        <rocketmq.version>5.1.3</rocketmq.version>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
