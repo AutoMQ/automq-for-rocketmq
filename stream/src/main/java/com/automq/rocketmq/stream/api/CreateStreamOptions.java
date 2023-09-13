@@ -17,7 +17,7 @@
 
 package com.automq.rocketmq.stream.api;
 
-import kafka.log.es.utils.Arguments;
+import com.google.common.base.Preconditions;
 
 public class CreateStreamOptions {
     private int replicaCount;
@@ -39,7 +39,7 @@ public class CreateStreamOptions {
         private final CreateStreamOptions options = new CreateStreamOptions();
 
         public Builder replicaCount(int replicaCount) {
-            Arguments.check(replicaCount > 0, "replica count should larger than 0");
+            Preconditions.checkArgument(replicaCount > 0, "replica count should larger than 0");
             options.replicaCount = replicaCount;
             return this;
         }
