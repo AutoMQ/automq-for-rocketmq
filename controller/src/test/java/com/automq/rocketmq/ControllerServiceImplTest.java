@@ -42,6 +42,7 @@ public class ControllerServiceImplTest {
         BrokerHeartbeatRequest request = BrokerHeartbeatRequest.newBuilder().setBrokerId(1).setBrokerEpoch(1).build();
         BrokerHeartbeatReply reply = blockingStub.processBrokerHeartbeat(request);
         assertEquals(Code.OK, reply.getStatus().getCode());
+        channel.shutdownNow();
         testServer.stop();
     }
 
