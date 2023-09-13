@@ -15,10 +15,10 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq;
+package com.automq.rocketmq.store.model.stream;
 
-public class Main {
-    public static void main(String[] args) {
-        System.out.println("Hello world!");
-    }
+import com.automq.rocketmq.common.model.Message;
+import java.util.List;
+
+public record FetchResult(int status, List<Message> messageList) {
 }
