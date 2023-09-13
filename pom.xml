@@ -33,6 +33,7 @@
         <module>proxy</module>
         <module>store</module>
         <module>broker</module>
+        <module>admin</module>
     </modules>
 
     <properties>
