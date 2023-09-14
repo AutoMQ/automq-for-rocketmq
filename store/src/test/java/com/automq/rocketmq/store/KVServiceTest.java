@@ -148,6 +148,7 @@ public class KVServiceTest {
         assertEquals(3, num.get());
 
         store.close();
+        store.destroy();
     }
 }
 
