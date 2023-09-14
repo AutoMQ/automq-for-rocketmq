@@ -17,5 +17,5 @@
 
 package com.automq.rocketmq.store.model.message;
 
-public record ChangeInvisibleTimeResult() {
+public record ChangeInvisibleDurationResult() {
 }

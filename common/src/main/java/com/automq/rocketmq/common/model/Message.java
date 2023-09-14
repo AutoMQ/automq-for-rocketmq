@@ -17,5 +17,5 @@
 
 package com.automq.rocketmq.common.model;
 
-public record Message() {
+public record Message(long offset) {
 }
