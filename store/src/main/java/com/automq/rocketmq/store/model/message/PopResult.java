@@ -20,5 +20,5 @@ package com.automq.rocketmq.store.model.message;
 import com.automq.rocketmq.common.model.Message;
 import java.util.List;
 
-public record PopResult(int status, List<Message> messageList) {
+public record PopResult(int status, long deliveryTimestamp, List<Message> messageList) {
 }

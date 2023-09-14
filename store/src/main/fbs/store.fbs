@@ -1,0 +1,11 @@
+namespace com.automq.rocketmq.store.model.generated;
+
+table CheckPoint {
+  serial_number:long;
+  delivery_timestamp:long;
+  invisible_duration:long;
+  topic_id:long;
+  queue_id:long;
+  offset:long;
+  consumer_group_id:long;
+}
