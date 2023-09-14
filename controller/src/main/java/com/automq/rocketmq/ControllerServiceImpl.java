@@ -45,6 +45,8 @@ import apache.rocketmq.controller.v1.ListTopicMessageQueueAssignmentsReply;
 import apache.rocketmq.controller.v1.ListTopicMessageQueueAssignmentsRequest;
 import apache.rocketmq.controller.v1.ListTopicsReply;
 import apache.rocketmq.controller.v1.ListTopicsRequest;
+import apache.rocketmq.controller.v1.NotifyMessageQueuesAssignableReply;
+import apache.rocketmq.controller.v1.NotifyMessageQueuesAssignableRequest;
 import apache.rocketmq.controller.v1.ReassignMessageQueueReply;
 import apache.rocketmq.controller.v1.ReassignMessageQueueRequest;
 import apache.rocketmq.controller.v1.Status;
@@ -60,12 +62,14 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     private static final Logger LOGGER = LoggerFactory.getLogger(ControllerServiceImpl.class);
 
     @Override
-    public void registerBroker(BrokerRegistrationRequest request, StreamObserver<BrokerRegistrationReply> responseObserver) {
+    public void registerBroker(BrokerRegistrationRequest request,
+        StreamObserver<BrokerRegistrationReply> responseObserver) {
         super.registerBroker(request, responseObserver);
     }
 
     @Override
-    public void unregisterBroker(BrokerUnregistrationRequest request, StreamObserver<BrokerUnregistrationReply> responseObserver) {
+    public void unregisterBroker(BrokerUnregistrationRequest request,
+        StreamObserver<BrokerUnregistrationReply> responseObserver) {
         super.unregisterBroker(request, responseObserver);
     }
 
@@ -108,17 +112,26 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     }
 
     @Override
-    public void listTopicMessageQueues(ListTopicMessageQueueAssignmentsRequest request, StreamObserver<ListTopicMessageQueueAssignmentsReply> responseObserver) {
+    public void listTopicMessageQueues(ListTopicMessageQueueAssignmentsRequest request,
+        StreamObserver<ListTopicMessageQueueAssignmentsReply> responseObserver) {
         super.listTopicMessageQueues(request, responseObserver);
     }
 
     @Override
-    public void reassignMessageQueue(ReassignMessageQueueRequest request, StreamObserver<ReassignMessageQueueReply> responseObserver) {
+    public void reassignMessageQueue(ReassignMessageQueueRequest request,
+        StreamObserver<ReassignMessageQueueReply> responseObserver) {
         super.reassignMessageQueue(request, responseObserver);
     }
 
     @Override
-    public void listMessageQueueReassignments(ListMessageQueueReassignmentsRequest request, StreamObserver<ListMessageQueueReassignmentsReply> responseObserver) {
+    public void notifyMessageQueueAssignable(NotifyMessageQueuesAssignableRequest request,
+        StreamObserver<NotifyMessageQueuesAssignableReply> responseObserver) {
+        super.notifyMessageQueueAssignable(request, responseObserver);
+    }
+
+    @Override
+    public void listMessageQueueReassignments(ListMessageQueueReassignmentsRequest request,
+        StreamObserver<ListMessageQueueReassignmentsReply> responseObserver) {
         super.listMessageQueueReassignments(request, responseObserver);
     }
 
