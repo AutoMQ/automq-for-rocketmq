@@ -111,7 +111,7 @@ public class EtcdTest {
 
     @Test
     public void testEtcdElection() throws InterruptedException {
-        ByteSequence electionName = ByteSequence.from("leader", Charset.defaultCharset());
+        ByteSequence electionName = ByteSequence.from("leader-election", Charset.defaultCharset());
 
         final CountDownLatch latch = new CountDownLatch(1);
         final AtomicInteger term = new AtomicInteger(0);
@@ -148,7 +148,7 @@ public class EtcdTest {
 
     @Test
     public void testEtcdResign() throws InterruptedException {
-        ByteSequence electionName = ByteSequence.from("leader", Charset.defaultCharset());
+        ByteSequence electionName = ByteSequence.from("leader-resign", Charset.defaultCharset());
 
         final CountDownLatch latch = new CountDownLatch(2);
         final AtomicInteger term = new AtomicInteger(0);
@@ -195,7 +195,7 @@ public class EtcdTest {
             LeaseGrantResponse grantResponse = lease.grant(3).get();
             long leaseId = grantResponse.getID();
             lease.keepAliveOnce(leaseId);
-            ByteSequence electionName = ByteSequence.from("leader".getBytes());
+            ByteSequence electionName = ByteSequence.from("leader-txn".getBytes());
             ByteSequence proposal = ByteSequence.from("127.0.0.1".getBytes());
             CampaignResponse campaignResponse = election.campaign(electionName, leaseId, proposal).get();
             LeaderKey leaderKey = campaignResponse.getLeader();
