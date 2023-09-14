@@ -266,26 +266,9 @@ public class RocksDBKVService implements KVService {
         columnFamilyOptions.close();
     }
 
-    private void recursiveDelete(File file) throws RocksDBException {
-        if (file.isFile()) {
-            if (!file.delete()) {
-                throw new RocksDBException("Delete file " + file.getName() + " failed.");
-            }
-        } else {
-            File[] files = file.listFiles();
-            if (files != null) {
-                for (File f : files) {
-                    recursiveDelete(f);
-                }
-                if (!file.delete()) {
-                    throw new RocksDBException("Delete file " + file.getName() + " failed.");
-                }
-            }
-        }
-    }
-
     @Override
     public void destroy() throws RocksDBException {
-        recursiveDelete(new File(path));
+        close();
+        RocksDB.destroyDB(path, new Options());
     }
 }
