@@ -25,7 +25,7 @@ import org.rocksdb.RocksDBException;
 public interface KVService {
     Charset CHARSET = StandardCharsets.UTF_8;
 
-    // TODO: Map RocksDBException into KVStoreException
+    // TODO: Map RocksDBException into StoreException
 
     /**
      * Get value with specified key from backend kv engine.

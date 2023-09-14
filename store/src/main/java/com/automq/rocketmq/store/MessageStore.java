@@ -18,16 +18,17 @@
 package com.automq.rocketmq.store;
 
 import com.automq.rocketmq.store.model.message.AckResult;
-import com.automq.rocketmq.store.model.message.ChangeInvisibleTimeResult;
+import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
 import com.automq.rocketmq.store.model.message.PopResult;
-import java.util.UUID;
 
 public interface MessageStore {
-    PopResult pop(UUID topicId, int queueId, long offset, int maxCount, UUID groupId, boolean isOrder);
+    PopResult pop(long consumeGroupId, long topicId, int queueId, long offset, int maxCount, boolean isOrder, long invisibleDuration);
 
     AckResult ack(String receiptHandle);
 
-    ChangeInvisibleTimeResult changeInvisibleTime(String receiptHandle, int nextVisibleTime);
+    ChangeInvisibleDurationResult changeInvisibleDuration(String receiptHandle, int invisibleTime);
 
-    int getInflightStatsByQueue(UUID topicId, int queueId);
+    int getInflightStatsByQueue(long topicId, int queueId);
+
+    boolean cleanMetadata(long topicId, int queueId);
 }
