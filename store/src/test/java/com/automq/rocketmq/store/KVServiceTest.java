@@ -89,7 +89,6 @@ public class KVServiceTest {
         byte[] valueNotFound = store.get(PARTITION, key.getBytes(KVService.CHARSET));
         assertNull(valueNotFound);
 
-        store.close();
         store.destroy();
         assertFalse(new File(path).exists());
 
@@ -163,7 +162,7 @@ public class KVServiceTest {
         });
         assertEquals(3, num.get());
 
-        store.close();
+        store.destroy();
     }
 }
 
