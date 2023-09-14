@@ -1,14 +1,14 @@
 syntax = "proto3";
 
-import "google/protobuf/timestamp.proto";
-
 package apache.rocketmq.controller.v1;
+
+import "model.proto";
 
 option java_multiple_files = true;
 option java_package = "apache.rocketmq.controller.v1";
 option java_generate_equals_and_hash = true;
 option java_string_check_utf8 = true;
-option java_outer_classname = "MQService";
+option java_outer_classname = "ControllerApis";
 
 message Uuid {
   int64 most_significant_bits = 1;
@@ -28,11 +28,6 @@ message Status {
 
 // Aggregates common request headers, authentication, etc.
 message ControllerRequestContext {}
-
-message MessageQueue {
-  int64 topic_id = 1;
-  int32 queue_id = 2;
-}
 
 message BrokerRegistrationRequest {
   ControllerRequestContext context = 1;
@@ -98,15 +93,6 @@ message ListTopicsRequest {
   ControllerRequestContext context = 1;
 }
 
-message Topic {
-  string name = 1;
-  int64 topic_id = 2;
-  int32 count = 3;
-  repeated MessageQueueAssignment assignments = 4;
-  // Message queues that are in the progress of reassignment
-  repeated OngoingMessageQueueReassignment reassignments = 5;
-}
-
 // Use server streaming in case there are a large number of topics available.
 message ListTopicsReply {
   Status status = 1;
@@ -139,25 +125,9 @@ message DeleteTopicReply {
   Status status = 1;
 }
 
-message MessageQueueAssignment {
-  MessageQueue queue = 1;
-  int32 broker_id = 2;
-}
-
 message ListMessageQueueReassignmentsRequest {
   ControllerRequestContext context = 1;
   repeated string topics = 2;
-}
-
-message OngoingTopicReassignment {
-  string name = 1;
-  repeated OngoingMessageQueueReassignment queues = 2;
-}
-
-message OngoingMessageQueueReassignment {
-  MessageQueue queue = 1;
-  int32 src_broker_id = 2;
-  int32 dst_broker_id = 3;
 }
 
 message ListMessageQueueReassignmentsReply {
@@ -199,68 +169,6 @@ message ListTopicMessageQueueAssignmentsReply {
   repeated MessageQueueAssignment assignments = 2;
 }
 
-message Range {
-  // Begin offset, inclusive.
-  int64 begin = 1;
-
-  // End offset of this range, exclusive.
-  int64 end = 2;
-}
-
-message OssSegment {
-  int64 segment_id = 1;
-  MessageQueue queue = 2;
-  Range range = 3;
-
-  // Objective Storage Service path.
-  string path = 4;
-}
-
-message AddOssSegmentRequest {
-  ControllerRequestContext context = 1;
-  int32 broker_id = 2;
-  int64 broker_epoch = 3;
-  OssSegment segment = 4;
-
-  // Store timestamp of the last message. It, as a result, would be
-  // safe to determine lifespan of the segment through this field.
-  google.protobuf.Timestamp store_time = 5;
-}
-
-message AddOssSegmentReply {
-  Status status = 1;
-}
-
-message ListOssSegmentsCriteria {
-  // Omit if negative
-  int64 topic_id = 1;
-
-  // Omit if negative
-  int32 queue_id = 2;
-
-  // Accept if OSS segment store_time is prior to this timestamp
-  google.protobuf.Timestamp timestamp = 3;
-}
-
-message ListOssSegmentsRequest {
-  ControllerRequestContext context = 1;
-  ListOssSegmentsCriteria criteria = 2;
-}
-
-message ListOssSegmentsResponse {
-  Status status = 1;
-  repeated OssSegment segments = 2;
-}
-
-message DeleteOssSegmentRequest {
-  ControllerRequestContext context = 1;
-  int64 segment_id = 2;
-}
-
-message DeleteOssSegmentReply {
-  Status status = 1;
-}
-
 message CommitOffsetRequest {
   ControllerRequestContext context = 1;
   int64 group_id = 2;
@@ -300,12 +208,6 @@ service ControllerService {
 
   // List ongoing message queue reassignments.
   rpc listMessageQueueReassignments(ListMessageQueueReassignmentsRequest) returns (ListMessageQueueReassignmentsReply) {}
-
-  rpc addOssSegment(AddOssSegmentRequest) returns (AddOssSegmentReply) {}
-
-  rpc listOssSegments(ListOssSegmentsRequest) returns (ListOssSegmentsResponse) {}
-
-  rpc deleteOssSegment(DeleteOssSegmentRequest) returns (DeleteOssSegmentReply) {}
 
   rpc commitOffset(CommitOffsetRequest) returns (CommitOffsetReply) {}
 }
