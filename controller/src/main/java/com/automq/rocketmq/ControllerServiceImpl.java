@@ -17,8 +17,6 @@
 
 package com.automq.rocketmq;
 
-import apache.rocketmq.controller.v1.AddOssSegmentReply;
-import apache.rocketmq.controller.v1.AddOssSegmentRequest;
 import apache.rocketmq.controller.v1.BrokerHeartbeatReply;
 import apache.rocketmq.controller.v1.BrokerHeartbeatRequest;
 import apache.rocketmq.controller.v1.BrokerRegistrationReply;
@@ -31,16 +29,12 @@ import apache.rocketmq.controller.v1.CommitOffsetRequest;
 import apache.rocketmq.controller.v1.ControllerServiceGrpc;
 import apache.rocketmq.controller.v1.CreateTopicReply;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
-import apache.rocketmq.controller.v1.DeleteOssSegmentReply;
-import apache.rocketmq.controller.v1.DeleteOssSegmentRequest;
 import apache.rocketmq.controller.v1.DeleteTopicReply;
 import apache.rocketmq.controller.v1.DeleteTopicRequest;
 import apache.rocketmq.controller.v1.DescribeTopicReply;
 import apache.rocketmq.controller.v1.DescribeTopicRequest;
 import apache.rocketmq.controller.v1.ListMessageQueueReassignmentsReply;
 import apache.rocketmq.controller.v1.ListMessageQueueReassignmentsRequest;
-import apache.rocketmq.controller.v1.ListOssSegmentsRequest;
-import apache.rocketmq.controller.v1.ListOssSegmentsResponse;
 import apache.rocketmq.controller.v1.ListTopicMessageQueueAssignmentsReply;
 import apache.rocketmq.controller.v1.ListTopicMessageQueueAssignmentsRequest;
 import apache.rocketmq.controller.v1.ListTopicsReply;
@@ -133,21 +127,6 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     public void listMessageQueueReassignments(ListMessageQueueReassignmentsRequest request,
         StreamObserver<ListMessageQueueReassignmentsReply> responseObserver) {
         super.listMessageQueueReassignments(request, responseObserver);
-    }
-
-    @Override
-    public void addOssSegment(AddOssSegmentRequest request, StreamObserver<AddOssSegmentReply> responseObserver) {
-        super.addOssSegment(request, responseObserver);
-    }
-
-    @Override
-    public void listOssSegments(ListOssSegmentsRequest request, StreamObserver<ListOssSegmentsResponse> responseObserver) {
-        super.listOssSegments(request, responseObserver);
-    }
-
-    @Override
-    public void deleteOssSegment(DeleteOssSegmentRequest request, StreamObserver<DeleteOssSegmentReply> responseObserver) {
-        super.deleteOssSegment(request, responseObserver);
     }
 
     @Override
