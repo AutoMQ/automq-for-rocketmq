@@ -46,7 +46,6 @@
         <slf4j.version>2.0.9</slf4j.version>
         <logback.version>1.4.11</logback.version>
         <etcd.version>0.7.6</etcd.version>
-        <awaitility.version>4.2.0</awaitility.version>
 
         <!-- Testing related -->
         <mockito-core.version>5.5.0</mockito-core.version>
@@ -98,13 +97,17 @@
                 </exclusions>
             </dependency>
 
+            <!-- Below artifact are not directly used by the project, but are required by the dependencies of the project. -->
             <dependency>
-                <groupId>org.awaitility</groupId>
-                <artifactId>awaitility</artifactId>
-                <version>${awaitility.version}</version>
-                <scope>test</scope>
+                <groupId>com.google.protobuf</groupId>
+                <artifactId>protobuf-java-util</artifactId>
+                <version>3.24.0</version>
             </dependency>
-
+            <dependency>
+                <groupId>com.squareup.okio</groupId>
+                <artifactId>okio-jvm</artifactId>
+                <version>3.2.0</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -137,13 +140,6 @@
             <artifactId>assertj-core</artifactId>
             <version>${assertj-core.version}</version>
             <scope>test</scope>
-            <exclusions>
-                <exclusion>
-                    <!-- Exclude the byte-buddy, since the mockito-core already has a higher version of it. -->
-                    <groupId>net.bytebuddy</groupId>
-                    <artifactId>byte-buddy</artifactId>
-                </exclusion>
-            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.mockito</groupId>
@@ -161,6 +157,14 @@
             <groupId>org.awaitility</groupId>
             <artifactId>awaitility</artifactId>
             <version>${awaitility.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Below dependencies are not directly used by the project, but are required by the dependencies of the project. -->
+        <dependency>
+            <groupId>net.bytebuddy</groupId>
+            <artifactId>byte-buddy</artifactId>
+            <version>1.14.6</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -185,6 +189,25 @@
                         <goals>
                             <goal>check</goal>
                         </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>1.4.1</version>
+                <executions>
+                    <execution>
+                        <id>enforce</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <requireUpperBoundDeps/>
+                                <banDuplicatePomDependencyVersions/>
+                            </rules>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
