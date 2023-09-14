@@ -93,7 +93,7 @@ public interface KVService {
     /**
      * Flush all dirty pages and shutdown the backend engine.
      */
-    void close();
+    void close() throws RocksDBException;
 
     /**
      * Delete all data in the backend engine.
