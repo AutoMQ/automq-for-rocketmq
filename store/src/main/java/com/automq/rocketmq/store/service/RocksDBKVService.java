@@ -252,15 +252,16 @@ public class RocksDBKVService implements KVService {
     }
 
     @Override
-    public void close() {
+    public void close() throws RocksDBException {
         if (stopped) {
             return;
         }
         stopped = true;
+        rocksDB.flushWal(true);
         for (Map.Entry<String, ColumnFamilyHandle> entry : columnFamilyNameHandleMap.entrySet()) {
             entry.getValue().close();
         }
-        rocksDB.close();
+        rocksDB.closeE();
         dbOptions.close();
         columnFamilyOptions.close();
     }
