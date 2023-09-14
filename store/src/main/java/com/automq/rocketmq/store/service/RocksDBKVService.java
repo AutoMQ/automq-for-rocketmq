@@ -78,7 +78,7 @@ public class RocksDBKVService implements KVService {
     @Override
     public byte[] get(final String partition, final byte[] key) throws RocksDBException {
         if (stopped) {
-            return null;
+            throw new RocksDBException("KV service is stopped.");
         }
 
         if (!columnFamilyNameHandleMap.containsKey(partition)) {
@@ -245,6 +245,9 @@ public class RocksDBKVService implements KVService {
 
     @Override
     public void flush(boolean sync) throws RocksDBException {
+        if (stopped) {
+            throw new RocksDBException("KV service is stopped.");
+        }
         rocksDB.flushWal(sync);
     }
 
