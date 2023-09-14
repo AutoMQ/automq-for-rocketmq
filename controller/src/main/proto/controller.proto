@@ -29,6 +29,11 @@ message Status {
 // Aggregates common request headers, authentication, etc.
 message ControllerRequestContext {}
 
+message MessageQueue {
+  int64 topic_id = 1;
+  int32 queue_id = 2;
+}
+
 message BrokerRegistrationRequest {
   ControllerRequestContext context = 1;
 
@@ -135,9 +140,8 @@ message DeleteTopicReply {
 }
 
 message MessageQueueAssignment {
-  int64 topic_id = 1;
-  int64 queue_id = 2;
-  int32 broker_id = 3;
+  MessageQueue queue = 1;
+  int32 broker_id = 2;
 }
 
 message ListMessageQueueReassignmentsRequest {
@@ -151,10 +155,9 @@ message OngoingTopicReassignment {
 }
 
 message OngoingMessageQueueReassignment {
-  int64 topic_id = 1;
-  int64 queue_id = 2;
-  int32 src_broker_id = 3;
-  int32 dst_broker_id = 4;
+  MessageQueue queue = 1;
+  int32 src_broker_id = 2;
+  int32 dst_broker_id = 3;
 }
 
 message ListMessageQueueReassignmentsReply {
@@ -162,15 +165,25 @@ message ListMessageQueueReassignmentsReply {
   repeated OngoingTopicReassignment reassignments = 2;
 }
 
+// Controller in leader role would use this request to instruct broker, which is serving the message queue, to conduct
+// migration procedure.
 message ReassignMessageQueueRequest {
   ControllerRequestContext context = 1;
-  int64 topic_id = 2;
-  int64 queue_id = 3;
-  int32 src_broker_id = 4;
-  int32 dst_broker_id = 5;
+  MessageQueue queue = 2;
+  int32 src_broker_id = 3;
+  int32 dst_broker_id = 4;
 }
 
 message ReassignMessageQueueReply {
+  Status status = 1;
+}
+
+message NotifyMessageQueuesAssignableRequest {
+  ControllerRequestContext context = 1;
+  repeated MessageQueue queues = 2;
+}
+
+message NotifyMessageQueuesAssignableReply {
   Status status = 1;
 }
 
@@ -196,12 +209,11 @@ message Range {
 
 message OssSegment {
   int64 segment_id = 1;
-  int64 topic_id = 2;
-  int64 queue_id = 3;
-  Range range = 4;
+  MessageQueue queue = 2;
+  Range range = 3;
 
   // Objective Storage Service path.
-  string path = 5;
+  string path = 4;
 }
 
 message AddOssSegmentRequest {
@@ -224,7 +236,7 @@ message ListOssSegmentsCriteria {
   int64 topic_id = 1;
 
   // Omit if negative
-  int64 queue_id = 2;
+  int32 queue_id = 2;
 
   // Accept if OSS segment store_time is prior to this timestamp
   google.protobuf.Timestamp timestamp = 3;
@@ -252,9 +264,8 @@ message DeleteOssSegmentReply {
 message CommitOffsetRequest {
   ControllerRequestContext context = 1;
   int64 group_id = 2;
-  int64 topic_id = 3;
-  int64 queue_id = 4;
-  int64 offset = 5;
+  MessageQueue queue = 3;
+  int64 offset = 4;
 }
 
 message CommitOffsetReply {
@@ -282,6 +293,10 @@ service ControllerService {
 
   // Reassign message queue from one broker to another.
   rpc reassignMessageQueue(ReassignMessageQueueRequest) returns (ReassignMessageQueueReply) {}
+
+  // For broker to notify leader controller that the message queues have become assignable. Message queues might be in
+  // its own charge or just adopted from a crashed node.
+  rpc notifyMessageQueueAssignable(NotifyMessageQueuesAssignableRequest) returns (NotifyMessageQueuesAssignableReply) {}
 
   // List ongoing message queue reassignments.
   rpc listMessageQueueReassignments(ListMessageQueueReassignmentsRequest) returns (ListMessageQueueReassignmentsReply) {}
