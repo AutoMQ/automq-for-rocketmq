@@ -22,11 +22,36 @@ import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
 import com.automq.rocketmq.store.model.message.PopResult;
 
 public interface MessageStore {
-    PopResult pop(long consumeGroupId, long topicId, int queueId, long offset, int maxCount, boolean isOrder, long invisibleDuration);
+    /**
+     * Pop message from specified topic and queue.
+     *
+     * @param consumeGroupId consumer group id that launches this query
+     * @param topicId topic id to pop message from
+     * @param queueId queue id to pop message from
+     * @param offset offset to start from
+     * @param batchSize maximum count of messages
+     * @param isOrder is orderly pop
+     * @param invisibleDuration the duration for the next time this batch of messages will be visible, in nanoseconds
+     * @return pop result, see {@link PopResult}
+     */
+    PopResult pop(long consumeGroupId, long topicId, int queueId, long offset, int batchSize, boolean isOrder, long invisibleDuration);
 
+    /**
+     * Ack message.
+     *
+     * @param receiptHandle unique receipt handle to identify inflight message
+     * @return ack result, see {@link AckResult}
+     */
     AckResult ack(String receiptHandle);
 
-    ChangeInvisibleDurationResult changeInvisibleDuration(String receiptHandle, int invisibleTime);
+    /**
+     * Change invisible duration.
+     *
+     * @param receiptHandle unique receipt handle to identify inflight message
+     * @param invisibleDuration the duration for the next time this batch of messages will be visible, in nanoseconds
+     * @return change invisible duration result, see {@link ChangeInvisibleDurationResult}
+     */
+    ChangeInvisibleDurationResult changeInvisibleDuration(String receiptHandle, long invisibleDuration);
 
     int getInflightStatsByQueue(long topicId, int queueId);
 
