@@ -54,6 +54,10 @@
             <artifactId>flatbuffers-java</artifactId>
             <version>23.5.26</version>
         </dependency>
+        <dependency>
+            <groupId>com.automq.rocketmq</groupId>
+            <artifactId>rocketmq-s3stream</artifactId>
+        </dependency>
     </dependencies>
 
     <build>

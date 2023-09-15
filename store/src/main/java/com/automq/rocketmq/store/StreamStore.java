@@ -17,9 +17,13 @@
 
 package com.automq.rocketmq.store;
 
-import com.automq.rocketmq.store.model.stream.FetchResult;
-import java.util.UUID;
+import com.automq.rocketmq.stream.api.AppendResult;
+import com.automq.rocketmq.stream.api.FetchResult;
+import com.automq.rocketmq.stream.api.RecordBatch;
+import java.util.concurrent.CompletableFuture;
 
 public interface StreamStore {
-    FetchResult fetch(UUID topicId, int queueId, long offset, int maxCount);
+    CompletableFuture<FetchResult> fetch(long streamId, long startOffset, int maxCount);
+
+    CompletableFuture<AppendResult> append(long streamId, RecordBatch recordBatch);
 }
