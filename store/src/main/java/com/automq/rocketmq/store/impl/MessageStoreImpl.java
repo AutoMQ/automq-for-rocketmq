@@ -21,6 +21,7 @@ import com.automq.rocketmq.common.model.Message;
 import com.automq.rocketmq.store.MessageStore;
 import com.automq.rocketmq.store.StreamStore;
 import com.automq.rocketmq.store.model.generated.CheckPoint;
+import com.automq.rocketmq.store.model.kv.BatchWriteRequest;
 import com.automq.rocketmq.store.model.message.AckResult;
 import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
 import com.automq.rocketmq.store.model.message.PopResult;
@@ -95,13 +96,13 @@ public class MessageStoreImpl implements MessageStore {
         // insert check point and timer tag into KVService
         messageList.forEach(message -> {
             try {
-                // put check point
-                kvService.put(KV_PARTITION_CHECK_POINT,
+                BatchWriteRequest writeCheckPointRequest = new BatchWriteRequest(KV_PARTITION_CHECK_POINT,
                     buildCheckPointKey(consumeGroupId, topicId, queueId, message.offset()),
                     buildCheckPointValue(serialNumber, deliveryTimestamp, invisibleDuration, topicId, queueId, message.offset(), consumeGroupId));
-                // put timer tag
-                kvService.put(KV_PARTITION_TIMER_TAG,
+                BatchWriteRequest writeTimerTagRequest = new BatchWriteRequest(KV_PARTITION_TIMER_TAG,
                     buildTimerTagKey(invisibleDuration, consumeGroupId, topicId, queueId, message.offset()), new byte[0]);
+                // write check point and timer tag to KV service atomically
+                kvService.writeBatch(writeCheckPointRequest, writeTimerTagRequest);
             } catch (RocksDBException e) {
                 throw new RuntimeException(e);
             }

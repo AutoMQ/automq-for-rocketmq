@@ -17,7 +17,8 @@
 
 package com.automq.rocketmq.store.service;
 
-import com.automq.rocketmq.store.model.callback.KVIteratorCallback;
+import com.automq.rocketmq.store.model.kv.BatchWriteRequest;
+import com.automq.rocketmq.store.model.kv.IteratorCallback;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import org.rocksdb.RocksDBException;
@@ -41,10 +42,10 @@ public interface KVService {
      * Iterate all the k-v pairs.
      *
      * @param partition the partition storing required the k-v pair
-     * @param callback the iterator will call {@link KVIteratorCallback#onRead} to consume the kv pair
+     * @param callback the iterator will call {@link IteratorCallback#onRead} to consume the kv pair
      * @throws RocksDBException if backend engine fails
      */
-    void iterate(final String partition, KVIteratorCallback callback) throws RocksDBException;
+    void iterate(final String partition, IteratorCallback callback) throws RocksDBException;
 
     /**
      * Iterate the k-v pair with the given prefix, start and end.
@@ -57,11 +58,11 @@ public interface KVService {
      * @param prefix iterate the kv pair with the specified prefix
      * @param start the lower bound to start iterate
      * @param end the upper bound to end iterate
-     * @param callback the iterator will call {@link KVIteratorCallback#onRead} to consume the kv pair
+     * @param callback the iterator will call {@link IteratorCallback#onRead} to consume the kv pair
      * @throws RocksDBException if backend engine fails
      */
     void iterate(final String partition, String prefix, final String start,
-        final String end, KVIteratorCallback callback) throws RocksDBException;
+        final String end, IteratorCallback callback) throws RocksDBException;
 
     /**
      * Put the kv pair into the backend engine.
@@ -72,6 +73,15 @@ public interface KVService {
      * @throws RocksDBException if backend engine fails
      */
     void put(final String partition, byte[] key, byte[] value) throws RocksDBException;
+
+    /**
+     * Put the kv pair into the backend engine.
+     * The kv pair will be written into the backend engine in batch.
+     *
+     * @param writeRequests the batch builder
+     * @throws RocksDBException if backend engine fails
+     */
+    void writeBatch(BatchWriteRequest... writeRequests) throws RocksDBException;
 
     /**
      * Delete value with specified key from backend kv engine.

@@ -24,6 +24,9 @@ import com.automq.rocketmq.store.model.message.PopResult;
 import com.automq.rocketmq.store.service.KVService;
 import com.automq.rocketmq.store.service.RocksDBKVService;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.rocksdb.RocksDBException;
@@ -40,15 +43,20 @@ class MessageStoreTest {
     private static MessageStore messageStore;
 
     @BeforeAll
-    private static void setUp() throws RocksDBException {
+    public static void setUp() throws RocksDBException {
         kvService = new RocksDBKVService(PATH);
         messageStore = new MessageStoreImpl(null, kvService);
+    }
+
+    @AfterAll
+    public static void tearDown() throws RocksDBException {
+        kvService.destroy();
     }
 
     @Test
     void pop() throws RocksDBException {
         long testStartTime = System.nanoTime();
-        PopResult popResult = messageStore.pop(1, 1, 1, 1, 32, false, 100);
+        PopResult popResult = messageStore.pop(1, 1, 1, 0, 32, false, 100);
         assertEquals(0, popResult.status());
         assertFalse(popResult.messageList().isEmpty());
 
@@ -65,5 +73,31 @@ class MessageStoreTest {
             assertEquals(1, checkPoint.queueId());
             assertEquals(message.offset(), checkPoint.offset());
         }
+
+        messageStore.pop(2, 2, 2, 0, 32, false, 100);
+        messageStore.pop(1, 2, 2, 0, 32, false, 100);
+        messageStore.pop(1, 1, 2, 0, 32, false, 100);
+
+        List<CheckPoint> allCheckPointList = new ArrayList<>();
+        kvService.iterate(MessageStoreImpl.KV_PARTITION_CHECK_POINT, (key, value) ->
+            allCheckPointList.add(CheckPoint.getRootAsCheckPoint(ByteBuffer.wrap(value))));
+
+        assertEquals(4, allCheckPointList.size());
+
+        assertEquals(1, allCheckPointList.get(0).consumerGroupId());
+        assertEquals(1, allCheckPointList.get(0).topicId());
+        assertEquals(1, allCheckPointList.get(0).queueId());
+
+        assertEquals(1, allCheckPointList.get(1).consumerGroupId());
+        assertEquals(1, allCheckPointList.get(1).topicId());
+        assertEquals(2, allCheckPointList.get(1).queueId());
+
+        assertEquals(1, allCheckPointList.get(2).consumerGroupId());
+        assertEquals(2, allCheckPointList.get(2).topicId());
+        assertEquals(2, allCheckPointList.get(2).queueId());
+
+        assertEquals(2, allCheckPointList.get(3).consumerGroupId());
+        assertEquals(2, allCheckPointList.get(3).topicId());
+        assertEquals(2, allCheckPointList.get(3).queueId());
     }
 }
