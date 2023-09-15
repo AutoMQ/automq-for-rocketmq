@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq;
+package com.automq.rocketmq.controller;
 
 import io.grpc.BindableService;
 import io.grpc.Grpc;

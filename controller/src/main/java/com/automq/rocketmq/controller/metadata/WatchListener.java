@@ -15,10 +15,30 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq;
+package com.automq.rocketmq.controller.metadata;
 
-public class Main {
-    public static void main(String[] args) {
-        System.out.println("Hello world!");
+import io.etcd.jetcd.Watch;
+import io.etcd.jetcd.watch.WatchResponse;
+
+public class WatchListener implements Watch.Listener {
+    private final EtcdMetadataStore store;
+
+    public WatchListener(EtcdMetadataStore store) {
+        this.store = store;
+    }
+
+    @Override
+    public void onNext(WatchResponse response) {
+        this.store.onWatch(response);
+    }
+
+    @Override
+    public void onError(Throwable throwable) {
+        this.store.onWatchError(throwable);
+    }
+
+    @Override
+    public void onCompleted() {
+        this.store.onWatchComplete();
     }
 }
