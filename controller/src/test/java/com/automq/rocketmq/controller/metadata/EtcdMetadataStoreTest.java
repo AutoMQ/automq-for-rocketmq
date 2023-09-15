@@ -15,18 +15,21 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.metadata;
+package com.automq.rocketmq.controller.metadata;
 
-import java.io.IOException;
+import com.automq.rocketmq.controller.exception.ControllerException;
+import java.util.concurrent.TimeUnit;
+import org.awaitility.Awaitility;
+import org.junit.jupiter.api.Test;
 
-public interface MetadataStore {
+public class EtcdMetadataStoreTest extends EtcdTestBase {
 
-    /**
-     * Register broker into metadata store and return broker epoch
-     *
-     * @param brokerId brokerId to register
-     * @return broker epoch
-     * @throws IOException If there is an I/O error.
-     */
-    long registerBroker(int brokerId) throws IOException;
+    @Test
+    public void testCtor() throws ControllerException {
+        EtcdMetadataStore metadataStore = new EtcdMetadataStore(cluster.clientEndpoints(), "testCtor");
+        Awaitility.await().atMost(3, TimeUnit.SECONDS).with().pollInterval(100, TimeUnit.MILLISECONDS)
+                .until(() -> metadataStore.getRole() == Role.Leader);
+        metadataStore.close();
+    }
+
 }

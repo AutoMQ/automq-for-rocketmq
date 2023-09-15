@@ -18,6 +18,7 @@ message Uuid {
 // Define all error codes here
 enum Code {
   OK = 0;
+  INTERRUPTED = 1;
   NOT_FOUND = 404;
 }
 

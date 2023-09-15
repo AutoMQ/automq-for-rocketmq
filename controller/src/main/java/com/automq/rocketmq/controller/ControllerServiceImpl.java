@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq;
+package com.automq.rocketmq.controller;
 
 import apache.rocketmq.controller.v1.BrokerHeartbeatReply;
 import apache.rocketmq.controller.v1.BrokerHeartbeatRequest;
