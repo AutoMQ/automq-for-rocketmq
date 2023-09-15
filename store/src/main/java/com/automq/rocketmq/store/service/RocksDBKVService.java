@@ -17,7 +17,8 @@
 
 package com.automq.rocketmq.store.service;
 
-import com.automq.rocketmq.store.model.callback.KVIteratorCallback;
+import com.automq.rocketmq.store.model.kv.BatchWriteRequest;
+import com.automq.rocketmq.store.model.kv.IteratorCallback;
 import com.google.common.base.Strings;
 import java.io.File;
 import java.util.ArrayList;
@@ -35,6 +36,8 @@ import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.RocksIterator;
 import org.rocksdb.Slice;
+import org.rocksdb.WriteBatch;
+import org.rocksdb.WriteOptions;
 
 public class RocksDBKVService implements KVService {
     private final String path;
@@ -102,7 +105,7 @@ public class RocksDBKVService implements KVService {
     }
 
     @Override
-    public void iterate(final String partition, KVIteratorCallback callback) throws RocksDBException {
+    public void iterate(final String partition, IteratorCallback callback) throws RocksDBException {
         if (stopped) {
             throw new RocksDBException("KV service is stopped.");
         }
@@ -125,7 +128,7 @@ public class RocksDBKVService implements KVService {
 
     @Override
     public void iterate(final String partition, String prefix, final String start,
-        final String end, KVIteratorCallback callback) throws RocksDBException {
+        final String end, IteratorCallback callback) throws RocksDBException {
         if (stopped) {
             throw new RocksDBException("KV service is stopped.");
         }
@@ -230,6 +233,20 @@ public class RocksDBKVService implements KVService {
 
         ColumnFamilyHandle handle = getOrCreateColumnFamily(partition);
         rocksDB.put(handle, key, value);
+    }
+
+    @Override
+    public void writeBatch(BatchWriteRequest... writeRequests) throws RocksDBException {
+        if (stopped) {
+            throw new RocksDBException("KV service is stopped.");
+        }
+        try (WriteOptions writeOptions = new WriteOptions(); WriteBatch writeBatch = new WriteBatch()) {
+            for (BatchWriteRequest request : writeRequests) {
+                ColumnFamilyHandle handle = getOrCreateColumnFamily(request.partition());
+                writeBatch.put(handle, request.key(), request.value());
+            }
+            rocksDB.write(writeOptions, writeBatch);
+        }
     }
 
     @Override

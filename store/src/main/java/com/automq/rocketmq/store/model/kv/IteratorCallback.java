@@ -15,12 +15,12 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.store.model.callback;
+package com.automq.rocketmq.store.model.kv;
 
 /**
  * Callback to execute once a key-value pair is read from KV store.
  */
-public interface KVIteratorCallback {
+public interface IteratorCallback {
     /**
      * Callback to execute once a key-value pair is read from KV store.
      *
