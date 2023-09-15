@@ -15,34 +15,27 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.metadata;
+package com.automq.rocketmq.common;
 
-import io.etcd.jetcd.Client;
-import java.io.IOException;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
 
-public class EtcdMetadataStore implements MetadataStore {
+public class PrefixThreadFactory implements ThreadFactory {
+    private final String prefix;
 
-    /**
-     * Etcd target.
-     *
-     * dns:///foo.bar.com:2379
-     * ip:///etcd0:2379,etcd1:2379,etcd2:2379
-     */
-    private final String target;
+    private final AtomicInteger index;
 
-    /**
-     * Nested etcd client.
-     */
-    private final Client etcdClient;
-
-    public EtcdMetadataStore(String target) {
-        this.target = target;
-        this.etcdClient = Client.builder().target(target).build();
+    public PrefixThreadFactory(String prefix) {
+        this.prefix = prefix;
+        this.index = new AtomicInteger(0);
     }
 
     @Override
-    public long registerBroker(int brokerId) throws IOException {
-
-        return 0;
+    public Thread newThread(Runnable r) {
+        final String threadName = String.format("%s_%d", this.prefix, this.index.getAndIncrement());
+        Thread t = new Thread(r);
+        t.setName(threadName);
+        t.setDaemon(true);
+        return t;
     }
 }

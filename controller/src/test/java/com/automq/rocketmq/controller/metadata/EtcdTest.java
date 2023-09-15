@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.metadata;
+package com.automq.rocketmq.controller.metadata;
 
 import io.etcd.jetcd.ByteSequence;
 import io.etcd.jetcd.Client;
@@ -29,14 +29,12 @@ import io.etcd.jetcd.election.CampaignResponse;
 import io.etcd.jetcd.election.LeaderKey;
 import io.etcd.jetcd.kv.GetResponse;
 import io.etcd.jetcd.kv.TxnResponse;
-import io.etcd.jetcd.launcher.EtcdCluster;
 import io.etcd.jetcd.lease.LeaseGrantResponse;
 import io.etcd.jetcd.op.Cmp;
 import io.etcd.jetcd.op.CmpTarget;
 import io.etcd.jetcd.op.Op;
 import io.etcd.jetcd.options.PutOption;
 import io.etcd.jetcd.options.WatchOption;
-import io.etcd.jetcd.test.EtcdClusterExtension;
 import io.etcd.jetcd.watch.WatchEvent;
 import io.etcd.jetcd.watch.WatchResponse;
 import java.nio.charset.Charset;
@@ -45,36 +43,14 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.extension.RegisterExtension;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 /**
  * Test basic usage of Etcd Java binding.
  */
-public class EtcdTest {
-
-    public static final Logger LOGGER = LoggerFactory.getLogger(EtcdTest.class);
-
-    @RegisterExtension
-    public static final EtcdClusterExtension CLUSTER_EXTENSION = EtcdClusterExtension.builder().withNodes(1).build();
-
-    public static EtcdCluster cluster = CLUSTER_EXTENSION.cluster();
-
-    @BeforeClass
-    public static void setUp() {
-        cluster.start();
-    }
-
-    @AfterClass
-    public static void tearDown() {
-        cluster.close();
-    }
+public class EtcdTest extends EtcdTestBase {
 
     @Test
     public void testKV() throws Exception {
