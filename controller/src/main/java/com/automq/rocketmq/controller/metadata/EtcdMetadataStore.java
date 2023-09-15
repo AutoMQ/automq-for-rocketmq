@@ -126,15 +126,27 @@ public class EtcdMetadataStore implements MetadataStore, AutoCloseable {
         ByteSequence electionName = ByteSequence.from(this.leaderElectionName, StandardCharsets.UTF_8);
         ByteSequence proposal = ByteSequence.from("dummy", StandardCharsets.UTF_8);
         this.election.campaign(electionName, this.leaseId, proposal)
-            .thenAccept(this::onLeader);
+            .thenAccept(this::onElected);
     }
 
-    private void onLeader(CampaignResponse campaignResponse) {
+    /**
+     * Handle election campaign winning.
+     *
+     * Procedure is:
+     * <ol>
+     *     <li>Change controller role to Elected</li>
+     *     <li>Modify term</li>
+     * </ol>
+     * @param campaignResponse The campaign response.
+     */
+    private void onElected(CampaignResponse campaignResponse) {
         this.leaderKey = campaignResponse.getLeader();
         LOGGER.info("Campaign completes and gets elected as leader of {}", this.leaderKey.getName());
         this.role = Role.Elected;
 
-        // Now we update controller term
+        // Now that this controller node is elected as leader, we update controller term and wait till CDC catches up.
+        // Once the watching receives the latest term change, this controller node is safe to act as leader, because
+        // all previous changes are definitely applied.
         this.term = UUID.randomUUID();
         ByteSequence termKey = ByteSequence.from(String.format("/%s/term", this.clusterName), StandardCharsets.UTF_8);
         ByteBuffer buffer = ByteBuffer.allocate(16);
@@ -160,6 +172,11 @@ public class EtcdMetadataStore implements MetadataStore, AutoCloseable {
         this.watch.watch(watchPrefix, WatchOption.builder().isPrefix(true).build(), new WatchListener(this));
     }
 
+    /**
+     * Part of watch listener.
+     *
+     * @param response Watch response.
+     */
     void onWatch(WatchResponse response) {
         LOGGER.debug("Got a watch response");
         for (WatchEvent event : response.getEvents()) {
@@ -167,6 +184,13 @@ public class EtcdMetadataStore implements MetadataStore, AutoCloseable {
         }
     }
 
+    /**
+     * Process WatchEvent from etcd cluster.
+     *
+     * Actions to each watch event vary according to the associated key path.
+     *
+     * @param event Watch event to handle
+     */
     private void processWatchEvent(WatchEvent event) {
         ByteSequence termKey = ByteSequence.from(String.format("/%s/term", this.clusterName), StandardCharsets.UTF_8);
         KeyValue kv = event.getKeyValue();
