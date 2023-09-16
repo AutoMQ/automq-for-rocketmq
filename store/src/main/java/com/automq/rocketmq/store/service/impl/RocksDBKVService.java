@@ -15,10 +15,11 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.store.service;
+package com.automq.rocketmq.store.service.impl;
 
 import com.automq.rocketmq.store.model.kv.BatchRequest;
 import com.automq.rocketmq.store.model.kv.IteratorCallback;
+import com.automq.rocketmq.store.service.KVService;
 import com.google.common.base.Strings;
 import java.io.File;
 import java.util.ArrayList;

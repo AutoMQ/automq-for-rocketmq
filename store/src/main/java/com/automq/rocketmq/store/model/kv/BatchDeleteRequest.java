@@ -19,11 +19,6 @@ package com.automq.rocketmq.store.model.kv;
 
 public record BatchDeleteRequest(String partition, byte[] key) implements BatchRequest {
     @Override
-    public byte[] value() {
-        return null;
-    }
-
-    @Override
     public BatchRequestType type() {
         return BatchRequestType.DELETE;
     }

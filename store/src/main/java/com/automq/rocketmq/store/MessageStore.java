@@ -20,21 +20,23 @@ package com.automq.rocketmq.store;
 import com.automq.rocketmq.store.model.message.AckResult;
 import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
 import com.automq.rocketmq.store.model.message.PopResult;
+import java.util.concurrent.CompletableFuture;
 
 public interface MessageStore {
     /**
      * Pop message from specified topic and queue.
      *
-     * @param consumeGroupId consumer group id that launches this query
-     * @param topicId topic id to pop message from
-     * @param queueId queue id to pop message from
-     * @param offset offset to start from
-     * @param batchSize maximum count of messages
-     * @param isOrder is orderly pop
+     * @param consumeGroupId    consumer group id that launches this query
+     * @param topicId           topic id to pop message from
+     * @param queueId           queue id to pop message from
+     * @param offset            offset to start from
+     * @param batchSize         maximum count of messages
+     * @param isOrder           is orderly pop
      * @param invisibleDuration the duration for the next time this batch of messages will be visible, in nanoseconds
      * @return pop result, see {@link PopResult}
      */
-    PopResult pop(long consumeGroupId, long topicId, int queueId, long offset, int batchSize, boolean isOrder, long invisibleDuration);
+    CompletableFuture<PopResult> pop(long consumeGroupId, long topicId, int queueId, long offset, int batchSize, boolean isOrder,
+        long invisibleDuration);
 
     /**
      * Ack message.
@@ -42,16 +44,16 @@ public interface MessageStore {
      * @param receiptHandle unique receipt handle to identify inflight message
      * @return ack result, see {@link AckResult}
      */
-    AckResult ack(String receiptHandle);
+    CompletableFuture<AckResult> ack(String receiptHandle);
 
     /**
      * Change invisible duration.
      *
-     * @param receiptHandle unique receipt handle to identify inflight message
+     * @param receiptHandle     unique receipt handle to identify inflight message
      * @param invisibleDuration the duration for the next time this batch of messages will be visible, in nanoseconds
      * @return change invisible duration result, see {@link ChangeInvisibleDurationResult}
      */
-    ChangeInvisibleDurationResult changeInvisibleDuration(String receiptHandle, long invisibleDuration);
+    CompletableFuture<ChangeInvisibleDurationResult> changeInvisibleDuration(String receiptHandle, long invisibleDuration);
 
     int getInflightStatsByQueue(long topicId, int queueId);
 
