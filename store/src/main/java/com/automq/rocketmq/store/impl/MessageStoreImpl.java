@@ -56,8 +56,6 @@ public class MessageStoreImpl implements MessageStore {
     private final OperationLogService operationLogService;
     private final KVService kvService;
 
-    private final AtomicLong fakeSerialNumberGenerator = new AtomicLong();
-
     public MessageStoreImpl(StreamStore streamStore, OperationLogService operationLogService, KVService kvService) {
         this.streamStore = streamStore;
         this.operationLogService = operationLogService;
@@ -197,7 +195,7 @@ public class MessageStoreImpl implements MessageStore {
                     // TODO: Check and commit consumer offset if pop message orderly
                     if (checkPoint.isOrder()) {
                         BatchDeleteRequest deleteOrderIndexRequest = new BatchDeleteRequest(KV_PARTITION_ORDER_INDEX,
-                            buildOrderIndexKey(checkPoint.consumerGroupId(), handle.topicId(), handle.queueId(), checkPoint.messgeOffset()));
+                            buildOrderIndexKey(checkPoint.consumerGroupId(), handle.topicId(), handle.queueId(), checkPoint.messageOffset()));
                         requestList.add(deleteOrderIndexRequest);
                     }
 
@@ -238,8 +236,8 @@ public class MessageStoreImpl implements MessageStore {
 
                     // Write new check point and timer tag.
                     BatchWriteRequest writeCheckPointRequest = new BatchWriteRequest(KV_PARTITION_CHECK_POINT,
-                        buildCheckPointKey(checkPoint.topicId(), checkPoint.queueId(), checkPoint.messgeOffset(), checkPoint.operationId()),
-                        buildCheckPointValue(checkPoint.topicId(), checkPoint.queueId(), checkPoint.messgeOffset(),
+                        buildCheckPointKey(checkPoint.topicId(), checkPoint.queueId(), checkPoint.messageOffset(), checkPoint.operationId()),
+                        buildCheckPointValue(checkPoint.topicId(), checkPoint.queueId(), checkPoint.messageOffset(),
                             checkPoint.consumerGroupId(), checkPoint.operationId(), checkPoint.isOrder(),
                             checkPoint.deliveryTimestamp(), nextInvisibleTimestamp, checkPoint.reconsumeCount()));
 

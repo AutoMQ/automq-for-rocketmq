@@ -75,7 +75,7 @@ class MessageStoreTest {
         assertEquals(1, checkPoint.consumerGroupId());
         assertEquals(1, checkPoint.topicId());
         assertEquals(1, checkPoint.queueId());
-        assertEquals(message.offset(), checkPoint.messgeOffset());
+        assertEquals(message.offset(), checkPoint.messageOffset());
 
         messageStore.pop(1, 1, 2, 0, 1, false, 100).join();
 
