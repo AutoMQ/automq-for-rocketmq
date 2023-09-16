@@ -18,3 +18,25 @@ table ReceiptHandle {
   message_offset:long;
   operation_id:long;
 }
+
+table PopOperation {
+  consumer_group_id:long;
+  topic_id:long;
+  queue_id:int;
+  offset:long;
+  batch_size:long;
+  is_order:bool;
+  invisible_duration:long;
+  operation_timestamp:long;
+}
+
+table AckOperation {
+  receipt_handle:ReceiptHandle;
+  operation_timestamp:long;
+}
+
+table ChangeInvisibleDurationOperation {
+  receipt_handle:ReceiptHandle;
+  invisible_duration:long;
+  operation_timestamp:long;
+}
