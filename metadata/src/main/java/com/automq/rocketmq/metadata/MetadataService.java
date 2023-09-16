@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.common.metadata;
+package com.automq.rocketmq.metadata;
 
 public interface MetadataService {
     long getStreamId(long topicId, long queueId);
