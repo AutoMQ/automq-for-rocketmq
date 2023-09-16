@@ -3,7 +3,7 @@ namespace com.automq.rocketmq.store.model.generated;
 table CheckPoint {
   topic_id:long;
   queue_id:int;
-  messge_offset:long;
+  message_offset:long;
   consumer_group_id:long;
   operation_id:long;
   is_order:bool;
