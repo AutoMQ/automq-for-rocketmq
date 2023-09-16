@@ -27,7 +27,7 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
 
 public class StreamOperationLogService implements OperationLogService {
-    private StreamStore streamStore;
+    private final StreamStore streamStore;
 
     public StreamOperationLogService(StreamStore streamStore) {
         this.streamStore = streamStore;
@@ -35,8 +35,7 @@ public class StreamOperationLogService implements OperationLogService {
 
     @Override
     public CompletableFuture<Long> logPopOperation(long consumeGroupId, long topicId, int queueId, long offset,
-        int batchSize,
-        boolean isOrder, long invisibleDuration, long operationTimestamp) {
+        int batchSize, boolean isOrder, long invisibleDuration, long operationTimestamp) {
         // TODO: get the stream id from metadata server.
         CompletableFuture<AppendResult> append = streamStore.append(0, new SingleRecord(operationTimestamp,
             ByteBuffer.wrap(SerializeUtil.encodePopOperation(consumeGroupId, topicId, queueId, offset, batchSize, isOrder, invisibleDuration, operationTimestamp))));
