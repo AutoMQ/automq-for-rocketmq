@@ -36,7 +36,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicLong;
 import org.rocksdb.RocksDBException;
 
 import static com.automq.rocketmq.store.util.SerializeUtil.buildCheckPointKey;
