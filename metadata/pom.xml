@@ -27,12 +27,4 @@
     </parent>
 
     <artifactId>rocketmq-metadata</artifactId>
-
-    <dependencies>
-        <dependency>
-            <groupId>${project.groupId}</groupId>
-            <artifactId>rocketmq-metadata</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-    </dependencies>
 </project>
