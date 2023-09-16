@@ -17,9 +17,30 @@
 
 package com.automq.rocketmq.store;
 
-import com.automq.rocketmq.store.model.stream.FetchResult;
-import java.util.UUID;
+import com.automq.rocketmq.stream.api.AppendResult;
+import com.automq.rocketmq.stream.api.FetchResult;
+import com.automq.rocketmq.stream.api.RecordBatch;
+import java.util.concurrent.CompletableFuture;
 
+/**
+ * A high level abstraction of stream store, hidden the details of S3Stream module.
+ */
 public interface StreamStore {
-    FetchResult fetch(UUID topicId, int queueId, long offset, int maxCount);
+    /**
+     * Fetch records from stream store.
+     *
+     * @param streamId the target stream id.
+     * @param startOffset the start offset of the fetch.
+     * @param maxCount the max return count of the fetch.
+     * @return the future of fetch result.
+     */
+    CompletableFuture<FetchResult> fetch(long streamId, long startOffset, int maxCount);
+
+    /**
+     * Append record batch to stream store.
+     * @param streamId the target stream id.
+     * @param recordBatch the record batch to append.
+     * @return the future of append result.
+     */
+    CompletableFuture<AppendResult> append(long streamId, RecordBatch recordBatch);
 }
