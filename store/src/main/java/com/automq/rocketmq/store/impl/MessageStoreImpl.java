@@ -46,9 +46,9 @@ import static com.automq.rocketmq.store.util.SerializeUtil.buildTimerTagKey;
 import static com.automq.rocketmq.store.util.SerializeUtil.decodeReceiptHandle;
 
 public class MessageStoreImpl implements MessageStore {
-    protected static final String KV_PARTITION_CHECK_POINT = "check_point";
-    protected static final String KV_PARTITION_TIMER_TAG = "timer_tag";
-    protected static final String KV_PARTITION_ORDER_INDEX = "order_index";
+    protected static final String KV_NAMESPACE_CHECK_POINT = "check_point";
+    protected static final String KV_NAMESPACE_TIMER_TAG = "timer_tag";
+    protected static final String KV_NAMESPACE_ORDER_INDEX = "order_index";
 
     private final StreamStore streamStore;
 
@@ -84,18 +84,18 @@ public class MessageStoreImpl implements MessageStore {
                     try {
                         // TODO: Undefined behavior if last operation is not orderly.
                         byte[] orderIndexKey = buildOrderIndexKey(consumeGroupId, topicId, queueId, offset + i);
-                        byte[] bytes = kvService.get(KV_PARTITION_ORDER_INDEX, orderIndexKey);
+                        byte[] bytes = kvService.get(KV_NAMESPACE_ORDER_INDEX, orderIndexKey);
                         // If order index not found, this message has not been consumed.
                         if (bytes == null) {
                             continue;
                         }
                         long lastOperationId = ByteBuffer.wrap(bytes).getLong();
-                        byte[] checkPoint = kvService.get(KV_PARTITION_CHECK_POINT, buildCheckPointKey(topicId, queueId, offset + i, lastOperationId));
+                        byte[] checkPoint = kvService.get(KV_NAMESPACE_CHECK_POINT, buildCheckPointKey(topicId, queueId, offset + i, lastOperationId));
                         if (checkPoint != null) {
                             orderCheckPointMap.put(offset + i, CheckPoint.getRootAsCheckPoint(ByteBuffer.wrap(checkPoint)));
                         } else {
                             // TODO: log finding a orphan index, this maybe a bug
-                            kvService.delete(KV_PARTITION_ORDER_INDEX, orderIndexKey);
+                            kvService.delete(KV_NAMESPACE_ORDER_INDEX, orderIndexKey);
                         }
                     } catch (RocksDBException e) {
                         // TODO: handle exception
@@ -112,21 +112,21 @@ public class MessageStoreImpl implements MessageStore {
                     if (isOrder && orderCheckPointMap.containsKey(message.offset())) {
                         // Delete last check point and timer tag.
                         CheckPoint lastCheckPoint = orderCheckPointMap.get(message.offset());
-                        BatchDeleteRequest deleteLastCheckPointRequest = new BatchDeleteRequest(KV_PARTITION_CHECK_POINT,
+                        BatchDeleteRequest deleteLastCheckPointRequest = new BatchDeleteRequest(KV_NAMESPACE_CHECK_POINT,
                             buildCheckPointKey(topicId, queueId, message.offset(), lastCheckPoint.operationId()));
 
-                        BatchDeleteRequest deleteLastTimerTagRequest = new BatchDeleteRequest(KV_PARTITION_TIMER_TAG,
+                        BatchDeleteRequest deleteLastTimerTagRequest = new BatchDeleteRequest(KV_NAMESPACE_TIMER_TAG,
                             buildTimerTagKey(lastCheckPoint.nextVisibleTimestamp(), topicId, queueId, lastCheckPoint.operationId()));
 
                         // Write new check point, timer tag, and order index.
-                        BatchWriteRequest writeCheckPointRequest = new BatchWriteRequest(KV_PARTITION_CHECK_POINT,
+                        BatchWriteRequest writeCheckPointRequest = new BatchWriteRequest(KV_NAMESPACE_CHECK_POINT,
                             buildCheckPointKey(topicId, queueId, message.offset(), operationId),
                             buildCheckPointValue(topicId, queueId, message.offset(), consumeGroupId, operationId, true, operationTimestamp, nextVisibleTimestamp, lastCheckPoint.reconsumeCount() + 1));
 
-                        BatchWriteRequest writeTimerTagRequest = new BatchWriteRequest(KV_PARTITION_TIMER_TAG,
+                        BatchWriteRequest writeTimerTagRequest = new BatchWriteRequest(KV_NAMESPACE_TIMER_TAG,
                             buildTimerTagKey(nextVisibleTimestamp, topicId, queueId, operationId), new byte[0]);
 
-                        BatchWriteRequest writeOrderIndexRequest = new BatchWriteRequest(KV_PARTITION_ORDER_INDEX,
+                        BatchWriteRequest writeOrderIndexRequest = new BatchWriteRequest(KV_NAMESPACE_ORDER_INDEX,
                             buildOrderIndexKey(consumeGroupId, topicId, queueId, message.offset()), buildOrderIndexValue(operationId));
                         kvService.batch(deleteLastCheckPointRequest, deleteLastTimerTagRequest, writeCheckPointRequest, writeTimerTagRequest, writeOrderIndexRequest);
                         continue;
@@ -134,18 +134,18 @@ public class MessageStoreImpl implements MessageStore {
 
                     // If this message is not orderly or has not been consumed, write check point and timer tag to KV service atomically.
                     List<BatchRequest> requestList = new ArrayList<>();
-                    BatchWriteRequest writeCheckPointRequest = new BatchWriteRequest(KV_PARTITION_CHECK_POINT,
+                    BatchWriteRequest writeCheckPointRequest = new BatchWriteRequest(KV_NAMESPACE_CHECK_POINT,
                         buildCheckPointKey(topicId, queueId, message.offset(), operationId),
                         buildCheckPointValue(topicId, queueId, message.offset(), consumeGroupId, operationId, isOrder, operationTimestamp, nextVisibleTimestamp, 0));
                     requestList.add(writeCheckPointRequest);
 
-                    BatchWriteRequest writeTimerTagRequest = new BatchWriteRequest(KV_PARTITION_TIMER_TAG,
+                    BatchWriteRequest writeTimerTagRequest = new BatchWriteRequest(KV_NAMESPACE_TIMER_TAG,
                         buildTimerTagKey(nextVisibleTimestamp, topicId, queueId, operationId), new byte[0]);
                     requestList.add(writeTimerTagRequest);
 
                     // If this message is orderly, write order index to KV service.
                     if (isOrder) {
-                        BatchWriteRequest writeOrderIndexRequest = new BatchWriteRequest(KV_PARTITION_ORDER_INDEX,
+                        BatchWriteRequest writeOrderIndexRequest = new BatchWriteRequest(KV_NAMESPACE_ORDER_INDEX,
                             buildOrderIndexKey(consumeGroupId, topicId, queueId, message.offset()), buildOrderIndexValue(operationId));
                         requestList.add(writeOrderIndexRequest);
                     }
@@ -174,7 +174,7 @@ public class MessageStoreImpl implements MessageStore {
                 try {
                     // Check if check point exists.
                     byte[] checkPointKey = buildCheckPointKey(handle.topicId(), handle.queueId(), handle.messageOffset(), handle.operationId());
-                    byte[] buffer = kvService.get(KV_PARTITION_CHECK_POINT, checkPointKey);
+                    byte[] buffer = kvService.get(KV_NAMESPACE_CHECK_POINT, checkPointKey);
                     if (buffer == null) {
                         // TODO: Check point not found
                         return new AckResult();
@@ -184,16 +184,16 @@ public class MessageStoreImpl implements MessageStore {
                     CheckPoint checkPoint = CheckPoint.getRootAsCheckPoint(ByteBuffer.wrap(buffer));
 
                     List<BatchRequest> requestList = new ArrayList<>();
-                    BatchDeleteRequest deleteCheckPointRequest = new BatchDeleteRequest(KV_PARTITION_CHECK_POINT, checkPointKey);
+                    BatchDeleteRequest deleteCheckPointRequest = new BatchDeleteRequest(KV_NAMESPACE_CHECK_POINT, checkPointKey);
                     requestList.add(deleteCheckPointRequest);
 
-                    BatchDeleteRequest deleteTimerTagRequest = new BatchDeleteRequest(KV_PARTITION_TIMER_TAG,
+                    BatchDeleteRequest deleteTimerTagRequest = new BatchDeleteRequest(KV_NAMESPACE_TIMER_TAG,
                         buildTimerTagKey(checkPoint.nextVisibleTimestamp(), handle.topicId(), handle.queueId(), checkPoint.operationId()));
                     requestList.add(deleteTimerTagRequest);
 
                     // TODO: Check and commit consumer offset if pop message orderly
                     if (checkPoint.isOrder()) {
-                        BatchDeleteRequest deleteOrderIndexRequest = new BatchDeleteRequest(KV_PARTITION_ORDER_INDEX,
+                        BatchDeleteRequest deleteOrderIndexRequest = new BatchDeleteRequest(KV_NAMESPACE_ORDER_INDEX,
                             buildOrderIndexKey(checkPoint.consumerGroupId(), handle.topicId(), handle.queueId(), checkPoint.messageOffset()));
                         requestList.add(deleteOrderIndexRequest);
                     }
@@ -221,7 +221,7 @@ public class MessageStoreImpl implements MessageStore {
                 try {
                     // Check if check point exists.
                     byte[] checkPointKey = buildCheckPointKey(handle.topicId(), handle.queueId(), handle.messageOffset(), handle.operationId());
-                    byte[] buffer = kvService.get(KV_PARTITION_CHECK_POINT, checkPointKey);
+                    byte[] buffer = kvService.get(KV_NAMESPACE_CHECK_POINT, checkPointKey);
                     if (buffer == null) {
                         // TODO: Check point not found
                         return new ChangeInvisibleDurationResult();
@@ -230,17 +230,17 @@ public class MessageStoreImpl implements MessageStore {
                     // Delete last timer tag.
                     CheckPoint checkPoint = CheckPoint.getRootAsCheckPoint(ByteBuffer.wrap(buffer));
 
-                    BatchDeleteRequest deleteLastTimerTagRequest = new BatchDeleteRequest(KV_PARTITION_TIMER_TAG,
+                    BatchDeleteRequest deleteLastTimerTagRequest = new BatchDeleteRequest(KV_NAMESPACE_TIMER_TAG,
                         buildTimerTagKey(checkPoint.nextVisibleTimestamp(), checkPoint.topicId(), checkPoint.queueId(), checkPoint.operationId()));
 
                     // Write new check point and timer tag.
-                    BatchWriteRequest writeCheckPointRequest = new BatchWriteRequest(KV_PARTITION_CHECK_POINT,
+                    BatchWriteRequest writeCheckPointRequest = new BatchWriteRequest(KV_NAMESPACE_CHECK_POINT,
                         buildCheckPointKey(checkPoint.topicId(), checkPoint.queueId(), checkPoint.messageOffset(), checkPoint.operationId()),
                         buildCheckPointValue(checkPoint.topicId(), checkPoint.queueId(), checkPoint.messageOffset(),
                             checkPoint.consumerGroupId(), checkPoint.operationId(), checkPoint.isOrder(),
                             checkPoint.deliveryTimestamp(), nextInvisibleTimestamp, checkPoint.reconsumeCount()));
 
-                    BatchWriteRequest writeTimerTagRequest = new BatchWriteRequest(KV_PARTITION_TIMER_TAG,
+                    BatchWriteRequest writeTimerTagRequest = new BatchWriteRequest(KV_NAMESPACE_TIMER_TAG,
                         buildTimerTagKey(nextInvisibleTimestamp, checkPoint.topicId(), checkPoint.queueId(), checkPoint.operationId()), new byte[0]);
 
                     kvService.batch(deleteLastTimerTagRequest, writeCheckPointRequest, writeTimerTagRequest);

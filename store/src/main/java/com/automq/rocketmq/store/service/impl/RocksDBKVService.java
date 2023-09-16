@@ -80,16 +80,16 @@ public class RocksDBKVService implements KVService {
     }
 
     @Override
-    public byte[] get(final String partition, final byte[] key) throws RocksDBException {
+    public byte[] get(final String namespace, final byte[] key) throws RocksDBException {
         if (stopped) {
             throw new RocksDBException("KV service is stopped.");
         }
 
-        if (!columnFamilyNameHandleMap.containsKey(partition)) {
+        if (!columnFamilyNameHandleMap.containsKey(namespace)) {
             return null;
         }
 
-        ColumnFamilyHandle handle = columnFamilyNameHandleMap.get(partition);
+        ColumnFamilyHandle handle = columnFamilyNameHandleMap.get(namespace);
         return rocksDB.get(handle, key);
     }
 
@@ -106,7 +106,7 @@ public class RocksDBKVService implements KVService {
     }
 
     @Override
-    public void iterate(final String partition, IteratorCallback callback) throws RocksDBException {
+    public void iterate(final String namespace, IteratorCallback callback) throws RocksDBException {
         if (stopped) {
             throw new RocksDBException("KV service is stopped.");
         }
@@ -115,7 +115,7 @@ public class RocksDBKVService implements KVService {
             throw new RocksDBException("The callback can not be null.");
         }
 
-        ColumnFamilyHandle columnFamilyHandle = columnFamilyNameHandleMap.get(partition);
+        ColumnFamilyHandle columnFamilyHandle = columnFamilyNameHandleMap.get(namespace);
         if (columnFamilyHandle == null) {
             return;
         }
@@ -128,7 +128,7 @@ public class RocksDBKVService implements KVService {
     }
 
     @Override
-    public void iterate(final String partition, String prefix, final String start,
+    public void iterate(final String namespace, String prefix, final String start,
         final String end, IteratorCallback callback) throws RocksDBException {
         if (stopped) {
             throw new RocksDBException("KV service is stopped.");
@@ -146,7 +146,7 @@ public class RocksDBKVService implements KVService {
             throw new RocksDBException("To determine upper bound, prefix and end may not be null at the same time.");
         }
 
-        ColumnFamilyHandle columnFamilyHandle = columnFamilyNameHandleMap.get(partition);
+        ColumnFamilyHandle columnFamilyHandle = columnFamilyNameHandleMap.get(namespace);
         if (columnFamilyHandle == null) {
             return;
         }
@@ -227,12 +227,12 @@ public class RocksDBKVService implements KVService {
     }
 
     @Override
-    public void put(final String partition, byte[] key, byte[] value) throws RocksDBException {
+    public void put(final String namespace, byte[] key, byte[] value) throws RocksDBException {
         if (stopped) {
             throw new RocksDBException("KV service is stopped.");
         }
 
-        ColumnFamilyHandle handle = getOrCreateColumnFamily(partition);
+        ColumnFamilyHandle handle = getOrCreateColumnFamily(namespace);
         rocksDB.put(handle, key, value);
     }
 
@@ -248,7 +248,7 @@ public class RocksDBKVService implements KVService {
 
         try (WriteOptions writeOptions = new WriteOptions(); WriteBatch writeBatch = new WriteBatch()) {
             for (BatchRequest request : requests) {
-                ColumnFamilyHandle handle = getOrCreateColumnFamily(request.partition());
+                ColumnFamilyHandle handle = getOrCreateColumnFamily(request.namespace());
                 switch (request.type()) {
                     case WRITE -> writeBatch.put(handle, request.key(), request.value());
                     case DELETE -> writeBatch.delete(handle, request.key());
@@ -260,12 +260,12 @@ public class RocksDBKVService implements KVService {
     }
 
     @Override
-    public void delete(final String partition, byte[] key) throws RocksDBException {
+    public void delete(final String namespace, byte[] key) throws RocksDBException {
         if (stopped) {
             throw new RocksDBException("KV service is stopped.");
         }
-        if (columnFamilyNameHandleMap.containsKey(partition)) {
-            ColumnFamilyHandle handle = columnFamilyNameHandleMap.get(partition);
+        if (columnFamilyNameHandleMap.containsKey(namespace)) {
+            ColumnFamilyHandle handle = columnFamilyNameHandleMap.get(namespace);
             rocksDB.delete(handle, key);
         }
     }
