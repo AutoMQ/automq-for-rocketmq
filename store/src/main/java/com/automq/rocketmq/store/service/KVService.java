@@ -31,21 +31,21 @@ public interface KVService {
     /**
      * Get value with specified key from backend kv engine.
      *
-     * @param partition the partition storing required the kv pair
+     * @param namespace the namespace storing required the kv pair
      * @param key the key for querying
      * @return the value of the specified key
      * @throws RocksDBException if backend engine fails
      */
-    byte[] get(final String partition, final byte[] key) throws RocksDBException;
+    byte[] get(final String namespace, final byte[] key) throws RocksDBException;
 
     /**
      * Iterate all the k-v pairs.
      *
-     * @param partition the partition storing required the k-v pair
+     * @param namespace the namespace storing required the k-v pair
      * @param callback the iterator will call {@link IteratorCallback#onRead} to consume the kv pair
      * @throws RocksDBException if backend engine fails
      */
-    void iterate(final String partition, IteratorCallback callback) throws RocksDBException;
+    void iterate(final String namespace, IteratorCallback callback) throws RocksDBException;
 
     /**
      * Iterate the k-v pair with the given prefix, start and end.
@@ -54,25 +54,25 @@ public interface KVService {
      * {@code prefix} with {@code end}, or {@code start} with {@code end}.
      * When both the prefix and start are specified, parameter {@code start} has higher priority.
      *
-     * @param partition the partition storing required the k-v pair
+     * @param namespace the namespace storing required the k-v pair
      * @param prefix iterate the kv pair with the specified prefix
      * @param start the lower bound to start iterate
      * @param end the upper bound to end iterate
      * @param callback the iterator will call {@link IteratorCallback#onRead} to consume the kv pair
      * @throws RocksDBException if backend engine fails
      */
-    void iterate(final String partition, String prefix, final String start,
+    void iterate(final String namespace, String prefix, final String start,
         final String end, IteratorCallback callback) throws RocksDBException;
 
     /**
      * Put the kv pair into the backend engine.
      *
-     * @param partition the partition storing required the k-v pair
+     * @param namespace the namespace storing required the k-v pair
      * @param key the key for inserting
      * @param value the value for inserting
      * @throws RocksDBException if backend engine fails
      */
-    void put(final String partition, byte[] key, byte[] value) throws RocksDBException;
+    void put(final String namespace, byte[] key, byte[] value) throws RocksDBException;
 
     /**
      * Put or delete the kv pair in batch.
@@ -85,11 +85,11 @@ public interface KVService {
     /**
      * Delete value with specified key from backend kv engine.
      *
-     * @param partition the partition storing required the k-v pair
+     * @param namespace the namespace storing required the k-v pair
      * @param key the key for deleting
      * @throws RocksDBException if backend engine fails
      */
-    void delete(final String partition, byte[] key) throws RocksDBException;
+    void delete(final String namespace, byte[] key) throws RocksDBException;
 
     /**
      * Forced dirty pages to the hard disk.
