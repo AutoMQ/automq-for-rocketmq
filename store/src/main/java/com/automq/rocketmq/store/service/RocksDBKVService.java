@@ -17,7 +17,7 @@
 
 package com.automq.rocketmq.store.service;
 
-import com.automq.rocketmq.store.model.kv.BatchWriteRequest;
+import com.automq.rocketmq.store.model.kv.BatchRequest;
 import com.automq.rocketmq.store.model.kv.IteratorCallback;
 import com.google.common.base.Strings;
 import java.io.File;
@@ -236,14 +236,23 @@ public class RocksDBKVService implements KVService {
     }
 
     @Override
-    public void writeBatch(BatchWriteRequest... writeRequests) throws RocksDBException {
+    public void batch(BatchRequest... requests) throws RocksDBException {
         if (stopped) {
             throw new RocksDBException("KV service is stopped.");
         }
+
+        if (requests == null) {
+            throw new RocksDBException("The requests can not be null.");
+        }
+
         try (WriteOptions writeOptions = new WriteOptions(); WriteBatch writeBatch = new WriteBatch()) {
-            for (BatchWriteRequest request : writeRequests) {
+            for (BatchRequest request : requests) {
                 ColumnFamilyHandle handle = getOrCreateColumnFamily(request.partition());
-                writeBatch.put(handle, request.key(), request.value());
+                switch (request.type()) {
+                    case WRITE -> writeBatch.put(handle, request.key(), request.value());
+                    case DELETE -> writeBatch.delete(handle, request.key());
+                    default -> throw new RocksDBException("Unsupported request type: " + request.type());
+                }
             }
             rocksDB.write(writeOptions, writeBatch);
         }
