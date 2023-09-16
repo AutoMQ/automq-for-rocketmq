@@ -65,7 +65,7 @@ class MessageStoreTest {
         assertFalse(popResult.messageList().isEmpty());
 
         Message message = popResult.messageList().get(0);
-        byte[] bytes = kvService.get(MessageStoreImpl.KV_PARTITION_CHECK_POINT, SerializeUtil.buildCheckPointKey(1, 1, 0, popResult.operationId()));
+        byte[] bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(1, 1, 0, popResult.operationId()));
         assertNotNull(bytes);
 
         CheckPoint checkPoint = CheckPoint.getRootAsCheckPoint(ByteBuffer.wrap(bytes));
@@ -80,7 +80,7 @@ class MessageStoreTest {
         messageStore.pop(1, 1, 2, 0, 1, false, 100).join();
 
         List<CheckPoint> allCheckPointList = new ArrayList<>();
-        kvService.iterate(MessageStoreImpl.KV_PARTITION_CHECK_POINT, (key, value) ->
+        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, (key, value) ->
             allCheckPointList.add(CheckPoint.getRootAsCheckPoint(ByteBuffer.wrap(value))));
 
         assertEquals(2, allCheckPointList.size());
@@ -101,7 +101,7 @@ class MessageStoreTest {
         assertFalse(popResult.messageList().isEmpty());
 
         Message message = popResult.messageList().get(0);
-        byte[] bytes = kvService.get(MessageStoreImpl.KV_PARTITION_CHECK_POINT, SerializeUtil.buildCheckPointKey(1, 1, message.offset(), popResult.operationId()));
+        byte[] bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(1, 1, message.offset(), popResult.operationId()));
         assertNotNull(bytes);
 
         CheckPoint checkPoint = CheckPoint.getRootAsCheckPoint(ByteBuffer.wrap(bytes));
@@ -111,7 +111,7 @@ class MessageStoreTest {
         assertEquals(popResult.deliveryTimestamp() + 100, checkPoint.nextVisibleTimestamp());
         assertEquals(0, checkPoint.reconsumeCount());
 
-        bytes = kvService.get(MessageStoreImpl.KV_PARTITION_ORDER_INDEX, SerializeUtil.buildOrderIndexKey(1, 1, 1, message.offset()));
+        bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_ORDER_INDEX, SerializeUtil.buildOrderIndexKey(1, 1, 1, message.offset()));
         assertNotNull(bytes);
 
         assertEquals(popResult.operationId(), ByteBuffer.wrap(bytes).getLong());
@@ -120,7 +120,7 @@ class MessageStoreTest {
         popResult = messageStore.pop(1, 1, 1, 0, 1, true, 100).join();
 
         message = popResult.messageList().get(0);
-        bytes = kvService.get(MessageStoreImpl.KV_PARTITION_CHECK_POINT, SerializeUtil.buildCheckPointKey(1, 1, message.offset(), popResult.operationId()));
+        bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(1, 1, message.offset(), popResult.operationId()));
         assertNotNull(bytes);
 
         checkPoint = CheckPoint.getRootAsCheckPoint(ByteBuffer.wrap(bytes));
@@ -130,21 +130,21 @@ class MessageStoreTest {
         assertEquals(popResult.deliveryTimestamp() + 100, checkPoint.nextVisibleTimestamp());
         assertEquals(1, checkPoint.reconsumeCount());
 
-        bytes = kvService.get(MessageStoreImpl.KV_PARTITION_ORDER_INDEX, SerializeUtil.buildOrderIndexKey(1, 1, 1, message.offset()));
+        bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_ORDER_INDEX, SerializeUtil.buildOrderIndexKey(1, 1, 1, message.offset()));
         assertNotNull(bytes);
 
         assertEquals(popResult.operationId(), ByteBuffer.wrap(bytes).getLong());
 
         AtomicInteger checkPointCount = new AtomicInteger();
-        kvService.iterate(MessageStoreImpl.KV_PARTITION_CHECK_POINT, (key, value) -> checkPointCount.getAndIncrement());
+        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, (key, value) -> checkPointCount.getAndIncrement());
         assertEquals(1, checkPointCount.get());
 
         AtomicInteger orderIndexCount = new AtomicInteger();
-        kvService.iterate(MessageStoreImpl.KV_PARTITION_ORDER_INDEX, (key, value) -> orderIndexCount.getAndIncrement());
+        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_ORDER_INDEX, (key, value) -> orderIndexCount.getAndIncrement());
         assertEquals(1, orderIndexCount.get());
 
         AtomicInteger timerTagCount = new AtomicInteger();
-        kvService.iterate(MessageStoreImpl.KV_PARTITION_TIMER_TAG, (key, value) -> timerTagCount.getAndIncrement());
+        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_TIMER_TAG, (key, value) -> timerTagCount.getAndIncrement());
         assertEquals(1, timerTagCount.get());
     }
 
@@ -158,15 +158,15 @@ class MessageStoreTest {
         messageStore.ack(SerializeUtil.encodeReceiptHandle(1, 1, message.offset(), popResult.operationId())).join();
 
         AtomicInteger checkPointCount = new AtomicInteger();
-        kvService.iterate(MessageStoreImpl.KV_PARTITION_CHECK_POINT, (key, value) -> checkPointCount.getAndIncrement());
+        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, (key, value) -> checkPointCount.getAndIncrement());
         assertEquals(0, checkPointCount.get());
 
         AtomicInteger orderIndexCount = new AtomicInteger();
-        kvService.iterate(MessageStoreImpl.KV_PARTITION_ORDER_INDEX, (key, value) -> orderIndexCount.getAndIncrement());
+        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_ORDER_INDEX, (key, value) -> orderIndexCount.getAndIncrement());
         assertEquals(0, orderIndexCount.get());
 
         AtomicInteger timerTagCount = new AtomicInteger();
-        kvService.iterate(MessageStoreImpl.KV_PARTITION_TIMER_TAG, (key, value) -> timerTagCount.getAndIncrement());
+        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_TIMER_TAG, (key, value) -> timerTagCount.getAndIncrement());
         assertEquals(0, timerTagCount.get());
     }
 
@@ -178,7 +178,7 @@ class MessageStoreTest {
         assertFalse(popResult.messageList().isEmpty());
 
         byte[] checkPointKey = SerializeUtil.buildCheckPointKey(1, 1, 0, popResult.operationId());
-        byte[] bytes = kvService.get(MessageStoreImpl.KV_PARTITION_CHECK_POINT, checkPointKey);
+        byte[] bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, checkPointKey);
         assertNotNull(bytes);
 
         CheckPoint checkPoint = CheckPoint.getRootAsCheckPoint(ByteBuffer.wrap(bytes));
@@ -192,7 +192,7 @@ class MessageStoreTest {
         String receiptHandle = SerializeUtil.encodeReceiptHandle(1, 1, message.offset(), popResult.operationId());
         messageStore.changeInvisibleDuration(receiptHandle, 100_000_000_000L).join();
 
-        bytes = kvService.get(MessageStoreImpl.KV_PARTITION_CHECK_POINT, checkPointKey);
+        bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, checkPointKey);
         assertNotNull(bytes);
 
         checkPoint = CheckPoint.getRootAsCheckPoint(ByteBuffer.wrap(bytes));
@@ -201,11 +201,11 @@ class MessageStoreTest {
         assertTrue(popEndTimestamp + 100 < checkPoint.nextVisibleTimestamp());
 
         AtomicInteger checkPointCount = new AtomicInteger();
-        kvService.iterate(MessageStoreImpl.KV_PARTITION_CHECK_POINT, (key, value) -> checkPointCount.getAndIncrement());
+        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, (key, value) -> checkPointCount.getAndIncrement());
         assertEquals(1, checkPointCount.get());
 
         AtomicInteger timerTagCount = new AtomicInteger();
-        kvService.iterate(MessageStoreImpl.KV_PARTITION_TIMER_TAG, (key, value) -> timerTagCount.getAndIncrement());
+        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_TIMER_TAG, (key, value) -> timerTagCount.getAndIncrement());
         assertEquals(1, timerTagCount.get());
 
         // Change the invisible duration again.
@@ -214,22 +214,22 @@ class MessageStoreTest {
         messageStore.changeInvisibleDuration(receiptHandle, 0L).join();
 
         checkPointCount.set(0);
-        kvService.iterate(MessageStoreImpl.KV_PARTITION_CHECK_POINT, (key, value) -> checkPointCount.getAndIncrement());
+        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, (key, value) -> checkPointCount.getAndIncrement());
         assertEquals(1, checkPointCount.get());
 
         timerTagCount.set(0);
-        kvService.iterate(MessageStoreImpl.KV_PARTITION_TIMER_TAG, (key, value) -> timerTagCount.getAndIncrement());
+        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_TIMER_TAG, (key, value) -> timerTagCount.getAndIncrement());
         assertEquals(1, timerTagCount.get());
 
         // Ack the message with the same receipt handle.
         messageStore.ack(receiptHandle).join();
 
         checkPointCount.set(0);
-        kvService.iterate(MessageStoreImpl.KV_PARTITION_CHECK_POINT, (key, value) -> checkPointCount.getAndIncrement());
+        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, (key, value) -> checkPointCount.getAndIncrement());
         assertEquals(0, checkPointCount.get());
 
         timerTagCount.set(0);
-        kvService.iterate(MessageStoreImpl.KV_PARTITION_TIMER_TAG, (key, value) -> timerTagCount.getAndIncrement());
+        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_TIMER_TAG, (key, value) -> timerTagCount.getAndIncrement());
         assertEquals(0, timerTagCount.get());
     }
 }

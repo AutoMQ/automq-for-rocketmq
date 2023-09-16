@@ -21,7 +21,7 @@ public interface BatchRequest {
     /**
      * Required, return the type of the batch request.
      */
-    String partition();
+    String namespace();
 
     /**
      * Required, return the key of the kv pair.
