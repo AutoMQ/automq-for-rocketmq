@@ -19,13 +19,16 @@ package com.automq.rocketmq.store.impl;
 
 import com.automq.rocketmq.common.model.Message;
 import com.automq.rocketmq.store.MessageStore;
+import com.automq.rocketmq.store.mock.MockOperationLogService;
 import com.automq.rocketmq.store.model.generated.CheckPoint;
 import com.automq.rocketmq.store.model.message.PopResult;
 import com.automq.rocketmq.store.service.KVService;
-import com.automq.rocketmq.store.service.RocksDBKVService;
+import com.automq.rocketmq.store.service.impl.RocksDBKVService;
+import com.automq.rocketmq.store.util.SerializeUtil;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,7 +49,7 @@ class MessageStoreTest {
     @BeforeEach
     public void setUp() throws RocksDBException {
         kvService = new RocksDBKVService(PATH);
-        messageStore = new MessageStoreImpl(null, kvService);
+        messageStore = new MessageStoreImpl(null, new MockOperationLogService(), kvService);
     }
 
     @AfterEach
@@ -55,14 +58,14 @@ class MessageStoreTest {
     }
 
     @Test
-    void pop() throws RocksDBException {
+    void pop() throws RocksDBException, ExecutionException, InterruptedException {
         long testStartTime = System.nanoTime();
-        PopResult popResult = messageStore.pop(1, 1, 1, 0, 1, false, 100);
+        PopResult popResult = messageStore.pop(1, 1, 1, 0, 1, false, 100).get();
         assertEquals(0, popResult.status());
         assertFalse(popResult.messageList().isEmpty());
 
         Message message = popResult.messageList().get(0);
-        byte[] bytes = kvService.get(MessageStoreImpl.KV_PARTITION_CHECK_POINT, MessageStoreImpl.buildCheckPointKey(1, 1, 0, popResult.operationId()));
+        byte[] bytes = kvService.get(MessageStoreImpl.KV_PARTITION_CHECK_POINT, SerializeUtil.buildCheckPointKey(1, 1, 0, popResult.operationId()));
         assertNotNull(bytes);
 
         CheckPoint checkPoint = CheckPoint.getRootAsCheckPoint(ByteBuffer.wrap(bytes));
@@ -74,7 +77,7 @@ class MessageStoreTest {
         assertEquals(1, checkPoint.queueId());
         assertEquals(message.offset(), checkPoint.messgeOffset());
 
-        messageStore.pop(1, 1, 2, 0, 1, false, 100);
+        messageStore.pop(1, 1, 2, 0, 1, false, 100).join();
 
         List<CheckPoint> allCheckPointList = new ArrayList<>();
         kvService.iterate(MessageStoreImpl.KV_PARTITION_CHECK_POINT, (key, value) ->
@@ -92,13 +95,13 @@ class MessageStoreTest {
     }
 
     @Test
-    void popOrderly() throws RocksDBException {
-        PopResult popResult = messageStore.pop(1, 1, 1, 0, 1, true, 100);
+    void popOrderly() throws RocksDBException, ExecutionException, InterruptedException {
+        PopResult popResult = messageStore.pop(1, 1, 1, 0, 1, true, 100).get();
         assertEquals(0, popResult.status());
         assertFalse(popResult.messageList().isEmpty());
 
         Message message = popResult.messageList().get(0);
-        byte[] bytes = kvService.get(MessageStoreImpl.KV_PARTITION_CHECK_POINT, MessageStoreImpl.buildCheckPointKey(1, 1, message.offset(), popResult.operationId()));
+        byte[] bytes = kvService.get(MessageStoreImpl.KV_PARTITION_CHECK_POINT, SerializeUtil.buildCheckPointKey(1, 1, message.offset(), popResult.operationId()));
         assertNotNull(bytes);
 
         CheckPoint checkPoint = CheckPoint.getRootAsCheckPoint(ByteBuffer.wrap(bytes));
@@ -108,16 +111,16 @@ class MessageStoreTest {
         assertEquals(popResult.deliveryTimestamp() + 100, checkPoint.nextVisibleTimestamp());
         assertEquals(0, checkPoint.reconsumeCount());
 
-        bytes = kvService.get(MessageStoreImpl.KV_PARTITION_ORDER_INDEX, MessageStoreImpl.buildOrderIndexKey(1, 1, 1, message.offset()));
+        bytes = kvService.get(MessageStoreImpl.KV_PARTITION_ORDER_INDEX, SerializeUtil.buildOrderIndexKey(1, 1, 1, message.offset()));
         assertNotNull(bytes);
 
         assertEquals(popResult.operationId(), ByteBuffer.wrap(bytes).getLong());
 
         // Pop the same message again.
-        popResult = messageStore.pop(1, 1, 1, 0, 1, true, 100);
+        popResult = messageStore.pop(1, 1, 1, 0, 1, true, 100).join();
 
         message = popResult.messageList().get(0);
-        bytes = kvService.get(MessageStoreImpl.KV_PARTITION_CHECK_POINT, MessageStoreImpl.buildCheckPointKey(1, 1, message.offset(), popResult.operationId()));
+        bytes = kvService.get(MessageStoreImpl.KV_PARTITION_CHECK_POINT, SerializeUtil.buildCheckPointKey(1, 1, message.offset(), popResult.operationId()));
         assertNotNull(bytes);
 
         checkPoint = CheckPoint.getRootAsCheckPoint(ByteBuffer.wrap(bytes));
@@ -127,7 +130,7 @@ class MessageStoreTest {
         assertEquals(popResult.deliveryTimestamp() + 100, checkPoint.nextVisibleTimestamp());
         assertEquals(1, checkPoint.reconsumeCount());
 
-        bytes = kvService.get(MessageStoreImpl.KV_PARTITION_ORDER_INDEX, MessageStoreImpl.buildOrderIndexKey(1, 1, 1, message.offset()));
+        bytes = kvService.get(MessageStoreImpl.KV_PARTITION_ORDER_INDEX, SerializeUtil.buildOrderIndexKey(1, 1, 1, message.offset()));
         assertNotNull(bytes);
 
         assertEquals(popResult.operationId(), ByteBuffer.wrap(bytes).getLong());
@@ -146,13 +149,13 @@ class MessageStoreTest {
     }
 
     @Test
-    void ack() throws RocksDBException {
-        PopResult popResult = messageStore.pop(1, 1, 1, 0, 1, true, 100);
+    void ack() throws RocksDBException, ExecutionException, InterruptedException {
+        PopResult popResult = messageStore.pop(1, 1, 1, 0, 1, true, 100).get();
         assertEquals(0, popResult.status());
         assertFalse(popResult.messageList().isEmpty());
 
         Message message = popResult.messageList().get(0);
-        messageStore.ack(MessageStoreImpl.encodeReceiptHandle(1, 1, message.offset(), popResult.operationId()));
+        messageStore.ack(SerializeUtil.encodeReceiptHandle(1, 1, message.offset(), popResult.operationId())).join();
 
         AtomicInteger checkPointCount = new AtomicInteger();
         kvService.iterate(MessageStoreImpl.KV_PARTITION_CHECK_POINT, (key, value) -> checkPointCount.getAndIncrement());
@@ -168,13 +171,13 @@ class MessageStoreTest {
     }
 
     @Test
-    void changeInvisibleDuration() throws RocksDBException {
+    void changeInvisibleDuration() throws RocksDBException, ExecutionException, InterruptedException {
         // Pop the message to generate the check point.
-        PopResult popResult = messageStore.pop(1, 1, 1, 0, 1, false, 100);
+        PopResult popResult = messageStore.pop(1, 1, 1, 0, 1, false, 100).get();
         assertEquals(0, popResult.status());
         assertFalse(popResult.messageList().isEmpty());
 
-        byte[] checkPointKey = MessageStoreImpl.buildCheckPointKey(1, 1, 0, popResult.operationId());
+        byte[] checkPointKey = SerializeUtil.buildCheckPointKey(1, 1, 0, popResult.operationId());
         byte[] bytes = kvService.get(MessageStoreImpl.KV_PARTITION_CHECK_POINT, checkPointKey);
         assertNotNull(bytes);
 
@@ -186,8 +189,8 @@ class MessageStoreTest {
 
         // Change the invisible duration.
         Message message = popResult.messageList().get(0);
-        String receiptHandle = MessageStoreImpl.encodeReceiptHandle(1, 1, message.offset(), popResult.operationId());
-        messageStore.changeInvisibleDuration(receiptHandle, 100_000_000_000L);
+        String receiptHandle = SerializeUtil.encodeReceiptHandle(1, 1, message.offset(), popResult.operationId());
+        messageStore.changeInvisibleDuration(receiptHandle, 100_000_000_000L).join();
 
         bytes = kvService.get(MessageStoreImpl.KV_PARTITION_CHECK_POINT, checkPointKey);
         assertNotNull(bytes);
@@ -197,14 +200,35 @@ class MessageStoreTest {
         assertTrue(lastVisibleTime < checkPoint.nextVisibleTimestamp());
         assertTrue(popEndTimestamp + 100 < checkPoint.nextVisibleTimestamp());
 
-        // Ack the message with the same receipt handle.
-        messageStore.ack(receiptHandle);
-
         AtomicInteger checkPointCount = new AtomicInteger();
+        kvService.iterate(MessageStoreImpl.KV_PARTITION_CHECK_POINT, (key, value) -> checkPointCount.getAndIncrement());
+        assertEquals(1, checkPointCount.get());
+
+        AtomicInteger timerTagCount = new AtomicInteger();
+        kvService.iterate(MessageStoreImpl.KV_PARTITION_TIMER_TAG, (key, value) -> timerTagCount.getAndIncrement());
+        assertEquals(1, timerTagCount.get());
+
+        // Change the invisible duration again.
+        message = popResult.messageList().get(0);
+        receiptHandle = SerializeUtil.encodeReceiptHandle(1, 1, message.offset(), popResult.operationId());
+        messageStore.changeInvisibleDuration(receiptHandle, 0L).join();
+
+        checkPointCount.set(0);
+        kvService.iterate(MessageStoreImpl.KV_PARTITION_CHECK_POINT, (key, value) -> checkPointCount.getAndIncrement());
+        assertEquals(1, checkPointCount.get());
+
+        timerTagCount.set(0);
+        kvService.iterate(MessageStoreImpl.KV_PARTITION_TIMER_TAG, (key, value) -> timerTagCount.getAndIncrement());
+        assertEquals(1, timerTagCount.get());
+
+        // Ack the message with the same receipt handle.
+        messageStore.ack(receiptHandle).join();
+
+        checkPointCount.set(0);
         kvService.iterate(MessageStoreImpl.KV_PARTITION_CHECK_POINT, (key, value) -> checkPointCount.getAndIncrement());
         assertEquals(0, checkPointCount.get());
 
-        AtomicInteger timerTagCount = new AtomicInteger();
+        timerTagCount.set(0);
         kvService.iterate(MessageStoreImpl.KV_PARTITION_TIMER_TAG, (key, value) -> timerTagCount.getAndIncrement());
         assertEquals(0, timerTagCount.get());
     }

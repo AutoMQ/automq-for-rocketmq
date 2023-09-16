@@ -20,7 +20,7 @@ package com.automq.rocketmq.store;
 import com.automq.rocketmq.store.model.kv.BatchDeleteRequest;
 import com.automq.rocketmq.store.model.kv.BatchWriteRequest;
 import com.automq.rocketmq.store.service.KVService;
-import com.automq.rocketmq.store.service.RocksDBKVService;
+import com.automq.rocketmq.store.service.impl.RocksDBKVService;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;

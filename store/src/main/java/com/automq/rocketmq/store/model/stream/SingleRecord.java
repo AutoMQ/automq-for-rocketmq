@@ -15,30 +15,21 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.store.model.kv;
+package com.automq.rocketmq.store.model.stream;
 
-public interface BatchRequest {
-    /**
-     * Required, return the type of the batch request.
-     */
-    String partition();
+import com.automq.rocketmq.stream.api.RecordBatch;
+import java.nio.ByteBuffer;
+import java.util.HashMap;
+import java.util.Map;
 
-    /**
-     * Required, return the key of the kv pair.
-     */
-    byte[] key();
-
-
-    /**
-     * Optional, return the value of the kv pair.
-     */
-    default byte[] value() {
-        return new byte[] {};
+public record SingleRecord(long baseTimestamp, ByteBuffer rawPayload) implements RecordBatch {
+    @Override
+    public int count() {
+        return 1;
     }
 
-
-    /**
-     * Required, return the type of the batch request.
-     */
-    BatchRequestType type();
+    @Override
+    public Map<String, String> properties() {
+        return new HashMap<>();
+    }
 }
