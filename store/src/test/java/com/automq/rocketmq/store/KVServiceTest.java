@@ -17,6 +17,8 @@
 
 package com.automq.rocketmq.store;
 
+import com.automq.rocketmq.store.model.kv.BatchDeleteRequest;
+import com.automq.rocketmq.store.model.kv.BatchWriteRequest;
 import com.automq.rocketmq.store.service.KVService;
 import com.automq.rocketmq.store.service.RocksDBKVService;
 import java.io.File;
@@ -163,6 +165,42 @@ public class KVServiceTest {
         assertEquals(3, num.get());
 
         store.destroy();
+    }
+
+    @Test
+    public void testBatch() throws IOException, RocksDBException {
+        String path = new File(PATH + UUID.randomUUID()).getCanonicalPath();
+        cleanUp(path);
+        KVService store = new RocksDBKVService(path);
+        assertNotNull(store);
+
+        assertThrowsExactly(RocksDBException.class, () -> store.batch(null));
+        store.batch(new BatchWriteRequest(PARTITION, "0".getBytes(), "0".getBytes()), new BatchWriteRequest(PARTITION, "1".getBytes(), "1".getBytes()));
+
+        AtomicInteger num = new AtomicInteger();
+        store.iterate(PARTITION, (key, value) -> {
+            String valueStr = new String(value, KVService.CHARSET);
+            String target = String.valueOf(num.getAndIncrement());
+
+            assertEquals(target, valueStr);
+        });
+        assertEquals(2, num.get());
+
+        store.batch(new BatchDeleteRequest(PARTITION, "0".getBytes()), new BatchWriteRequest(PARTITION, "2".getBytes(), "2".getBytes()));
+
+        num.set(1);
+        store.iterate(PARTITION, (key, value) -> {
+            String valueStr = new String(value, KVService.CHARSET);
+            String target = String.valueOf(num.getAndIncrement());
+
+            assertEquals(target, valueStr);
+        });
+        assertEquals(3, num.get());
+
+        store.batch(new BatchDeleteRequest(PARTITION, "1".getBytes()), new BatchDeleteRequest(PARTITION, "2".getBytes()));
+        num.set(0);
+        store.iterate(PARTITION, (key, value) -> num.getAndIncrement());
+        assertEquals(0, num.get());
     }
 }
 

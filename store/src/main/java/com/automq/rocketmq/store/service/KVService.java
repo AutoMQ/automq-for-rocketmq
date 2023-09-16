@@ -17,7 +17,7 @@
 
 package com.automq.rocketmq.store.service;
 
-import com.automq.rocketmq.store.model.kv.BatchWriteRequest;
+import com.automq.rocketmq.store.model.kv.BatchRequest;
 import com.automq.rocketmq.store.model.kv.IteratorCallback;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -75,13 +75,12 @@ public interface KVService {
     void put(final String partition, byte[] key, byte[] value) throws RocksDBException;
 
     /**
-     * Put the kv pair into the backend engine.
-     * The kv pair will be written into the backend engine in batch.
+     * Put or delete the kv pair in batch.
      *
-     * @param writeRequests the batch builder
+     * @param requests the mutation requests
      * @throws RocksDBException if backend engine fails
      */
-    void writeBatch(BatchWriteRequest... writeRequests) throws RocksDBException;
+    void batch(BatchRequest... requests) throws RocksDBException;
 
     /**
      * Delete value with specified key from backend kv engine.

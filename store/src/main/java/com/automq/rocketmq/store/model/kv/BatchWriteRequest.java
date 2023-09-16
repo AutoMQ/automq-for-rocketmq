@@ -17,5 +17,9 @@
 
 package com.automq.rocketmq.store.model.kv;
 
-public record BatchWriteRequest(String partition, byte[] key, byte[] value) {
+public record BatchWriteRequest(String partition, byte[] key, byte[] value) implements BatchRequest {
+    @Override
+    public BatchRequestType type() {
+        return BatchRequestType.WRITE;
+    }
 }
