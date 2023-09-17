@@ -20,27 +20,30 @@ package com.automq.rocketmq.store.util;
 import com.automq.rocketmq.store.model.generated.AckOperation;
 import com.automq.rocketmq.store.model.generated.ChangeInvisibleDurationOperation;
 import com.automq.rocketmq.store.model.generated.CheckPoint;
+import com.automq.rocketmq.store.model.generated.Operation;
+import com.automq.rocketmq.store.model.generated.OperationLogItem;
 import com.automq.rocketmq.store.model.generated.PopOperation;
 import com.automq.rocketmq.store.model.generated.ReceiptHandle;
 import java.nio.ByteBuffer;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-class SerializeUtilTest {
-    private static final long TOPIC_ID = 0L;
-    private static final int QUEUE_ID = 1;
-    private static final long OFFSET = 2L;
-    private static final long OPERATION_ID = 3L;
-    private static final long CONSUME_GROUP_ID = 4L;
-    private static final boolean IS_ORDER = true;
-    private static final long DELIVERY_TIMESTAMP = 5L;
-    private static final long NEXT_VISIBLE_TIMESTAMP = 6L;
-    private static final int RECONSUME_COUNT = 7;
-    private static final int BATCH_SIZE = 8;
-    private static final long INVISIBLE_DURATION = 9L;
-    private static final long OPERATION_TIMESTAMP = 10L;
-    private static final String RECEIPT_HANDLE = "EAAAAAwAGAAAAAQACAAQAAwAAAABAAAAAgAAAAAAAAADAAAAAAAAAA==";
+public class SerializeUtilTest {
+    public static final long TOPIC_ID = 0L;
+    public static final int QUEUE_ID = 1;
+    public static final long OFFSET = 2L;
+    public static final long OPERATION_ID = 3L;
+    public static final long CONSUMER_GROUP_ID = 4L;
+    public static final boolean IS_ORDER = true;
+    public static final long DELIVERY_TIMESTAMP = 5L;
+    public static final long NEXT_VISIBLE_TIMESTAMP = 6L;
+    public static final int RECONSUME_COUNT = 7;
+    public static final int BATCH_SIZE = 8;
+    public static final long INVISIBLE_DURATION = 9L;
+    public static final long OPERATION_TIMESTAMP = 10L;
+    public static final String RECEIPT_HANDLE = "EAAAAAwAGAAAAAQACAAQAAwAAAABAAAAAgAAAAAAAAADAAAAAAAAAA==";
 
     @Test
     void buildCheckPointKey() {
@@ -50,12 +53,12 @@ class SerializeUtilTest {
 
     @Test
     void buildCheckPointValue() {
-        byte[] value = SerializeUtil.buildCheckPointValue(TOPIC_ID, QUEUE_ID, OFFSET, CONSUME_GROUP_ID, OPERATION_ID, IS_ORDER, DELIVERY_TIMESTAMP, NEXT_VISIBLE_TIMESTAMP, RECONSUME_COUNT);
+        byte[] value = SerializeUtil.buildCheckPointValue(TOPIC_ID, QUEUE_ID, OFFSET, CONSUMER_GROUP_ID, OPERATION_ID, IS_ORDER, DELIVERY_TIMESTAMP, NEXT_VISIBLE_TIMESTAMP, RECONSUME_COUNT);
         CheckPoint checkPoint = CheckPoint.getRootAsCheckPoint(ByteBuffer.wrap(value));
         assertEquals(TOPIC_ID, checkPoint.topicId());
         assertEquals(QUEUE_ID, checkPoint.queueId());
         assertEquals(OFFSET, checkPoint.messageOffset());
-        assertEquals(CONSUME_GROUP_ID, checkPoint.consumerGroupId());
+        assertEquals(CONSUMER_GROUP_ID, checkPoint.consumerGroupId());
         assertEquals(OPERATION_ID, checkPoint.operationId());
         assertEquals(IS_ORDER, checkPoint.isOrder());
         assertEquals(DELIVERY_TIMESTAMP, checkPoint.deliveryTimestamp());
@@ -71,7 +74,7 @@ class SerializeUtilTest {
 
     @Test
     void buildOrderIndexKey() {
-        byte[] key = SerializeUtil.buildOrderIndexKey(CONSUME_GROUP_ID, TOPIC_ID, QUEUE_ID, OFFSET);
+        byte[] key = SerializeUtil.buildOrderIndexKey(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, OFFSET);
         assertEquals(28, key.length);
     }
 
@@ -98,9 +101,13 @@ class SerializeUtilTest {
 
     @Test
     void encodePopOperation() {
-        byte[] bytes = SerializeUtil.encodePopOperation(CONSUME_GROUP_ID, TOPIC_ID, QUEUE_ID, OFFSET, BATCH_SIZE, IS_ORDER, INVISIBLE_DURATION, OPERATION_TIMESTAMP);
-        PopOperation operation = PopOperation.getRootAsPopOperation(ByteBuffer.wrap(bytes));
-        assertEquals(CONSUME_GROUP_ID, operation.consumerGroupId());
+        byte[] bytes = SerializeUtil.encodePopOperation(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, OFFSET, BATCH_SIZE, IS_ORDER, INVISIBLE_DURATION, OPERATION_TIMESTAMP);
+        OperationLogItem operationLogItem = OperationLogItem.getRootAsOperationLogItem(ByteBuffer.wrap(bytes));
+        assertEquals(Operation.PopOperation, operationLogItem.operationType());
+
+        PopOperation operation = (PopOperation) operationLogItem.operation(new PopOperation());
+        assertNotNull(operation);
+        assertEquals(CONSUMER_GROUP_ID, operation.consumerGroupId());
         assertEquals(TOPIC_ID, operation.topicId());
         assertEquals(QUEUE_ID, operation.queueId());
         assertEquals(OFFSET, operation.offset());
@@ -113,7 +120,11 @@ class SerializeUtilTest {
     @Test
     void encodeAckOperation() {
         byte[] bytes = SerializeUtil.encodeAckOperation(SerializeUtil.decodeReceiptHandle(RECEIPT_HANDLE), OPERATION_TIMESTAMP);
-        AckOperation operation = AckOperation.getRootAsAckOperation(ByteBuffer.wrap(bytes));
+        OperationLogItem operationLogItem = OperationLogItem.getRootAsOperationLogItem(ByteBuffer.wrap(bytes));
+        assertEquals(Operation.AckOperation, operationLogItem.operationType());
+
+        AckOperation operation = (AckOperation) operationLogItem.operation(new AckOperation());
+        assertNotNull(operation);
         assertEquals(TOPIC_ID, operation.receiptHandle().topicId());
         assertEquals(QUEUE_ID, operation.receiptHandle().queueId());
         assertEquals(OFFSET, operation.receiptHandle().messageOffset());
@@ -124,7 +135,11 @@ class SerializeUtilTest {
     @Test
     void encodeChangeInvisibleDurationOperation() {
         byte[] bytes = SerializeUtil.encodeChangeInvisibleDurationOperation(SerializeUtil.decodeReceiptHandle(RECEIPT_HANDLE), INVISIBLE_DURATION, OPERATION_TIMESTAMP);
-        ChangeInvisibleDurationOperation operation = ChangeInvisibleDurationOperation.getRootAsChangeInvisibleDurationOperation(ByteBuffer.wrap(bytes));
+        OperationLogItem operationLogItem = OperationLogItem.getRootAsOperationLogItem(ByteBuffer.wrap(bytes));
+        assertEquals(Operation.ChangeInvisibleDurationOperation, operationLogItem.operationType());
+
+        ChangeInvisibleDurationOperation operation = (ChangeInvisibleDurationOperation) operationLogItem.operation(new ChangeInvisibleDurationOperation());
+        assertNotNull(operation);
         assertEquals(TOPIC_ID, operation.receiptHandle().topicId());
         assertEquals(QUEUE_ID, operation.receiptHandle().queueId());
         assertEquals(OFFSET, operation.receiptHandle().messageOffset());

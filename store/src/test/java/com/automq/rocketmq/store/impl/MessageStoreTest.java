@@ -17,18 +17,22 @@
 
 package com.automq.rocketmq.store.impl;
 
-import com.automq.rocketmq.common.model.Message;
+import com.automq.rocketmq.common.model.generated.Message;
+import com.automq.rocketmq.metadata.StoreMetadataService;
 import com.automq.rocketmq.store.MessageStore;
+import com.automq.rocketmq.store.StreamStore;
 import com.automq.rocketmq.store.mock.MockOperationLogService;
+import com.automq.rocketmq.store.mock.MockStoreMetadataService;
 import com.automq.rocketmq.store.model.generated.CheckPoint;
 import com.automq.rocketmq.store.model.message.PopResult;
+import com.automq.rocketmq.store.model.stream.SingleRecord;
 import com.automq.rocketmq.store.service.KVService;
 import com.automq.rocketmq.store.service.impl.RocksDBKVService;
 import com.automq.rocketmq.store.util.SerializeUtil;
+import com.google.flatbuffers.FlatBufferBuilder;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,12 +48,16 @@ class MessageStoreTest {
     private static final String PATH = "/tmp/test_message_store/";
 
     private static KVService kvService;
+    private static StoreMetadataService metadataService;
+    private static StreamStore streamStore;
     private static MessageStore messageStore;
 
     @BeforeEach
     public void setUp() throws RocksDBException {
         kvService = new RocksDBKVService(PATH);
-        messageStore = new MessageStoreImpl(null, new MockOperationLogService(), kvService);
+        metadataService = new MockStoreMetadataService();
+        streamStore = new StreamStoreImpl();
+        messageStore = new MessageStoreImpl(streamStore, new MockOperationLogService(), metadataService, kvService);
     }
 
     @AfterEach
@@ -57,10 +65,31 @@ class MessageStoreTest {
         kvService.destroy();
     }
 
+    private ByteBuffer buildMessage() {
+        FlatBufferBuilder builder = new FlatBufferBuilder();
+        int root = Message.createMessage(builder, 1, 1, 0);
+        builder.finish(root);
+        return builder.dataBuffer();
+    }
+
+    private ByteBuffer buildMessage(long topicId, int queueId, long offset) {
+        FlatBufferBuilder builder = new FlatBufferBuilder();
+        int root = Message.createMessage(builder, topicId, queueId, offset);
+        builder.finish(root);
+        return builder.dataBuffer();
+    }
+
     @Test
-    void pop() throws RocksDBException, ExecutionException, InterruptedException {
+    void pop() throws RocksDBException {
         long testStartTime = System.nanoTime();
-        PopResult popResult = messageStore.pop(1, 1, 1, 0, 1, false, 100).get();
+
+        // Append mock message.
+        long streamId = metadataService.getStreamId(1, 1);
+        streamStore.append(streamId, new SingleRecord(System.nanoTime(), buildMessage(1, 1, 0))).join();
+        streamId = metadataService.getStreamId(1, 2);
+        streamStore.append(streamId, new SingleRecord(System.nanoTime(), buildMessage(1, 2, 0))).join();
+
+        PopResult popResult = messageStore.pop(1, 1, 1, 0, 1, false, 100).join();
         assertEquals(0, popResult.status());
         assertFalse(popResult.messageList().isEmpty());
 
@@ -95,8 +124,12 @@ class MessageStoreTest {
     }
 
     @Test
-    void popOrderly() throws RocksDBException, ExecutionException, InterruptedException {
-        PopResult popResult = messageStore.pop(1, 1, 1, 0, 1, true, 100).get();
+    void popOrderly() throws RocksDBException {
+        // Append mock message.
+        long streamId = metadataService.getStreamId(1, 1);
+        streamStore.append(streamId, new SingleRecord(System.nanoTime(), buildMessage())).join();
+
+        PopResult popResult = messageStore.pop(1, 1, 1, 0, 1, true, 100).join();
         assertEquals(0, popResult.status());
         assertFalse(popResult.messageList().isEmpty());
 
@@ -149,8 +182,12 @@ class MessageStoreTest {
     }
 
     @Test
-    void ack() throws RocksDBException, ExecutionException, InterruptedException {
-        PopResult popResult = messageStore.pop(1, 1, 1, 0, 1, true, 100).get();
+    void ack() throws RocksDBException {
+        // Append mock message.
+        long streamId = metadataService.getStreamId(1, 1);
+        streamStore.append(streamId, new SingleRecord(System.nanoTime(), buildMessage())).join();
+
+        PopResult popResult = messageStore.pop(1, 1, 1, 0, 1, true, 100).join();
         assertEquals(0, popResult.status());
         assertFalse(popResult.messageList().isEmpty());
 
@@ -171,9 +208,13 @@ class MessageStoreTest {
     }
 
     @Test
-    void changeInvisibleDuration() throws RocksDBException, ExecutionException, InterruptedException {
+    void changeInvisibleDuration() throws RocksDBException {
+        // Append mock message.
+        long streamId = metadataService.getStreamId(1, 1);
+        streamStore.append(streamId, new SingleRecord(System.nanoTime(), buildMessage())).join();
+
         // Pop the message to generate the check point.
-        PopResult popResult = messageStore.pop(1, 1, 1, 0, 1, false, 100).get();
+        PopResult popResult = messageStore.pop(1, 1, 1, 0, 1, false, 100).join();
         assertEquals(0, popResult.status());
         assertFalse(popResult.messageList().isEmpty());
 

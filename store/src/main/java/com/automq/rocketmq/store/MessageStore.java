@@ -26,7 +26,7 @@ public interface MessageStore {
     /**
      * Pop message from specified topic and queue.
      *
-     * @param consumeGroupId    consumer group id that launches this query
+     * @param consumerGroupId   consumer group id that launches this query
      * @param topicId           topic id to pop message from
      * @param queueId           queue id to pop message from
      * @param offset            offset to start from
@@ -35,8 +35,8 @@ public interface MessageStore {
      * @param invisibleDuration the duration for the next time this batch of messages will be visible, in nanoseconds
      * @return pop result, see {@link PopResult}
      */
-    CompletableFuture<PopResult> pop(long consumeGroupId, long topicId, int queueId, long offset, int batchSize, boolean isOrder,
-        long invisibleDuration);
+    CompletableFuture<PopResult> pop(long consumerGroupId, long topicId, int queueId, long offset, int batchSize,
+        boolean isOrder, long invisibleDuration);
 
     /**
      * Ack message.
@@ -53,7 +53,8 @@ public interface MessageStore {
      * @param invisibleDuration the duration for the next time this batch of messages will be visible, in nanoseconds
      * @return change invisible duration result, see {@link ChangeInvisibleDurationResult}
      */
-    CompletableFuture<ChangeInvisibleDurationResult> changeInvisibleDuration(String receiptHandle, long invisibleDuration);
+    CompletableFuture<ChangeInvisibleDurationResult> changeInvisibleDuration(String receiptHandle,
+        long invisibleDuration);
 
     int getInflightStatsByQueue(long topicId, int queueId);
 

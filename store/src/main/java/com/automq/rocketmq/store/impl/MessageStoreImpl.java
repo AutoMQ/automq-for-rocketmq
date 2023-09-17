@@ -17,7 +17,8 @@
 
 package com.automq.rocketmq.store.impl;
 
-import com.automq.rocketmq.common.model.Message;
+import com.automq.rocketmq.common.model.generated.Message;
+import com.automq.rocketmq.metadata.StoreMetadataService;
 import com.automq.rocketmq.store.MessageStore;
 import com.automq.rocketmq.store.StreamStore;
 import com.automq.rocketmq.store.model.generated.CheckPoint;
@@ -53,27 +54,34 @@ public class MessageStoreImpl implements MessageStore {
     private final StreamStore streamStore;
 
     private final OperationLogService operationLogService;
+    private final StoreMetadataService metadataService;
     private final KVService kvService;
 
-    public MessageStoreImpl(StreamStore streamStore, OperationLogService operationLogService, KVService kvService) {
+    public MessageStoreImpl(StreamStore streamStore, OperationLogService operationLogService,
+        StoreMetadataService metadataService, KVService kvService) {
         this.streamStore = streamStore;
         this.operationLogService = operationLogService;
+        this.metadataService = metadataService;
         this.kvService = kvService;
     }
 
     @Override
-    public CompletableFuture<PopResult> pop(long consumeGroupId, long topicId, int queueId, long offset, int batchSize,
+    public CompletableFuture<PopResult> pop(long consumerGroupId, long topicId, int queueId, long offset, int batchSize,
         boolean isOrder, long invisibleDuration) {
+        // Write pop operation to operation log.
         // Operation id should be monotonically increasing for each queue
         long operationTimestamp = System.nanoTime();
-        CompletableFuture<Long> logOperationFuture = operationLogService.logPopOperation(consumeGroupId, topicId, queueId, offset, batchSize, isOrder, invisibleDuration, operationTimestamp);
-        CompletableFuture<List<Message>> fetchMessageFuture = new CompletableFuture<>();
+        CompletableFuture<Long> logOperationFuture = operationLogService.logPopOperation(consumerGroupId, topicId, queueId, offset, batchSize, isOrder, invisibleDuration, operationTimestamp);
 
-        // TODO: fetch message and retry message from stream store
-        List<Message> mockMessageList = new ArrayList<>();
-        // add mock message
-        mockMessageList.add(new Message(0));
-        fetchMessageFuture.complete(mockMessageList);
+        long streamId = metadataService.getStreamId(topicId, queueId);
+        CompletableFuture<List<Message>> fetchMessageFuture = streamStore.fetch(streamId, offset, batchSize)
+            .thenApply(fetchResult -> {
+                // TODO: Assume message count is always 1 in each batch for now.
+                return fetchResult.recordBatchList()
+                    .stream()
+                    .map(batch -> Message.getRootAsMessage(batch.rawPayload()))
+                    .toList();
+            });
 
         return logOperationFuture.thenCombine(fetchMessageFuture, (operationId, messageList) -> {
             long nextVisibleTimestamp = operationTimestamp + invisibleDuration;
@@ -83,7 +91,7 @@ public class MessageStoreImpl implements MessageStore {
                 for (int i = 0; i < batchSize; i++) {
                     try {
                         // TODO: Undefined behavior if last operation is not orderly.
-                        byte[] orderIndexKey = buildOrderIndexKey(consumeGroupId, topicId, queueId, offset + i);
+                        byte[] orderIndexKey = buildOrderIndexKey(consumerGroupId, topicId, queueId, offset + i);
                         byte[] bytes = kvService.get(KV_NAMESPACE_ORDER_INDEX, orderIndexKey);
                         // If order index not found, this message has not been consumed.
                         if (bytes == null) {
@@ -105,7 +113,7 @@ public class MessageStoreImpl implements MessageStore {
             }
 
             // Insert or renew check point and timer tag into KVService.
-            for (Message message : mockMessageList) {
+            for (Message message : messageList) {
                 try {
                     // If pop orderly, the message already consumed will not trigger writing new check point.
                     // But reconsume count should be increased.
@@ -121,13 +129,13 @@ public class MessageStoreImpl implements MessageStore {
                         // Write new check point, timer tag, and order index.
                         BatchWriteRequest writeCheckPointRequest = new BatchWriteRequest(KV_NAMESPACE_CHECK_POINT,
                             buildCheckPointKey(topicId, queueId, message.offset(), operationId),
-                            buildCheckPointValue(topicId, queueId, message.offset(), consumeGroupId, operationId, true, operationTimestamp, nextVisibleTimestamp, lastCheckPoint.reconsumeCount() + 1));
+                            buildCheckPointValue(topicId, queueId, message.offset(), consumerGroupId, operationId, true, operationTimestamp, nextVisibleTimestamp, lastCheckPoint.reconsumeCount() + 1));
 
                         BatchWriteRequest writeTimerTagRequest = new BatchWriteRequest(KV_NAMESPACE_TIMER_TAG,
                             buildTimerTagKey(nextVisibleTimestamp, topicId, queueId, operationId), new byte[0]);
 
                         BatchWriteRequest writeOrderIndexRequest = new BatchWriteRequest(KV_NAMESPACE_ORDER_INDEX,
-                            buildOrderIndexKey(consumeGroupId, topicId, queueId, message.offset()), buildOrderIndexValue(operationId));
+                            buildOrderIndexKey(consumerGroupId, topicId, queueId, message.offset()), buildOrderIndexValue(operationId));
                         kvService.batch(deleteLastCheckPointRequest, deleteLastTimerTagRequest, writeCheckPointRequest, writeTimerTagRequest, writeOrderIndexRequest);
                         continue;
                     }
@@ -136,7 +144,7 @@ public class MessageStoreImpl implements MessageStore {
                     List<BatchRequest> requestList = new ArrayList<>();
                     BatchWriteRequest writeCheckPointRequest = new BatchWriteRequest(KV_NAMESPACE_CHECK_POINT,
                         buildCheckPointKey(topicId, queueId, message.offset(), operationId),
-                        buildCheckPointValue(topicId, queueId, message.offset(), consumeGroupId, operationId, isOrder, operationTimestamp, nextVisibleTimestamp, 0));
+                        buildCheckPointValue(topicId, queueId, message.offset(), consumerGroupId, operationId, isOrder, operationTimestamp, nextVisibleTimestamp, 0));
                     requestList.add(writeCheckPointRequest);
 
                     BatchWriteRequest writeTimerTagRequest = new BatchWriteRequest(KV_NAMESPACE_TIMER_TAG,
@@ -146,7 +154,7 @@ public class MessageStoreImpl implements MessageStore {
                     // If this message is orderly, write order index to KV service.
                     if (isOrder) {
                         BatchWriteRequest writeOrderIndexRequest = new BatchWriteRequest(KV_NAMESPACE_ORDER_INDEX,
-                            buildOrderIndexKey(consumeGroupId, topicId, queueId, message.offset()), buildOrderIndexValue(operationId));
+                            buildOrderIndexKey(consumerGroupId, topicId, queueId, message.offset()), buildOrderIndexValue(operationId));
                         requestList.add(writeOrderIndexRequest);
                     }
 
@@ -157,16 +165,14 @@ public class MessageStoreImpl implements MessageStore {
                 }
             }
 
-            // TODO:  If not pop message orderly, commit consumer offset.
-            if (!isOrder) {
-            }
-
-            return new PopResult(0, operationId, operationTimestamp, mockMessageList);
+            return new PopResult(0, operationId, operationTimestamp, messageList);
         });
     }
 
     @Override
     public CompletableFuture<AckResult> ack(String receiptHandle) {
+        // Write ack operation to operation log.
+        // Operation id should be monotonically increasing for each queue
         ReceiptHandle handle = decodeReceiptHandle(receiptHandle);
         return operationLogService.logAckOperation(handle, System.nanoTime())
             .thenApply(operationId -> {
@@ -191,7 +197,6 @@ public class MessageStoreImpl implements MessageStore {
                         buildTimerTagKey(checkPoint.nextVisibleTimestamp(), handle.topicId(), handle.queueId(), checkPoint.operationId()));
                     requestList.add(deleteTimerTagRequest);
 
-                    // TODO: Check and commit consumer offset if pop message orderly
                     if (checkPoint.isOrder()) {
                         BatchDeleteRequest deleteOrderIndexRequest = new BatchDeleteRequest(KV_NAMESPACE_ORDER_INDEX,
                             buildOrderIndexKey(checkPoint.consumerGroupId(), handle.topicId(), handle.queueId(), checkPoint.messageOffset()));
@@ -211,6 +216,8 @@ public class MessageStoreImpl implements MessageStore {
     @Override
     public CompletableFuture<ChangeInvisibleDurationResult> changeInvisibleDuration(String receiptHandle,
         long invisibleDuration) {
+        // Write change invisible duration operation to operation log.
+        // Operation id should be monotonically increasing for each queue
         long operationTimestamp = System.nanoTime();
         ReceiptHandle handle = decodeReceiptHandle(receiptHandle);
 
