@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.store.service.impl;
 
+import com.automq.rocketmq.metadata.StoreMetadataService;
 import com.automq.rocketmq.store.StreamStore;
 import com.automq.rocketmq.store.model.generated.ReceiptHandle;
 import com.automq.rocketmq.store.model.stream.SingleRecord;
@@ -29,24 +30,27 @@ import java.util.concurrent.CompletableFuture;
 public class StreamOperationLogService implements OperationLogService {
     private final StreamStore streamStore;
 
-    public StreamOperationLogService(StreamStore streamStore) {
+    private final StoreMetadataService metadataService;
+
+    public StreamOperationLogService(StreamStore streamStore, StoreMetadataService metadataService) {
         this.streamStore = streamStore;
+        this.metadataService = metadataService;
     }
 
     @Override
-    public CompletableFuture<Long> logPopOperation(long consumeGroupId, long topicId, int queueId, long offset,
+    public CompletableFuture<Long> logPopOperation(long consumerGroupId, long topicId, int queueId, long offset,
         int batchSize, boolean isOrder, long invisibleDuration, long operationTimestamp) {
-        // TODO: get the stream id from metadata server.
-        CompletableFuture<AppendResult> append = streamStore.append(0, new SingleRecord(operationTimestamp,
-            ByteBuffer.wrap(SerializeUtil.encodePopOperation(consumeGroupId, topicId, queueId, offset, batchSize, isOrder, invisibleDuration, operationTimestamp))));
+        long streamId = metadataService.getOperationLogStreamId(topicId, queueId);
+        CompletableFuture<AppendResult> append = streamStore.append(streamId, new SingleRecord(operationTimestamp,
+            ByteBuffer.wrap(SerializeUtil.encodePopOperation(consumerGroupId, topicId, queueId, offset, batchSize, isOrder, invisibleDuration, operationTimestamp))));
         return append.thenApply(AppendResult::baseOffset);
     }
 
     @Override
     public CompletableFuture<Long> logAckOperation(ReceiptHandle receiptHandle,
         long operationTimestamp) {
-        // TODO: get the stream id from metadata server.
-        CompletableFuture<AppendResult> append = streamStore.append(0, new SingleRecord(operationTimestamp,
+        long streamId = metadataService.getOperationLogStreamId(receiptHandle.topicId(), receiptHandle.queueId());
+        CompletableFuture<AppendResult> append = streamStore.append(streamId, new SingleRecord(operationTimestamp,
             ByteBuffer.wrap(SerializeUtil.encodeAckOperation(receiptHandle, operationTimestamp))));
         return append.thenApply(AppendResult::baseOffset);
     }
@@ -54,8 +58,8 @@ public class StreamOperationLogService implements OperationLogService {
     @Override
     public CompletableFuture<Long> logChangeInvisibleDurationOperation(ReceiptHandle receiptHandle,
         long invisibleDuration, long operationTimestamp) {
-        // TODO: get the stream id from metadata server.
-        CompletableFuture<AppendResult> append = streamStore.append(0, new SingleRecord(operationTimestamp,
+        long streamId = metadataService.getOperationLogStreamId(receiptHandle.topicId(), receiptHandle.queueId());
+        CompletableFuture<AppendResult> append = streamStore.append(streamId, new SingleRecord(operationTimestamp,
             ByteBuffer.wrap(SerializeUtil.encodeChangeInvisibleDurationOperation(receiptHandle, invisibleDuration, operationTimestamp))));
         return append.thenApply(AppendResult::baseOffset);
     }

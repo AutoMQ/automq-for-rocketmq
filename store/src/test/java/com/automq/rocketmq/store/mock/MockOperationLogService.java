@@ -26,7 +26,7 @@ public class MockOperationLogService implements OperationLogService {
     AtomicLong operationCount = new AtomicLong(0);
 
     @Override
-    public CompletableFuture<Long> logPopOperation(long consumeGroupId, long topicId, int queueId, long offset,
+    public CompletableFuture<Long> logPopOperation(long consumerGroupId, long topicId, int queueId, long offset,
         int batchSize, boolean isOrder, long invisibleDuration, long operationTimestamp) {
         return CompletableFuture.completedFuture(operationCount.incrementAndGet());
     }

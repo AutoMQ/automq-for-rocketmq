@@ -19,6 +19,12 @@ table ReceiptHandle {
   operation_id:long;
 }
 
+union Operation { PopOperation, AckOperation, ChangeInvisibleDurationOperation }
+
+table OperationLogItem {
+  operation:Operation;
+}
+
 table PopOperation {
   consumer_group_id:long;
   topic_id:long;
