@@ -17,7 +17,7 @@
 
 package com.automq.rocketmq.metadata;
 
-public interface MetadataService {
+public interface StoreMetadataService {
     long getStreamId(long topicId, long queueId);
 
     long getOperationLogStreamId(long topicId, long queueId);

@@ -28,17 +28,20 @@
 
     <artifactId>rocketmq-store</artifactId>
 
-    <properties>
-        <fbs.sources>${basedir}/src/main/fbs</fbs.sources>
-        <fbs.generated.sources>${project.build.directory}/generated-sources/java</fbs.generated.sources>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    </properties>
-
     <dependencies>
         <dependency>
             <groupId>${groupId}</groupId>
             <artifactId>rocketmq-common</artifactId>
             <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>${groupId}</groupId>
+            <artifactId>rocketmq-metadata</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.automq.rocketmq</groupId>
+            <artifactId>rocketmq-s3stream</artifactId>
         </dependency>
         <dependency>
             <groupId>org.rocksdb</groupId>
@@ -48,15 +51,9 @@
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
         </dependency>
-
         <dependency>
             <groupId>com.google.flatbuffers</groupId>
             <artifactId>flatbuffers-java</artifactId>
-            <version>23.5.26</version>
-        </dependency>
-        <dependency>
-            <groupId>com.automq.rocketmq</groupId>
-            <artifactId>rocketmq-s3stream</artifactId>
         </dependency>
     </dependencies>
 

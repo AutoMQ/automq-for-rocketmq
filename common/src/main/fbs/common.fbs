@@ -1,0 +1,7 @@
+namespace com.automq.rocketmq.common.model.generated;
+
+table Message {
+  topic_id:long;
+  queue_id:int;
+  offset:long;
+}

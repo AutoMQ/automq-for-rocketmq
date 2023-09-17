@@ -48,6 +48,11 @@
         <logback.version>1.4.11</logback.version>
         <etcd.version>0.7.6</etcd.version>
 
+        <!-- Flat buffers related -->
+        <flatbuffers.version>23.5.26</flatbuffers.version>
+        <fbs.sources>${basedir}/src/main/fbs</fbs.sources>
+        <fbs.generated.sources>${project.build.directory}/generated-sources/java</fbs.generated.sources>
+
         <!-- Testing related -->
         <mockito-core.version>5.5.0</mockito-core.version>
         <junit-jupiter.version>5.10.0</junit-jupiter.version>
@@ -101,6 +106,12 @@
                         <artifactId>error_prone_annotations</artifactId>
                     </exclusion>
                 </exclusions>
+            </dependency>
+
+            <dependency>
+                <groupId>com.google.flatbuffers</groupId>
+                <artifactId>flatbuffers-java</artifactId>
+                <version>${flatbuffers.version}</version>
             </dependency>
 
             <!-- Below artifact are not directly used by the project, but are required by the dependencies of the project. -->
