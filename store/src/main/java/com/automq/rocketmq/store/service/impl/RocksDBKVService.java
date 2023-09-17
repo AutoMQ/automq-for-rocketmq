@@ -20,11 +20,11 @@ package com.automq.rocketmq.store.service.impl;
 import com.automq.rocketmq.store.model.kv.BatchRequest;
 import com.automq.rocketmq.store.model.kv.IteratorCallback;
 import com.automq.rocketmq.store.service.KVService;
-import com.google.common.base.Strings;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.rocksdb.ColumnFamilyDescriptor;
@@ -74,7 +74,7 @@ public class RocksDBKVService implements KVService {
         }
         rocksDB = RocksDB.open(dbOptions, this.path, columnFamilyDescriptors, columnFamilyHandles);
         for (int i = 0; i < columnFamilyNames.size(); i++) {
-            columnFamilyNameHandleMap.put(new String(columnFamilyNames.get(i), CHARSET),
+            columnFamilyNameHandleMap.put(new String(columnFamilyNames.get(i)),
                 columnFamilyHandles.get(i));
         }
     }
@@ -128,8 +128,8 @@ public class RocksDBKVService implements KVService {
     }
 
     @Override
-    public void iterate(final String namespace, String prefix, final String start,
-        final String end, IteratorCallback callback) throws RocksDBException {
+    public void iterate(final String namespace, final byte[] prefix, final byte[] start,
+        final byte[] end, IteratorCallback callback) throws RocksDBException {
         if (stopped) {
             throw new RocksDBException("KV service is stopped.");
         }
@@ -138,11 +138,11 @@ public class RocksDBKVService implements KVService {
             throw new RocksDBException("The callback can not be null.");
         }
 
-        if (Strings.isNullOrEmpty(prefix) && Strings.isNullOrEmpty(start)) {
+        if (Objects.isNull(prefix) && Objects.isNull(start)) {
             throw new RocksDBException("To determine lower bound, prefix and start may not be null at the same time.");
         }
 
-        if (Strings.isNullOrEmpty(prefix) && Strings.isNullOrEmpty(end)) {
+        if (Objects.isNull(prefix) && Objects.isNull(end)) {
             throw new RocksDBException("To determine upper bound, prefix and end may not be null at the same time.");
         }
 
@@ -160,34 +160,32 @@ public class RocksDBKVService implements KVService {
             readOptions = new ReadOptions();
             readOptions.setTotalOrderSeek(true);
             readOptions.setReadaheadSize(4L * 1024 * 1024);
-            boolean hasStart = !Strings.isNullOrEmpty(start);
-            boolean hasPrefix = !Strings.isNullOrEmpty(prefix);
+            boolean hasStart = !Objects.isNull(start);
+            boolean hasPrefix = !Objects.isNull(prefix);
 
             if (hasStart) {
                 startSlice = new Slice(start);
                 readOptions.setIterateLowerBound(startSlice);
-            }
-
-            if (!Strings.isNullOrEmpty(end)) {
-                endSlice = new Slice(end);
-                readOptions.setIterateUpperBound(endSlice);
-            }
-
-            if (!hasStart && hasPrefix) {
+            } else {
                 prefixSlice = new Slice(prefix);
                 readOptions.setIterateLowerBound(prefixSlice);
             }
 
+            if (!Objects.isNull(end)) {
+                endSlice = new Slice(end);
+                readOptions.setIterateUpperBound(endSlice);
+            }
+
             iterator = rocksDB.newIterator(columnFamilyHandle, readOptions);
             if (hasStart) {
-                iterator.seek(start.getBytes(CHARSET));
+                iterator.seek(start);
             } else if (hasPrefix) {
-                iterator.seek(prefix.getBytes(CHARSET));
+                iterator.seek(prefix);
             }
 
             while (iterator.isValid()) {
                 byte[] key = iterator.key();
-                if (hasPrefix && !checkPrefix(key, prefix.getBytes(CHARSET))) {
+                if (hasPrefix && !checkPrefix(key, prefix)) {
                     break;
                 }
                 callback.onRead(iterator.key(), iterator.value());
@@ -217,7 +215,7 @@ public class RocksDBKVService implements KVService {
             synchronized (this) {
                 if (!columnFamilyNameHandleMap.containsKey(columnFamily)) {
                     ColumnFamilyDescriptor columnFamilyDescriptor =
-                        new ColumnFamilyDescriptor(columnFamily.getBytes(CHARSET), columnFamilyOptions);
+                        new ColumnFamilyDescriptor(columnFamily.getBytes(), columnFamilyOptions);
                     ColumnFamilyHandle columnFamilyHandle = rocksDB.createColumnFamily(columnFamilyDescriptor);
                     columnFamilyNameHandleMap.putIfAbsent(columnFamily, columnFamilyHandle);
                 }

@@ -22,33 +22,54 @@ import java.nio.ByteBuffer;
 
 public class MockStoreMetadataService implements StoreMetadataService {
     @Override
-    public long getStreamId(long topicId, long queueId) {
+    public long getStreamId(long topicId, int queueId) {
         ByteBuffer buffer = ByteBuffer.allocate(8);
-        buffer.putInt(0, (int) topicId);
-        buffer.putInt(4, (int) queueId);
+        // Mark the stream type as origin topic.
+        buffer.putShort(0, (short) 0);
+        buffer.putShort(2, (short) topicId);
+        buffer.putShort(4, (short) queueId);
         return buffer.getLong(0);
     }
 
     @Override
-    public long getOperationLogStreamId(long topicId, long queueId) {
+    public long getOperationLogStreamId(long topicId, int queueId) {
         ByteBuffer buffer = ByteBuffer.allocate(8);
-        buffer.putInt(0, (int) topicId);
-        buffer.putInt(4, (int) queueId);
+        // Mark the stream type as operation log.
+        buffer.putShort(0, (short) 1);
+        buffer.putShort(2, (short) topicId);
+        buffer.putShort(4, (short) queueId);
         return buffer.getLong(0);
     }
 
     @Override
-    public long getRetryStreamId(long consumerGroupId, long topicId, long queueId) {
-        return 0;
+    public long getRetryStreamId(long consumerGroupId, long topicId, int queueId) {
+        ByteBuffer buffer = ByteBuffer.allocate(8);
+        // Mark the stream type as retry topic.
+        buffer.putShort(0, (short) 2);
+        buffer.putShort(2, (short) consumerGroupId);
+        buffer.putShort(4, (short) topicId);
+        buffer.putShort(6, (short) queueId);
+        return buffer.getLong(0);
     }
 
     @Override
-    public long getDeadLetterStreamId(long consumerGroupId, long topicId, long queueId) {
-        return 0;
+    public long getDeadLetterStreamId(long consumerGroupId, long topicId, int queueId) {
+        ByteBuffer buffer = ByteBuffer.allocate(8);
+        // Mark the stream type as dead letter topic.
+        buffer.putShort(0, (short) 3);
+        buffer.putShort(2, (short) consumerGroupId);
+        buffer.putShort(4, (short) topicId);
+        buffer.putShort(6, (short) queueId);
+        return buffer.getLong(0);
     }
 
     @Override
-    public void advanceConsumeOffset(long consumerGroupId, long topicId, long queueId, long offset) {
+    public int getMaxRetryTimes(long consumerGroupId) {
+        return 1;
+    }
+
+    @Override
+    public void advanceConsumeOffset(long consumerGroupId, long topicId, int queueId, long offset) {
 
     }
 }
