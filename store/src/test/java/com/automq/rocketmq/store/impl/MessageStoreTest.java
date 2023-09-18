@@ -125,7 +125,7 @@ class MessageStoreTest {
         assertNotNull(bytes);
 
         CheckPoint checkPoint = CheckPoint.getRootAsCheckPoint(ByteBuffer.wrap(bytes));
-        assertTrue(checkPoint.isOrder());
+        assertTrue(checkPoint.fifo());
         assertEquals(popResult.operationId(), checkPoint.operationId());
         assertEquals(popResult.deliveryTimestamp(), checkPoint.deliveryTimestamp());
         assertEquals(popResult.deliveryTimestamp() + 100, checkPoint.nextVisibleTimestamp());
@@ -144,7 +144,7 @@ class MessageStoreTest {
         assertNotNull(bytes);
 
         checkPoint = CheckPoint.getRootAsCheckPoint(ByteBuffer.wrap(bytes));
-        assertTrue(checkPoint.isOrder());
+        assertTrue(checkPoint.fifo());
         assertEquals(popResult.operationId(), checkPoint.operationId());
         assertEquals(popResult.deliveryTimestamp(), checkPoint.deliveryTimestamp());
         assertEquals(popResult.deliveryTimestamp() + 100, checkPoint.nextVisibleTimestamp());

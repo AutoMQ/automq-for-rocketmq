@@ -79,7 +79,7 @@ class StreamOperationLogServiceTest {
         assertEquals(QUEUE_ID, operation.queueId());
         assertEquals(OFFSET, operation.offset());
         assertEquals(BATCH_SIZE, operation.batchSize());
-        assertEquals(IS_ORDER, operation.isOrder());
+        assertEquals(IS_ORDER, operation.fifo());
         assertEquals(INVISIBLE_DURATION, operation.invisibleDuration());
         assertEquals(OPERATION_TIMESTAMP, operation.operationTimestamp());
     }

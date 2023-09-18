@@ -76,18 +76,18 @@ public class MessageStoreImpl implements MessageStore {
 
     @Override
     public CompletableFuture<PopResult> pop(long consumerGroupId, long topicId, int queueId, long offset, int batchSize,
-        boolean isOrder, boolean isRetry, long invisibleDuration) {
-        if (isOrder && isRetry) {
-            return CompletableFuture.failedFuture(new RuntimeException("Order and retry cannot be true at the same time"));
+        boolean fifo, boolean retry, long invisibleDuration) {
+        if (fifo && retry) {
+            return CompletableFuture.failedFuture(new RuntimeException("Fifo and retry cannot be true at the same time"));
         }
 
         // Write pop operation to operation log.
         // Operation id should be monotonically increasing for each queue
         long operationTimestamp = System.nanoTime();
-        CompletableFuture<Long> logOperationFuture = operationLogService.logPopOperation(consumerGroupId, topicId, queueId, offset, batchSize, isOrder, invisibleDuration, operationTimestamp);
+        CompletableFuture<Long> logOperationFuture = operationLogService.logPopOperation(consumerGroupId, topicId, queueId, offset, batchSize, fifo, invisibleDuration, operationTimestamp);
 
         long streamId;
-        if (isRetry) {
+        if (retry) {
             streamId = metadataService.getRetryStreamId(consumerGroupId, topicId, queueId);
         } else {
             streamId = metadataService.getStreamId(topicId, queueId);
@@ -106,7 +106,7 @@ public class MessageStoreImpl implements MessageStore {
             long nextVisibleTimestamp = operationTimestamp + invisibleDuration;
             // If pop orderly, check whether the message is already consumed.
             Map<Long, CheckPoint> orderCheckPointMap = new HashMap<>();
-            if (isOrder) {
+            if (fifo) {
                 for (int i = 0; i < batchSize; i++) {
                     try {
                         // TODO: Undefined behavior if last operation is not orderly.
@@ -136,7 +136,7 @@ public class MessageStoreImpl implements MessageStore {
                 try {
                     // If pop orderly, the message already consumed will not trigger writing new check point.
                     // But reconsume count should be increased.
-                    if (isOrder && orderCheckPointMap.containsKey(message.offset())) {
+                    if (fifo && orderCheckPointMap.containsKey(message.offset())) {
                         // Delete last check point and timer tag.
                         CheckPoint lastCheckPoint = orderCheckPointMap.get(message.offset());
                         BatchDeleteRequest deleteLastCheckPointRequest = new BatchDeleteRequest(KV_NAMESPACE_CHECK_POINT,
@@ -164,7 +164,7 @@ public class MessageStoreImpl implements MessageStore {
                     List<BatchRequest> requestList = new ArrayList<>();
                     BatchWriteRequest writeCheckPointRequest = new BatchWriteRequest(KV_NAMESPACE_CHECK_POINT,
                         buildCheckPointKey(topicId, queueId, message.offset(), operationId),
-                        buildCheckPointValue(topicId, queueId, message.offset(), consumerGroupId, operationId, isOrder, isRetry, operationTimestamp, nextVisibleTimestamp, 0));
+                        buildCheckPointValue(topicId, queueId, message.offset(), consumerGroupId, operationId, fifo, retry, operationTimestamp, nextVisibleTimestamp, 0));
                     requestList.add(writeCheckPointRequest);
 
                     BatchWriteRequest writeTimerTagRequest = new BatchWriteRequest(KV_NAMESPACE_TIMER_TAG,
@@ -173,7 +173,7 @@ public class MessageStoreImpl implements MessageStore {
                     requestList.add(writeTimerTagRequest);
 
                     // If this message is orderly, write order index to KV service.
-                    if (isOrder) {
+                    if (fifo) {
                         BatchWriteRequest writeOrderIndexRequest = new BatchWriteRequest(KV_NAMESPACE_ORDER_INDEX,
                             buildOrderIndexKey(consumerGroupId, topicId, queueId, message.offset()), buildOrderIndexValue(operationId));
                         requestList.add(writeOrderIndexRequest);
@@ -218,7 +218,7 @@ public class MessageStoreImpl implements MessageStore {
                         buildTimerTagKey(checkPoint.nextVisibleTimestamp(), handle.topicId(), handle.queueId(), handle.messageOffset(), checkPoint.operationId()));
                     requestList.add(deleteTimerTagRequest);
 
-                    if (checkPoint.isOrder()) {
+                    if (checkPoint.fifo()) {
                         BatchDeleteRequest deleteOrderIndexRequest = new BatchDeleteRequest(KV_NAMESPACE_ORDER_INDEX,
                             buildOrderIndexKey(checkPoint.consumerGroupId(), handle.topicId(), handle.queueId(), checkPoint.messageOffset()));
                         requestList.add(deleteOrderIndexRequest);
@@ -265,11 +265,11 @@ public class MessageStoreImpl implements MessageStore {
                     BatchWriteRequest writeCheckPointRequest = new BatchWriteRequest(KV_NAMESPACE_CHECK_POINT,
                         buildCheckPointKey(checkPoint.topicId(), checkPoint.queueId(), checkPoint.messageOffset(), checkPoint.operationId()),
                         buildCheckPointValue(checkPoint.topicId(), checkPoint.queueId(), checkPoint.messageOffset(),
-                            checkPoint.consumerGroupId(), checkPoint.operationId(), checkPoint.isOrder(), checkPoint.isRetry(),
+                            checkPoint.consumerGroupId(), checkPoint.operationId(), checkPoint.fifo(), checkPoint.retry(),
                             checkPoint.deliveryTimestamp(), nextInvisibleTimestamp, checkPoint.reconsumeCount()));
 
                     long streamId;
-                    if (checkPoint.isRetry()) {
+                    if (checkPoint.retry()) {
                         streamId = metadataService.getRetryStreamId(checkPoint.consumerGroupId(), checkPoint.topicId(), checkPoint.queueId());
                     } else {
                         streamId = metadataService.getStreamId(checkPoint.topicId(), checkPoint.queueId());
