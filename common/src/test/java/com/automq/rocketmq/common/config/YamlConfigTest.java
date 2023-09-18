@@ -24,7 +24,7 @@ import org.yaml.snakeyaml.introspector.BeanAccess;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class YamlConfigTest {
-    private static final String configStr = """
+    private static final String CONFIG_STR = """
         broker:
           name: broker1
         proxy:
@@ -39,7 +39,7 @@ class YamlConfigTest {
     void load() {
         Yaml yaml = new Yaml();
         yaml.setBeanAccess(BeanAccess.FIELD);
-        YamlConfig config = yaml.loadAs(configStr, YamlConfig.class);
+        YamlConfig config = yaml.loadAs(CONFIG_STR, YamlConfig.class);
         assertEquals("broker1", config.broker().name());
         assertEquals("proxy1", config.proxy().name());
         assertEquals(1, config.store().maxFetchCount());

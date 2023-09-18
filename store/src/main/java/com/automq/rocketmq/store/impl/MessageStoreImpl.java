@@ -199,7 +199,7 @@ public class MessageStoreImpl implements MessageStore {
                 if (filter.needApply()) {
                     boolean hasMoreMessages = messageList.size() >= fetchBatchSize;
                     int fetchCount = messageList.size();
-                    long fetchBytes = messageList.stream().map(message -> (long) message.getByteBuffer().limit()).reduce(0L, Long::sum);
+                    long fetchBytes = messageList.stream().map(message -> (long) message.getByteBuffer().remaining()).reduce(0L, Long::sum);
 
                     // Apply filter to messages
                     messageList = filter.doFilter(messageList);
@@ -215,12 +215,11 @@ public class MessageStoreImpl implements MessageStore {
                         fetchResult = fetchMessages(streamId, offset + fetchCount, fetchBatchSize).join();
                         hasMoreMessages = messageList.size() >= fetchBatchSize;
                         fetchCount += fetchResult.size();
-                        fetchBytes += fetchResult.stream().map(message -> (long) message.getByteBuffer().limit()).reduce(0L, Long::sum);
+                        fetchBytes += fetchResult.stream().map(message -> (long) message.getByteBuffer().remaining()).reduce(0L, Long::sum);
 
                         // Add filter result to message list.
                         messageList.addAll(filter.doFilter(fetchResult));
                     }
-                    System.out.println("Fetch count: " + fetchCount + ", fetch size: " + fetchBytes);
                 }
 
                 // If pop orderly, check whether the message is already consumed.
