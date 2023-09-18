@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.store.impl;
 
+import com.automq.rocketmq.common.model.MessageExt;
 import com.automq.rocketmq.common.model.generated.Message;
 import com.automq.rocketmq.metadata.StoreMetadataService;
 import com.automq.rocketmq.store.MessageStore;
@@ -24,7 +25,9 @@ import com.automq.rocketmq.store.StreamStore;
 import com.automq.rocketmq.store.mock.MockOperationLogService;
 import com.automq.rocketmq.store.mock.MockStoreMetadataService;
 import com.automq.rocketmq.store.model.generated.CheckPoint;
+import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PopResult;
+import com.automq.rocketmq.store.model.message.TagFilter;
 import com.automq.rocketmq.store.model.stream.SingleRecord;
 import com.automq.rocketmq.store.service.KVService;
 import com.automq.rocketmq.store.service.impl.RocksDBKVService;
@@ -72,15 +75,15 @@ class MessageStoreTest {
 
         // Append mock message.
         long streamId = metadataService.getStreamId(1, 1);
-        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, 0))).join();
+        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, 0, ""))).join();
         streamId = metadataService.getStreamId(1, 2);
-        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 2, 0))).join();
+        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 2, 0, ""))).join();
 
-        PopResult popResult = messageStore.pop(1, 1, 1, 0, 1, false, false, 100).join();
+        PopResult popResult = messageStore.pop(1, 1, 1, 0, Filter.DEFAULT_FILTER, 1, false, false, 100).join();
         assertEquals(0, popResult.status());
         assertFalse(popResult.messageList().isEmpty());
 
-        Message message = popResult.messageList().get(0);
+        Message message = popResult.messageList().get(0).message();
         byte[] bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(1, 1, 0, popResult.operationId()));
         assertNotNull(bytes);
 
@@ -93,7 +96,7 @@ class MessageStoreTest {
         assertEquals(1, checkPoint.queueId());
         assertEquals(message.offset(), checkPoint.messageOffset());
 
-        messageStore.pop(1, 1, 2, 0, 1, false, false, 100).join();
+        messageStore.pop(1, 1, 2, 0, Filter.DEFAULT_FILTER, 1, false, false, 100).join();
 
         List<CheckPoint> allCheckPointList = new ArrayList<>();
         kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, (key, value) ->
@@ -111,16 +114,136 @@ class MessageStoreTest {
     }
 
     @Test
+    void popMultiple() throws RocksDBException {
+        // Append mock message.
+        long streamId = metadataService.getStreamId(1, 1);
+        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, 0, ""))).join();
+        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, 1, ""))).join();
+        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, 2, ""))).join();
+        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, 3, ""))).join();
+        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, 4, ""))).join();
+
+        PopResult popResult = messageStore.pop(1, 1, 1, 0, Filter.DEFAULT_FILTER, 32, true, false, 100).join();
+        assertEquals(0, popResult.status());
+        assertEquals(5, popResult.messageList().size());
+
+        for (int i = 0; i < 5; i++) {
+            assertEquals(i, popResult.messageList().get(i).message().offset());
+        }
+
+        AtomicInteger checkPointCount = new AtomicInteger();
+        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, (key, value) -> checkPointCount.getAndIncrement());
+        assertEquals(5, checkPointCount.get());
+
+        AtomicInteger orderIndexCount = new AtomicInteger();
+        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_FIFO_INDEX, (key, value) -> orderIndexCount.getAndIncrement());
+        assertEquals(5, orderIndexCount.get());
+
+        AtomicInteger timerTagCount = new AtomicInteger();
+        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_TIMER_TAG, (key, value) -> timerTagCount.getAndIncrement());
+        assertEquals(5, timerTagCount.get());
+
+        // Pop again.
+        popResult = messageStore.pop(1, 1, 1, 0, Filter.DEFAULT_FILTER, 32, true, false, 100).join();
+        assertEquals(0, popResult.status());
+        assertEquals(5, popResult.messageList().size());
+
+        for (int i = 0; i < 5; i++) {
+            assertEquals(i, popResult.messageList().get(i).message().offset());
+        }
+
+        checkPointCount.set(0);
+        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, (key, value) -> {
+            int index = checkPointCount.getAndIncrement();
+            CheckPoint checkPoint = CheckPoint.getRootAsCheckPoint(ByteBuffer.wrap(value));
+            assertEquals(index, checkPoint.messageOffset());
+            assertEquals(1, checkPoint.reconsumeCount());
+        });
+        assertEquals(5, checkPointCount.get());
+
+        orderIndexCount.set(0);
+        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_FIFO_INDEX, (key, value) -> orderIndexCount.getAndIncrement());
+        assertEquals(5, orderIndexCount.get());
+
+        timerTagCount.set(0);
+        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_TIMER_TAG, (key, value) -> timerTagCount.getAndIncrement());
+        assertEquals(5, timerTagCount.get());
+
+        // Change invisible duration and ack all messages.
+        for (MessageExt messageExt : popResult.messageList()) {
+            messageStore.changeInvisibleDuration(messageExt.receiptHandle().get(), 1000).join();
+            messageStore.ack(messageExt.receiptHandle().get()).join();
+        }
+
+        checkPointCount.set(0);
+        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, (key, value) -> checkPointCount.getAndIncrement());
+        assertEquals(0, checkPointCount.get());
+
+        orderIndexCount.set(0);
+        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_FIFO_INDEX, (key, value) -> orderIndexCount.getAndIncrement());
+        assertEquals(0, orderIndexCount.get());
+
+        timerTagCount.set(0);
+        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_TIMER_TAG, (key, value) -> timerTagCount.getAndIncrement());
+        assertEquals(0, timerTagCount.get());
+    }
+
+    @Test
+    void popWithFilter() throws RocksDBException {
+        // Append mock message.
+        long streamId = metadataService.getStreamId(1, 1);
+        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, 0, "tagA"))).join();
+        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, 1, "tagA"))).join();
+        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, 2, "tagB"))).join();
+        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, 3, "tagA"))).join();
+        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, 4, "tagB"))).join();
+
+        PopResult popResult = messageStore.pop(1, 1, 1, 0, new TagFilter("tagB"), 2, true, false, 100).join();
+        assertEquals(0, popResult.status());
+        assertEquals(2, popResult.messageList().size());
+
+        Message firstMessage = popResult.messageList().get(0).message();
+        assertEquals(2, firstMessage.offset());
+        assertEquals("tagB", firstMessage.tag());
+
+        Message secondMessage = popResult.messageList().get(1).message();
+        assertEquals(4, secondMessage.offset());
+        assertEquals("tagB", secondMessage.tag());
+
+        AtomicInteger checkPointCount = new AtomicInteger();
+        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, (key, value) -> checkPointCount.getAndIncrement());
+        assertEquals(2, checkPointCount.get());
+
+        AtomicInteger timerTagCount = new AtomicInteger();
+        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_TIMER_TAG, (key, value) -> timerTagCount.getAndIncrement());
+        assertEquals(2, timerTagCount.get());
+
+        // Ack all messages.
+        for (MessageExt messageExt : popResult.messageList()) {
+            messageStore.changeInvisibleDuration(messageExt.receiptHandle().get(), 1000).join();
+            messageStore.ack(messageExt.receiptHandle().get()).join();
+        }
+
+        checkPointCount.set(0);
+        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, (key, value) -> checkPointCount.getAndIncrement());
+        assertEquals(0, checkPointCount.get());
+
+        timerTagCount.set(0);
+        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_TIMER_TAG, (key, value) -> timerTagCount.getAndIncrement());
+        assertEquals(0, timerTagCount.get());
+    }
+
+    @Test
     void popOrderly() throws RocksDBException {
         // Append mock message.
         long streamId = metadataService.getStreamId(1, 1);
         streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage())).join();
 
-        PopResult popResult = messageStore.pop(1, 1, 1, 0, 1, true, false, 100).join();
+        PopResult popResult = messageStore.pop(1, 1, 1, 0, Filter.DEFAULT_FILTER, 1, true, false, 100).join();
         assertEquals(0, popResult.status());
         assertFalse(popResult.messageList().isEmpty());
 
-        Message message = popResult.messageList().get(0);
+        Message message = popResult.messageList().get(0).message();
         byte[] bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(1, 1, message.offset(), popResult.operationId()));
         assertNotNull(bytes);
 
@@ -131,15 +254,15 @@ class MessageStoreTest {
         assertEquals(popResult.deliveryTimestamp() + 100, checkPoint.nextVisibleTimestamp());
         assertEquals(0, checkPoint.reconsumeCount());
 
-        bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_ORDER_INDEX, SerializeUtil.buildOrderIndexKey(1, 1, 1, message.offset()));
+        bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_FIFO_INDEX, SerializeUtil.buildOrderIndexKey(1, 1, 1, message.offset()));
         assertNotNull(bytes);
 
         assertEquals(popResult.operationId(), ByteBuffer.wrap(bytes).getLong());
 
         // Pop the same message again.
-        popResult = messageStore.pop(1, 1, 1, 0, 1, true, false, 100).join();
+        popResult = messageStore.pop(1, 1, 1, 0, Filter.DEFAULT_FILTER, 1, true, false, 100).join();
 
-        message = popResult.messageList().get(0);
+        message = popResult.messageList().get(0).message();
         bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(1, 1, message.offset(), popResult.operationId()));
         assertNotNull(bytes);
 
@@ -150,7 +273,7 @@ class MessageStoreTest {
         assertEquals(popResult.deliveryTimestamp() + 100, checkPoint.nextVisibleTimestamp());
         assertEquals(1, checkPoint.reconsumeCount());
 
-        bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_ORDER_INDEX, SerializeUtil.buildOrderIndexKey(1, 1, 1, message.offset()));
+        bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_FIFO_INDEX, SerializeUtil.buildOrderIndexKey(1, 1, 1, message.offset()));
         assertNotNull(bytes);
 
         assertEquals(popResult.operationId(), ByteBuffer.wrap(bytes).getLong());
@@ -160,7 +283,7 @@ class MessageStoreTest {
         assertEquals(1, checkPointCount.get());
 
         AtomicInteger orderIndexCount = new AtomicInteger();
-        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_ORDER_INDEX, (key, value) -> orderIndexCount.getAndIncrement());
+        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_FIFO_INDEX, (key, value) -> orderIndexCount.getAndIncrement());
         assertEquals(1, orderIndexCount.get());
 
         AtomicInteger timerTagCount = new AtomicInteger();
@@ -174,11 +297,11 @@ class MessageStoreTest {
         long streamId = metadataService.getStreamId(1, 1);
         streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage())).join();
 
-        PopResult popResult = messageStore.pop(1, 1, 1, 0, 1, true, false, 100).join();
+        PopResult popResult = messageStore.pop(1, 1, 1, 0, Filter.DEFAULT_FILTER, 1, true, false, 100).join();
         assertEquals(0, popResult.status());
         assertFalse(popResult.messageList().isEmpty());
 
-        Message message = popResult.messageList().get(0);
+        Message message = popResult.messageList().get(0).message();
         messageStore.ack(SerializeUtil.encodeReceiptHandle(1, 1, message.offset(), popResult.operationId())).join();
 
         AtomicInteger checkPointCount = new AtomicInteger();
@@ -186,7 +309,7 @@ class MessageStoreTest {
         assertEquals(0, checkPointCount.get());
 
         AtomicInteger orderIndexCount = new AtomicInteger();
-        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_ORDER_INDEX, (key, value) -> orderIndexCount.getAndIncrement());
+        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_FIFO_INDEX, (key, value) -> orderIndexCount.getAndIncrement());
         assertEquals(0, orderIndexCount.get());
 
         AtomicInteger timerTagCount = new AtomicInteger();
@@ -201,7 +324,7 @@ class MessageStoreTest {
         streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage())).join();
 
         // Pop the message to generate the check point.
-        PopResult popResult = messageStore.pop(1, 1, 1, 0, 1, false, false, 100).join();
+        PopResult popResult = messageStore.pop(1, 1, 1, 0, Filter.DEFAULT_FILTER, 1, false, false, 100).join();
         assertEquals(0, popResult.status());
         assertFalse(popResult.messageList().isEmpty());
 
@@ -216,7 +339,7 @@ class MessageStoreTest {
         assertTrue(popEndTimestamp + 100 > checkPoint.nextVisibleTimestamp());
 
         // Change the invisible duration.
-        Message message = popResult.messageList().get(0);
+        Message message = popResult.messageList().get(0).message();
         String receiptHandle = SerializeUtil.encodeReceiptHandle(1, 1, message.offset(), popResult.operationId());
         messageStore.changeInvisibleDuration(receiptHandle, 100_000_000_000L).join();
 
@@ -237,7 +360,7 @@ class MessageStoreTest {
         assertEquals(1, timerTagCount.get());
 
         // Change the invisible duration again.
-        message = popResult.messageList().get(0);
+        message = popResult.messageList().get(0).message();
         receiptHandle = SerializeUtil.encodeReceiptHandle(1, 1, message.offset(), popResult.operationId());
         messageStore.changeInvisibleDuration(receiptHandle, 0L).join();
 

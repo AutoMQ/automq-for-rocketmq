@@ -19,6 +19,7 @@ package com.automq.rocketmq.store;
 
 import com.automq.rocketmq.store.model.message.AckResult;
 import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
+import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PopResult;
 import java.util.concurrent.CompletableFuture;
 
@@ -30,12 +31,14 @@ public interface MessageStore {
      * @param topicId           topic id to pop message from
      * @param queueId           queue id to pop message from
      * @param offset            offset to start from
+     * @param filter            filter to apply to messages
      * @param batchSize         maximum count of messages
-     * @param fifo           is orderly pop
+     * @param fifo              is orderly pop
      * @param invisibleDuration the duration for the next time this batch of messages will be visible, in nanoseconds
      * @return pop result, see {@link PopResult}
      */
-    CompletableFuture<PopResult> pop(long consumerGroupId, long topicId, int queueId, long offset, int batchSize,
+    CompletableFuture<PopResult> pop(long consumerGroupId, long topicId, int queueId, long offset, Filter filter,
+        int batchSize,
         boolean fifo, boolean retry, long invisibleDuration);
 
     /**

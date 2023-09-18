@@ -15,24 +15,36 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.store.mock;
+package com.automq.rocketmq.store.model.message;
 
 import com.automq.rocketmq.common.model.generated.Message;
-import com.google.flatbuffers.FlatBufferBuilder;
-import java.nio.ByteBuffer;
+import java.util.List;
 
-public class MockMessageUtil {
-    public static ByteBuffer buildMessage() {
-        FlatBufferBuilder builder = new FlatBufferBuilder();
-        int root = Message.createMessage(builder, 1, 1, 0, builder.createString(""));
-        builder.finish(root);
-        return builder.dataBuffer();
+public interface Filter {
+    Filter DEFAULT_FILTER = new Filter() {
+        @Override
+        public FilterType type() {
+            return FilterType.NONE;
+        }
+
+        @Override
+        public String expression() {
+            return "";
+        }
+
+        @Override
+        public List<Message> apply(List<Message> messageList) {
+            return messageList;
+        }
+    };
+
+    FilterType type();
+
+    default boolean needApply() {
+        return type() != FilterType.NONE;
     }
 
-    public static ByteBuffer buildMessage(long topicId, int queueId, long offset, String tag) {
-        FlatBufferBuilder builder = new FlatBufferBuilder();
-        int root = Message.createMessage(builder, topicId, queueId, offset, builder.createString(tag));
-        builder.finish(root);
-        return builder.dataBuffer();
-    }
+    String expression();
+
+    List<Message> apply(List<Message> messageList);
 }

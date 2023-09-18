@@ -33,10 +33,10 @@ public class SerializeUtil {
     // <topicId><queueId><offset><operationId>
     public static byte[] buildCheckPointKey(long topicId, int queueId, long offset, long operationId) {
         ByteBuffer buffer = ByteBuffer.allocate(28);
-        buffer.putLong(0, topicId);
-        buffer.putInt(8, queueId);
-        buffer.putLong(12, offset);
-        buffer.putLong(20, operationId);
+        buffer.putLong(topicId);
+        buffer.putInt(queueId);
+        buffer.putLong(offset);
+        buffer.putLong(operationId);
         return buffer.array();
     }
 
@@ -52,12 +52,12 @@ public class SerializeUtil {
     // <deliveryTimestamp + invisibleDuration><topicId><queueId><operationId>
     public static byte[] buildTimerTagKey(long nextVisibleTimestamp, long topicId, int queueId, long offset,
         long operationId) {
-        ByteBuffer buffer = ByteBuffer.allocate(28);
-        buffer.putLong(0, nextVisibleTimestamp);
-        buffer.putLong(8, topicId);
-        buffer.putInt(16, queueId);
-        buffer.putLong(16, offset);
-        buffer.putLong(20, operationId);
+        ByteBuffer buffer = ByteBuffer.allocate(36);
+        buffer.putLong(nextVisibleTimestamp);
+        buffer.putLong(topicId);
+        buffer.putInt(queueId);
+        buffer.putLong(offset);
+        buffer.putLong(operationId);
         return buffer.array();
     }
 
@@ -72,17 +72,17 @@ public class SerializeUtil {
     // <groupId><topicId><queueId><offset>
     public static byte[] buildOrderIndexKey(long consumerGroupId, long topicId, int queueId, long offset) {
         ByteBuffer buffer = ByteBuffer.allocate(28);
-        buffer.putLong(0, consumerGroupId);
-        buffer.putLong(8, topicId);
-        buffer.putInt(16, queueId);
-        buffer.putLong(20, offset);
+        buffer.putLong(consumerGroupId);
+        buffer.putLong(topicId);
+        buffer.putInt(queueId);
+        buffer.putLong(offset);
         return buffer.array();
     }
 
     // <operationId>
     public static byte[] buildOrderIndexValue(long operationId) {
         ByteBuffer buffer = ByteBuffer.allocate(8);
-        buffer.putLong(0, operationId);
+        buffer.putLong(operationId);
         return buffer.array();
     }
 

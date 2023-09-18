@@ -4,4 +4,5 @@ table Message {
   topic_id:long;
   queue_id:int;
   offset:long;
+  tag:string;
 }
