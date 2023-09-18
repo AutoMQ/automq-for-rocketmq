@@ -18,15 +18,17 @@
 package com.automq.rocketmq.metadata;
 
 public interface StoreMetadataService {
-    long getStreamId(long topicId, long queueId);
+    long getStreamId(long topicId, int queueId);
 
-    long getOperationLogStreamId(long topicId, long queueId);
+    long getOperationLogStreamId(long topicId, int queueId);
 
-    long getRetryStreamId(long consumerGroupId, long topicId, long queueId);
+    long getRetryStreamId(long consumerGroupId, long topicId, int queueId);
 
-    long getDeadLetterStreamId(long consumerGroupId, long topicId, long queueId);
+    long getDeadLetterStreamId(long consumerGroupId, long topicId, int queueId);
+
+    int getMaxRetryTimes(long consumerGroupId);
 
     // Each time pop will advance the consumer offset by batch size.
     // Metadata service will cache the consumer offset in memory, and periodically commit to Controller.
-    void advanceConsumeOffset(long consumerGroupId, long topicId, long queueId, long offset);
+    void advanceConsumeOffset(long consumerGroupId, long topicId, int queueId, long offset);
 }

@@ -72,23 +72,23 @@ public class KVServiceTest {
         cleanUp(path);
         KVService store = new RocksDBKVService(path);
         assertNotNull(store);
-        store.put(NAMESPACE, key.getBytes(KVService.CHARSET), value.getBytes(KVService.CHARSET));
+        store.put(NAMESPACE, key.getBytes(), value.getBytes());
         store.flush(true);
 
         final Map<String, String> queryResult = new HashMap<>();
         store.iterate(NAMESPACE, (key1, value1) ->
-            queryResult.put(new String(key1, KVService.CHARSET), new String(value1, KVService.CHARSET)));
+            queryResult.put(new String(key1), new String(value1)));
 
         assertEquals(1, queryResult.size());
         assertEquals(key, queryResult.keySet().iterator().next());
         assertEquals(value, queryResult.values().iterator().next());
 
-        byte[] valueFound = store.get(NAMESPACE, key.getBytes(KVService.CHARSET));
+        byte[] valueFound = store.get(NAMESPACE, key.getBytes());
         assertNotNull(valueFound);
-        assertEquals(value, new String(valueFound, KVService.CHARSET));
+        assertEquals(value, new String(valueFound));
 
-        store.delete(NAMESPACE, key.getBytes(KVService.CHARSET));
-        byte[] valueNotFound = store.get(NAMESPACE, key.getBytes(KVService.CHARSET));
+        store.delete(NAMESPACE, key.getBytes());
+        byte[] valueNotFound = store.get(NAMESPACE, key.getBytes());
         assertNull(valueNotFound);
 
         store.destroy();
@@ -97,7 +97,7 @@ public class KVServiceTest {
         assertThrowsExactly(RocksDBException.class, () -> store.get(NAMESPACE, key.getBytes()));
         assertThrowsExactly(RocksDBException.class, () -> store.iterate(NAMESPACE, (_key, _value) -> {
         }));
-        assertThrowsExactly(RocksDBException.class, () -> store.iterate(NAMESPACE, key, key, key, (_key, _value) -> {
+        assertThrowsExactly(RocksDBException.class, () -> store.iterate(NAMESPACE, key.getBytes(), key.getBytes(), key.getBytes(), (_key, _value) -> {
         }));
         assertThrowsExactly(RocksDBException.class, () -> store.put(NAMESPACE, key.getBytes(), key.getBytes()));
         assertThrowsExactly(RocksDBException.class, () -> store.delete(NAMESPACE, key.getBytes()));
@@ -113,30 +113,30 @@ public class KVServiceTest {
 
         assertThrowsExactly(RocksDBException.class, () -> store.iterate(NAMESPACE, null));
         assertThrowsExactly(RocksDBException.class, () -> store.iterate(NAMESPACE, null, null, null, null));
-        assertThrowsExactly(RocksDBException.class, () -> store.iterate(NAMESPACE, null, "start", null, (key, value) -> {
+        assertThrowsExactly(RocksDBException.class, () -> store.iterate(NAMESPACE, null, "start".getBytes(), null, (key, value) -> {
         }));
-        assertThrowsExactly(RocksDBException.class, () -> store.iterate(NAMESPACE, null, null, "end", (key, value) -> {
+        assertThrowsExactly(RocksDBException.class, () -> store.iterate(NAMESPACE, null, null, "end".getBytes(), (key, value) -> {
         }));
 
         String prefix1 = "/1/";
-        store.put(NAMESPACE, (prefix1 + "0").getBytes(KVService.CHARSET), "0".getBytes(KVService.CHARSET));
-        store.put(NAMESPACE, (prefix1 + "1").getBytes(KVService.CHARSET), "1".getBytes(KVService.CHARSET));
+        store.put(NAMESPACE, (prefix1 + "0").getBytes(), "0".getBytes());
+        store.put(NAMESPACE, (prefix1 + "1").getBytes(), "1".getBytes());
 
         String prefix2 = "/2/";
-        store.put(NAMESPACE, (prefix2 + "2").getBytes(KVService.CHARSET), "2".getBytes(KVService.CHARSET));
-        store.put(NAMESPACE, (prefix2 + "3").getBytes(KVService.CHARSET), "3".getBytes(KVService.CHARSET));
-        store.put(NAMESPACE, (prefix2 + "4").getBytes(KVService.CHARSET), "4".getBytes(KVService.CHARSET));
+        store.put(NAMESPACE, (prefix2 + "2").getBytes(), "2".getBytes());
+        store.put(NAMESPACE, (prefix2 + "3").getBytes(), "3".getBytes());
+        store.put(NAMESPACE, (prefix2 + "4").getBytes(), "4".getBytes());
 
         String prefix3 = "/3/";
-        store.put(NAMESPACE, (prefix3 + "5").getBytes(KVService.CHARSET), "5".getBytes(KVService.CHARSET));
-        store.put(NAMESPACE, (prefix3 + "6").getBytes(KVService.CHARSET), "6".getBytes(KVService.CHARSET));
+        store.put(NAMESPACE, (prefix3 + "5").getBytes(), "5".getBytes());
+        store.put(NAMESPACE, (prefix3 + "6").getBytes(), "6".getBytes());
 
         store.flush(true);
 
         AtomicInteger num = new AtomicInteger();
 
         store.iterate(NAMESPACE, (key, value) -> {
-            String valueStr = new String(value, KVService.CHARSET);
+            String valueStr = new String(value);
             String target = String.valueOf(num.get());
 
             assertEquals(target, valueStr);
@@ -145,8 +145,8 @@ public class KVServiceTest {
         assertEquals(7, num.get());
 
         num.set(0);
-        store.iterate(NAMESPACE, prefix1, null, null, (key, value) -> {
-            String valueStr = new String(value, KVService.CHARSET);
+        store.iterate(NAMESPACE, prefix1.getBytes(), null, null, (key, value) -> {
+            String valueStr = new String(value);
             String target = String.valueOf(num.get());
 
             assertEquals(target, valueStr);
@@ -155,8 +155,8 @@ public class KVServiceTest {
         assertEquals(2, num.get());
 
         num.set(0);
-        store.iterate(NAMESPACE, null, prefix2 + "1", prefix2 + "5", (key, value) -> {
-            String valueStr = new String(value, KVService.CHARSET);
+        store.iterate(NAMESPACE, null, (prefix2 + "1").getBytes(), (prefix2 + "5").getBytes(), (key, value) -> {
+            String valueStr = new String(value);
             String target = String.valueOf(num.get() + 2);
 
             assertEquals(target, valueStr);
@@ -179,7 +179,7 @@ public class KVServiceTest {
 
         AtomicInteger num = new AtomicInteger();
         store.iterate(NAMESPACE, (key, value) -> {
-            String valueStr = new String(value, KVService.CHARSET);
+            String valueStr = new String(value);
             String target = String.valueOf(num.getAndIncrement());
 
             assertEquals(target, valueStr);
@@ -190,7 +190,7 @@ public class KVServiceTest {
 
         num.set(1);
         store.iterate(NAMESPACE, (key, value) -> {
-            String valueStr = new String(value, KVService.CHARSET);
+            String valueStr = new String(value);
             String target = String.valueOf(num.getAndIncrement());
 
             assertEquals(target, valueStr);
