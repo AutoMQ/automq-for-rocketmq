@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.store.impl;
 
+import com.automq.rocketmq.common.model.MessageExt;
 import com.automq.rocketmq.common.model.generated.Message;
 import com.automq.rocketmq.metadata.StoreMetadataService;
 import com.automq.rocketmq.store.MessageStore;
@@ -28,15 +29,19 @@ import com.automq.rocketmq.store.model.kv.BatchRequest;
 import com.automq.rocketmq.store.model.kv.BatchWriteRequest;
 import com.automq.rocketmq.store.model.message.AckResult;
 import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
+import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PopResult;
 import com.automq.rocketmq.store.service.KVService;
 import com.automq.rocketmq.store.service.OperationLogService;
 import com.automq.rocketmq.store.service.impl.ReviveService;
+import com.automq.rocketmq.store.util.SerializeUtil;
+import com.google.common.util.concurrent.MoreExecutors;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import org.rocksdb.RocksDBException;
 
@@ -51,7 +56,12 @@ import static com.automq.rocketmq.store.util.SerializeUtil.decodeReceiptHandle;
 public class MessageStoreImpl implements MessageStore {
     protected static final String KV_NAMESPACE_CHECK_POINT = "check_point";
     protected static final String KV_NAMESPACE_TIMER_TAG = "timer_tag";
-    protected static final String KV_NAMESPACE_ORDER_INDEX = "order_index";
+    protected static final String KV_NAMESPACE_FIFO_INDEX = "fifo_index";
+
+    // TODO: Make these limitations configurable.
+    protected static final int MAX_FETCH_COUNT = 1000;
+    protected static final long MAX_FETCH_BYTES = 10L * 1024 * 1024; // 10MB
+    protected static final long MAX_FETCH_TIME_NANOS = 10L * 1000 * 1000_000; // 10s
 
     private final StreamStore streamStore;
 
@@ -74,9 +84,89 @@ public class MessageStoreImpl implements MessageStore {
         reviveService.start();
     }
 
+    public void writeCheckPoint(long topicId, int queueId, long streamId, long offset, long consumerGroupId,
+        long operationId,
+        boolean fifo, boolean retry, long operationTimestamp, long nextVisibleTimestamp) throws RocksDBException {
+        // If this message is not orderly or has not been consumed, write check point and timer tag to KV service atomically.
+        List<BatchRequest> requestList = new ArrayList<>();
+        BatchWriteRequest writeCheckPointRequest = new BatchWriteRequest(KV_NAMESPACE_CHECK_POINT,
+            buildCheckPointKey(topicId, queueId, offset, operationId),
+            buildCheckPointValue(topicId, queueId, offset, consumerGroupId, operationId, fifo, retry, operationTimestamp, nextVisibleTimestamp, 0));
+        requestList.add(writeCheckPointRequest);
+
+        BatchWriteRequest writeTimerTagRequest = new BatchWriteRequest(KV_NAMESPACE_TIMER_TAG,
+            buildTimerTagKey(nextVisibleTimestamp, topicId, queueId, offset, operationId),
+            buildTimerTagValue(nextVisibleTimestamp, consumerGroupId, topicId, queueId, streamId, offset, operationId));
+        requestList.add(writeTimerTagRequest);
+
+        // If this message is orderly, write order index to KV service.
+        if (fifo) {
+            BatchWriteRequest writeOrderIndexRequest = new BatchWriteRequest(KV_NAMESPACE_FIFO_INDEX,
+                buildOrderIndexKey(consumerGroupId, topicId, queueId, offset), buildOrderIndexValue(operationId));
+            requestList.add(writeOrderIndexRequest);
+        }
+
+        kvService.batch(requestList.toArray(new BatchRequest[0]));
+    }
+
+    public Optional<CheckPoint> retrieveFifoCheckPoint(long consumerGroupId, long topicId, int queueId,
+        long offset) throws RocksDBException {
+        // TODO: Undefined behavior if last operation is not orderly.
+        byte[] orderIndexKey = buildOrderIndexKey(consumerGroupId, topicId, queueId, offset);
+        byte[] bytes = kvService.get(KV_NAMESPACE_FIFO_INDEX, orderIndexKey);
+        // If fifo index not found, this message has not been consumed.
+        if (bytes == null) {
+            return Optional.empty();
+        }
+        long lastOperationId = ByteBuffer.wrap(bytes).getLong();
+        byte[] checkPoint = kvService.get(KV_NAMESPACE_CHECK_POINT, buildCheckPointKey(topicId, queueId, offset, lastOperationId));
+        if (checkPoint != null) {
+            return Optional.of(CheckPoint.getRootAsCheckPoint(ByteBuffer.wrap(checkPoint)));
+        } else {
+            // TODO: log finding a orphan index, this maybe a bug
+            kvService.delete(KV_NAMESPACE_FIFO_INDEX, orderIndexKey);
+        }
+        return Optional.empty();
+    }
+
+    public void renewFifoCheckPoint(CheckPoint lastCheckPoint, long topicId, int queueId, long streamId, long offset,
+        long consumerGroupId, long operationId, long operationTimestamp,
+        long nextVisibleTimestamp) throws RocksDBException {
+        // Delete last check point and timer tag.
+        BatchDeleteRequest deleteLastCheckPointRequest = new BatchDeleteRequest(KV_NAMESPACE_CHECK_POINT,
+            buildCheckPointKey(topicId, queueId, offset, lastCheckPoint.operationId()));
+
+        BatchDeleteRequest deleteLastTimerTagRequest = new BatchDeleteRequest(KV_NAMESPACE_TIMER_TAG,
+            buildTimerTagKey(lastCheckPoint.nextVisibleTimestamp(), topicId, queueId, offset, lastCheckPoint.operationId()));
+
+        // Write new check point, timer tag, and order index.
+        BatchWriteRequest writeCheckPointRequest = new BatchWriteRequest(KV_NAMESPACE_CHECK_POINT,
+            buildCheckPointKey(topicId, queueId, offset, operationId),
+            buildCheckPointValue(topicId, queueId, offset, consumerGroupId, operationId, true, false, operationTimestamp, nextVisibleTimestamp, lastCheckPoint.reconsumeCount() + 1));
+
+        BatchWriteRequest writeTimerTagRequest = new BatchWriteRequest(KV_NAMESPACE_TIMER_TAG,
+            buildTimerTagKey(nextVisibleTimestamp, topicId, queueId, offset, operationId),
+            buildTimerTagValue(nextVisibleTimestamp, consumerGroupId, topicId, queueId, streamId, offset, operationId));
+
+        BatchWriteRequest writeOrderIndexRequest = new BatchWriteRequest(KV_NAMESPACE_FIFO_INDEX,
+            buildOrderIndexKey(consumerGroupId, topicId, queueId, offset), buildOrderIndexValue(operationId));
+        kvService.batch(deleteLastCheckPointRequest, deleteLastTimerTagRequest, writeCheckPointRequest, writeTimerTagRequest, writeOrderIndexRequest);
+    }
+
+    public CompletableFuture<List<Message>> fetchMessages(long streamId, long offset, int batchSize) {
+        return streamStore.fetch(streamId, offset, batchSize)
+            .thenApply(fetchResult -> {
+                // TODO: Assume message count is always 1 in each batch for now.
+                return fetchResult.recordBatchList()
+                    .stream()
+                    .map(batch -> Message.getRootAsMessage(batch.rawPayload()))
+                    .toList();
+            });
+    }
+
     @Override
-    public CompletableFuture<PopResult> pop(long consumerGroupId, long topicId, int queueId, long offset, int batchSize,
-        boolean fifo, boolean retry, long invisibleDuration) {
+    public CompletableFuture<PopResult> pop(long consumerGroupId, long topicId, int queueId, long offset, Filter filter,
+        int batchSize, boolean fifo, boolean retry, long invisibleDuration) {
         if (fifo && retry) {
             return CompletableFuture.failedFuture(new RuntimeException("Fifo and retry cannot be true at the same time"));
         }
@@ -93,101 +183,80 @@ public class MessageStoreImpl implements MessageStore {
             streamId = metadataService.getStreamId(topicId, queueId);
         }
 
-        CompletableFuture<List<Message>> fetchMessageFuture = streamStore.fetch(streamId, offset, batchSize)
-            .thenApply(fetchResult -> {
-                // TODO: Assume message count is always 1 in each batch for now.
-                return fetchResult.recordBatchList()
-                    .stream()
-                    .map(batch -> Message.getRootAsMessage(batch.rawPayload()))
-                    .toList();
-            });
+        int fetchBatchSize;
+        if (filter.needApply()) {
+            fetchBatchSize = batchSize * 2;
+        } else {
+            fetchBatchSize = batchSize;
+        }
 
-        return logOperationFuture.thenCombine(fetchMessageFuture, (operationId, messageList) -> {
-            long nextVisibleTimestamp = operationTimestamp + invisibleDuration;
-            // If pop orderly, check whether the message is already consumed.
-            Map<Long, CheckPoint> orderCheckPointMap = new HashMap<>();
-            if (fifo) {
-                for (int i = 0; i < batchSize; i++) {
-                    try {
-                        // TODO: Undefined behavior if last operation is not orderly.
-                        byte[] orderIndexKey = buildOrderIndexKey(consumerGroupId, topicId, queueId, offset + i);
-                        byte[] bytes = kvService.get(KV_NAMESPACE_ORDER_INDEX, orderIndexKey);
-                        // If order index not found, this message has not been consumed.
-                        if (bytes == null) {
-                            continue;
-                        }
-                        long lastOperationId = ByteBuffer.wrap(bytes).getLong();
-                        byte[] checkPoint = kvService.get(KV_NAMESPACE_CHECK_POINT, buildCheckPointKey(topicId, queueId, offset + i, lastOperationId));
-                        if (checkPoint != null) {
-                            orderCheckPointMap.put(offset + i, CheckPoint.getRootAsCheckPoint(ByteBuffer.wrap(checkPoint)));
-                        } else {
-                            // TODO: log finding a orphan index, this maybe a bug
-                            kvService.delete(KV_NAMESPACE_ORDER_INDEX, orderIndexKey);
-                        }
-                    } catch (RocksDBException e) {
-                        // TODO: handle exception
-                        throw new RuntimeException(e);
+        return logOperationFuture.thenCombineAsync(fetchMessages(streamId, offset, fetchBatchSize), (operationId, fetchResult) -> {
+            try {
+                long nextVisibleTimestamp = operationTimestamp + invisibleDuration;
+                List<Message> messageList = new ArrayList<>(fetchResult);
+
+                // If a filter needs to be applied, fetch more messages and apply it to messages
+                // until exceeding the limit.
+                if (filter.needApply()) {
+                    boolean hasMoreMessages = messageList.size() >= fetchBatchSize;
+                    int fetchCount = messageList.size();
+                    long fetchSize = messageList.stream().map(message -> (long) message.getByteBuffer().limit()).reduce(0L, Long::sum);
+
+                    // Apply filter to messages
+                    messageList = filter.doFilter(messageList);
+
+                    // If not enough messages after applying filter, fetch more messages.
+                    while (hasMoreMessages &&
+                        messageList.size() < batchSize &&
+                        fetchCount < MAX_FETCH_COUNT &&
+                        fetchSize < MAX_FETCH_BYTES &&
+                        System.nanoTime() - operationTimestamp < MAX_FETCH_TIME_NANOS) {
+
+                        // Fetch more messages.
+                        fetchResult = fetchMessages(streamId, offset + fetchCount, fetchBatchSize).join();
+                        hasMoreMessages = messageList.size() >= fetchBatchSize;
+                        fetchCount += fetchResult.size();
+                        fetchSize += fetchResult.stream().map(message -> (long) message.getByteBuffer().limit()).reduce(0L, Long::sum);
+
+                        // Add filter result to message list.
+                        messageList.addAll(filter.doFilter(fetchResult));
+                    }
+                    System.out.println("Fetch count: " + fetchCount + ", fetch size: " + fetchSize);
+                }
+
+                // If pop orderly, check whether the message is already consumed.
+                Map<Long, CheckPoint> fifoCheckPointMap = new HashMap<>();
+                if (fifo) {
+                    for (int i = 0; i < batchSize; i++) {
+                        retrieveFifoCheckPoint(consumerGroupId, topicId, queueId, offset + i)
+                            .ifPresent(checkPoint -> fifoCheckPointMap.put(checkPoint.messageOffset(), checkPoint));
+
                     }
                 }
-            }
 
-            // Insert or renew check point and timer tag into KVService.
-            for (Message message : messageList) {
-                try {
+                // Insert or renew check point and timer tag into KVService.
+                List<MessageExt> messageExtList = new ArrayList<>(messageList.size());
+                for (Message message : messageList) {
                     // If pop orderly, the message already consumed will not trigger writing new check point.
                     // But reconsume count should be increased.
-                    if (fifo && orderCheckPointMap.containsKey(message.offset())) {
-                        // Delete last check point and timer tag.
-                        CheckPoint lastCheckPoint = orderCheckPointMap.get(message.offset());
-                        BatchDeleteRequest deleteLastCheckPointRequest = new BatchDeleteRequest(KV_NAMESPACE_CHECK_POINT,
-                            buildCheckPointKey(topicId, queueId, message.offset(), lastCheckPoint.operationId()));
-
-                        BatchDeleteRequest deleteLastTimerTagRequest = new BatchDeleteRequest(KV_NAMESPACE_TIMER_TAG,
-                            buildTimerTagKey(lastCheckPoint.nextVisibleTimestamp(), topicId, queueId, message.offset(), lastCheckPoint.operationId()));
-
-                        // Write new check point, timer tag, and order index.
-                        BatchWriteRequest writeCheckPointRequest = new BatchWriteRequest(KV_NAMESPACE_CHECK_POINT,
-                            buildCheckPointKey(topicId, queueId, message.offset(), operationId),
-                            buildCheckPointValue(topicId, queueId, message.offset(), consumerGroupId, operationId, true, false, operationTimestamp, nextVisibleTimestamp, lastCheckPoint.reconsumeCount() + 1));
-
-                        BatchWriteRequest writeTimerTagRequest = new BatchWriteRequest(KV_NAMESPACE_TIMER_TAG,
-                            buildTimerTagKey(nextVisibleTimestamp, topicId, queueId, message.offset(), operationId),
-                            buildTimerTagValue(nextVisibleTimestamp, consumerGroupId, topicId, queueId, streamId, message.offset(), operationId));
-
-                        BatchWriteRequest writeOrderIndexRequest = new BatchWriteRequest(KV_NAMESPACE_ORDER_INDEX,
-                            buildOrderIndexKey(consumerGroupId, topicId, queueId, message.offset()), buildOrderIndexValue(operationId));
-                        kvService.batch(deleteLastCheckPointRequest, deleteLastTimerTagRequest, writeCheckPointRequest, writeTimerTagRequest, writeOrderIndexRequest);
-                        continue;
+                    if (fifo && fifoCheckPointMap.containsKey(message.offset())) {
+                        renewFifoCheckPoint(fifoCheckPointMap.get(message.offset()), topicId, queueId, streamId, message.offset(), consumerGroupId, operationId, operationTimestamp, nextVisibleTimestamp);
+                    } else {
+                        writeCheckPoint(topicId, queueId, streamId, message.offset(), consumerGroupId, operationId, fifo, retry, operationTimestamp, nextVisibleTimestamp);
                     }
 
-                    // If this message is not orderly or has not been consumed, write check point and timer tag to KV service atomically.
-                    List<BatchRequest> requestList = new ArrayList<>();
-                    BatchWriteRequest writeCheckPointRequest = new BatchWriteRequest(KV_NAMESPACE_CHECK_POINT,
-                        buildCheckPointKey(topicId, queueId, message.offset(), operationId),
-                        buildCheckPointValue(topicId, queueId, message.offset(), consumerGroupId, operationId, fifo, retry, operationTimestamp, nextVisibleTimestamp, 0));
-                    requestList.add(writeCheckPointRequest);
-
-                    BatchWriteRequest writeTimerTagRequest = new BatchWriteRequest(KV_NAMESPACE_TIMER_TAG,
-                        buildTimerTagKey(nextVisibleTimestamp, topicId, queueId, message.offset(), operationId),
-                        buildTimerTagValue(nextVisibleTimestamp, consumerGroupId, topicId, queueId, streamId, message.offset(), operationId));
-                    requestList.add(writeTimerTagRequest);
-
-                    // If this message is orderly, write order index to KV service.
-                    if (fifo) {
-                        BatchWriteRequest writeOrderIndexRequest = new BatchWriteRequest(KV_NAMESPACE_ORDER_INDEX,
-                            buildOrderIndexKey(consumerGroupId, topicId, queueId, message.offset()), buildOrderIndexValue(operationId));
-                        requestList.add(writeOrderIndexRequest);
-                    }
-
-                    kvService.batch(requestList.toArray(new BatchRequest[0]));
-                } catch (RocksDBException e) {
-                    // TODO: handle exception
-                    throw new RuntimeException(e);
+                    String receiptHandle = SerializeUtil.encodeReceiptHandle(topicId, queueId, message.offset(), operationId);
+                    MessageExt messageExt = new MessageExt(message, receiptHandle);
+                    messageExtList.add(messageExt);
                 }
-            }
 
-            return new PopResult(0, operationId, operationTimestamp, messageList);
-        });
+                return new PopResult(0, operationId, operationTimestamp, messageExtList);
+            } catch (RocksDBException e) {
+                // TODO: handle exception
+                throw new RuntimeException(e);
+            }
+            // TODO: Use another executor.
+        }, MoreExecutors.directExecutor());
     }
 
     @Override
@@ -219,7 +288,7 @@ public class MessageStoreImpl implements MessageStore {
                     requestList.add(deleteTimerTagRequest);
 
                     if (checkPoint.fifo()) {
-                        BatchDeleteRequest deleteOrderIndexRequest = new BatchDeleteRequest(KV_NAMESPACE_ORDER_INDEX,
+                        BatchDeleteRequest deleteOrderIndexRequest = new BatchDeleteRequest(KV_NAMESPACE_FIFO_INDEX,
                             buildOrderIndexKey(checkPoint.consumerGroupId(), handle.topicId(), handle.queueId(), checkPoint.messageOffset()));
                         requestList.add(deleteOrderIndexRequest);
                     }

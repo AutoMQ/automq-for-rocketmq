@@ -19,10 +19,27 @@ package com.automq.rocketmq.common.model;
 
 import com.automq.rocketmq.common.model.generated.Message;
 import com.google.common.base.Strings;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
-public record MessageExt(Message message, Map<String, String> systemPropertyMap) {
+public class MessageExt {
     private static final String SYSTEM_PROPERTY_RECONSUME_COUNT = "RECONSUME_COUNT";
+
+    private final Message message;
+
+    private final Map<String, String> systemPropertyMap;
+    private String receiptHandle;
+
+    public MessageExt(Message message, Map<String, String> systemPropertyMap) {
+        this.message = message;
+        this.systemPropertyMap = systemPropertyMap;
+    }
+
+    public MessageExt(Message message, String receiptHandle) {
+        this(message, new HashMap<>());
+        this.receiptHandle = receiptHandle;
+    }
 
     public int getReconsumeCount() {
         String reconsumeCount = systemPropertyMap.get(SYSTEM_PROPERTY_RECONSUME_COUNT);
@@ -34,5 +51,17 @@ public record MessageExt(Message message, Map<String, String> systemPropertyMap)
 
     public void setReconsumeCount(int reconsumeCount) {
         systemPropertyMap.put(SYSTEM_PROPERTY_RECONSUME_COUNT, String.valueOf(reconsumeCount));
+    }
+
+    public Map<String, String> systemPropertyMap() {
+        return systemPropertyMap;
+    }
+
+    public Message message() {
+        return message;
+    }
+
+    public Optional<String> receiptHandle() {
+        return Optional.ofNullable(receiptHandle);
     }
 }

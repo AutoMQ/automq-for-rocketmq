@@ -17,8 +17,8 @@
 
 package com.automq.rocketmq.store.model.message;
 
-import com.automq.rocketmq.common.model.MessageExt;
-import java.util.List;
-
-public record PopResult(int status, long operationId, long deliveryTimestamp, List<MessageExt> messageList) {
+public enum FilterType {
+    NONE,
+    TAG,
+    SQL
 }
