@@ -198,7 +198,7 @@ class MessageStoreTest {
         streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, 3, "tagA"))).join();
         streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, 4, "tagB"))).join();
 
-        PopResult popResult = messageStore.pop(1, 1, 1, 0, new TagFilter("tagB"), 2, true, false, 100).join();
+        PopResult popResult = messageStore.pop(1, 1, 1, 0, new TagFilter("tagB || tagC"), 2, true, false, 100).join();
         assertEquals(0, popResult.status());
         assertEquals(2, popResult.messageList().size());
 

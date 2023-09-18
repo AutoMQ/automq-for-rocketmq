@@ -18,20 +18,54 @@
 package com.automq.rocketmq.store.model.message;
 
 import com.automq.rocketmq.common.model.generated.Message;
+import com.google.common.base.Strings;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
-public record TagFilter(String expression) implements Filter {
+public class TagFilter implements Filter {
+    public final static String SUB_ALL = "*";
+
+    String expression;
+    Set<String> tagSet;
+
+    public TagFilter(String expression) {
+        if (Strings.isNullOrEmpty(expression)) {
+            throw new IllegalArgumentException("Expression can not be null or empty");
+        }
+
+        if (expression.contains(SUB_ALL)) {
+            throw new IllegalArgumentException("Expression of TagFilter can not contain *, use Filter#DEFAULT_FILTER instead");
+        }
+
+        this.expression = expression;
+        String[] tags = expression.split("\\|\\|");
+        if (tags.length > 0) {
+            this.tagSet = Arrays.stream(tags)
+                .map(String::trim)
+                // Filter out blank tags and SUB_ALL
+                .filter(tag -> !tag.isBlank())
+                .collect(Collectors.toSet());
+        } else {
+            throw new IllegalArgumentException("Split expression failed");
+        }
+    }
+
     @Override
     public FilterType type() {
         return FilterType.TAG;
     }
 
     @Override
+    public String expression() {
+        return expression;
+    }
+
+    @Override
     public List<Message> apply(List<Message> messageList) {
         return messageList.stream()
-            .filter(message -> Objects.equals(message.tag(), expression))
+            .filter(message -> !Strings.isNullOrEmpty(message.tag()) && tagSet.contains(message.tag()))
             .collect(Collectors.toList());
     }
 }
