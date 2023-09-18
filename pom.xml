@@ -47,6 +47,7 @@
         <slf4j.version>2.0.9</slf4j.version>
         <logback.version>1.4.11</logback.version>
         <etcd.version>0.7.6</etcd.version>
+        <snakeyaml.version>2.2</snakeyaml.version>
 
         <!-- Flat buffers related -->
         <flatbuffers.version>23.5.26</flatbuffers.version>
@@ -73,6 +74,7 @@
                 <artifactId>rocketmq-s3stream</artifactId>
                 <version>${project.version}</version>
             </dependency>
+
             <dependency>
                 <groupId>io.grpc</groupId>
                 <artifactId>grpc-bom</artifactId>
@@ -80,22 +82,26 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+
             <dependency>
                 <groupId>org.rocksdb</groupId>
                 <artifactId>rocksdbjni</artifactId>
                 <version>${rocksdb.version}</version>
             </dependency>
+
             <dependency>
                 <groupId>io.etcd</groupId>
                 <artifactId>jetcd-core</artifactId>
                 <version>${etcd.version}</version>
             </dependency>
+
             <dependency>
                 <groupId>io.etcd</groupId>
                 <artifactId>jetcd-test</artifactId>
                 <version>${etcd.version}</version>
                 <scope>test</scope>
             </dependency>
+
             <dependency>
                 <groupId>com.google.guava</groupId>
                 <artifactId>guava</artifactId>
@@ -107,6 +113,13 @@
                     </exclusion>
                 </exclusions>
             </dependency>
+
+            <dependency>
+                <groupId>org.yaml</groupId>
+                <artifactId>snakeyaml</artifactId>
+                <version>${snakeyaml.version}</version>
+            </dependency>
+
 
             <dependency>
                 <groupId>com.google.flatbuffers</groupId>
