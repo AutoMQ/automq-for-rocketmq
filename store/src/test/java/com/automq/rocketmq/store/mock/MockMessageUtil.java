@@ -17,21 +17,27 @@
 
 package com.automq.rocketmq.store.mock;
 
+import com.automq.rocketmq.common.model.generated.KeyValue;
 import com.automq.rocketmq.common.model.generated.Message;
 import com.google.flatbuffers.FlatBufferBuilder;
 import java.nio.ByteBuffer;
 
 public class MockMessageUtil {
     public static ByteBuffer buildMessage() {
-        FlatBufferBuilder builder = new FlatBufferBuilder();
-        int root = Message.createMessage(builder, 1, 1, 0, builder.createString(""));
-        builder.finish(root);
-        return builder.dataBuffer();
+        return buildMessage(1,1,"");
     }
 
-    public static ByteBuffer buildMessage(long topicId, int queueId, long offset, String tag) {
+    public static ByteBuffer buildMessage(long topicId, int queueId, String tag) {
+        // Build properties for message
         FlatBufferBuilder builder = new FlatBufferBuilder();
-        int root = Message.createMessage(builder, topicId, queueId, offset, builder.createString(tag));
+        int key = builder.createString("foo_key");
+        int value = builder.createString("foo_value");
+        int properties = KeyValue.createKeyValue(builder, key, value);
+
+        // Build the payload for message
+        int payload = Message.createPayloadVector(builder, new byte[1024]);
+
+        int root = Message.createMessage(builder, topicId, queueId, builder.createString(tag), properties, payload);
         builder.finish(root);
         return builder.dataBuffer();
     }

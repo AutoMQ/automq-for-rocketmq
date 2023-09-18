@@ -111,10 +111,10 @@ public class ReviveService implements Runnable {
             message.setReconsumeCount(message.getReconsumeCount() + 1);
             if (message.getReconsumeCount() <= metadataService.getMaxRetryTimes(timerTag.consumerGroupId())) {
                 long retryStreamId = metadataService.getRetryStreamId(timerTag.consumerGroupId(), timerTag.originTopicId(), timerTag.originQueueId());
-                streamStore.append(retryStreamId, new SingleRecord(message.systemPropertyMap(), message.message().getByteBuffer())).join();
+                streamStore.append(retryStreamId, new SingleRecord(message.getSystemProperties(), message.getMessage().getByteBuffer())).join();
             } else {
                 long deadLetterStreamId = metadataService.getDeadLetterStreamId(timerTag.consumerGroupId(), timerTag.originTopicId(), timerTag.originQueueId());
-                streamStore.append(deadLetterStreamId, new SingleRecord(message.systemPropertyMap(), message.message().getByteBuffer())).join();
+                streamStore.append(deadLetterStreamId, new SingleRecord(message.getSystemProperties(), message.getMessage().getByteBuffer())).join();
             }
 
             // Delete checkpoint and timer tag

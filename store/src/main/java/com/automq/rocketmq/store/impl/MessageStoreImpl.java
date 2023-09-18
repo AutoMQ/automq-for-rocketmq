@@ -32,6 +32,8 @@ import com.automq.rocketmq.store.model.message.AckResult;
 import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
 import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PopResult;
+import com.automq.rocketmq.store.model.message.PutResult;
+import com.automq.rocketmq.store.model.stream.SingleRecord;
 import com.automq.rocketmq.store.service.KVService;
 import com.automq.rocketmq.store.service.OperationLogService;
 import com.automq.rocketmq.store.service.impl.ReviveService;
@@ -152,13 +154,17 @@ public class MessageStoreImpl implements MessageStore {
         kvService.batch(deleteLastCheckPointRequest, deleteLastTimerTagRequest, writeCheckPointRequest, writeTimerTagRequest, writeOrderIndexRequest);
     }
 
-    public CompletableFuture<List<Message>> fetchMessages(long streamId, long offset, int batchSize) {
+    public CompletableFuture<List<MessageExt>> fetchMessages(long streamId, long offset, int batchSize) {
         return streamStore.fetch(streamId, offset, batchSize)
             .thenApply(fetchResult -> {
                 // TODO: Assume message count is always 1 in each batch for now.
                 return fetchResult.recordBatchList()
                     .stream()
-                    .map(batch -> Message.getRootAsMessage(batch.rawPayload()))
+                    .map(batch -> {
+                        Message message = Message.getRootAsMessage(batch.rawPayload());
+                        MessageExt messageExt = new MessageExt(message, batch.properties(), batch.baseOffset());
+                        return messageExt;
+                    })
                     .toList();
             });
     }
@@ -192,14 +198,14 @@ public class MessageStoreImpl implements MessageStore {
         return logOperationFuture.thenCombineAsync(fetchMessages(streamId, offset, fetchBatchSize), (operationId, fetchResult) -> {
             try {
                 long nextVisibleTimestamp = operationTimestamp + invisibleDuration;
-                List<Message> messageList = new ArrayList<>(fetchResult);
+                List<MessageExt> messageList = new ArrayList<>(fetchResult);
 
                 // If a filter needs to be applied, fetch more messages and apply it to messages
                 // until exceeding the limit.
                 if (filter.needApply()) {
                     boolean hasMoreMessages = messageList.size() >= fetchBatchSize;
                     int fetchCount = messageList.size();
-                    long fetchBytes = messageList.stream().map(message -> (long) message.getByteBuffer().remaining()).reduce(0L, Long::sum);
+                    long fetchBytes = messageList.stream().map(messageExt -> (long) messageExt.getMessage().getByteBuffer().remaining()).reduce(0L, Long::sum);
 
                     // Apply filter to messages
                     messageList = filter.doFilter(messageList);
@@ -215,7 +221,7 @@ public class MessageStoreImpl implements MessageStore {
                         fetchResult = fetchMessages(streamId, offset + fetchCount, fetchBatchSize).join();
                         hasMoreMessages = messageList.size() >= fetchBatchSize;
                         fetchCount += fetchResult.size();
-                        fetchBytes += fetchResult.stream().map(message -> (long) message.getByteBuffer().remaining()).reduce(0L, Long::sum);
+                        fetchBytes += fetchResult.stream().map(messageExt -> (long) messageExt.getMessage().getByteBuffer().remaining()).reduce(0L, Long::sum);
 
                         // Add filter result to message list.
                         messageList.addAll(filter.doFilter(fetchResult));
@@ -233,28 +239,33 @@ public class MessageStoreImpl implements MessageStore {
                 }
 
                 // Insert or renew check point and timer tag into KVService.
-                List<MessageExt> messageExtList = new ArrayList<>(messageList.size());
-                for (Message message : messageList) {
+                for (MessageExt message : messageList) {
                     // If pop orderly, the message already consumed will not trigger writing new check point.
                     // But reconsume count should be increased.
-                    if (fifo && fifoCheckPointMap.containsKey(message.offset())) {
-                        renewFifoCheckPoint(fifoCheckPointMap.get(message.offset()), topicId, queueId, streamId, message.offset(), consumerGroupId, operationId, operationTimestamp, nextVisibleTimestamp);
+                    if (fifo && fifoCheckPointMap.containsKey(message.getOffset())) {
+                        renewFifoCheckPoint(fifoCheckPointMap.get(message.getOffset()), topicId, queueId, streamId, message.getOffset(), consumerGroupId, operationId, operationTimestamp, nextVisibleTimestamp);
                     } else {
-                        writeCheckPoint(topicId, queueId, streamId, message.offset(), consumerGroupId, operationId, fifo, retry, operationTimestamp, nextVisibleTimestamp);
+                        writeCheckPoint(topicId, queueId, streamId, message.getOffset(), consumerGroupId, operationId, fifo, retry, operationTimestamp, nextVisibleTimestamp);
                     }
 
-                    String receiptHandle = SerializeUtil.encodeReceiptHandle(topicId, queueId, message.offset(), operationId);
-                    MessageExt messageExt = new MessageExt(message, receiptHandle);
-                    messageExtList.add(messageExt);
+                    String receiptHandle = SerializeUtil.encodeReceiptHandle(topicId, queueId, message.getOffset(), operationId);
+                    message.setReceiptHandle(receiptHandle);
                 }
 
-                return new PopResult(0, operationId, operationTimestamp, messageExtList);
+                return new PopResult(0, operationId, operationTimestamp, messageList);
             } catch (RocksDBException e) {
                 // TODO: handle exception
                 throw new RuntimeException(e);
             }
             // TODO: Use another executor.
         }, MoreExecutors.directExecutor());
+    }
+
+    @Override
+    public CompletableFuture<PutResult> put(Message message, Map<String, String> systemProperties) {
+        long streamId = metadataService.getStreamId(message.topicId(), message.queueId());
+        return streamStore.append(streamId, new SingleRecord(systemProperties, message.getByteBuffer())).thenApply(appendResult -> new PutResult(appendResult.baseOffset()));
+
     }
 
     @Override
