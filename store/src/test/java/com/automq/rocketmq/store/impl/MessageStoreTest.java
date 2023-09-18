@@ -71,7 +71,7 @@ class MessageStoreTest {
     }
 
     @Test
-    void append_then_pop() throws RocksDBException {
+    void putWithPop() throws RocksDBException {
         Message message = Message.getRootAsMessage(buildMessage(1, 1, "TagA"));
         messageStore.put(message, new HashMap<>());
 

@@ -70,8 +70,4 @@ public class MessageExt {
     public long getOffset() {
         return offset;
     }
-
-    public void setOffset(long offset) {
-        this.offset = offset;
-    }
 }
