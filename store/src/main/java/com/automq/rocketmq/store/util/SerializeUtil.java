@@ -24,6 +24,7 @@ import com.automq.rocketmq.store.model.generated.Operation;
 import com.automq.rocketmq.store.model.generated.OperationLogItem;
 import com.automq.rocketmq.store.model.generated.PopOperation;
 import com.automq.rocketmq.store.model.generated.ReceiptHandle;
+import com.automq.rocketmq.store.model.generated.TimerTag;
 import com.google.flatbuffers.FlatBufferBuilder;
 import java.nio.ByteBuffer;
 import java.util.Base64;
@@ -40,23 +41,32 @@ public class SerializeUtil {
     }
 
     public static byte[] buildCheckPointValue(long topicId, int queueId, long offset,
-        long consumerGroupId, long operationId, boolean isOrder, long deliveryTimestamp, long nextVisibleTimestamp,
-        int reconsumeCount) {
+        long consumerGroupId, long operationId, boolean isOrder, boolean isRetry, long deliveryTimestamp,
+        long nextVisibleTimestamp, int reconsumeCount) {
         FlatBufferBuilder builder = new FlatBufferBuilder();
-        int root = CheckPoint.createCheckPoint(builder, topicId, queueId, offset, consumerGroupId, operationId, isOrder, deliveryTimestamp, nextVisibleTimestamp, reconsumeCount);
+        int root = CheckPoint.createCheckPoint(builder, topicId, queueId, offset, consumerGroupId, operationId, isOrder, isRetry, deliveryTimestamp, nextVisibleTimestamp, reconsumeCount);
         builder.finish(root);
         return builder.sizedByteArray();
     }
 
     // <deliveryTimestamp + invisibleDuration><topicId><queueId><operationId>
-    public static byte[] buildTimerTagKey(long nextVisibleTimestamp, long topicId, int queueId,
+    public static byte[] buildTimerTagKey(long nextVisibleTimestamp, long topicId, int queueId, long offset,
         long operationId) {
         ByteBuffer buffer = ByteBuffer.allocate(28);
         buffer.putLong(0, nextVisibleTimestamp);
         buffer.putLong(8, topicId);
         buffer.putInt(16, queueId);
+        buffer.putLong(16, offset);
         buffer.putLong(20, operationId);
         return buffer.array();
+    }
+
+    public static byte[] buildTimerTagValue(long nextVisibleTimestamp, long consumerGroupId, long topicId, int queueId,
+        long streamId, long offset, long operationId) {
+        FlatBufferBuilder builder = new FlatBufferBuilder();
+        int root = TimerTag.createTimerTag(builder, nextVisibleTimestamp, consumerGroupId, topicId, queueId, streamId, offset, operationId);
+        builder.finish(root);
+        return builder.sizedByteArray();
     }
 
     // <groupId><topicId><queueId><offset>

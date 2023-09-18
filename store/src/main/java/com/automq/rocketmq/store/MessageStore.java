@@ -36,7 +36,7 @@ public interface MessageStore {
      * @return pop result, see {@link PopResult}
      */
     CompletableFuture<PopResult> pop(long consumerGroupId, long topicId, int queueId, long offset, int batchSize,
-        boolean isOrder, long invisibleDuration);
+        boolean isOrder, boolean isRetry, long invisibleDuration);
 
     /**
      * Ack message.

@@ -7,9 +7,20 @@ table CheckPoint {
   consumer_group_id:long;
   operation_id:long;
   is_order:bool;
+  is_retry:bool;
   delivery_timestamp:long;
   next_visible_timestamp:long;
   reconsume_count:int;
+}
+
+table TimerTag {
+  next_visible_timestamp:long;
+  consumer_group_id:long;
+  origin_topic_id:long;
+  origin_queue_id:int;
+  stream_id:long;
+  offset:long;
+  operation_id:long;
 }
 
 table ReceiptHandle {

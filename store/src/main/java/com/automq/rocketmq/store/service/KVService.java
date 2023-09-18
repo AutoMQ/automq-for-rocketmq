@@ -19,13 +19,9 @@ package com.automq.rocketmq.store.service;
 
 import com.automq.rocketmq.store.model.kv.BatchRequest;
 import com.automq.rocketmq.store.model.kv.IteratorCallback;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import org.rocksdb.RocksDBException;
 
 public interface KVService {
-    Charset CHARSET = StandardCharsets.UTF_8;
-
     // TODO: Map RocksDBException into StoreException
 
     /**
@@ -61,8 +57,8 @@ public interface KVService {
      * @param callback the iterator will call {@link IteratorCallback#onRead} to consume the kv pair
      * @throws RocksDBException if backend engine fails
      */
-    void iterate(final String namespace, String prefix, final String start,
-        final String end, IteratorCallback callback) throws RocksDBException;
+    void iterate(final String namespace, final byte[] prefix, final byte[] start,
+        final byte[] end, IteratorCallback callback) throws RocksDBException;
 
     /**
      * Put the kv pair into the backend engine.
