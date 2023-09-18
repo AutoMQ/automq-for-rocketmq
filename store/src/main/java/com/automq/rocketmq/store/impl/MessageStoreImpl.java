@@ -38,7 +38,6 @@ import com.automq.rocketmq.store.service.KVService;
 import com.automq.rocketmq.store.service.OperationLogService;
 import com.automq.rocketmq.store.service.impl.ReviveService;
 import com.automq.rocketmq.store.util.SerializeUtil;
-import com.google.common.util.concurrent.MoreExecutors;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -169,6 +168,37 @@ public class MessageStoreImpl implements MessageStore {
             });
     }
 
+    // Fetch and filter messages until exceeding the limit.
+    public CompletableFuture<List<MessageExt>> fetchAndFilterMessages(long streamId, long offset, int batchSize,
+        int fetchBatchSize, Filter filter, long operationTimestamp, List<MessageExt> messageList, int fetchCount,
+        long fetchBytes) {
+        // Fetch more messages.
+        return fetchMessages(streamId, offset + fetchCount, fetchBatchSize)
+            .thenCompose(fetchResult -> {
+                // Add filter result to message list.
+                messageList.addAll(filter.doFilter(fetchResult));
+
+                // If not enough messages after applying filter, fetch more messages.
+                boolean needToFetch = messageList.size() < batchSize;
+                boolean hasMoreMessages = fetchResult.size() >= fetchBatchSize;
+
+                int newFetchCount = fetchCount + fetchResult.size();
+                long newFetchBytes = fetchBytes + fetchResult.stream()
+                    .map(message -> (long) message.getMessage().getByteBuffer().limit())
+                    .reduce(0L, Long::sum);
+                boolean notExceedLimit = newFetchCount < config.maxFetchCount() &&
+                    newFetchBytes < config.maxFetchBytes() &&
+                    System.nanoTime() - operationTimestamp < config.maxFetchTimeNanos();
+
+                if (needToFetch && hasMoreMessages && notExceedLimit) {
+                    return fetchAndFilterMessages(streamId, offset, batchSize, fetchBatchSize, filter,
+                        operationTimestamp, messageList, newFetchCount, newFetchBytes);
+                } else {
+                    return CompletableFuture.completedFuture(messageList);
+                }
+            });
+    }
+
     @Override
     public CompletableFuture<PopResult> pop(long consumerGroupId, long topicId, int queueId, long offset, Filter filter,
         int batchSize, boolean fifo, boolean retry, long invisibleDuration) {
@@ -179,7 +209,8 @@ public class MessageStoreImpl implements MessageStore {
         // Write pop operation to operation log.
         // Operation id should be monotonically increasing for each queue
         long operationTimestamp = System.nanoTime();
-        CompletableFuture<Long> logOperationFuture = operationLogService.logPopOperation(consumerGroupId, topicId, queueId, offset, batchSize, fifo, invisibleDuration, operationTimestamp);
+        CompletableFuture<Long> logOperationFuture = operationLogService.logPopOperation(consumerGroupId, topicId,
+            queueId, offset, batchSize, fifo, invisibleDuration, operationTimestamp);
 
         long streamId;
         if (retry) {
@@ -195,38 +226,36 @@ public class MessageStoreImpl implements MessageStore {
             fetchBatchSize = batchSize;
         }
 
-        return logOperationFuture.thenCombineAsync(fetchMessages(streamId, offset, fetchBatchSize), (operationId, fetchResult) -> {
-            try {
-                long nextVisibleTimestamp = operationTimestamp + invisibleDuration;
+        CompletableFuture<List<MessageExt>> fetchAndFilterMessagesFuture = fetchMessages(streamId, offset, fetchBatchSize)
+            .thenCompose(fetchResult -> {
                 List<MessageExt> messageList = new ArrayList<>(fetchResult);
-
                 // If a filter needs to be applied, fetch more messages and apply it to messages
                 // until exceeding the limit.
                 if (filter.needApply()) {
-                    boolean hasMoreMessages = messageList.size() >= fetchBatchSize;
                     int fetchCount = messageList.size();
-                    long fetchBytes = messageList.stream().map(messageExt -> (long) messageExt.getMessage().getByteBuffer().remaining()).reduce(0L, Long::sum);
+                    long fetchBytes = messageList.stream()
+                        .map(message -> (long) message.getMessage().getByteBuffer().remaining())
+                        .reduce(0L, Long::sum);
 
                     // Apply filter to messages
                     messageList = filter.doFilter(messageList);
 
                     // If not enough messages after applying filter, fetch more messages.
-                    while (hasMoreMessages &&
-                        messageList.size() < batchSize &&
-                        fetchCount < config.maxFetchCount() &&
-                        fetchBytes < config.maxFetchBytes() &&
-                        System.nanoTime() - operationTimestamp < config.maxFetchTimeNanos()) {
-
-                        // Fetch more messages.
-                        fetchResult = fetchMessages(streamId, offset + fetchCount, fetchBatchSize).join();
-                        hasMoreMessages = messageList.size() >= fetchBatchSize;
-                        fetchCount += fetchResult.size();
-                        fetchBytes += fetchResult.stream().map(messageExt -> (long) messageExt.getMessage().getByteBuffer().remaining()).reduce(0L, Long::sum);
-
-                        // Add filter result to message list.
-                        messageList.addAll(filter.doFilter(fetchResult));
+                    boolean needToFetch = messageList.size() < batchSize;
+                    boolean hasMoreMessages = fetchResult.size() >= fetchBatchSize;
+                    if (needToFetch && hasMoreMessages) {
+                        return fetchAndFilterMessages(streamId, offset, batchSize, fetchBatchSize, filter,
+                            operationTimestamp, messageList, fetchCount, fetchBytes);
                     }
                 }
+
+                return CompletableFuture.completedFuture(messageList);
+            });
+
+        // Write check point and build pop result.
+        return logOperationFuture.thenCombineAsync(fetchAndFilterMessagesFuture, (operationId, messageList) -> {
+            try {
+                long nextVisibleTimestamp = operationTimestamp + invisibleDuration;
 
                 // If pop orderly, check whether the message is already consumed.
                 Map<Long, CheckPoint> fifoCheckPointMap = new HashMap<>();
@@ -234,7 +263,6 @@ public class MessageStoreImpl implements MessageStore {
                     for (int i = 0; i < batchSize; i++) {
                         retrieveFifoCheckPoint(consumerGroupId, topicId, queueId, offset + i)
                             .ifPresent(checkPoint -> fifoCheckPointMap.put(checkPoint.messageOffset(), checkPoint));
-
                     }
                 }
 
@@ -243,9 +271,11 @@ public class MessageStoreImpl implements MessageStore {
                     // If pop orderly, the message already consumed will not trigger writing new check point.
                     // But reconsume count should be increased.
                     if (fifo && fifoCheckPointMap.containsKey(message.getOffset())) {
-                        renewFifoCheckPoint(fifoCheckPointMap.get(message.getOffset()), topicId, queueId, streamId, message.getOffset(), consumerGroupId, operationId, operationTimestamp, nextVisibleTimestamp);
+                        renewFifoCheckPoint(fifoCheckPointMap.get(message.getOffset()), topicId, queueId, streamId,
+                            message.getOffset(), consumerGroupId, operationId, operationTimestamp, nextVisibleTimestamp);
                     } else {
-                        writeCheckPoint(topicId, queueId, streamId, message.getOffset(), consumerGroupId, operationId, fifo, retry, operationTimestamp, nextVisibleTimestamp);
+                        writeCheckPoint(topicId, queueId, streamId, message.getOffset(), consumerGroupId, operationId,
+                            fifo, retry, operationTimestamp, nextVisibleTimestamp);
                     }
 
                     String receiptHandle = SerializeUtil.encodeReceiptHandle(topicId, queueId, message.getOffset(), operationId);
@@ -257,8 +287,7 @@ public class MessageStoreImpl implements MessageStore {
                 // TODO: handle exception
                 throw new RuntimeException(e);
             }
-            // TODO: Use another executor.
-        }, MoreExecutors.directExecutor());
+        });
     }
 
     @Override
