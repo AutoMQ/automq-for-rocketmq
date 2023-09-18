@@ -61,7 +61,7 @@ public class SerializeUtilTest {
         assertEquals(OFFSET, checkPoint.messageOffset());
         assertEquals(CONSUMER_GROUP_ID, checkPoint.consumerGroupId());
         assertEquals(OPERATION_ID, checkPoint.operationId());
-        assertEquals(IS_ORDER, checkPoint.isOrder());
+        assertEquals(IS_ORDER, checkPoint.fifo());
         assertEquals(DELIVERY_TIMESTAMP, checkPoint.deliveryTimestamp());
         assertEquals(NEXT_VISIBLE_TIMESTAMP, checkPoint.nextVisibleTimestamp());
         assertEquals(RECONSUME_COUNT, checkPoint.reconsumeCount());
@@ -113,7 +113,7 @@ public class SerializeUtilTest {
         assertEquals(QUEUE_ID, operation.queueId());
         assertEquals(OFFSET, operation.offset());
         assertEquals(BATCH_SIZE, operation.batchSize());
-        assertEquals(IS_ORDER, operation.isOrder());
+        assertEquals(IS_ORDER, operation.fifo());
         assertEquals(INVISIBLE_DURATION, operation.invisibleDuration());
         assertEquals(OPERATION_TIMESTAMP, operation.operationTimestamp());
     }
