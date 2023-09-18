@@ -203,7 +203,7 @@ public class MessageStoreImpl implements MessageStore {
                     long fetchSize = messageList.stream().map(message -> (long) message.getByteBuffer().limit()).reduce(0L, Long::sum);
 
                     // Apply filter to messages
-                    messageList = filter.apply(messageList);
+                    messageList = filter.doFilter(messageList);
 
                     // If not enough messages after applying filter, fetch more messages.
                     while (hasMoreMessages &&
@@ -219,7 +219,7 @@ public class MessageStoreImpl implements MessageStore {
                         fetchSize += fetchResult.stream().map(message -> (long) message.getByteBuffer().limit()).reduce(0L, Long::sum);
 
                         // Add filter result to message list.
-                        messageList.addAll(filter.apply(fetchResult));
+                        messageList.addAll(filter.doFilter(fetchResult));
                     }
                     System.out.println("Fetch count: " + fetchCount + ", fetch size: " + fetchSize);
                 }

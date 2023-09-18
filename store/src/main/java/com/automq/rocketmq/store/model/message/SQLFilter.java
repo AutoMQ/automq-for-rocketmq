@@ -27,7 +27,7 @@ public record SQLFilter(String expression) implements Filter {
     }
 
     @Override
-    public List<Message> apply(List<Message> messageList) {
+    public List<Message> doFilter(List<Message> messageList) {
         return messageList;
     }
 }

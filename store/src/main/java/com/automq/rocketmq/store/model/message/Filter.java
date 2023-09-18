@@ -33,7 +33,7 @@ public interface Filter {
         }
 
         @Override
-        public List<Message> apply(List<Message> messageList) {
+        public List<Message> doFilter(List<Message> messageList) {
             return messageList;
         }
     };
@@ -46,5 +46,5 @@ public interface Filter {
 
     String expression();
 
-    List<Message> apply(List<Message> messageList);
+    List<Message> doFilter(List<Message> messageList);
 }

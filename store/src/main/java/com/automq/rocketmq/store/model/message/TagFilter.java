@@ -63,7 +63,7 @@ public class TagFilter implements Filter {
     }
 
     @Override
-    public List<Message> apply(List<Message> messageList) {
+    public List<Message> doFilter(List<Message> messageList) {
         return messageList.stream()
             .filter(message -> !Strings.isNullOrEmpty(message.tag()) && tagSet.contains(message.tag()))
             .collect(Collectors.toList());
