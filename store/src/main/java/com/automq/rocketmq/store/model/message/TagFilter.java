@@ -17,7 +17,7 @@
 
 package com.automq.rocketmq.store.model.message;
 
-import com.automq.rocketmq.common.model.generated.Message;
+import com.automq.rocketmq.common.model.MessageExt;
 import com.google.common.base.Strings;
 import java.util.Arrays;
 import java.util.List;
@@ -63,9 +63,9 @@ public class TagFilter implements Filter {
     }
 
     @Override
-    public List<Message> doFilter(List<Message> messageList) {
+    public List<MessageExt> doFilter(List<MessageExt> messageList) {
         return messageList.stream()
-            .filter(message -> !Strings.isNullOrEmpty(message.tag()) && tagSet.contains(message.tag()))
+            .filter(messageExt -> !Strings.isNullOrEmpty(messageExt.getMessage().tag()) && tagSet.contains(messageExt.getMessage().tag()))
             .collect(Collectors.toList());
     }
 }

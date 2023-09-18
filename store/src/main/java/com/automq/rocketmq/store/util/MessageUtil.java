@@ -19,11 +19,11 @@ package com.automq.rocketmq.store.util;
 
 import com.automq.rocketmq.common.model.MessageExt;
 import com.automq.rocketmq.common.model.generated.Message;
-import com.automq.rocketmq.stream.api.RecordBatch;
+import com.automq.rocketmq.stream.api.RecordBatchWithContext;
 
 public class MessageUtil {
-    public static MessageExt transferToMessage(RecordBatch recordBatch) {
+    public static MessageExt transferToMessage(RecordBatchWithContext recordBatch) {
         Message message = Message.getRootAsMessage(recordBatch.rawPayload());
-        return new MessageExt(message, recordBatch.properties());
+        return new MessageExt(message, recordBatch.properties(), recordBatch.baseOffset());
     }
 }
