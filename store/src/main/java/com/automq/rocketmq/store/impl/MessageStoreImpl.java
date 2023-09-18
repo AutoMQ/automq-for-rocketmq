@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.store.impl;
 
+import com.automq.rocketmq.common.config.StoreConfig;
 import com.automq.rocketmq.common.model.MessageExt;
 import com.automq.rocketmq.common.model.generated.Message;
 import com.automq.rocketmq.metadata.StoreMetadataService;
@@ -58,10 +59,7 @@ public class MessageStoreImpl implements MessageStore {
     protected static final String KV_NAMESPACE_TIMER_TAG = "timer_tag";
     protected static final String KV_NAMESPACE_FIFO_INDEX = "fifo_index";
 
-    // TODO: Make these limitations configurable.
-    protected static final int MAX_FETCH_COUNT = 1000;
-    protected static final long MAX_FETCH_BYTES = 10L * 1024 * 1024; // 10MB
-    protected static final long MAX_FETCH_TIME_NANOS = 10L * 1000 * 1000_000; // 10s
+    StoreConfig config;
 
     private final StreamStore streamStore;
 
@@ -71,8 +69,9 @@ public class MessageStoreImpl implements MessageStore {
 
     private ReviveService reviveService;
 
-    public MessageStoreImpl(StreamStore streamStore, OperationLogService operationLogService,
+    public MessageStoreImpl(StoreConfig config, StreamStore streamStore, OperationLogService operationLogService,
         StoreMetadataService metadataService, KVService kvService) {
+        this.config = config;
         this.streamStore = streamStore;
         this.operationLogService = operationLogService;
         this.metadataService = metadataService;
@@ -200,7 +199,7 @@ public class MessageStoreImpl implements MessageStore {
                 if (filter.needApply()) {
                     boolean hasMoreMessages = messageList.size() >= fetchBatchSize;
                     int fetchCount = messageList.size();
-                    long fetchSize = messageList.stream().map(message -> (long) message.getByteBuffer().limit()).reduce(0L, Long::sum);
+                    long fetchBytes = messageList.stream().map(message -> (long) message.getByteBuffer().remaining()).reduce(0L, Long::sum);
 
                     // Apply filter to messages
                     messageList = filter.doFilter(messageList);
@@ -208,20 +207,19 @@ public class MessageStoreImpl implements MessageStore {
                     // If not enough messages after applying filter, fetch more messages.
                     while (hasMoreMessages &&
                         messageList.size() < batchSize &&
-                        fetchCount < MAX_FETCH_COUNT &&
-                        fetchSize < MAX_FETCH_BYTES &&
-                        System.nanoTime() - operationTimestamp < MAX_FETCH_TIME_NANOS) {
+                        fetchCount < config.maxFetchCount() &&
+                        fetchBytes < config.maxFetchBytes() &&
+                        System.nanoTime() - operationTimestamp < config.maxFetchTimeNanos()) {
 
                         // Fetch more messages.
                         fetchResult = fetchMessages(streamId, offset + fetchCount, fetchBatchSize).join();
                         hasMoreMessages = messageList.size() >= fetchBatchSize;
                         fetchCount += fetchResult.size();
-                        fetchSize += fetchResult.stream().map(message -> (long) message.getByteBuffer().limit()).reduce(0L, Long::sum);
+                        fetchBytes += fetchResult.stream().map(message -> (long) message.getByteBuffer().remaining()).reduce(0L, Long::sum);
 
                         // Add filter result to message list.
                         messageList.addAll(filter.doFilter(fetchResult));
                     }
-                    System.out.println("Fetch count: " + fetchCount + ", fetch size: " + fetchSize);
                 }
 
                 // If pop orderly, check whether the message is already consumed.

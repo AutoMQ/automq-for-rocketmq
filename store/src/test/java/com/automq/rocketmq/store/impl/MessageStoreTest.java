@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.store.impl;
 
+import com.automq.rocketmq.common.config.StoreConfig;
 import com.automq.rocketmq.common.model.MessageExt;
 import com.automq.rocketmq.common.model.generated.Message;
 import com.automq.rocketmq.metadata.StoreMetadataService;
@@ -61,7 +62,7 @@ class MessageStoreTest {
         kvService = new RocksDBKVService(PATH);
         metadataService = new MockStoreMetadataService();
         streamStore = new StreamStoreImpl();
-        messageStore = new MessageStoreImpl(streamStore, new MockOperationLogService(), metadataService, kvService);
+        messageStore = new MessageStoreImpl(new StoreConfig(), streamStore, new MockOperationLogService(), metadataService, kvService);
     }
 
     @AfterEach
@@ -171,6 +172,7 @@ class MessageStoreTest {
 
         // Change invisible duration and ack all messages.
         for (MessageExt messageExt : popResult.messageList()) {
+            assertTrue(messageExt.receiptHandle().isPresent());
             messageStore.changeInvisibleDuration(messageExt.receiptHandle().get(), 1000).join();
             messageStore.ack(messageExt.receiptHandle().get()).join();
         }
@@ -220,6 +222,7 @@ class MessageStoreTest {
 
         // Ack all messages.
         for (MessageExt messageExt : popResult.messageList()) {
+            assertTrue(messageExt.receiptHandle().isPresent());
             messageStore.changeInvisibleDuration(messageExt.receiptHandle().get(), 1000).join();
             messageStore.ack(messageExt.receiptHandle().get()).join();
         }
