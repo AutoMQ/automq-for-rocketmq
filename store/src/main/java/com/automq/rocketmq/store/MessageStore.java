@@ -31,12 +31,12 @@ public interface MessageStore {
      * @param queueId           queue id to pop message from
      * @param offset            offset to start from
      * @param batchSize         maximum count of messages
-     * @param isOrder           is orderly pop
+     * @param fifo           is orderly pop
      * @param invisibleDuration the duration for the next time this batch of messages will be visible, in nanoseconds
      * @return pop result, see {@link PopResult}
      */
     CompletableFuture<PopResult> pop(long consumerGroupId, long topicId, int queueId, long offset, int batchSize,
-        boolean isOrder, boolean isRetry, long invisibleDuration);
+        boolean fifo, boolean retry, long invisibleDuration);
 
     /**
      * Ack message.
