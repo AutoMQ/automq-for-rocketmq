@@ -64,7 +64,7 @@ class ReviveServiceTest {
     void tryRevive() throws RocksDBException {
         // Append mock message.
         long streamId = metadataService.getStreamId(32, 32);
-        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(32, 32, 0, ""))).join();
+        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(32, 32, ""))).join();
 
         // Append mock check point and timer tag.
         kvService.put(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(32, 32, 0, Long.MAX_VALUE), new byte[0]);
@@ -82,9 +82,9 @@ class ReviveServiceTest {
 
         MessageExt messageExt = MessageUtil.transferToMessage(fetchResult.recordBatchList().get(0));
         assertEquals(1, messageExt.getReconsumeCount());
-        assertEquals(32, messageExt.message().topicId());
-        assertEquals(32, messageExt.message().queueId());
-        assertEquals(0, messageExt.message().offset());
+        assertEquals(32, messageExt.getMessage().topicId());
+        assertEquals(32, messageExt.getMessage().queueId());
+        assertEquals(0, messageExt.getOffset());
 
         AtomicInteger checkPointCount = new AtomicInteger();
         kvService.iterate(KV_NAMESPACE_CHECK_POINT, (key, value) -> checkPointCount.getAndIncrement());
@@ -105,9 +105,9 @@ class ReviveServiceTest {
 
         messageExt = MessageUtil.transferToMessage(fetchResult.recordBatchList().get(0));
         assertEquals(2, messageExt.getReconsumeCount());
-        assertEquals(32, messageExt.message().topicId());
-        assertEquals(32, messageExt.message().queueId());
-        assertEquals(0, messageExt.message().offset());
+        assertEquals(32, messageExt.getMessage().topicId());
+        assertEquals(32, messageExt.getMessage().queueId());
+        assertEquals(0, messageExt.getOffset());
 
         timerTagCount.set(0);
         kvService.iterate(KV_NAMESPACE_TIMER_TAG, (key, value) -> timerTagCount.getAndIncrement());

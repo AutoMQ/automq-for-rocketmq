@@ -1,8 +1,22 @@
 namespace com.automq.rocketmq.common.model.generated;
 
+// A guide for writing schema: https://flatbuffers.dev/flatbuffers_guide_writing_schema.html
+
+// The message in flatbuffer format
 table Message {
-  topic_id:long;
-  queue_id:int;
-  offset:long;
-  tag:string;
+  // The topic of the message
+  topic_id: long;
+  // The queue id of the message
+  queue_id: int;
+  // The tag of the message
+  tag: string;
+  // The user setted properties assiocated with the message
+  user_properties: [KeyValue];
+  // The carried payload of the message
+  payload: [byte];
+}
+
+table KeyValue {
+    key: string (id: 0, required);
+    value: string (id: 1, required);
 }

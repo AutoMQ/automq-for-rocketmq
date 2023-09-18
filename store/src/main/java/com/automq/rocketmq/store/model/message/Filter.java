@@ -17,7 +17,7 @@
 
 package com.automq.rocketmq.store.model.message;
 
-import com.automq.rocketmq.common.model.generated.Message;
+import com.automq.rocketmq.common.model.MessageExt;
 import java.util.List;
 
 public interface Filter {
@@ -33,7 +33,7 @@ public interface Filter {
         }
 
         @Override
-        public List<Message> doFilter(List<Message> messageList) {
+        public List<MessageExt> doFilter(List<MessageExt> messageList) {
             return messageList;
         }
     };
@@ -46,5 +46,5 @@ public interface Filter {
 
     String expression();
 
-    List<Message> doFilter(List<Message> messageList);
+    List<MessageExt> doFilter(List<MessageExt> messageList);
 }

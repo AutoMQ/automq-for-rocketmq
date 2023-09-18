@@ -19,7 +19,6 @@ package com.automq.rocketmq.common.model;
 
 import com.automq.rocketmq.common.model.generated.Message;
 import com.google.common.base.Strings;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -28,21 +27,20 @@ public class MessageExt {
 
     private final Message message;
 
-    private final Map<String, String> systemPropertyMap;
+    private final Map<String, String> systemProperties;
     private String receiptHandle;
 
-    public MessageExt(Message message, Map<String, String> systemPropertyMap) {
-        this.message = message;
-        this.systemPropertyMap = systemPropertyMap;
-    }
+    // The offset of the message in the queue
+    private long offset;
 
-    public MessageExt(Message message, String receiptHandle) {
-        this(message, new HashMap<>());
-        this.receiptHandle = receiptHandle;
+    public MessageExt(Message message, Map<String, String> systemProperties, long offset) {
+        this.message = message;
+        this.systemProperties = systemProperties;
+        this.offset = offset;
     }
 
     public int getReconsumeCount() {
-        String reconsumeCount = systemPropertyMap.get(SYSTEM_PROPERTY_RECONSUME_COUNT);
+        String reconsumeCount = systemProperties.get(SYSTEM_PROPERTY_RECONSUME_COUNT);
         if (Strings.isNullOrEmpty(reconsumeCount)) {
             return 0;
         }
@@ -50,18 +48,30 @@ public class MessageExt {
     }
 
     public void setReconsumeCount(int reconsumeCount) {
-        systemPropertyMap.put(SYSTEM_PROPERTY_RECONSUME_COUNT, String.valueOf(reconsumeCount));
+        systemProperties.put(SYSTEM_PROPERTY_RECONSUME_COUNT, String.valueOf(reconsumeCount));
     }
 
-    public Map<String, String> systemPropertyMap() {
-        return systemPropertyMap;
+    public Map<String, String> getSystemProperties() {
+        return systemProperties;
     }
 
-    public Message message() {
+    public Message getMessage() {
         return message;
     }
 
-    public Optional<String> receiptHandle() {
+    public Optional<String> getReceiptHandle() {
         return Optional.ofNullable(receiptHandle);
+    }
+
+    public void setReceiptHandle(String receiptHandle) {
+        this.receiptHandle = receiptHandle;
+    }
+
+    public long getOffset() {
+        return offset;
+    }
+
+    public void setOffset(long offset) {
+        this.offset = offset;
     }
 }

@@ -17,17 +17,5 @@
 
 package com.automq.rocketmq.store.model.message;
 
-import com.automq.rocketmq.common.model.MessageExt;
-import java.util.List;
-
-public record SQLFilter(String expression) implements Filter {
-    @Override
-    public FilterType type() {
-        return FilterType.SQL;
-    }
-
-    @Override
-    public List<MessageExt> doFilter(List<MessageExt> messageList) {
-        return messageList;
-    }
+public record PutResult(long offset) {
 }
