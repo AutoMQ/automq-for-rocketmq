@@ -6,6 +6,7 @@ on:
 
 jobs:
   dist-tar:
+    name: Build distribution tar
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
