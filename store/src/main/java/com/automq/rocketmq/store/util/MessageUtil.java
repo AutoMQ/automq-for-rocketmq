@@ -24,6 +24,10 @@ import com.automq.rocketmq.stream.api.RecordBatchWithContext;
 public class MessageUtil {
     public static MessageExt transferToMessage(RecordBatchWithContext recordBatch) {
         Message message = Message.getRootAsMessage(recordBatch.rawPayload());
-        return new MessageExt(message, recordBatch.properties(), recordBatch.baseOffset());
+        return MessageExt.Builder.builder()
+            .message(message)
+            .offset(recordBatch.baseOffset())
+            .systemProperties(recordBatch.properties())
+            .build();
     }
 }

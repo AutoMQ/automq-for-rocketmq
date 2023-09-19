@@ -19,27 +19,88 @@ package com.automq.rocketmq.common.model;
 
 import com.automq.rocketmq.common.model.generated.Message;
 import com.google.common.base.Strings;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
 public class MessageExt {
     private static final String SYSTEM_PROPERTY_RECONSUME_COUNT = "RECONSUME_COUNT";
 
-    private final Message message;
+    private Message message;
 
-    private final Map<String, String> systemProperties;
+    // Only system properties can be mutated. The rest of the variables are immutable.
+    private Map<String, String> systemProperties;
     private String receiptHandle;
 
     // The offset of the message in the queue
-    private long offset;
+    private long offset = -1;
 
-    public MessageExt(Message message, Map<String, String> systemProperties, long offset) {
-        this.message = message;
-        this.systemProperties = systemProperties;
-        this.offset = offset;
+    private MessageExt() {
+
     }
 
-    public int getReconsumeCount() {
+    public static class Builder {
+        private final MessageExt messageExt;
+
+        private Builder() {
+            messageExt = new MessageExt();
+        }
+
+        public static Builder builder() {
+            return new Builder();
+        }
+
+        public Builder message(Message message) {
+            messageExt.message = message;
+            return this;
+        }
+
+        public Builder systemProperties(Map<String, String> systemProperties) {
+            messageExt.systemProperties = systemProperties;
+            return this;
+        }
+
+        public Builder receiptHandle(String receiptHandle) {
+            messageExt.receiptHandle = receiptHandle;
+            return this;
+        }
+
+        public Builder offset(long offset) {
+            messageExt.offset = offset;
+            return this;
+        }
+
+        public MessageExt build() {
+            if (messageExt.message == null) {
+                throw new IllegalArgumentException("Message not set");
+            }
+            if (messageExt.offset < 0) {
+                throw new IllegalArgumentException("Message offset not set or invalid");
+            }
+            if (messageExt.systemProperties == null) {
+                messageExt.systemProperties = new HashMap<>();
+            }
+            return messageExt;
+        }
+    }
+
+    public Map<String, String> systemProperties() {
+        return systemProperties;
+    }
+
+    public Message message() {
+        return message;
+    }
+
+    public Optional<String> receiptHandle() {
+        return Optional.ofNullable(receiptHandle);
+    }
+
+    public long offset() {
+        return offset;
+    }
+
+    public int reconsumeCount() {
         String reconsumeCount = systemProperties.get(SYSTEM_PROPERTY_RECONSUME_COUNT);
         if (Strings.isNullOrEmpty(reconsumeCount)) {
             return 0;
@@ -47,27 +108,7 @@ public class MessageExt {
         return Integer.parseInt(reconsumeCount);
     }
 
-    public void setReconsumeCount(int reconsumeCount) {
+    public void mutateReconsumeCount(int reconsumeCount) {
         systemProperties.put(SYSTEM_PROPERTY_RECONSUME_COUNT, String.valueOf(reconsumeCount));
-    }
-
-    public Map<String, String> getSystemProperties() {
-        return systemProperties;
-    }
-
-    public Message getMessage() {
-        return message;
-    }
-
-    public Optional<String> getReceiptHandle() {
-        return Optional.ofNullable(receiptHandle);
-    }
-
-    public void setReceiptHandle(String receiptHandle) {
-        this.receiptHandle = receiptHandle;
-    }
-
-    public long getOffset() {
-        return offset;
     }
 }

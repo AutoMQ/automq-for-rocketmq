@@ -108,13 +108,13 @@ public class ReviveService implements Runnable {
 
             // Build the retry message and append it to retry stream or dead letter stream.
             MessageExt message = MessageUtil.transferToMessage(result.recordBatchList().get(0));
-            message.setReconsumeCount(message.getReconsumeCount() + 1);
-            if (message.getReconsumeCount() <= metadataService.getMaxRetryTimes(timerTag.consumerGroupId())) {
+            message.mutateReconsumeCount(message.reconsumeCount() + 1);
+            if (message.reconsumeCount() <= metadataService.getMaxRetryTimes(timerTag.consumerGroupId())) {
                 long retryStreamId = metadataService.getRetryStreamId(timerTag.consumerGroupId(), timerTag.originTopicId(), timerTag.originQueueId());
-                streamStore.append(retryStreamId, new SingleRecord(message.getSystemProperties(), message.getMessage().getByteBuffer())).join();
+                streamStore.append(retryStreamId, new SingleRecord(message.systemProperties(), message.message().getByteBuffer())).join();
             } else {
                 long deadLetterStreamId = metadataService.getDeadLetterStreamId(timerTag.consumerGroupId(), timerTag.originTopicId(), timerTag.originQueueId());
-                streamStore.append(deadLetterStreamId, new SingleRecord(message.getSystemProperties(), message.getMessage().getByteBuffer())).join();
+                streamStore.append(deadLetterStreamId, new SingleRecord(message.systemProperties(), message.message().getByteBuffer())).join();
             }
 
             // Delete checkpoint and timer tag
