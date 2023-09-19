@@ -20,11 +20,5 @@ jobs:
           distribution: "temurin"
           java-version: "17"
           cache: "maven"
-      - name: Test with Maven
-        run: mvn clean test
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: true
-          verbose: true
+      - name: Build with Maven
+        run: mvn clean install
