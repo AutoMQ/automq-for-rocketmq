@@ -20,8 +20,8 @@ jobs:
           distribution: "temurin"
           java-version: "17"
           cache: "maven"
-      - name: Build with Maven
-        run: mvn test
+      - name: Test with Maven
+        run: mvn clean test
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
