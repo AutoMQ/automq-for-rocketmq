@@ -21,6 +21,8 @@ jobs:
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-maven
+      - name: Install flatc
+        run: sudo bash install_flatc.sh
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v2
         with:
