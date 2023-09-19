@@ -20,6 +20,7 @@ package com.automq.rocketmq.store.service.impl;
 import com.automq.rocketmq.common.model.MessageExt;
 import com.automq.rocketmq.metadata.StoreMetadataService;
 import com.automq.rocketmq.store.StreamStore;
+import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.generated.TimerTag;
 import com.automq.rocketmq.store.model.kv.BatchDeleteRequest;
 import com.automq.rocketmq.store.model.stream.SingleRecord;
@@ -29,7 +30,6 @@ import com.automq.rocketmq.store.util.SerializeUtil;
 import com.automq.rocketmq.stream.api.FetchResult;
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.rocksdb.RocksDBException;
 
 public class ReviveService implements Runnable {
     private Thread thread;
@@ -79,15 +79,15 @@ public class ReviveService implements Runnable {
             try {
                 tryRevive();
                 Thread.sleep(1000);
-            } catch (RocksDBException e) {
-                // TODO: handle exception
+            } catch (StoreException e) {
+                // TODO: log exception
                 e.printStackTrace();
             } catch (InterruptedException ignored) {
             }
         }
     }
 
-    protected void tryRevive() throws RocksDBException {
+    protected void tryRevive() throws StoreException {
         byte[] start = ByteBuffer.allocate(8).putLong(0).array();
         byte[] end = ByteBuffer.allocate(8).putLong(System.currentTimeMillis() - 1).array();
 
@@ -98,7 +98,7 @@ public class ReviveService implements Runnable {
             TimerTag timerTag = TimerTag.getRootAsTimerTag(ByteBuffer.wrap(value));
             // The timer tag may belong to origin topic or retry topic.
             FetchResult result = streamStore.fetch(timerTag.streamId(), timerTag.offset(), 1).join();
-            // TODO: handle exception
+            // TODO: log exception
             assert result.recordBatchList().size() <= 1;
             // Message has already been deleted.
             if (result.recordBatchList().isEmpty()) {
@@ -125,8 +125,8 @@ public class ReviveService implements Runnable {
                 BatchDeleteRequest deleteTimerTagRequest = new BatchDeleteRequest(timerTagNamespace,
                     SerializeUtil.buildTimerTagKey(timerTag.nextVisibleTimestamp(), timerTag.originTopicId(), timerTag.originQueueId(), timerTag.offset(), timerTag.operationId()));
                 kvService.batch(deleteCheckPointRequest, deleteTimerTagRequest);
-            } catch (RocksDBException e) {
-                // TODO: handle exception
+            } catch (StoreException e) {
+                // TODO: log exception
             }
         });
     }

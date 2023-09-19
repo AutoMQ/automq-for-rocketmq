@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.store;
 
+import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.kv.BatchDeleteRequest;
 import com.automq.rocketmq.store.model.kv.BatchWriteRequest;
 import com.automq.rocketmq.store.service.KVService;
@@ -30,7 +31,6 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
-import org.rocksdb.RocksDBException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -64,7 +64,7 @@ public class KVServiceTest {
     }
 
     @Test
-    public void testMutation() throws IOException, RocksDBException {
+    public void testMutation() throws IOException, StoreException {
         String key = "Hello world";
         String value = "Hello RocketMQ";
 
@@ -94,28 +94,28 @@ public class KVServiceTest {
         store.destroy();
         assertFalse(new File(path).exists());
 
-        assertThrowsExactly(RocksDBException.class, () -> store.get(NAMESPACE, key.getBytes()));
-        assertThrowsExactly(RocksDBException.class, () -> store.iterate(NAMESPACE, (_key, _value) -> {
+        assertThrowsExactly(StoreException.class, () -> store.get(NAMESPACE, key.getBytes()));
+        assertThrowsExactly(StoreException.class, () -> store.iterate(NAMESPACE, (_key, _value) -> {
         }));
-        assertThrowsExactly(RocksDBException.class, () -> store.iterate(NAMESPACE, key.getBytes(), key.getBytes(), key.getBytes(), (_key, _value) -> {
+        assertThrowsExactly(StoreException.class, () -> store.iterate(NAMESPACE, key.getBytes(), key.getBytes(), key.getBytes(), (_key, _value) -> {
         }));
-        assertThrowsExactly(RocksDBException.class, () -> store.put(NAMESPACE, key.getBytes(), key.getBytes()));
-        assertThrowsExactly(RocksDBException.class, () -> store.delete(NAMESPACE, key.getBytes()));
-        assertThrowsExactly(RocksDBException.class, () -> store.flush(true));
+        assertThrowsExactly(StoreException.class, () -> store.put(NAMESPACE, key.getBytes(), key.getBytes()));
+        assertThrowsExactly(StoreException.class, () -> store.delete(NAMESPACE, key.getBytes()));
+        assertThrowsExactly(StoreException.class, () -> store.flush(true));
     }
 
     @Test
-    public void testIterate() throws IOException, RocksDBException {
+    public void testIterate() throws IOException, StoreException {
         String path = new File(PATH + UUID.randomUUID()).getCanonicalPath();
         cleanUp(path);
         KVService store = new RocksDBKVService(path);
         assertNotNull(store);
 
-        assertThrowsExactly(RocksDBException.class, () -> store.iterate(NAMESPACE, null));
-        assertThrowsExactly(RocksDBException.class, () -> store.iterate(NAMESPACE, null, null, null, null));
-        assertThrowsExactly(RocksDBException.class, () -> store.iterate(NAMESPACE, null, "start".getBytes(), null, (key, value) -> {
+        assertThrowsExactly(StoreException.class, () -> store.iterate(NAMESPACE, null));
+        assertThrowsExactly(StoreException.class, () -> store.iterate(NAMESPACE, null, null, null, null));
+        assertThrowsExactly(StoreException.class, () -> store.iterate(NAMESPACE, null, "start".getBytes(), null, (key, value) -> {
         }));
-        assertThrowsExactly(RocksDBException.class, () -> store.iterate(NAMESPACE, null, null, "end".getBytes(), (key, value) -> {
+        assertThrowsExactly(StoreException.class, () -> store.iterate(NAMESPACE, null, null, "end".getBytes(), (key, value) -> {
         }));
 
         String prefix1 = "/1/";
@@ -168,13 +168,13 @@ public class KVServiceTest {
     }
 
     @Test
-    public void testBatch() throws IOException, RocksDBException {
+    public void testBatch() throws IOException, StoreException {
         String path = new File(PATH + UUID.randomUUID()).getCanonicalPath();
         cleanUp(path);
         KVService store = new RocksDBKVService(path);
         assertNotNull(store);
 
-        assertThrowsExactly(RocksDBException.class, () -> store.batch(null));
+        assertThrowsExactly(StoreException.class, () -> store.batch(null));
         store.batch(new BatchWriteRequest(NAMESPACE, "0".getBytes(), "0".getBytes()), new BatchWriteRequest(NAMESPACE, "1".getBytes(), "1".getBytes()));
 
         AtomicInteger num = new AtomicInteger();
