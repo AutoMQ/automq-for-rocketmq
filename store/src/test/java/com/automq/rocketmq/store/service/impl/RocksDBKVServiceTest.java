@@ -84,10 +84,10 @@ public class RocksDBKVServiceTest {
 
     @Test
     public void translateException() throws StoreException {
-        RocksDBKVService.translateException(() -> {
+        RocksDBKVService.transformException(() -> {
         }, "store error");
-        RocksDBKVService.translateException(() -> 0L, "store error");
-        assertThrowsExactly(StoreException.class, () -> RocksDBKVService.translateException(() -> {
+        RocksDBKVService.transformException(() -> 0L, "store error");
+        assertThrowsExactly(StoreException.class, () -> RocksDBKVService.transformException(() -> {
             throw new RocksDBException("rocksdb error");
         }, "store error"));
     }

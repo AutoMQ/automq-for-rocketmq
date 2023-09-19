@@ -67,7 +67,7 @@ public class RocksDBKVService implements KVService {
         List<ColumnFamilyDescriptor> columnFamilyDescriptors = new ArrayList<>();
         List<ColumnFamilyHandle> columnFamilyHandles = new ArrayList<>();
         if (storeFile.exists()) {
-            translateException(() -> columnFamilyNames.addAll(RocksDB.listColumnFamilies(new Options(dbOptions, columnFamilyOptions), this.path)),
+            transformException(() -> columnFamilyNames.addAll(RocksDB.listColumnFamilies(new Options(dbOptions, columnFamilyOptions), this.path)),
                 "Failed to list column families.");
 
         } else {
@@ -77,7 +77,7 @@ public class RocksDBKVService implements KVService {
             columnFamilyDescriptors.add(new ColumnFamilyDescriptor(columnFamilyName, columnFamilyOptions));
         }
 
-        rocksDB = translateException(() -> RocksDB.open(dbOptions, this.path, columnFamilyDescriptors, columnFamilyHandles),
+        rocksDB = transformException(() -> RocksDB.open(dbOptions, this.path, columnFamilyDescriptors, columnFamilyHandles),
             "Failed to open RocksDB.");
         for (int i = 0; i < columnFamilyNames.size(); i++) {
             columnFamilyNameHandleMap.put(new String(columnFamilyNames.get(i)),
@@ -89,7 +89,7 @@ public class RocksDBKVService implements KVService {
         T execute() throws RocksDBException;
     }
 
-    protected static <T> T translateException(RocksDBSupplier<T> operation, String message) throws StoreException {
+    protected static <T> T transformException(RocksDBSupplier<T> operation, String message) throws StoreException {
         try {
             return operation.execute();
         } catch (RocksDBException e) {
@@ -105,7 +105,7 @@ public class RocksDBKVService implements KVService {
         void execute() throws RocksDBException;
     }
 
-    protected static void translateException(RocksDBOperation operation, String message) throws StoreException {
+    protected static void transformException(RocksDBOperation operation, String message) throws StoreException {
         try {
             operation.execute();
         } catch (RocksDBException e) {
@@ -128,7 +128,7 @@ public class RocksDBKVService implements KVService {
         }
 
         ColumnFamilyHandle handle = columnFamilyNameHandleMap.get(namespace);
-        return translateException(() -> rocksDB.get(handle, key)
+        return transformException(() -> rocksDB.get(handle, key)
             , "Failed to get value from RocksDB.");
     }
 
@@ -254,7 +254,7 @@ public class RocksDBKVService implements KVService {
                 if (!columnFamilyNameHandleMap.containsKey(columnFamily)) {
                     ColumnFamilyDescriptor columnFamilyDescriptor =
                         new ColumnFamilyDescriptor(columnFamily.getBytes(), columnFamilyOptions);
-                    ColumnFamilyHandle columnFamilyHandle = translateException(() -> rocksDB.createColumnFamily(columnFamilyDescriptor),
+                    ColumnFamilyHandle columnFamilyHandle = transformException(() -> rocksDB.createColumnFamily(columnFamilyDescriptor),
                         "Failed to create column family.");
                     columnFamilyNameHandleMap.putIfAbsent(columnFamily, columnFamilyHandle);
                 }
@@ -270,7 +270,7 @@ public class RocksDBKVService implements KVService {
         }
 
         ColumnFamilyHandle handle = getOrCreateColumnFamily(namespace);
-        translateException(() -> rocksDB.put(handle, key, value),
+        transformException(() -> rocksDB.put(handle, key, value),
             "Failed to put value into RocksDB.");
     }
 
@@ -288,15 +288,15 @@ public class RocksDBKVService implements KVService {
             for (BatchRequest request : requests) {
                 ColumnFamilyHandle handle = getOrCreateColumnFamily(request.namespace());
                 switch (request.type()) {
-                    case WRITE -> translateException(() -> writeBatch.put(handle, request.key(), request.value()),
+                    case WRITE -> transformException(() -> writeBatch.put(handle, request.key(), request.value()),
                         "Failed to put value into RocksDB.");
-                    case DELETE -> translateException(() -> writeBatch.delete(handle, request.key()),
+                    case DELETE -> transformException(() -> writeBatch.delete(handle, request.key()),
                         "Failed to delete value from RocksDB.");
                     default ->
                         throw new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "Unsupported request type: " + request.type());
                 }
             }
-            translateException(() -> rocksDB.write(writeOptions, writeBatch),
+            transformException(() -> rocksDB.write(writeOptions, writeBatch),
                 "Failed to batch write into RocksDB.");
         }
     }
@@ -308,7 +308,7 @@ public class RocksDBKVService implements KVService {
         }
         if (columnFamilyNameHandleMap.containsKey(namespace)) {
             ColumnFamilyHandle handle = columnFamilyNameHandleMap.get(namespace);
-            translateException(() -> rocksDB.delete(handle, key),
+            transformException(() -> rocksDB.delete(handle, key),
                 "Failed to delete value from RocksDB.");
         }
     }
@@ -318,7 +318,7 @@ public class RocksDBKVService implements KVService {
         if (stopped) {
             throw new StoreException(StoreErrorCode.KV_SERVICE_IS_NOT_RUNNING, "KV service is stopped.");
         }
-        translateException(() -> rocksDB.flushWal(sync),
+        transformException(() -> rocksDB.flushWal(sync),
             "Failed to flush RocksDB.");
     }
 
@@ -328,12 +328,12 @@ public class RocksDBKVService implements KVService {
             return;
         }
         stopped = true;
-        translateException(() -> rocksDB.flushWal(true),
+        transformException(() -> rocksDB.flushWal(true),
             "Failed to flush RocksDB.");
         for (Map.Entry<String, ColumnFamilyHandle> entry : columnFamilyNameHandleMap.entrySet()) {
             entry.getValue().close();
         }
-        translateException(rocksDB::closeE,
+        transformException(rocksDB::closeE,
             "Failed to close RocksDB.");
         dbOptions.close();
         columnFamilyOptions.close();
@@ -342,7 +342,7 @@ public class RocksDBKVService implements KVService {
     @Override
     public void destroy() throws StoreException {
         close();
-        translateException(() -> RocksDB.destroyDB(path, new Options()),
+        transformException(() -> RocksDB.destroyDB(path, new Options()),
             "Failed to destroy RocksDB.");
     }
 }
