@@ -21,11 +21,13 @@ import apache.rocketmq.controller.v1.BrokerHeartbeatReply;
 import apache.rocketmq.controller.v1.BrokerHeartbeatRequest;
 import apache.rocketmq.controller.v1.Code;
 import apache.rocketmq.controller.v1.ControllerServiceGrpc;
+import com.automq.rocketmq.controller.metadata.MetadataStore;
 import io.grpc.Grpc;
 import io.grpc.InsecureChannelCredentials;
 import io.grpc.ManagedChannel;
 import java.io.IOException;
 import org.junit.Test;
+import org.mockito.Mockito;
 
 import static org.junit.Assert.assertEquals;
 
@@ -33,7 +35,8 @@ public class ControllerServiceImplTest {
 
     @Test
     public void testHeartbeatGrpc() throws IOException, InterruptedException {
-        ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl());
+        MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
+        ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
         testServer.start();
 
         int port = testServer.getPort();

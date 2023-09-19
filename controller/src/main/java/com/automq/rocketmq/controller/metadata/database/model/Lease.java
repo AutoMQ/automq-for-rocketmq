@@ -15,21 +15,44 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.metadata;
+package com.automq.rocketmq.controller.metadata.database.model;
 
-import com.automq.rocketmq.controller.exception.ControllerException;
-import java.util.concurrent.TimeUnit;
-import org.awaitility.Awaitility;
-import org.junit.jupiter.api.Test;
+import java.util.Date;
 
-public class EtcdMetadataStoreTest extends EtcdTestBase {
+public class Lease {
+    private int brokerId;
+    private int term;
+    private Date expirationTime;
 
-    @Test
-    public void testCtor() throws ControllerException {
-        EtcdMetadataStore metadataStore = new EtcdMetadataStore(cluster.clientEndpoints(), "testCtor");
-        Awaitility.await().atMost(3, TimeUnit.SECONDS).with().pollInterval(100, TimeUnit.MILLISECONDS)
-                .until(() -> metadataStore.getRole() == Role.Leader);
-        metadataStore.close();
+    public int getBrokerId() {
+        return brokerId;
     }
 
+    public void setBrokerId(int brokerId) {
+        this.brokerId = brokerId;
+    }
+
+    public int getTerm() {
+        return term;
+    }
+
+    public void setTerm(int term) {
+        this.term = term;
+    }
+
+    public Date getExpirationTime() {
+        return expirationTime;
+    }
+
+    public void setExpirationTime(Date expirationTime) {
+        this.expirationTime = expirationTime;
+    }
+
+    public boolean expired() {
+        if (null == this.expirationTime) {
+            return true;
+        }
+
+        return this.expirationTime.before(new Date());
+    }
 }
