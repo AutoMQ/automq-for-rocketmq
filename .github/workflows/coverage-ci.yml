@@ -1,0 +1,31 @@
+name: Coverage
+
+on:
+  pull_request:
+    types: [ opened, reopened, synchronize ]
+  push:
+    branches: [ main ]
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: Install flatc
+        run: sudo bash install_flatc.sh
+      - uses: actions/setup-java@v3
+        with:
+          distribution: "temurin"
+          java-version: "17"
+          cache: "maven"
+      - name: Test with Maven
+        run: mvn clean test
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
+          verbose: true
