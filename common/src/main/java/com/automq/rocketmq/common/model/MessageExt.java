@@ -108,7 +108,7 @@ public class MessageExt {
         return Integer.parseInt(reconsumeCount);
     }
 
-    public void mutateReconsumeCount(int reconsumeCount) {
+    public void setReconsumeCount(int reconsumeCount) {
         systemProperties.put(SYSTEM_PROPERTY_RECONSUME_COUNT, String.valueOf(reconsumeCount));
     }
 }

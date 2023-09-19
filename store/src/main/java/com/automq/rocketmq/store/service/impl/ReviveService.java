@@ -108,7 +108,7 @@ public class ReviveService implements Runnable {
 
             // Build the retry message and append it to retry stream or dead letter stream.
             MessageExt messageExt = MessageUtil.transferToMessage(result.recordBatchList().get(0));
-            messageExt.mutateReconsumeCount(messageExt.reconsumeCount() + 1);
+            messageExt.setReconsumeCount(messageExt.reconsumeCount() + 1);
             if (messageExt.reconsumeCount() <= metadataService.getMaxRetryTimes(timerTag.consumerGroupId())) {
                 long retryStreamId = metadataService.getRetryStreamId(timerTag.consumerGroupId(), timerTag.originTopicId(), timerTag.originQueueId());
                 streamStore.append(retryStreamId, new SingleRecord(messageExt.systemProperties(), messageExt.message().getByteBuffer())).join();
