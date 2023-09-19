@@ -191,7 +191,7 @@ public class MessageStoreImpl implements MessageStore {
 
                 int newFetchCount = fetchCount + fetchResult.size();
                 long newFetchBytes = fetchBytes + fetchResult.stream()
-                    .map(message -> (long) message.message().getByteBuffer().limit())
+                    .map(messageExt -> (long) messageExt.message().getByteBuffer().limit())
                     .reduce(0L, Long::sum);
                 boolean notExceedLimit = newFetchCount < config.maxFetchCount() &&
                     newFetchBytes < config.maxFetchBytes() &&
@@ -250,7 +250,7 @@ public class MessageStoreImpl implements MessageStore {
                     if (filter.needApply()) {
                         int fetchCount = messageList.size();
                         long fetchBytes = messageList.stream()
-                            .map(message -> (long) message.message().getByteBuffer().remaining())
+                            .map(messageExt -> (long) messageExt.message().getByteBuffer().remaining())
                             .reduce(0L, Long::sum);
 
                         // Apply filter to messages
@@ -283,14 +283,14 @@ public class MessageStoreImpl implements MessageStore {
                 }
 
                 // Insert or renew check point and timer tag into KVService.
-                for (MessageExt message : messageList) {
+                for (MessageExt messageExt : messageList) {
                     // If pop orderly, the message already consumed will not trigger writing new check point.
                     // But reconsume count should be increased.
-                    if (fifo && fifoCheckPointMap.containsKey(message.offset())) {
-                        renewFifoCheckPoint(fifoCheckPointMap.get(message.offset()), topicId, queueId, streamId,
-                            message.offset(), consumerGroupId, operationId, operationTimestamp, nextVisibleTimestamp);
+                    if (fifo && fifoCheckPointMap.containsKey(messageExt.offset())) {
+                        renewFifoCheckPoint(fifoCheckPointMap.get(messageExt.offset()), topicId, queueId, streamId,
+                            messageExt.offset(), consumerGroupId, operationId, operationTimestamp, nextVisibleTimestamp);
                     } else {
-                        writeCheckPoint(topicId, queueId, streamId, message.offset(), consumerGroupId, operationId,
+                        writeCheckPoint(topicId, queueId, streamId, messageExt.offset(), consumerGroupId, operationId,
                             fifo, retry, operationTimestamp, nextVisibleTimestamp);
                     }
                 }
