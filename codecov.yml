@@ -1,0 +1,55 @@
+coverage:
+  # Coverage status
+  status:
+    # Overall project status
+    project:
+      default:
+        enabled: yes
+        target: auto
+        threshold: 0%
+        if_no_uploads: error
+        if_not_found: success
+        if_ci_failed: error
+    # Pull request coverage diff
+    patch:
+      default:
+        enabled: yes
+        target: auto
+        threshold: 0%
+        if_no_uploads: error
+        if_not_found: success
+        if_ci_failed: error
+    # Unexpected changes
+    changes:
+      default:
+        enabled: yes
+        if_no_uploads: error
+        if_not_found: success
+        if_ci_failed: error
+
+comment:
+  layout: "diff, components, tree"
+  behavior: default
+
+component_management:
+  individual_components:
+    - component_id: "broker"
+      name: "RocketMQ Broker"
+      paths:
+        - "broker/"
+    - component_id: "common"
+      name: "RocketMQ Common"
+      paths:
+        - "common/"
+    - component_id: "controller"
+      name: "RocketMQ Controller"
+      paths:
+        - "controller/"
+    - component_id: "proxy"
+      name: "RocketMQ Proxy"
+      paths:
+        - "proxy/"
+    - component_id: "store"
+      name: "RocketMQ Store"
+      paths:
+        - "store/"
