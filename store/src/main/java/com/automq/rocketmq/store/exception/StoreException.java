@@ -17,7 +17,7 @@
 
 package com.automq.rocketmq.store.exception;
 
-public class StoreException extends RuntimeException {
+public class StoreException extends Exception {
     private final StoreErrorCode code;
 
     public StoreException(StoreErrorCode code, String message) {

@@ -83,7 +83,7 @@ public class RocksDBKVServiceTest {
     }
 
     @Test
-    public void translateException() {
+    public void translateException() throws StoreException {
         RocksDBKVService.translateException(() -> {
         }, "store error");
         RocksDBKVService.translateException(() -> 0L, "store error");
