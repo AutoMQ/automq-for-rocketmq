@@ -81,10 +81,10 @@ class ReviveServiceTest {
         assertEquals(1, fetchResult.recordBatchList().size());
 
         MessageExt messageExt = MessageUtil.transferToMessage(fetchResult.recordBatchList().get(0));
-        assertEquals(1, messageExt.getReconsumeCount());
-        assertEquals(32, messageExt.getMessage().topicId());
-        assertEquals(32, messageExt.getMessage().queueId());
-        assertEquals(0, messageExt.getOffset());
+        assertEquals(1, messageExt.reconsumeCount());
+        assertEquals(32, messageExt.message().topicId());
+        assertEquals(32, messageExt.message().queueId());
+        assertEquals(0, messageExt.offset());
 
         AtomicInteger checkPointCount = new AtomicInteger();
         kvService.iterate(KV_NAMESPACE_CHECK_POINT, (key, value) -> checkPointCount.getAndIncrement());
@@ -104,10 +104,10 @@ class ReviveServiceTest {
         assertEquals(1, fetchResult.recordBatchList().size());
 
         messageExt = MessageUtil.transferToMessage(fetchResult.recordBatchList().get(0));
-        assertEquals(2, messageExt.getReconsumeCount());
-        assertEquals(32, messageExt.getMessage().topicId());
-        assertEquals(32, messageExt.getMessage().queueId());
-        assertEquals(0, messageExt.getOffset());
+        assertEquals(2, messageExt.reconsumeCount());
+        assertEquals(32, messageExt.message().topicId());
+        assertEquals(32, messageExt.message().queueId());
+        assertEquals(0, messageExt.offset());
 
         timerTagCount.set(0);
         kvService.iterate(KV_NAMESPACE_TIMER_TAG, (key, value) -> timerTagCount.getAndIncrement());
