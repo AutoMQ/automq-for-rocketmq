@@ -180,7 +180,7 @@ public class MessageStoreImpl implements MessageStore {
         long offset, int batchSize, int fetchBatchSize, Filter filter, List<MessageExt> messageList,
         int fetchCount, long fetchBytes, long operationTimestamp, long operationId) {
         // Fetch more messages.
-        return fetchMessages(streamId, topicId, queueId, offset + fetchCount, fetchBatchSize, operationId)
+        return fetchMessages(streamId, topicId, queueId, offset, fetchBatchSize, operationId)
             .thenCompose(fetchResult -> {
                 // Add filter result to message list.
                 messageList.addAll(filter.doFilter(fetchResult));
@@ -198,7 +198,7 @@ public class MessageStoreImpl implements MessageStore {
                     System.nanoTime() - operationTimestamp < config.maxFetchTimeNanos();
 
                 if (needToFetch && hasMoreMessages && notExceedLimit) {
-                    return fetchAndFilterMessages(streamId, topicId, queueId, offset, batchSize, fetchBatchSize, filter,
+                    return fetchAndFilterMessages(streamId, topicId, queueId, offset + fetchResult.size(), batchSize, fetchBatchSize, filter,
                         messageList, newFetchCount, newFetchBytes, operationTimestamp, operationId);
                 } else {
                     return CompletableFuture.completedFuture(messageList);
@@ -260,7 +260,7 @@ public class MessageStoreImpl implements MessageStore {
                         boolean needToFetch = messageList.size() < batchSize;
                         boolean hasMoreMessages = fetchResult.size() >= fetchBatchSize;
                         if (needToFetch && hasMoreMessages) {
-                            return fetchAndFilterMessages(streamId, topicId, queueId, offset, batchSize, fetchBatchSize,
+                            return fetchAndFilterMessages(streamId, topicId, queueId, offset + fetchResult.size(), batchSize, fetchBatchSize,
                                 filter, messageList, fetchCount, fetchBytes, operationTimestamp, operationId);
                         }
                     }

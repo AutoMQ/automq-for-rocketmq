@@ -211,8 +211,14 @@ class MessageStoreTest {
         long streamId = metadataService.getStreamId(1, 1);
         streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, "tagA"))).join();
         streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, "tagA"))).join();
+        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, "tagA"))).join();
+        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, "tagA"))).join();
+
         streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, "tagB"))).join();
         streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, "tagA"))).join();
+        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, "tagA"))).join();
+        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, "tagA"))).join();
+
         streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, "tagB"))).join();
 
         PopResult popResult = messageStore.pop(1, 1, 1, 0, new TagFilter("tagB || tagC"), 2, true, false, 100).join();
@@ -220,11 +226,11 @@ class MessageStoreTest {
         assertEquals(2, popResult.messageList().size());
 
         MessageExt firstMessageExt = popResult.messageList().get(0);
-        assertEquals(2, firstMessageExt.offset());
+        assertEquals(4, firstMessageExt.offset());
         assertEquals("tagB", firstMessageExt.message().tag());
 
         MessageExt secondMessageExt = popResult.messageList().get(1);
-        assertEquals(4, secondMessageExt.offset());
+        assertEquals(8, secondMessageExt.offset());
         assertEquals("tagB", secondMessageExt.message().tag());
 
         AtomicInteger checkPointCount = new AtomicInteger();
