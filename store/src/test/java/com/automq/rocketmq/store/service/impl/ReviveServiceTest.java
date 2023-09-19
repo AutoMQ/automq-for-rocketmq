@@ -20,6 +20,7 @@ package com.automq.rocketmq.store.service.impl;
 import com.automq.rocketmq.common.model.MessageExt;
 import com.automq.rocketmq.metadata.StoreMetadataService;
 import com.automq.rocketmq.store.StreamStore;
+import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.impl.StreamStoreImpl;
 import com.automq.rocketmq.store.mock.MockStoreMetadataService;
 import com.automq.rocketmq.store.model.stream.SingleRecord;
@@ -32,7 +33,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.rocksdb.RocksDBException;
 
 import static com.automq.rocketmq.store.mock.MockMessageUtil.buildMessage;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -48,7 +48,7 @@ class ReviveServiceTest {
     private static ReviveService reviveService;
 
     @BeforeEach
-    public void setUp() throws RocksDBException {
+    public void setUp() throws StoreException {
         kvService = new RocksDBKVService(PATH);
         metadataService = new MockStoreMetadataService();
         streamStore = new StreamStoreImpl();
@@ -56,12 +56,12 @@ class ReviveServiceTest {
     }
 
     @AfterEach
-    public void tearDown() throws RocksDBException {
+    public void tearDown() throws StoreException {
         kvService.destroy();
     }
 
     @Test
-    void tryRevive() throws RocksDBException {
+    void tryRevive() throws StoreException {
         // Append mock message.
         long streamId = metadataService.getStreamId(32, 32);
         streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(32, 32, ""))).join();

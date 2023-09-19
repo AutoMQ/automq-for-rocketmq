@@ -23,6 +23,7 @@ import com.automq.rocketmq.common.model.generated.Message;
 import com.automq.rocketmq.metadata.StoreMetadataService;
 import com.automq.rocketmq.store.MessageStore;
 import com.automq.rocketmq.store.StreamStore;
+import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.generated.CheckPoint;
 import com.automq.rocketmq.store.model.generated.ReceiptHandle;
 import com.automq.rocketmq.store.model.kv.BatchDeleteRequest;
@@ -46,7 +47,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import org.apache.commons.lang3.tuple.Pair;
-import org.rocksdb.RocksDBException;
 
 import static com.automq.rocketmq.store.util.SerializeUtil.buildCheckPointKey;
 import static com.automq.rocketmq.store.util.SerializeUtil.buildCheckPointValue;
@@ -87,7 +87,7 @@ public class MessageStoreImpl implements MessageStore {
 
     public void writeCheckPoint(long topicId, int queueId, long streamId, long offset, long consumerGroupId,
         long operationId,
-        boolean fifo, boolean retry, long operationTimestamp, long nextVisibleTimestamp) throws RocksDBException {
+        boolean fifo, boolean retry, long operationTimestamp, long nextVisibleTimestamp) throws StoreException {
         // If this message is not orderly or has not been consumed, write check point and timer tag to KV service atomically.
         List<BatchRequest> requestList = new ArrayList<>();
         BatchWriteRequest writeCheckPointRequest = new BatchWriteRequest(KV_NAMESPACE_CHECK_POINT,
@@ -111,7 +111,7 @@ public class MessageStoreImpl implements MessageStore {
     }
 
     public Optional<CheckPoint> retrieveFifoCheckPoint(long consumerGroupId, long topicId, int queueId,
-        long offset) throws RocksDBException {
+        long offset) throws StoreException {
         // TODO: Undefined behavior if last operation is not orderly.
         byte[] orderIndexKey = buildOrderIndexKey(consumerGroupId, topicId, queueId, offset);
         byte[] bytes = kvService.get(KV_NAMESPACE_FIFO_INDEX, orderIndexKey);
@@ -132,7 +132,7 @@ public class MessageStoreImpl implements MessageStore {
 
     public void renewFifoCheckPoint(CheckPoint lastCheckPoint, long topicId, int queueId, long streamId, long offset,
         long consumerGroupId, long operationId, long operationTimestamp,
-        long nextVisibleTimestamp) throws RocksDBException {
+        long nextVisibleTimestamp) throws StoreException {
         // Delete last check point and timer tag.
         BatchDeleteRequest deleteLastCheckPointRequest = new BatchDeleteRequest(KV_NAMESPACE_CHECK_POINT,
             buildCheckPointKey(topicId, queueId, offset, lastCheckPoint.operationId()));
@@ -295,10 +295,15 @@ public class MessageStoreImpl implements MessageStore {
                     }
                 }
 
-                return new PopResult(0, operationId, operationTimestamp, messageList);
-            } catch (RocksDBException e) {
-                // TODO: handle exception
-                throw new RuntimeException(e);
+                PopResult.Status status;
+                if (!messageList.isEmpty()) {
+                    status = PopResult.Status.FOUND;
+                } else {
+                    status = PopResult.Status.NOT_FOUND;
+                }
+                return new PopResult(status, operationId, operationTimestamp, messageList);
+            } catch (StoreException e) {
+                return new PopResult(PopResult.Status.ERROR, operationId, operationTimestamp, messageList);
             }
         });
     }
@@ -324,7 +329,7 @@ public class MessageStoreImpl implements MessageStore {
                     byte[] buffer = kvService.get(KV_NAMESPACE_CHECK_POINT, checkPointKey);
                     if (buffer == null) {
                         // TODO: Check point not found
-                        return new AckResult();
+                        return new AckResult(AckResult.Status.ERROR);
                     }
 
                     // TODO: Data race between ack and revive.
@@ -345,12 +350,11 @@ public class MessageStoreImpl implements MessageStore {
                     }
 
                     kvService.batch(requestList.toArray(new BatchRequest[0]));
-                } catch (RocksDBException e) {
-                    // TODO: handle exception
-                    throw new RuntimeException(e);
+                } catch (StoreException e) {
+                    return new AckResult(AckResult.Status.ERROR);
                 }
 
-                return new AckResult();
+                return new AckResult(AckResult.Status.SUCCESS);
             });
     }
 
@@ -372,7 +376,7 @@ public class MessageStoreImpl implements MessageStore {
                     byte[] buffer = kvService.get(KV_NAMESPACE_CHECK_POINT, checkPointKey);
                     if (buffer == null) {
                         // TODO: Check point not found
-                        return new ChangeInvisibleDurationResult();
+                        return new ChangeInvisibleDurationResult(ChangeInvisibleDurationResult.Status.ERROR);
                     }
 
                     // Delete last timer tag.
@@ -400,12 +404,11 @@ public class MessageStoreImpl implements MessageStore {
                             streamId, checkPoint.messageOffset(), checkPoint.operationId()));
 
                     kvService.batch(deleteLastTimerTagRequest, writeCheckPointRequest, writeTimerTagRequest);
-                } catch (RocksDBException e) {
-                    // TODO: handle exception
-                    throw new RuntimeException(e);
+                } catch (StoreException e) {
+                    return new ChangeInvisibleDurationResult(ChangeInvisibleDurationResult.Status.ERROR);
                 }
 
-                return new ChangeInvisibleDurationResult();
+                return new ChangeInvisibleDurationResult(ChangeInvisibleDurationResult.Status.SUCCESS);
             });
     }
 
