@@ -85,11 +85,11 @@ public class RocksDBKVService implements KVService {
         }
     }
 
-    private interface RocksDBSupplier<T> {
+    protected interface RocksDBSupplier<T> {
         T execute() throws RocksDBException;
     }
 
-    private <T> T translateException(RocksDBSupplier<T> operation, String message) throws StoreException {
+    protected static <T> T translateException(RocksDBSupplier<T> operation, String message) throws StoreException {
         try {
             return operation.execute();
         } catch (RocksDBException e) {
@@ -101,11 +101,11 @@ public class RocksDBKVService implements KVService {
         }
     }
 
-    private interface RocksDBOperation {
+    protected interface RocksDBOperation {
         void execute() throws RocksDBException;
     }
 
-    private void translateException(RocksDBOperation operation, String message) throws StoreException {
+    protected static void translateException(RocksDBOperation operation, String message) throws StoreException {
         try {
             operation.execute();
         } catch (RocksDBException e) {
