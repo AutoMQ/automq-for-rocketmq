@@ -15,31 +15,20 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.metadata;
+package com.automq.rocketmq.controller.metadata.database;
 
-import io.etcd.jetcd.launcher.EtcdCluster;
-import io.etcd.jetcd.test.EtcdClusterExtension;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.jupiter.api.extension.RegisterExtension;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.automq.rocketmq.controller.exception.ControllerException;
+import com.automq.rocketmq.controller.metadata.MetadataStore;
 
-public class EtcdTestBase {
-    public static final Logger LOGGER = LoggerFactory.getLogger(EtcdTest.class);
+public class MetadataStoreMySQL implements MetadataStore {
 
-    @RegisterExtension
-    public static final EtcdClusterExtension CLUSTER_EXTENSION = EtcdClusterExtension.builder().withNodes(1).build();
-
-    public static EtcdCluster cluster = CLUSTER_EXTENSION.cluster();
-
-    @BeforeClass
-    public static void setUp() {
-        cluster.start();
+    @Override
+    public long registerBroker(int brokerId) throws ControllerException {
+        return 0;
     }
 
-    @AfterClass
-    public static void tearDown() {
-        cluster.close();
+    @Override
+    public boolean isLeader() throws ControllerException {
+        return false;
     }
 }

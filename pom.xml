@@ -46,7 +46,6 @@
         <guava.version>32.0.1-jre</guava.version>
         <slf4j.version>2.0.9</slf4j.version>
         <logback.version>1.4.11</logback.version>
-        <etcd.version>0.7.6</etcd.version>
         <snakeyaml.version>2.2</snakeyaml.version>
 
         <!-- Flat buffers related -->
@@ -87,19 +86,6 @@
                 <groupId>org.rocksdb</groupId>
                 <artifactId>rocksdbjni</artifactId>
                 <version>${rocksdb.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>io.etcd</groupId>
-                <artifactId>jetcd-core</artifactId>
-                <version>${etcd.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>io.etcd</groupId>
-                <artifactId>jetcd-test</artifactId>
-                <version>${etcd.version}</version>
-                <scope>test</scope>
             </dependency>
 
             <dependency>
@@ -252,6 +238,13 @@
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>0.8.10</version>
+                <configuration>
+                    <excludes>
+                        <exclude>**/*Exception*</exclude>
+                        <exclude>**/model/*</exclude>
+                        <exclude>apache/rocketmq/controller/**/*</exclude>
+                    </excludes>
+                </configuration>
                 <executions>
                     <execution>
                         <goals>

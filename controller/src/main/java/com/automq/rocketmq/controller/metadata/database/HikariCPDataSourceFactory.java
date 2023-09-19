@@ -15,26 +15,25 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.metadata;
+package com.automq.rocketmq.controller.metadata.database;
 
-import com.automq.rocketmq.controller.exception.ControllerException;
-import java.io.IOException;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
+import java.util.Properties;
+import javax.sql.DataSource;
+import org.apache.ibatis.datasource.pooled.PooledDataSourceFactory;
 
-public interface MetadataStore {
+public class HikariCPDataSourceFactory extends PooledDataSourceFactory {
+    private HikariDataSource dataSource;
 
-    /**
-     * Register broker into metadata store and return broker epoch
-     *
-     * @param brokerId brokerId to register
-     * @return broker epoch
-     * @throws IOException If there is an I/O error.
-     */
-    long registerBroker(int brokerId) throws ControllerException;
+    @Override
+    public void setProperties(Properties properties) {
+        HikariConfig config = new HikariConfig(properties);
+        this.dataSource = new HikariDataSource(config);
+    }
 
-    /**
-     * Check if current controller is playing leader role
-     * @return true if leader; false otherwise
-     * @throws ControllerException If there is any I/O error
-     */
-    boolean isLeader() throws ControllerException;
+    @Override
+    public DataSource getDataSource() {
+        return this.dataSource;
+    }
 }

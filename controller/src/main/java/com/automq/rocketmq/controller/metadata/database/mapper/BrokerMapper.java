@@ -15,30 +15,22 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.metadata;
+package com.automq.rocketmq.controller.metadata.database.mapper;
 
-import io.etcd.jetcd.Watch;
-import io.etcd.jetcd.watch.WatchResponse;
+import com.automq.rocketmq.controller.metadata.database.model.Broker;
+import java.util.List;
 
-public class WatchListener implements Watch.Listener {
-    private final EtcdMetadataStore store;
+public interface BrokerMapper {
+    /**
+     * Create a new broker record in database.
+     *
+     * @param broker Broker instance to persist
+     * @return Generated broker identity
+     */
+    int create(Broker broker);
 
-    public WatchListener(EtcdMetadataStore store) {
-        this.store = store;
-    }
 
-    @Override
-    public void onNext(WatchResponse response) {
-        this.store.onWatch(response);
-    }
+    List<Broker> list();
 
-    @Override
-    public void onError(Throwable throwable) {
-        this.store.onWatchError(throwable);
-    }
-
-    @Override
-    public void onCompleted() {
-        this.store.onWatchComplete();
-    }
+    void delete(int id);
 }
