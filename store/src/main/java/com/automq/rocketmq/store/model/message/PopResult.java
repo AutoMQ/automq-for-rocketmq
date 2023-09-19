@@ -20,5 +20,11 @@ package com.automq.rocketmq.store.model.message;
 import com.automq.rocketmq.common.model.MessageExt;
 import java.util.List;
 
-public record PopResult(int status, long operationId, long deliveryTimestamp, List<MessageExt> messageList) {
+public record PopResult(Status status, long operationId, long deliveryTimestamp, List<MessageExt> messageList) {
+    public enum Status {
+        FOUND,
+        NOT_FOUND,
+        END_OF_QUEUE,
+        ERROR
+    }
 }

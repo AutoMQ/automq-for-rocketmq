@@ -17,31 +17,29 @@
 
 package com.automq.rocketmq.store.service;
 
+import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.kv.BatchRequest;
 import com.automq.rocketmq.store.model.kv.IteratorCallback;
-import org.rocksdb.RocksDBException;
 
 public interface KVService {
-    // TODO: Map RocksDBException into StoreException
-
     /**
      * Get value with specified key from backend kv engine.
      *
      * @param namespace the namespace storing required the kv pair
      * @param key the key for querying
      * @return the value of the specified key
-     * @throws RocksDBException if backend engine fails
+     * @throws StoreException if backend engine fails
      */
-    byte[] get(final String namespace, final byte[] key) throws RocksDBException;
+    byte[] get(final String namespace, final byte[] key) throws StoreException;
 
     /**
      * Iterate all the k-v pairs.
      *
      * @param namespace the namespace storing required the k-v pair
      * @param callback the iterator will call {@link IteratorCallback#onRead} to consume the kv pair
-     * @throws RocksDBException if backend engine fails
+     * @throws StoreException if backend engine fails
      */
-    void iterate(final String namespace, IteratorCallback callback) throws RocksDBException;
+    void iterate(final String namespace, IteratorCallback callback) throws StoreException;
 
     /**
      * Iterate the k-v pair with the given prefix, start and end.
@@ -55,10 +53,10 @@ public interface KVService {
      * @param start the lower bound to start iterate
      * @param end the upper bound to end iterate
      * @param callback the iterator will call {@link IteratorCallback#onRead} to consume the kv pair
-     * @throws RocksDBException if backend engine fails
+     * @throws StoreException if backend engine fails
      */
     void iterate(final String namespace, final byte[] prefix, final byte[] start,
-        final byte[] end, IteratorCallback callback) throws RocksDBException;
+        final byte[] end, IteratorCallback callback) throws StoreException;
 
     /**
      * Put the kv pair into the backend engine.
@@ -66,44 +64,46 @@ public interface KVService {
      * @param namespace the namespace storing required the k-v pair
      * @param key the key for inserting
      * @param value the value for inserting
-     * @throws RocksDBException if backend engine fails
+     * @throws StoreException if backend engine fails
      */
-    void put(final String namespace, byte[] key, byte[] value) throws RocksDBException;
+    void put(final String namespace, byte[] key, byte[] value) throws StoreException;
 
     /**
      * Put or delete the kv pair in batch.
      *
      * @param requests the mutation requests
-     * @throws RocksDBException if backend engine fails
+     * @throws StoreException if backend engine fails
      */
-    void batch(BatchRequest... requests) throws RocksDBException;
+    void batch(BatchRequest... requests) throws StoreException;
 
     /**
      * Delete value with specified key from backend kv engine.
      *
      * @param namespace the namespace storing required the k-v pair
      * @param key the key for deleting
-     * @throws RocksDBException if backend engine fails
+     * @throws StoreException if backend engine fails
      */
-    void delete(final String namespace, byte[] key) throws RocksDBException;
+    void delete(final String namespace, byte[] key) throws StoreException;
 
     /**
      * Forced dirty pages to the hard disk.
      *
      * @param sync synchronous or not
-     * @throws RocksDBException if backend engine fails
+     * @throws StoreException if backend engine fails
      */
-    void flush(boolean sync) throws RocksDBException;
+    void flush(boolean sync) throws StoreException;
 
     /**
      * Flush all dirty pages and shutdown the backend engine.
+     *
+     * @throws StoreException if backend engine fails
      */
-    void close() throws RocksDBException;
+    void close() throws StoreException;
 
     /**
      * Delete all data in the backend engine.
      *
-     * @throws RocksDBException if backend engine fails
+     * @throws StoreException if backend engine fails
      */
-    void destroy() throws RocksDBException;
+    void destroy() throws StoreException;
 }

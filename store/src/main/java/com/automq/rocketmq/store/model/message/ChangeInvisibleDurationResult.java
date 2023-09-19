@@ -17,5 +17,9 @@
 
 package com.automq.rocketmq.store.model.message;
 
-public record ChangeInvisibleDurationResult() {
+public record ChangeInvisibleDurationResult(Status status) {
+    public enum Status {
+        SUCCESS,
+        ERROR
+    }
 }

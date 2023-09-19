@@ -15,11 +15,11 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.store.model.message;
+package com.automq.rocketmq.store.exception;
 
-public record AckResult(Status status) {
-    public enum Status {
-        SUCCESS,
-        ERROR
-    }
+public enum StoreErrorCode {
+    FILE_SYSTEM_PERMISSION,
+    KV_SERVICE_IS_NOT_RUNNING,
+    ILLEGAL_ARGUMENT,
+    KV_ENGINE_ERROR,
 }

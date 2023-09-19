@@ -1,12 +1,12 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements. See the NOTICE file distributed with
+ * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
  * The ASF licenses this file to You under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
- * the License. You may obtain a copy of the License at
+ * the License.  You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,12 +15,12 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.store;
+package com.automq.rocketmq.store.service.impl;
 
+import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.kv.BatchDeleteRequest;
 import com.automq.rocketmq.store.model.kv.BatchWriteRequest;
 import com.automq.rocketmq.store.service.KVService;
-import com.automq.rocketmq.store.service.impl.RocksDBKVService;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
@@ -39,7 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class KVServiceTest {
+public class RocksDBKVServiceTest {
     private static final String PATH = "/tmp/test_kv_service/";
     private static final String NAMESPACE = "rocketmq";
 
@@ -64,7 +64,36 @@ public class KVServiceTest {
     }
 
     @Test
-    public void testMutation() throws IOException, RocksDBException {
+    public void openAndClose() throws IOException, StoreException {
+        String path = new File(PATH + UUID.randomUUID()).getCanonicalPath();
+        cleanUp(path);
+        KVService store = new RocksDBKVService(path);
+        assertNotNull(store);
+
+        store.close();
+
+        assertThrowsExactly(StoreException.class, () -> store.get(NAMESPACE, "key".getBytes()));
+        assertThrowsExactly(StoreException.class, () -> store.iterate(NAMESPACE, (key, value) -> {
+        }));
+        assertThrowsExactly(StoreException.class, () -> store.iterate(NAMESPACE, "prefix".getBytes(), "start".getBytes(), "end".getBytes(), (key, value) -> {
+        }));
+        assertThrowsExactly(StoreException.class, () -> store.put(NAMESPACE, "key".getBytes(), "value".getBytes()));
+        assertThrowsExactly(StoreException.class, () -> store.delete(NAMESPACE, "key".getBytes()));
+        assertThrowsExactly(StoreException.class, () -> store.flush(true));
+    }
+
+    @Test
+    public void translateException() throws StoreException {
+        RocksDBKVService.transformException(() -> {
+        }, "store error");
+        RocksDBKVService.transformException(() -> 0L, "store error");
+        assertThrowsExactly(StoreException.class, () -> RocksDBKVService.transformException(() -> {
+            throw new RocksDBException("rocksdb error");
+        }, "store error"));
+    }
+
+    @Test
+    public void mutation() throws IOException, StoreException {
         String key = "Hello world";
         String value = "Hello RocketMQ";
 
@@ -94,28 +123,28 @@ public class KVServiceTest {
         store.destroy();
         assertFalse(new File(path).exists());
 
-        assertThrowsExactly(RocksDBException.class, () -> store.get(NAMESPACE, key.getBytes()));
-        assertThrowsExactly(RocksDBException.class, () -> store.iterate(NAMESPACE, (_key, _value) -> {
+        assertThrowsExactly(StoreException.class, () -> store.get(NAMESPACE, key.getBytes()));
+        assertThrowsExactly(StoreException.class, () -> store.iterate(NAMESPACE, (_key, _value) -> {
         }));
-        assertThrowsExactly(RocksDBException.class, () -> store.iterate(NAMESPACE, key.getBytes(), key.getBytes(), key.getBytes(), (_key, _value) -> {
+        assertThrowsExactly(StoreException.class, () -> store.iterate(NAMESPACE, key.getBytes(), key.getBytes(), key.getBytes(), (_key, _value) -> {
         }));
-        assertThrowsExactly(RocksDBException.class, () -> store.put(NAMESPACE, key.getBytes(), key.getBytes()));
-        assertThrowsExactly(RocksDBException.class, () -> store.delete(NAMESPACE, key.getBytes()));
-        assertThrowsExactly(RocksDBException.class, () -> store.flush(true));
+        assertThrowsExactly(StoreException.class, () -> store.put(NAMESPACE, key.getBytes(), key.getBytes()));
+        assertThrowsExactly(StoreException.class, () -> store.delete(NAMESPACE, key.getBytes()));
+        assertThrowsExactly(StoreException.class, () -> store.flush(true));
     }
 
     @Test
-    public void testIterate() throws IOException, RocksDBException {
+    public void iterate() throws IOException, StoreException {
         String path = new File(PATH + UUID.randomUUID()).getCanonicalPath();
         cleanUp(path);
         KVService store = new RocksDBKVService(path);
         assertNotNull(store);
 
-        assertThrowsExactly(RocksDBException.class, () -> store.iterate(NAMESPACE, null));
-        assertThrowsExactly(RocksDBException.class, () -> store.iterate(NAMESPACE, null, null, null, null));
-        assertThrowsExactly(RocksDBException.class, () -> store.iterate(NAMESPACE, null, "start".getBytes(), null, (key, value) -> {
+        assertThrowsExactly(StoreException.class, () -> store.iterate(NAMESPACE, null));
+        assertThrowsExactly(StoreException.class, () -> store.iterate(NAMESPACE, null, null, null, null));
+        assertThrowsExactly(StoreException.class, () -> store.iterate(NAMESPACE, null, "start".getBytes(), null, (key, value) -> {
         }));
-        assertThrowsExactly(RocksDBException.class, () -> store.iterate(NAMESPACE, null, null, "end".getBytes(), (key, value) -> {
+        assertThrowsExactly(StoreException.class, () -> store.iterate(NAMESPACE, null, null, "end".getBytes(), (key, value) -> {
         }));
 
         String prefix1 = "/1/";
@@ -168,13 +197,13 @@ public class KVServiceTest {
     }
 
     @Test
-    public void testBatch() throws IOException, RocksDBException {
+    public void batch() throws IOException, StoreException {
         String path = new File(PATH + UUID.randomUUID()).getCanonicalPath();
         cleanUp(path);
         KVService store = new RocksDBKVService(path);
         assertNotNull(store);
 
-        assertThrowsExactly(RocksDBException.class, () -> store.batch(null));
+        assertThrowsExactly(StoreException.class, () -> store.batch(null));
         store.batch(new BatchWriteRequest(NAMESPACE, "0".getBytes(), "0".getBytes()), new BatchWriteRequest(NAMESPACE, "1".getBytes(), "1".getBytes()));
 
         AtomicInteger num = new AtomicInteger();

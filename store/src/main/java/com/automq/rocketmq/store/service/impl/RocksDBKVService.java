@@ -17,6 +17,8 @@
 
 package com.automq.rocketmq.store.service.impl;
 
+import com.automq.rocketmq.store.exception.StoreErrorCode;
+import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.kv.BatchRequest;
 import com.automq.rocketmq.store.model.kv.IteratorCallback;
 import com.automq.rocketmq.store.service.KVService;
@@ -27,6 +29,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import org.apache.commons.lang3.StringUtils;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.ColumnFamilyOptions;
@@ -48,7 +51,7 @@ public class RocksDBKVService implements KVService {
     private final RocksDB rocksDB;
     private volatile boolean stopped;
 
-    public RocksDBKVService(String path) throws RocksDBException {
+    public RocksDBKVService(String path) throws StoreException {
         this.path = path;
         this.columnFamilyOptions = new ColumnFamilyOptions().optimizeForSmallDb();
         this.dbOptions = new DBOptions().setCreateIfMissing(true)
@@ -57,32 +60,67 @@ public class RocksDBKVService implements KVService {
         File storeFile = new File(this.path);
         if (!storeFile.getParentFile().exists()) {
             if (!storeFile.getParentFile().mkdirs()) {
-                throw new RocksDBException("Failed to create directory: " + storeFile.getParentFile().getAbsolutePath());
+                throw new StoreException(StoreErrorCode.FILE_SYSTEM_PERMISSION, "Failed to create directory: " + storeFile.getParentFile().getAbsolutePath());
             }
         }
         List<byte[]> columnFamilyNames = new ArrayList<>();
         List<ColumnFamilyDescriptor> columnFamilyDescriptors = new ArrayList<>();
         List<ColumnFamilyHandle> columnFamilyHandles = new ArrayList<>();
         if (storeFile.exists()) {
-            columnFamilyNames.addAll(RocksDB.listColumnFamilies(new Options(dbOptions, columnFamilyOptions),
-                this.path));
+            transformException(() -> columnFamilyNames.addAll(RocksDB.listColumnFamilies(new Options(dbOptions, columnFamilyOptions), this.path)),
+                "Failed to list column families.");
+
         } else {
             columnFamilyNames.add(RocksDB.DEFAULT_COLUMN_FAMILY);
         }
         for (byte[] columnFamilyName : columnFamilyNames) {
             columnFamilyDescriptors.add(new ColumnFamilyDescriptor(columnFamilyName, columnFamilyOptions));
         }
-        rocksDB = RocksDB.open(dbOptions, this.path, columnFamilyDescriptors, columnFamilyHandles);
+
+        rocksDB = transformException(() -> RocksDB.open(dbOptions, this.path, columnFamilyDescriptors, columnFamilyHandles),
+            "Failed to open RocksDB.");
         for (int i = 0; i < columnFamilyNames.size(); i++) {
             columnFamilyNameHandleMap.put(new String(columnFamilyNames.get(i)),
                 columnFamilyHandles.get(i));
         }
     }
 
+    protected interface RocksDBSupplier<T> {
+        T execute() throws RocksDBException;
+    }
+
+    protected static <T> T transformException(RocksDBSupplier<T> operation, String message) throws StoreException {
+        try {
+            return operation.execute();
+        } catch (RocksDBException e) {
+            if (StringUtils.isBlank(message)) {
+                throw new StoreException(StoreErrorCode.KV_ENGINE_ERROR, message, e);
+            } else {
+                throw new StoreException(StoreErrorCode.KV_ENGINE_ERROR, e.getMessage(), e);
+            }
+        }
+    }
+
+    protected interface RocksDBOperation {
+        void execute() throws RocksDBException;
+    }
+
+    protected static void transformException(RocksDBOperation operation, String message) throws StoreException {
+        try {
+            operation.execute();
+        } catch (RocksDBException e) {
+            if (StringUtils.isBlank(message)) {
+                throw new StoreException(StoreErrorCode.KV_ENGINE_ERROR, message, e);
+            } else {
+                throw new StoreException(StoreErrorCode.KV_ENGINE_ERROR, e.getMessage(), e);
+            }
+        }
+    }
+
     @Override
-    public byte[] get(final String namespace, final byte[] key) throws RocksDBException {
+    public byte[] get(final String namespace, final byte[] key) throws StoreException {
         if (stopped) {
-            throw new RocksDBException("KV service is stopped.");
+            throw new StoreException(StoreErrorCode.KV_SERVICE_IS_NOT_RUNNING, "KV service is stopped.");
         }
 
         if (!columnFamilyNameHandleMap.containsKey(namespace)) {
@@ -90,7 +128,8 @@ public class RocksDBKVService implements KVService {
         }
 
         ColumnFamilyHandle handle = columnFamilyNameHandleMap.get(namespace);
-        return rocksDB.get(handle, key);
+        return transformException(() -> rocksDB.get(handle, key)
+            , "Failed to get value from RocksDB.");
     }
 
     private boolean checkPrefix(byte[] key, byte[] upperBound) {
@@ -106,13 +145,13 @@ public class RocksDBKVService implements KVService {
     }
 
     @Override
-    public void iterate(final String namespace, IteratorCallback callback) throws RocksDBException {
+    public void iterate(final String namespace, IteratorCallback callback) throws StoreException {
         if (stopped) {
-            throw new RocksDBException("KV service is stopped.");
+            throw new StoreException(StoreErrorCode.KV_SERVICE_IS_NOT_RUNNING, "KV service is stopped.");
         }
 
         if (callback == null) {
-            throw new RocksDBException("The callback can not be null.");
+            throw new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "The callback can not be null.");
         }
 
         ColumnFamilyHandle columnFamilyHandle = columnFamilyNameHandleMap.get(namespace);
@@ -123,27 +162,26 @@ public class RocksDBKVService implements KVService {
             for (iterator.seekToFirst(); iterator.isValid(); iterator.next()) {
                 callback.onRead(iterator.key(), iterator.value());
             }
-            iterator.status();
         }
     }
 
     @Override
     public void iterate(final String namespace, final byte[] prefix, final byte[] start,
-        final byte[] end, IteratorCallback callback) throws RocksDBException {
+        final byte[] end, IteratorCallback callback) throws StoreException {
         if (stopped) {
-            throw new RocksDBException("KV service is stopped.");
+            throw new StoreException(StoreErrorCode.KV_SERVICE_IS_NOT_RUNNING, "KV service is stopped.");
         }
 
         if (callback == null) {
-            throw new RocksDBException("The callback can not be null.");
+            throw new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "The callback can not be null.");
         }
 
         if (Objects.isNull(prefix) && Objects.isNull(start)) {
-            throw new RocksDBException("To determine lower bound, prefix and start may not be null at the same time.");
+            throw new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "To determine lower bound, prefix and start may not be null at the same time.");
         }
 
         if (Objects.isNull(prefix) && Objects.isNull(end)) {
-            throw new RocksDBException("To determine upper bound, prefix and end may not be null at the same time.");
+            throw new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "To determine upper bound, prefix and end may not be null at the same time.");
         }
 
         ColumnFamilyHandle columnFamilyHandle = columnFamilyNameHandleMap.get(namespace);
@@ -179,7 +217,7 @@ public class RocksDBKVService implements KVService {
             iterator = rocksDB.newIterator(columnFamilyHandle, readOptions);
             if (hasStart) {
                 iterator.seek(start);
-            } else if (hasPrefix) {
+            } else {
                 iterator.seek(prefix);
             }
 
@@ -210,13 +248,14 @@ public class RocksDBKVService implements KVService {
         }
     }
 
-    private ColumnFamilyHandle getOrCreateColumnFamily(String columnFamily) throws RocksDBException {
+    private ColumnFamilyHandle getOrCreateColumnFamily(String columnFamily) throws StoreException {
         if (!columnFamilyNameHandleMap.containsKey(columnFamily)) {
             synchronized (this) {
                 if (!columnFamilyNameHandleMap.containsKey(columnFamily)) {
                     ColumnFamilyDescriptor columnFamilyDescriptor =
                         new ColumnFamilyDescriptor(columnFamily.getBytes(), columnFamilyOptions);
-                    ColumnFamilyHandle columnFamilyHandle = rocksDB.createColumnFamily(columnFamilyDescriptor);
+                    ColumnFamilyHandle columnFamilyHandle = transformException(() -> rocksDB.createColumnFamily(columnFamilyDescriptor),
+                        "Failed to create column family.");
                     columnFamilyNameHandleMap.putIfAbsent(columnFamily, columnFamilyHandle);
                 }
             }
@@ -225,75 +264,85 @@ public class RocksDBKVService implements KVService {
     }
 
     @Override
-    public void put(final String namespace, byte[] key, byte[] value) throws RocksDBException {
+    public void put(final String namespace, byte[] key, byte[] value) throws StoreException {
         if (stopped) {
-            throw new RocksDBException("KV service is stopped.");
+            throw new StoreException(StoreErrorCode.KV_SERVICE_IS_NOT_RUNNING, "KV service is stopped.");
         }
 
         ColumnFamilyHandle handle = getOrCreateColumnFamily(namespace);
-        rocksDB.put(handle, key, value);
+        transformException(() -> rocksDB.put(handle, key, value),
+            "Failed to put value into RocksDB.");
     }
 
     @Override
-    public void batch(BatchRequest... requests) throws RocksDBException {
+    public void batch(BatchRequest... requests) throws StoreException {
         if (stopped) {
-            throw new RocksDBException("KV service is stopped.");
+            throw new StoreException(StoreErrorCode.KV_SERVICE_IS_NOT_RUNNING, "KV service is stopped.");
         }
 
         if (requests == null) {
-            throw new RocksDBException("The requests can not be null.");
+            throw new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "The requests can not be null.");
         }
 
         try (WriteOptions writeOptions = new WriteOptions(); WriteBatch writeBatch = new WriteBatch()) {
             for (BatchRequest request : requests) {
                 ColumnFamilyHandle handle = getOrCreateColumnFamily(request.namespace());
                 switch (request.type()) {
-                    case WRITE -> writeBatch.put(handle, request.key(), request.value());
-                    case DELETE -> writeBatch.delete(handle, request.key());
-                    default -> throw new RocksDBException("Unsupported request type: " + request.type());
+                    case WRITE -> transformException(() -> writeBatch.put(handle, request.key(), request.value()),
+                        "Failed to put value into RocksDB.");
+                    case DELETE -> transformException(() -> writeBatch.delete(handle, request.key()),
+                        "Failed to delete value from RocksDB.");
+                    default ->
+                        throw new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "Unsupported request type: " + request.type());
                 }
             }
-            rocksDB.write(writeOptions, writeBatch);
+            transformException(() -> rocksDB.write(writeOptions, writeBatch),
+                "Failed to batch write into RocksDB.");
         }
     }
 
     @Override
-    public void delete(final String namespace, byte[] key) throws RocksDBException {
+    public void delete(final String namespace, byte[] key) throws StoreException {
         if (stopped) {
-            throw new RocksDBException("KV service is stopped.");
+            throw new StoreException(StoreErrorCode.KV_SERVICE_IS_NOT_RUNNING, "KV service is stopped.");
         }
         if (columnFamilyNameHandleMap.containsKey(namespace)) {
             ColumnFamilyHandle handle = columnFamilyNameHandleMap.get(namespace);
-            rocksDB.delete(handle, key);
+            transformException(() -> rocksDB.delete(handle, key),
+                "Failed to delete value from RocksDB.");
         }
     }
 
     @Override
-    public void flush(boolean sync) throws RocksDBException {
+    public void flush(boolean sync) throws StoreException {
         if (stopped) {
-            throw new RocksDBException("KV service is stopped.");
+            throw new StoreException(StoreErrorCode.KV_SERVICE_IS_NOT_RUNNING, "KV service is stopped.");
         }
-        rocksDB.flushWal(sync);
+        transformException(() -> rocksDB.flushWal(sync),
+            "Failed to flush RocksDB.");
     }
 
     @Override
-    public void close() throws RocksDBException {
+    public void close() throws StoreException {
         if (stopped) {
             return;
         }
         stopped = true;
-        rocksDB.flushWal(true);
+        transformException(() -> rocksDB.flushWal(true),
+            "Failed to flush RocksDB.");
         for (Map.Entry<String, ColumnFamilyHandle> entry : columnFamilyNameHandleMap.entrySet()) {
             entry.getValue().close();
         }
-        rocksDB.closeE();
+        transformException(rocksDB::closeE,
+            "Failed to close RocksDB.");
         dbOptions.close();
         columnFamilyOptions.close();
     }
 
     @Override
-    public void destroy() throws RocksDBException {
+    public void destroy() throws StoreException {
         close();
-        RocksDB.destroyDB(path, new Options());
+        transformException(() -> RocksDB.destroyDB(path, new Options()),
+            "Failed to destroy RocksDB.");
     }
 }
