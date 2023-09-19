@@ -46,6 +46,7 @@ import apache.rocketmq.controller.v1.ReassignMessageQueueRequest;
 import apache.rocketmq.controller.v1.Status;
 import apache.rocketmq.controller.v1.Topic;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
+import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.google.protobuf.TextFormat;
 import io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
@@ -54,6 +55,12 @@ import org.slf4j.LoggerFactory;
 public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServiceImplBase {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ControllerServiceImpl.class);
+
+    private final MetadataStore metadataStore;
+
+    public ControllerServiceImpl(MetadataStore metadataStore) {
+        this.metadataStore = metadataStore;
+    }
 
     @Override
     public void registerBroker(BrokerRegistrationRequest request,
