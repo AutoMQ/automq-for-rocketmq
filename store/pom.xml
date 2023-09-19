@@ -34,23 +34,28 @@
             <artifactId>rocketmq-common</artifactId>
             <version>${project.version}</version>
         </dependency>
+
         <dependency>
             <groupId>${groupId}</groupId>
             <artifactId>rocketmq-metadata</artifactId>
             <version>${project.version}</version>
         </dependency>
+
         <dependency>
             <groupId>com.automq.rocketmq</groupId>
             <artifactId>rocketmq-s3stream</artifactId>
         </dependency>
+
         <dependency>
             <groupId>org.rocksdb</groupId>
             <artifactId>rocksdbjni</artifactId>
         </dependency>
+
         <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
         </dependency>
+
         <dependency>
             <groupId>com.google.flatbuffers</groupId>
             <artifactId>flatbuffers-java</artifactId>

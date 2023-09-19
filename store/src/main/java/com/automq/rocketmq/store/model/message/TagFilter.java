@@ -65,7 +65,7 @@ public class TagFilter implements Filter {
     @Override
     public List<MessageExt> doFilter(List<MessageExt> messageList) {
         return messageList.stream()
-            .filter(messageExt -> !Strings.isNullOrEmpty(messageExt.getMessage().tag()) && tagSet.contains(messageExt.getMessage().tag()))
+            .filter(messageExt -> !Strings.isNullOrEmpty(messageExt.message().tag()) && tagSet.contains(messageExt.message().tag()))
             .collect(Collectors.toList());
     }
 }
