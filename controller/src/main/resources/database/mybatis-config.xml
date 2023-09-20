@@ -43,7 +43,7 @@
         </environment>
     </environments>
     <mappers>
-        <mapper resource="database/mapper/BrokerMapper.xml" />
         <mapper resource="database/mapper/LeaseMapper.xml" />
+        <mapper resource="database/mapper/NodeMapper.xml" />
     </mappers>
 </configuration>

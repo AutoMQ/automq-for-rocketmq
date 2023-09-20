@@ -48,7 +48,7 @@ import apache.rocketmq.controller.v1.Topic;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
-import com.automq.rocketmq.controller.metadata.database.dao.Broker;
+import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.google.protobuf.TextFormat;
 import io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
@@ -68,12 +68,12 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     public void registerBroker(BrokerRegistrationRequest request,
         StreamObserver<BrokerRegistrationReply> responseObserver) {
         try {
-            Broker broker = metadataStore.registerBroker(request.getBrokerName(), request.getAddress(),
+            Node node = metadataStore.registerBrokerNode(request.getBrokerName(), request.getAddress(),
                 request.getInstanceId());
             BrokerRegistrationReply reply = BrokerRegistrationReply.newBuilder()
                 .setStatus(Status.newBuilder().setCode(Code.OK).build())
-                .setId(broker.getId())
-                .setEpoch(broker.getEpoch())
+                .setId(node.getId())
+                .setEpoch(node.getEpoch())
                 .build();
             responseObserver.onNext(reply);
             responseObserver.onCompleted();

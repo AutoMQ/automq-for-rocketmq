@@ -22,7 +22,7 @@ import apache.rocketmq.controller.v1.BrokerRegistrationRequest;
 import apache.rocketmq.controller.v1.Code;
 import apache.rocketmq.controller.v1.ControllerServiceGrpc;
 import com.automq.rocketmq.controller.exception.ControllerException;
-import com.automq.rocketmq.controller.metadata.database.dao.Broker;
+import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.google.common.base.Strings;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.grpc.Grpc;
@@ -39,7 +39,7 @@ public class GrpcControllerClient implements ControllerClient {
         stubs = new ConcurrentHashMap<>();
     }
 
-    public Broker registerBroker(String target, String name, String address,
+    public Node registerBroker(String target, String name, String address,
         String instanceId) throws ControllerException {
         if (Strings.isNullOrEmpty(target)) {
             throw new ControllerException(Code.NO_LEADER_VALUE, "Target address to leader controller is null or empty");
@@ -61,14 +61,14 @@ public class GrpcControllerClient implements ControllerClient {
         try {
             BrokerRegistrationReply reply = future.get();
             if (reply.getStatus().getCode() == Code.OK) {
-                Broker broker = new Broker();
-                broker.setName(name);
-                broker.setAddress(address);
-                broker.setInstanceId(instanceId);
+                Node node = new Node();
+                node.setName(name);
+                node.setAddress(address);
+                node.setInstanceId(instanceId);
 
-                broker.setEpoch(reply.getEpoch());
-                broker.setId(reply.getId());
-                return broker;
+                node.setEpoch(reply.getEpoch());
+                node.setId(reply.getId());
+                return node;
             } else {
                 throw new ControllerException(reply.getStatus().getCode().getNumber(), reply.getStatus().getMessage());
             }

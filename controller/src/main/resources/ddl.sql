@@ -22,16 +22,18 @@ CREATE TABLE IF NOT EXISTS lease (
 
 INSERT INTO lease(broker_id, epoch, expiration_time) VALUES (0, 0, TIMESTAMP('2023-01-01'));
 
-CREATE TABLE IF NOT EXISTS broker (
+CREATE TABLE IF NOT EXISTS node (
     id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
     name VARCHAR(255) NOT NULL,
-    instance_id VARCHAR(255) NOT NULL,
+    instance_id VARCHAR(255),
+    volume_id VARCHAR(255),
+    hostname VARCHAR(255),
+    vpc_id VARCHAR(255),
     address VARCHAR(255) NOT NULL,
     epoch INT NOT NULL DEFAULT 1,
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
-CREATE UNIQUE INDEX idx_broker_instance_id ON broker(instance_id);
 
 CREATE TABLE IF NOT EXISTS topic (
     id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,

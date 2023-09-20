@@ -17,32 +17,32 @@
 
 package com.automq.rocketmq.controller.metadata.database.mapper;
 
-import com.automq.rocketmq.controller.metadata.database.dao.Broker;
+import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import java.util.Date;
 import java.util.List;
 
-public interface BrokerMapper {
+public interface NodeMapper {
     /**
-     * Create a new broker record in database.
+     * Create a new node record in database.
      *
-     * @param broker Broker instance to persist
+     * @param node Broker instance to persist
      * @return Generated broker identity
      */
-    int create(Broker broker);
+    int create(Node node);
 
-    Broker getByInstanceId(String instanceId);
+    Node getByInstanceId(String instanceId);
 
     /**
-     * Increase term of the broker for each registration.
+     * Increase term of the node for each registration.
      *
      * @param id ID of the broker whose term should be increased
      * @return Number of rows affected, expected to be 1.
      */
     int increaseEpoch(int id);
 
-    List<Broker> list();
+    List<Node> list();
 
-    List<Broker> deltaList(Date updateTime);
+    List<Node> deltaList(Date updateTime);
 
     void delete(int id);
 }
