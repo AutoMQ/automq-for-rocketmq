@@ -15,44 +15,20 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.metadata.database.model;
+package com.automq.rocketmq.controller.metadata.database.tasks;
 
-import java.util.Date;
+import com.automq.rocketmq.controller.metadata.database.DefaultMetadataStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-public class Lease {
-    private int brokerId;
-    private int term;
-    private Date expirationTime;
+public abstract class ControllerTask implements Runnable {
+    protected static final Logger LOGGER = LoggerFactory.getLogger(LeaseTask.class);
 
-    public int getBrokerId() {
-        return brokerId;
+    protected final DefaultMetadataStore metadataStore;
+
+    public ControllerTask(DefaultMetadataStore metadataStore) {
+        this.metadataStore = metadataStore;
     }
 
-    public void setBrokerId(int brokerId) {
-        this.brokerId = brokerId;
-    }
 
-    public int getTerm() {
-        return term;
-    }
-
-    public void setTerm(int term) {
-        this.term = term;
-    }
-
-    public Date getExpirationTime() {
-        return expirationTime;
-    }
-
-    public void setExpirationTime(Date expirationTime) {
-        this.expirationTime = expirationTime;
-    }
-
-    public boolean expired() {
-        if (null == this.expirationTime) {
-            return true;
-        }
-
-        return this.expirationTime.before(new Date());
-    }
 }

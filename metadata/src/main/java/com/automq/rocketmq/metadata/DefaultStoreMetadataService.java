@@ -15,20 +15,40 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.metadata.database;
+package com.automq.rocketmq.metadata;
 
-import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 
-public class MetadataStoreMySQL implements MetadataStore {
+public class DefaultStoreMetadataService implements StoreMetadataService {
+
+    private final MetadataStore metadataStore;
+
+    public DefaultStoreMetadataService(MetadataStore metadataStore) {
+        this.metadataStore = metadataStore;
+    }
 
     @Override
-    public long registerBroker(int brokerId) throws ControllerException {
+    public long getStreamId(long topicId, int queueId) {
         return 0;
     }
 
     @Override
-    public boolean isLeader() throws ControllerException {
-        return false;
+    public long getOperationLogStreamId(long topicId, int queueId) {
+        return 0;
+    }
+
+    @Override
+    public long getRetryStreamId(long consumerGroupId, long topicId, int queueId) {
+        return 0;
+    }
+
+    @Override
+    public long getDeadLetterStreamId(long consumerGroupId, long topicId, int queueId) {
+        return 0;
+    }
+
+    @Override
+    public int getMaxRetryTimes(long consumerGroupId) {
+        return 0;
     }
 }

@@ -33,7 +33,8 @@ public class DatabaseTestBase {
 
     @Container
     static MySQLContainer mySQLContainer = new MySQLContainer<>(DockerImageName.parse("mysql:8"))
-        .withInitScript("ddl.sql");
+        .withInitScript("ddl.sql")
+        .withReuse(true);
 
     protected SqlSessionFactory getSessionFactory() throws IOException {
         String resource = "database/mybatis-config.xml";

@@ -29,7 +29,7 @@
     </settings>
     
     <typeAliases>
-        <package name="com.automq.rocketmq.controller.metadata.database.model"/>
+        <package name="com.automq.rocketmq.controller.metadata.database.dao"/>
     </typeAliases>
 
     <environments default="development">

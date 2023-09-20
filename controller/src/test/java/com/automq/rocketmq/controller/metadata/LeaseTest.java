@@ -18,7 +18,7 @@
 package com.automq.rocketmq.controller.metadata;
 
 import com.automq.rocketmq.controller.metadata.database.mapper.LeaseMapper;
-import com.automq.rocketmq.controller.metadata.database.model.Lease;
+import com.automq.rocketmq.controller.metadata.database.dao.Lease;
 import java.io.IOException;
 import java.util.Calendar;
 import org.apache.ibatis.session.SqlSession;

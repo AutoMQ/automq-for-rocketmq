@@ -20,5 +20,9 @@ jobs:
           distribution: "temurin"
           java-version: "17"
           cache: "maven"
+      - name: Cache Docker images.
+        uses: ScribeMD/docker-cache@0.3.6
+        with:
+          key: docker-${{ runner.os }}
       - name: Build with Maven
         run: mvn clean install
