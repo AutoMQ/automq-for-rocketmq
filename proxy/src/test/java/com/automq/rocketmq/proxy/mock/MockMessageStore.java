@@ -32,9 +32,11 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class MockMessageStore implements MessageStore {
     private AtomicLong offset = new AtomicLong();
-    private Set<String> receiptHandleSet = new HashSet<>() {{
-        this.add("receiptHandle");
-    }};
+    private Set<String> receiptHandleSet = new HashSet<>();
+
+    public MockMessageStore() {
+        receiptHandleSet.add("receiptHandle");
+    }
 
     @Override
     public CompletableFuture<PopResult> pop(long consumerGroupId, long topicId, int queueId, long offset, Filter filter,
