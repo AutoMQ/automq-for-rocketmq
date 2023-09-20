@@ -101,13 +101,14 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
                     if (null != node) {
                         nodeMapper.increaseEpoch(node.getId());
                         node.setEpoch(node.getEpoch() + 1);
-                        return node;
                     } else {
                         LeaseMapper leaseMapper = session.getMapper(LeaseMapper.class);
                         Lease lease = leaseMapper.currentWithShareLock();
                         if (lease.getEpoch() != this.lease.getEpoch()) {
+                            // Refresh cached lease
                             this.lease = lease;
-                            LOGGER.info("Controller has yielded its leader role");
+                            LOGGER.info("Node[{}] has yielded its leader role", this.config.nodeId());
+                            // Redirect register node to the new leader in the next iteration.
                             continue;
                         }
                         node = new Node();
@@ -116,8 +117,8 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
                         node.setInstanceId(instanceId);
                         nodeMapper.create(node);
                         session.commit();
-                        return node;
                     }
+                    return node;
                 }
             } else {
                 return controllerClient.registerBroker(this.leaderAddress(), name, address, instanceId);

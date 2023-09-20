@@ -45,7 +45,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     public void testRegisterBroker() throws IOException {
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.brokerId()).thenReturn(1);
+        Mockito.when(config.nodeId()).thenReturn(1);
         Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
 
         ControllerClient client = Mockito.mock(ControllerClient.class);
@@ -90,7 +90,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     public void testRegisterBroker_BadRequest() throws IOException {
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.brokerId()).thenReturn(1);
+        Mockito.when(config.nodeId()).thenReturn(1);
         Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
 
         ControllerClient client = Mockito.mock(ControllerClient.class);

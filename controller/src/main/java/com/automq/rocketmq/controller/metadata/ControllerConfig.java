@@ -18,7 +18,7 @@
 package com.automq.rocketmq.controller.metadata;
 
 public interface ControllerConfig {
-    int brokerId();
+    int nodeId();
 
     int scanIntervalInSecs();
 

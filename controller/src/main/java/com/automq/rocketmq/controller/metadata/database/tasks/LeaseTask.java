@@ -39,7 +39,7 @@ public class LeaseTask extends ControllerTask {
                 Lease lease = leaseMapper.current();
                 this.metadataStore.setLease(lease);
                 if (!lease.expired()) {
-                    if (lease.getNodeId() == metadataStore.getConfig().brokerId()) {
+                    if (lease.getNodeId() == metadataStore.getConfig().nodeId()) {
                         // Current node is lease leader.
                         Lease update = leaseMapper.currentWithWriteLock();
                         this.metadataStore.setLease(update);
@@ -69,7 +69,7 @@ public class LeaseTask extends ControllerTask {
                     Lease update = leaseMapper.currentWithWriteLock();
                     if (lease.getEpoch() == update.getEpoch() && lease.getNodeId() == update.getNodeId()) {
                         update.setEpoch(update.getEpoch() + 1);
-                        update.setNodeId(metadataStore.getConfig().brokerId());
+                        update.setNodeId(metadataStore.getConfig().nodeId());
                         Calendar calendar = Calendar.getInstance();
                         calendar.add(Calendar.SECOND, metadataStore.getConfig().leaseLifeSpanInSecs());
                         update.setExpirationTime(calendar.getTime());
