@@ -18,7 +18,7 @@
 package com.automq.rocketmq.controller.metadata;
 
 import com.automq.rocketmq.controller.exception.ControllerException;
-import com.automq.rocketmq.controller.metadata.database.dao.Broker;
+import com.automq.rocketmq.controller.metadata.database.dao.Node;
 
 public interface MetadataStore {
 
@@ -30,7 +30,7 @@ public interface MetadataStore {
      * @return broker epoch
      * @throws ControllerException If there is an I/O error.
      */
-    Broker registerBroker(String name, String address, String instanceId) throws ControllerException;
+    Node registerBrokerNode(String name, String address, String instanceId) throws ControllerException;
 
     /**
      * Check if current controller is playing leader role

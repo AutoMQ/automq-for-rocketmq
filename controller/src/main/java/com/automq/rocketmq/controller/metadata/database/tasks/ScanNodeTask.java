@@ -18,48 +18,48 @@
 package com.automq.rocketmq.controller.metadata.database.tasks;
 
 import com.automq.rocketmq.controller.metadata.database.DefaultMetadataStore;
-import com.automq.rocketmq.controller.metadata.database.mapper.BrokerMapper;
-import com.automq.rocketmq.controller.metadata.database.dao.Broker;
+import com.automq.rocketmq.controller.metadata.database.dao.Node;
+import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
 import java.util.List;
 import org.apache.ibatis.session.SqlSession;
 
-public class ScanBrokerTask extends ScanTask {
+public class ScanNodeTask extends ScanTask {
 
-    public ScanBrokerTask(DefaultMetadataStore metadataStore) {
+    public ScanNodeTask(DefaultMetadataStore metadataStore) {
         super(metadataStore);
     }
 
     @Override
     public void run() {
-        LOGGER.info("ScanBrokerTask starts");
+        LOGGER.info("ScanNodeTask starts");
         try {
             if (null == this.lastScanTime) {
                 try (SqlSession session = this.metadataStore.getSessionFactory().openSession()) {
-                    BrokerMapper mapper = session.getMapper(BrokerMapper.class);
-                    List<Broker> brokers = mapper.list();
-                    updateBrokers(brokers);
+                    NodeMapper mapper = session.getMapper(NodeMapper.class);
+                    List<Node> nodes = mapper.list();
+                    updateBrokers(nodes);
                 }
             } else {
                 try (SqlSession session = this.metadataStore.getSessionFactory().openSession()) {
-                    BrokerMapper mapper = session.getMapper(BrokerMapper.class);
-                    List<Broker> brokers = mapper.deltaList(this.lastScanTime);
-                    updateBrokers(brokers);
+                    NodeMapper mapper = session.getMapper(NodeMapper.class);
+                    List<Node> nodes = mapper.deltaList(this.lastScanTime);
+                    updateBrokers(nodes);
                 }
             }
         } catch (Throwable e) {
-            LOGGER.error("Failed to scan brokers from database", e);
+            LOGGER.error("Failed to scan nodes from database", e);
         }
-        LOGGER.info("ScanBrokerTask completed");
+        LOGGER.info("ScanNodeTask completed");
     }
 
-    private void updateBrokers(List<Broker> brokers) {
-        if (null != brokers) {
-            for (Broker broker : brokers) {
-                this.metadataStore.addBroker(broker);
+    private void updateBrokers(List<Node> nodes) {
+        if (null != nodes) {
+            for (Node node : nodes) {
+                this.metadataStore.addBroker(node);
                 if (null == this.lastScanTime) {
-                    this.lastScanTime = broker.getUpdateTime();
-                } else if (broker.getUpdateTime().after(this.lastScanTime)) {
-                    this.lastScanTime = broker.getUpdateTime();
+                    this.lastScanTime = node.getUpdateTime();
+                } else if (node.getUpdateTime().after(this.lastScanTime)) {
+                    this.lastScanTime = node.getUpdateTime();
                 }
             }
         }

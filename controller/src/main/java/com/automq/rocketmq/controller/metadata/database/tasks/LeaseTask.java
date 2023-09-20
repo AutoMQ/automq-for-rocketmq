@@ -39,12 +39,12 @@ public class LeaseTask extends ControllerTask {
                 Lease lease = leaseMapper.current();
                 this.metadataStore.setLease(lease);
                 if (!lease.expired()) {
-                    if (lease.getBrokerId() == metadataStore.getConfig().brokerId()) {
+                    if (lease.getNodeId() == metadataStore.getConfig().brokerId()) {
                         // Current node is lease leader.
                         Lease update = leaseMapper.currentWithWriteLock();
                         this.metadataStore.setLease(update);
 
-                        if (update.getBrokerId() != lease.getBrokerId() || update.getEpoch() != lease.getEpoch()) {
+                        if (update.getNodeId() != lease.getNodeId() || update.getEpoch() != lease.getEpoch()) {
                             session.rollback();
                             this.metadataStore.setLease(update);
                             // Someone must have won the leader election campaign.
@@ -67,9 +67,9 @@ public class LeaseTask extends ControllerTask {
                 } else {
                     // Perform leader election campaign
                     Lease update = leaseMapper.currentWithWriteLock();
-                    if (lease.getEpoch() == update.getEpoch() && lease.getBrokerId() == update.getBrokerId()) {
+                    if (lease.getEpoch() == update.getEpoch() && lease.getNodeId() == update.getNodeId()) {
                         update.setEpoch(update.getEpoch() + 1);
-                        update.setBrokerId(metadataStore.getConfig().brokerId());
+                        update.setNodeId(metadataStore.getConfig().brokerId());
                         Calendar calendar = Calendar.getInstance();
                         calendar.add(Calendar.SECOND, metadataStore.getConfig().leaseLifeSpanInSecs());
                         update.setExpirationTime(calendar.getTime());

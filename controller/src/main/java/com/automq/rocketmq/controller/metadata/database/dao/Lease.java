@@ -20,16 +20,16 @@ package com.automq.rocketmq.controller.metadata.database.dao;
 import java.util.Date;
 
 public class Lease {
-    private int brokerId;
+    private int nodeId;
     private int epoch;
     private Date expirationTime;
 
-    public int getBrokerId() {
-        return brokerId;
+    public int getNodeId() {
+        return nodeId;
     }
 
-    public void setBrokerId(int brokerId) {
-        this.brokerId = brokerId;
+    public void setNodeId(int nodeId) {
+        this.nodeId = nodeId;
     }
 
     public int getEpoch() {
