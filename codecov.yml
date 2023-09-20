@@ -29,7 +29,7 @@ coverage:
 
 ignore:
   - "**/generated/**"
-  - "**/model/**"
+  - "**/metadata/database/dao/*"
   - "**/*Exception*"
 
 comment:
