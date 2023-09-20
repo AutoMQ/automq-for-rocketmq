@@ -79,6 +79,49 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             };
 
             svc.registerBroker(request, observer);
+
+            // It should work if register the broker multiple times. The only side effect is epoch is incremented.
+            svc.registerBroker(request, observer);
+        }
+    }
+
+
+    @Test
+    public void testRegisterBroker_BadRequest() throws IOException {
+        ControllerConfig config = Mockito.mock(ControllerConfig.class);
+        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(config.brokerId()).thenReturn(1);
+        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
+
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(getSessionFactory(), config)) {
+            metadataStore.start();
+            ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
+            Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
+                .atMost(10, TimeUnit.SECONDS)
+                .until(metadataStore::isLeader);
+            BrokerRegistrationRequest request = BrokerRegistrationRequest.newBuilder()
+                .setBrokerName("")
+                .setAddress("localhost:1234")
+                .setInstanceId("i-reg-broker")
+                .build();
+
+            StreamObserver<BrokerRegistrationReply> observer = new StreamObserver() {
+                @Override
+                public void onNext(Object value) {
+                    Assertions.fail("Should have raised an exception");
+                }
+
+                @Override
+                public void onError(Throwable t) {
+                    // OK, it's expected.
+                }
+
+                @Override
+                public void onCompleted() {
+                    Assertions.fail("Should have raised an exception");
+                }
+            };
+            svc.registerBroker(request, observer);
         }
     }
 
