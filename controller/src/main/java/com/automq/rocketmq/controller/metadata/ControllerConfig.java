@@ -17,27 +17,11 @@
 
 package com.automq.rocketmq.controller.metadata;
 
-import com.automq.rocketmq.controller.exception.ControllerException;
-import com.automq.rocketmq.controller.metadata.database.dao.Broker;
+public interface ControllerConfig {
+    int brokerId();
 
-public interface MetadataStore {
+    int scanIntervalInSecs();
 
-    void start();
+    int leaseLifeSpanInSecs();
 
-    /**
-     * Register broker into metadata store and return broker epoch
-     *
-     * @return broker epoch
-     * @throws ControllerException If there is an I/O error.
-     */
-    Broker registerBroker(String name, String address, String instanceId) throws ControllerException;
-
-    /**
-     * Check if current controller is playing leader role
-     * @return true if leader; false otherwise
-     * @throws ControllerException If there is any I/O error
-     */
-    boolean isLeader() throws ControllerException;
-
-    String leaderAddress() throws ControllerException;
 }

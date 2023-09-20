@@ -15,34 +15,44 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.metadata.database.mapper;
+package com.automq.rocketmq.controller.metadata.database.dao;
 
-import com.automq.rocketmq.controller.metadata.database.dao.Broker;
 import java.util.Date;
-import java.util.List;
 
-public interface BrokerMapper {
-    /**
-     * Create a new broker record in database.
-     *
-     * @param broker Broker instance to persist
-     * @return Generated broker identity
-     */
-    int create(Broker broker);
+public class Lease {
+    private int brokerId;
+    private int term;
+    private Date expirationTime;
 
-    Broker getByInstanceId(String instanceId);
+    public int getBrokerId() {
+        return brokerId;
+    }
 
-    /**
-     * Increase term of the broker for each registration.
-     *
-     * @param id ID of the broker whose term should be increased
-     * @return Number of rows affected, expected to be 1.
-     */
-    int increaseTerm(int id);
+    public void setBrokerId(int brokerId) {
+        this.brokerId = brokerId;
+    }
 
-    List<Broker> list();
+    public int getTerm() {
+        return term;
+    }
 
-    List<Broker> deltaList(Date updateTime);
+    public void setTerm(int term) {
+        this.term = term;
+    }
 
-    void delete(int id);
+    public Date getExpirationTime() {
+        return expirationTime;
+    }
+
+    public void setExpirationTime(Date expirationTime) {
+        this.expirationTime = expirationTime;
+    }
+
+    public boolean expired() {
+        if (null == this.expirationTime) {
+            return true;
+        }
+
+        return this.expirationTime.before(new Date());
+    }
 }

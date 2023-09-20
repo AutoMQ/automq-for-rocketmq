@@ -15,34 +15,34 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.metadata.database.mapper;
+package com.automq.rocketmq.metadata;
 
-import com.automq.rocketmq.controller.metadata.database.dao.Broker;
-import java.util.Date;
-import java.util.List;
+import org.junit.jupiter.api.Test;
 
-public interface BrokerMapper {
-    /**
-     * Create a new broker record in database.
-     *
-     * @param broker Broker instance to persist
-     * @return Generated broker identity
-     */
-    int create(Broker broker);
 
-    Broker getByInstanceId(String instanceId);
+class DefaultStoreMetadataServiceTest {
 
-    /**
-     * Increase term of the broker for each registration.
-     *
-     * @param id ID of the broker whose term should be increased
-     * @return Number of rows affected, expected to be 1.
-     */
-    int increaseTerm(int id);
+    @Test
+    void testGetStreamId() {
+    }
 
-    List<Broker> list();
+    @Test
+    void testGetOperationLogStreamId() {
+    }
 
-    List<Broker> deltaList(Date updateTime);
+    @Test
+    void testGetRetryStreamId() {
+    }
 
-    void delete(int id);
+    @Test
+    void testGetDeadLetterStreamId() {
+    }
+
+    @Test
+    void testGetMaxRetryTimes() {
+    }
+
+    @Test
+    void testAdvanceConsumeOffset() {
+    }
 }

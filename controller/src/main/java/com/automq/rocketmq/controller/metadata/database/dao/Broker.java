@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.metadata.database.model;
+package com.automq.rocketmq.controller.metadata.database.dao;
 
 import java.util.Date;
 
@@ -24,6 +24,8 @@ public class Broker {
     private String name;
     private String instanceId;
     private String address;
+
+    private int term;
 
     private Date createTime = new Date();
 
@@ -60,6 +62,14 @@ public class Broker {
 
     public void setAddress(String address) {
         this.address = address;
+    }
+
+    public int getTerm() {
+        return term;
+    }
+
+    public void setTerm(int term) {
+        this.term = term;
     }
 
     public Date getCreateTime() {
