@@ -29,7 +29,7 @@ import com.automq.rocketmq.controller.metadata.database.dao.Broker;
 import com.automq.rocketmq.controller.metadata.database.dao.Lease;
 import com.automq.rocketmq.controller.metadata.database.tasks.LeaseTask;
 import com.automq.rocketmq.controller.metadata.database.tasks.ScanBrokerTask;
-import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -77,9 +77,17 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
 
     @Override
     public Broker registerBroker(String name, String address, String instanceId) throws ControllerException {
-        Preconditions.checkNotNull(name);
-        Preconditions.checkNotNull(address);
-        Preconditions.checkNotNull(instanceId);
+        if (Strings.isNullOrEmpty(name)) {
+            throw new ControllerException(Code.BAD_REQUEST_VALUE, "Broker name is null or empty");
+        }
+
+        if (Strings.isNullOrEmpty(address)) {
+            throw new ControllerException(Code.BAD_REQUEST_VALUE, "Broker address is null or empty");
+        }
+
+        if (Strings.isNullOrEmpty(instanceId)) {
+            throw new ControllerException(Code.BAD_REQUEST_VALUE, "Broker instance-id is null or empty");
+        }
 
         for (;;) {
             if (this.isLeader()) {

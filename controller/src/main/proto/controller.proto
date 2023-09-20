@@ -21,6 +21,7 @@ enum Code {
   INTERRUPTED = 1;
   NOT_FOUND = 404;
   NO_LEADER = 1000;
+  BAD_REQUEST = 1001;
 }
 
 message Status {
@@ -34,17 +35,28 @@ message ControllerRequestContext {}
 message BrokerRegistrationRequest {
   ControllerRequestContext context = 1;
 
-  int32 broker_id = 2;
-  string cluster_id = 3;
+  // Name of the broker, controller node
+  string broker_name = 2;
+
+  // Address of the broker/controller node, through which to accept connections from peers
+  string address = 3;
+
+  // The instance-id of the elastic cloud
+  string instance_id = 4;
 
   // To uniquely identify each instance of a specific broker ID. This field is designed to change in case of
   // broker restarts.
-  Uuid fingerprint = 4;
+  Uuid fingerprint = 5;
 }
 
 message BrokerRegistrationReply {
   Status status = 1;
-  int64 epoch = 2;
+
+  // Broker-id
+  int32 id = 2;
+
+  // Term of the broker
+  int64 term = 3;
 }
 
 message BrokerUnregistrationRequest {
@@ -58,8 +70,8 @@ message BrokerUnregistrationReply {
 }
 
 message BrokerHeartbeatRequest {
-  int32 broker_id = 1;
-  int64 broker_epoch = 2;
+  int32 id = 1;
+  int64 term = 2;
 
   // Flag whether this broker is going to shutdown shortly.
   bool going_away = 3;

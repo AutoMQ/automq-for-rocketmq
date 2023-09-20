@@ -46,7 +46,9 @@ import apache.rocketmq.controller.v1.ReassignMessageQueueRequest;
 import apache.rocketmq.controller.v1.Status;
 import apache.rocketmq.controller.v1.Topic;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
+import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
+import com.automq.rocketmq.controller.metadata.database.dao.Broker;
 import com.google.protobuf.TextFormat;
 import io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
@@ -65,7 +67,19 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     @Override
     public void registerBroker(BrokerRegistrationRequest request,
         StreamObserver<BrokerRegistrationReply> responseObserver) {
-        super.registerBroker(request, responseObserver);
+        try {
+            Broker broker = metadataStore.registerBroker(request.getBrokerName(), request.getAddress(),
+                request.getInstanceId());
+            BrokerRegistrationReply reply = BrokerRegistrationReply.newBuilder()
+                .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                .setId(broker.getId())
+                .setTerm(broker.getTerm())
+                .build();
+            responseObserver.onNext(reply);
+            responseObserver.onCompleted();
+        } catch (ControllerException e) {
+            responseObserver.onError(e);
+        }
     }
 
     @Override

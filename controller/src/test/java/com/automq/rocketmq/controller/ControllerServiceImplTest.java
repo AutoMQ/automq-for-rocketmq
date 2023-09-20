@@ -26,12 +26,17 @@ import io.grpc.Grpc;
 import io.grpc.InsecureChannelCredentials;
 import io.grpc.ManagedChannel;
 import java.io.IOException;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import static org.junit.Assert.assertEquals;
 
 public class ControllerServiceImplTest {
+
+    @Test
+    public void testRegisterBroker() {
+
+    }
 
     @Test
     public void testHeartbeatGrpc() throws IOException, InterruptedException {
@@ -42,7 +47,7 @@ public class ControllerServiceImplTest {
         int port = testServer.getPort();
         ManagedChannel channel = Grpc.newChannelBuilderForAddress("localhost", port, InsecureChannelCredentials.create()).build();
         ControllerServiceGrpc.ControllerServiceBlockingStub blockingStub = ControllerServiceGrpc.newBlockingStub(channel);
-        BrokerHeartbeatRequest request = BrokerHeartbeatRequest.newBuilder().setBrokerId(1).setBrokerEpoch(1).build();
+        BrokerHeartbeatRequest request = BrokerHeartbeatRequest.newBuilder().setId(1).setTerm(1).build();
         BrokerHeartbeatReply reply = blockingStub.processBrokerHeartbeat(request);
         assertEquals(Code.OK, reply.getStatus().getCode());
         channel.shutdownNow();
