@@ -25,7 +25,7 @@ public class Broker {
     private String instanceId;
     private String address;
 
-    private int term;
+    private int epoch;
 
     private Date createTime = new Date();
 
@@ -64,12 +64,12 @@ public class Broker {
         this.address = address;
     }
 
-    public int getTerm() {
-        return term;
+    public int getEpoch() {
+        return epoch;
     }
 
-    public void setTerm(int term) {
-        this.term = term;
+    public void setEpoch(int epoch) {
+        this.epoch = epoch;
     }
 
     public Date getCreateTime() {

@@ -49,8 +49,8 @@ public class LeaseTest extends DatabaseTestBase {
             Lease lease = leaseMapper.current();
             if (lease.expired()) {
                 Lease inspect = leaseMapper.currentWithWriteLock();
-                if (lease.getTerm() == inspect.getTerm() && lease.getBrokerId() == inspect.getBrokerId()) {
-                    inspect.setTerm(inspect.getTerm() + 1);
+                if (lease.getEpoch() == inspect.getEpoch() && lease.getBrokerId() == inspect.getBrokerId()) {
+                    inspect.setEpoch(inspect.getEpoch() + 1);
                     inspect.setBrokerId(1);
                     Calendar calendar = Calendar.getInstance();
                     calendar.add(Calendar.SECOND, 30);
@@ -66,7 +66,7 @@ public class LeaseTest extends DatabaseTestBase {
             lease = leaseMapper.current();
             Assertions.assertFalse(lease.expired());
             Assertions.assertEquals(1, lease.getBrokerId());
-            Assertions.assertEquals(1, lease.getTerm());
+            Assertions.assertEquals(1, lease.getEpoch());
         }
     }
 }

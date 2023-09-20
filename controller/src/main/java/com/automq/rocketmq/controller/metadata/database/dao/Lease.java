@@ -21,7 +21,7 @@ import java.util.Date;
 
 public class Lease {
     private int brokerId;
-    private int term;
+    private int epoch;
     private Date expirationTime;
 
     public int getBrokerId() {
@@ -32,12 +32,12 @@ public class Lease {
         this.brokerId = brokerId;
     }
 
-    public int getTerm() {
-        return term;
+    public int getEpoch() {
+        return epoch;
     }
 
-    public void setTerm(int term) {
-        this.term = term;
+    public void setEpoch(int epoch) {
+        this.epoch = epoch;
     }
 
     public Date getExpirationTime() {

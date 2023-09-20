@@ -47,7 +47,7 @@ public interface LeaseMapper {
      * Once {@link #currentWithWriteLock()} succeeds, inspect whether the lease is expired and update it to mark self
      * as leader.
      *
-     * @param lease Lease of a new leader, whose term should be incremented by one and expiration_time renewed.
+     * @param lease Lease of a new leader, whose epoch should be incremented by one and expiration_time renewed.
      * @return Number of rows affected, 1 if successful
      */
     int update(Lease lease);

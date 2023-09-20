@@ -54,7 +54,26 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
                 brokerMapper.delete(broker.getId());
             }
         }
+    }
 
+    @Test
+    void testRegisterBroker_badArguments() throws ControllerException, IOException {
+        ControllerConfig config = Mockito.mock(ControllerConfig.class);
+        Mockito.when(config.brokerId()).thenReturn(1);
+        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(getSessionFactory(), config)) {
+            metadataStore.start();
+            Awaitility.await().with().atMost(10, TimeUnit.SECONDS)
+                .pollInterval(100, TimeUnit.MILLISECONDS)
+                .until(metadataStore::isLeader);
+            String name = "test-broker -0";
+            String address = "localhost:1234";
+            String instanceId = "i-register";
+            Assertions.assertThrows(ControllerException.class, () -> metadataStore.registerBroker("", address, instanceId));
+            Assertions.assertThrows(ControllerException.class, () -> metadataStore.registerBroker(name, null, instanceId));
+            Assertions.assertThrows(ControllerException.class, () -> metadataStore.registerBroker(name, address, ""));
+        }
     }
 
     /**

@@ -80,13 +80,13 @@ public class BrokerTest extends DatabaseTestBase {
             Assertions.assertEquals(1, affectedRows);
 
             Broker broker1 = brokerMapper.getByInstanceId(broker.getInstanceId());
-            Assertions.assertEquals(1, broker1.getTerm());
+            Assertions.assertEquals(1, broker1.getEpoch());
             Assertions.assertEquals(broker.getId(), broker1.getId());
-            affectedRows = brokerMapper.increaseTerm(broker.getId());
+            affectedRows = brokerMapper.increaseEpoch(broker.getId());
             Assertions.assertEquals(1, affectedRows);
 
             broker1 = brokerMapper.getByInstanceId(broker1.getInstanceId());
-            Assertions.assertEquals(2, broker1.getTerm());
+            Assertions.assertEquals(2, broker1.getEpoch());
             brokerMapper.delete(affectedRows);
         }
     }

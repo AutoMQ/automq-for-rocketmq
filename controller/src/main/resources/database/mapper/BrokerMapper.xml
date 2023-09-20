@@ -24,9 +24,9 @@
         INSERT INTO broker (name, instance_id, address) VALUES (#{name}, #{instanceId}, #{address})
     </insert>
 
-    <update id="increaseTerm" parameterType="int">
+    <update id="increaseEpoch" parameterType="int">
         UPDATE broker
-        SET term = term + 1
+        SET epoch = epoch + 1
         WHERE id = #{id}
     </update>
 
@@ -35,18 +35,18 @@
     </delete>
 
     <select id="list" resultType="Broker" >
-        SELECT id, name, instance_id, address, term
+        SELECT id, name, instance_id, address, epoch
         FROM broker
     </select>
 
     <select id="deltaList" parameterType="date" resultType="Broker">
-        SELECT id, name, instance_id, address, term
+        SELECT id, name, instance_id, address, epoch
         FROM broker
         WHERE update_time >= #{updateTime}
     </select>
 
     <select id="getByInstanceId" resultType="Broker" parameterType="string">
-        SELECT id, name, instance_id, address, term
+        SELECT id, name, instance_id, address, epoch
         FROM broker
         WHERE instance_id = #{instanceId}
     </select>
