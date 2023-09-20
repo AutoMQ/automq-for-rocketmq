@@ -23,12 +23,16 @@ import com.automq.rocketmq.store.StreamStore;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.impl.StreamStoreImpl;
 import com.automq.rocketmq.store.mock.MockStoreMetadataService;
+import com.automq.rocketmq.store.model.generated.TimerTag;
 import com.automq.rocketmq.store.model.stream.SingleRecord;
 import com.automq.rocketmq.store.service.KVService;
 import com.automq.rocketmq.store.util.MessageUtil;
 import com.automq.rocketmq.store.util.SerializeUtil;
 import com.automq.rocketmq.stream.api.FetchResult;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -61,7 +65,7 @@ class ReviveServiceTest {
     }
 
     @Test
-    void tryRevive() throws StoreException {
+    void tryRevive() throws StoreException, InterruptedException {
         // Append mock message.
         long streamId = metadataService.getStreamId(32, 32);
         streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(32, 32, ""))).join();
@@ -109,8 +113,12 @@ class ReviveServiceTest {
         assertEquals(32, messageExt.message().queueId());
         assertEquals(0, messageExt.offset());
 
-        timerTagCount.set(0);
-        kvService.iterate(KV_NAMESPACE_TIMER_TAG, (key, value) -> timerTagCount.getAndIncrement());
-        assertEquals(1, timerTagCount.get());
+        kvService.flush(true);
+        Set<TimerTag> timerTagSet = new HashSet<>();
+        kvService.iterate(KV_NAMESPACE_TIMER_TAG, (key, value) -> timerTagSet.add(TimerTag.getRootAsTimerTag(ByteBuffer.wrap(value))));
+        for (TimerTag tag : timerTagSet) {
+            System.out.printf("topic: %d, queue: %d, offset: %d, time %d%n", tag.originTopicId(), tag.originQueueId(), tag.offset(), tag.nextVisibleTimestamp());
+        }
+        assertEquals(1, timerTagSet.size());
     }
 }
