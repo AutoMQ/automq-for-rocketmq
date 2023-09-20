@@ -18,6 +18,7 @@
 package com.automq.rocketmq.controller.metadata.database;
 
 import com.automq.rocketmq.controller.exception.ControllerException;
+import com.automq.rocketmq.controller.metadata.ControllerClient;
 import com.automq.rocketmq.controller.metadata.ControllerConfig;
 import com.automq.rocketmq.controller.metadata.DatabaseTestBase;
 import com.automq.rocketmq.controller.metadata.database.mapper.BrokerMapper;
@@ -32,13 +33,19 @@ import org.mockito.Mockito;
 
 class DefaultMetadataStoreTest extends DatabaseTestBase {
 
+    ControllerClient client;
+
+    public DefaultMetadataStoreTest() {
+        this.client = Mockito.mock(ControllerClient.class);
+    }
+
     @Test
     void testRegisterBroker() throws ControllerException, IOException {
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.brokerId()).thenReturn(1);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
         Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(getSessionFactory(), config)) {
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().atMost(10, TimeUnit.SECONDS)
                 .pollInterval(100, TimeUnit.MILLISECONDS)
@@ -62,7 +69,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         Mockito.when(config.brokerId()).thenReturn(1);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
         Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(getSessionFactory(), config)) {
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().atMost(10, TimeUnit.SECONDS)
                 .pollInterval(100, TimeUnit.MILLISECONDS)
@@ -87,7 +94,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         Mockito.when(config.brokerId()).thenReturn(1);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
         Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(getSessionFactory(), config)) {
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertNull(metadataStore.getLease());
         }
     }
@@ -98,7 +105,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         Mockito.when(config.brokerId()).thenReturn(1);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
         Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(getSessionFactory(), config)) {
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await()
                 .with()
@@ -127,7 +134,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
         Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
 
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(getSessionFactory(), config)) {
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await()
                 .with()
@@ -157,7 +164,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         Mockito.when(config.brokerId()).thenReturn(1);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
         Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(getSessionFactory(), config)) {
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertThrows(ControllerException.class, metadataStore::leaderAddress);
         }
     }
@@ -168,7 +175,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         Mockito.when(config.brokerId()).thenReturn(1);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
         Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(getSessionFactory(), config)) {
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await()
                 .with()
