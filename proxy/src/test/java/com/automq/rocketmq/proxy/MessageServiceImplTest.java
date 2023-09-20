@@ -105,12 +105,19 @@ class MessageServiceImplTest {
         header.setMaxMsgNums(4);
         messageStore.put(MessageUtil.transferToMessage(topicId, 1, "", new HashMap<>(), new byte[] {}), new HashMap<>());
         messageStore.put(MessageUtil.transferToMessage(topicId, 2, "", new HashMap<>(), new byte[] {}), new HashMap<>());
+        messageStore.put(MessageUtil.transferToMessage(topicId, 2, "", new HashMap<>(), new byte[] {}), new HashMap<>());
         messageStore.put(MessageUtil.transferToMessage(topicId, 4, "", new HashMap<>(), new byte[] {}), new HashMap<>());
         messageStore.put(MessageUtil.transferToMessage(topicId, 4, "", new HashMap<>(), new byte[] {}), new HashMap<>());
 
         result = messageService.popMessage(ProxyContext.create(), null, header, 0L).join();
         assertEquals(PopStatus.FOUND, result.getPopStatus());
         assertEquals(4, result.getMsgFoundList().size());
+
+        // Pop partial queues.
+        header.setMaxMsgNums(1);
+        result = messageService.popMessage(ProxyContext.create(), null, header, 0L).join();
+        assertEquals(PopStatus.FOUND, result.getPopStatus());
+        assertEquals(1, result.getMsgFoundList().size());
     }
 
     @Test

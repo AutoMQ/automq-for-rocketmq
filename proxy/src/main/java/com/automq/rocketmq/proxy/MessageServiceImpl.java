@@ -116,6 +116,7 @@ public class MessageServiceImpl implements MessageService {
         // Try to pop origin messages.
         CompletableFuture<List<MessageExt>> popFuture = store.pop(consumerGroupId, topicId, queueId, offset, filter, batchSize, fifo, false, invisibleDuration)
             .thenApply(com.automq.rocketmq.store.model.message.PopResult::messageList);
+        // TODO: advance consume offset.
 
         // There is no retry message when pop orderly. So that return origin messages directly.
         if (fifo) {
