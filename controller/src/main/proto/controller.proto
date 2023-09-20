@@ -20,6 +20,7 @@ enum Code {
   OK = 0;
   INTERRUPTED = 1;
   NOT_FOUND = 404;
+  NO_LEADER = 1000;
 }
 
 message Status {

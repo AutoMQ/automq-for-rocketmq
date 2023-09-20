@@ -238,6 +238,13 @@
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>0.8.10</version>
+                <configuration>
+                    <excludes>
+                        <exclude>**/*Exception*</exclude>
+                        <exclude>**/metadata/database/dao/*</exclude>
+                        <exclude>apache/rocketmq/controller/**/*</exclude>
+                    </excludes>
+                </configuration>
                 <executions>
                     <execution>
                         <goals>

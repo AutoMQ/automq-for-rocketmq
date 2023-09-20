@@ -17,7 +17,7 @@
 
 package com.automq.rocketmq.controller.metadata.database.mapper;
 
-import com.automq.rocketmq.controller.metadata.database.model.Lease;
+import com.automq.rocketmq.controller.metadata.database.dao.Lease;
 
 public interface LeaseMapper {
 

@@ -15,34 +15,19 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.metadata.database.mapper;
+package com.automq.rocketmq.controller.metadata.database.tasks;
 
-import com.automq.rocketmq.controller.metadata.database.dao.Broker;
+import com.automq.rocketmq.controller.metadata.database.DefaultMetadataStore;
 import java.util.Date;
-import java.util.List;
 
-public interface BrokerMapper {
-    /**
-     * Create a new broker record in database.
-     *
-     * @param broker Broker instance to persist
-     * @return Generated broker identity
-     */
-    int create(Broker broker);
+public abstract class ScanTask extends ControllerTask {
 
-    Broker getByInstanceId(String instanceId);
+    protected Date lastScanTime;
 
-    /**
-     * Increase term of the broker for each registration.
-     *
-     * @param id ID of the broker whose term should be increased
-     * @return Number of rows affected, expected to be 1.
-     */
-    int increaseTerm(int id);
+    public ScanTask(DefaultMetadataStore metadataStore) {
+        super(metadataStore);
+    }
 
-    List<Broker> list();
 
-    List<Broker> deltaList(Date updateTime);
 
-    void delete(int id);
 }

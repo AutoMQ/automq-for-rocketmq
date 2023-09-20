@@ -18,7 +18,7 @@
 package com.automq.rocketmq.controller.metadata;
 
 import com.automq.rocketmq.controller.metadata.database.mapper.BrokerMapper;
-import com.automq.rocketmq.controller.metadata.database.model.Broker;
+import com.automq.rocketmq.controller.metadata.database.dao.Broker;
 import java.io.IOException;
 import java.util.List;
 import org.apache.ibatis.session.SqlSession;
@@ -50,9 +50,9 @@ public class BrokerTest extends DatabaseTestBase {
             broker.setName("Test-1");
             broker.setAddress("localhost:1234");
             broker.setInstanceId("i-asdf");
-            int id = brokerMapper.create(broker);
+            int affectedRows = brokerMapper.create(broker);
 
-            Assertions.assertTrue(id > 0);
+            Assertions.assertEquals(1, affectedRows);
 
             List<Broker> brokers = brokerMapper.list();
             Assertions.assertEquals(1, brokers.size());
@@ -60,10 +60,34 @@ public class BrokerTest extends DatabaseTestBase {
             Assertions.assertEquals("i-asdf", brokers.get(0).getInstanceId());
             Assertions.assertEquals("localhost:1234", brokers.get(0).getAddress());
 
-            brokerMapper.delete(id);
+            brokerMapper.delete(broker.getId());
 
             brokers = brokerMapper.list();
             Assertions.assertTrue(brokers.isEmpty());
+        }
+    }
+
+    @Test
+    @Order(3)
+    public void testTerm() throws IOException {
+        try (SqlSession session = this.getSessionFactory().openSession()) {
+            BrokerMapper brokerMapper = session.getMapper(BrokerMapper.class);
+            Broker broker = new Broker();
+            broker.setName("Test-1");
+            broker.setAddress("localhost:1234");
+            broker.setInstanceId("i-asdf");
+            int affectedRows = brokerMapper.create(broker);
+            Assertions.assertEquals(1, affectedRows);
+
+            Broker broker1 = brokerMapper.getByInstanceId(broker.getInstanceId());
+            Assertions.assertEquals(1, broker1.getTerm());
+            Assertions.assertEquals(broker.getId(), broker1.getId());
+            affectedRows = brokerMapper.increaseTerm(broker.getId());
+            Assertions.assertEquals(1, affectedRows);
+
+            broker1 = brokerMapper.getByInstanceId(broker1.getInstanceId());
+            Assertions.assertEquals(2, broker1.getTerm());
+            brokerMapper.delete(affectedRows);
         }
     }
 
