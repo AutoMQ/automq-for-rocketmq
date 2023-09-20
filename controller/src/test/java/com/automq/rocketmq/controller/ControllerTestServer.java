@@ -21,12 +21,13 @@ import io.grpc.BindableService;
 import io.grpc.Grpc;
 import io.grpc.InsecureServerCredentials;
 import io.grpc.Server;
+import java.io.Closeable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
-public class ControllerTestServer {
+public class ControllerTestServer implements Closeable {
     private static final Logger LOGGER = LoggerFactory.getLogger(ControllerTestServer.class);
 
     private int port;
@@ -57,5 +58,14 @@ public class ControllerTestServer {
 
     public int getPort() {
         return port;
+    }
+
+    @Override
+    public void close() throws IOException {
+        try {
+            this.stop();
+        } catch (InterruptedException e) {
+            throw new IOException(e);
+        }
     }
 }
