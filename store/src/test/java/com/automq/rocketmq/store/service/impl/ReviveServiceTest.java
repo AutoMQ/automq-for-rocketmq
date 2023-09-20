@@ -80,7 +80,7 @@ class ReviveServiceTest {
         FetchResult fetchResult = streamStore.fetch(retryStreamId, 0, 100).join();
         assertEquals(1, fetchResult.recordBatchList().size());
 
-        MessageExt messageExt = MessageUtil.transferToMessage(fetchResult.recordBatchList().get(0));
+        MessageExt messageExt = MessageUtil.transferToMessageExt(fetchResult.recordBatchList().get(0));
         assertEquals(1, messageExt.reconsumeCount());
         assertEquals(32, messageExt.message().topicId());
         assertEquals(32, messageExt.message().queueId());
@@ -103,7 +103,7 @@ class ReviveServiceTest {
         fetchResult = streamStore.fetch(deadLetterStreamId, 0, 100).join();
         assertEquals(1, fetchResult.recordBatchList().size());
 
-        messageExt = MessageUtil.transferToMessage(fetchResult.recordBatchList().get(0));
+        messageExt = MessageUtil.transferToMessageExt(fetchResult.recordBatchList().get(0));
         assertEquals(2, messageExt.reconsumeCount());
         assertEquals(32, messageExt.message().topicId());
         assertEquals(32, messageExt.message().queueId());

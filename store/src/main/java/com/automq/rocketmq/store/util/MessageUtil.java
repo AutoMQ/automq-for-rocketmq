@@ -18,16 +18,34 @@
 package com.automq.rocketmq.store.util;
 
 import com.automq.rocketmq.common.model.MessageExt;
+import com.automq.rocketmq.common.model.generated.KeyValue;
 import com.automq.rocketmq.common.model.generated.Message;
 import com.automq.rocketmq.stream.api.RecordBatchWithContext;
+import com.google.flatbuffers.FlatBufferBuilder;
+import java.util.Map;
 
 public class MessageUtil {
-    public static MessageExt transferToMessage(RecordBatchWithContext recordBatch) {
+    public static MessageExt transferToMessageExt(RecordBatchWithContext recordBatch) {
         Message message = Message.getRootAsMessage(recordBatch.rawPayload());
         return MessageExt.Builder.builder()
             .message(message)
             .offset(recordBatch.baseOffset())
             .systemProperties(recordBatch.properties())
             .build();
+    }
+
+    public static Message transferToMessage(long topicId, int queueId, String tag,
+        Map<String, String> userProperties, byte[] body) {
+        FlatBufferBuilder builder = new FlatBufferBuilder();
+        int[] userPropertiesOffsets = userProperties.entrySet()
+            .stream()
+            .map(entry -> KeyValue.createKeyValue(builder,
+                builder.createString(entry.getKey()), builder.createString(entry.getValue())))
+            .mapToInt(Integer::valueOf)
+            .toArray();
+        int root = Message.createMessage(builder, topicId, queueId, builder.createString(tag),
+            builder.createVectorOfTables(userPropertiesOffsets), builder.createByteVector(body));
+        builder.finish(root);
+        return Message.getRootAsMessage(builder.dataBuffer());
     }
 }

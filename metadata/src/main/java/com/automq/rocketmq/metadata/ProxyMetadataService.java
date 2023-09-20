@@ -15,10 +15,16 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq;
+package com.automq.rocketmq.metadata;
 
-public class Main {
-    public static void main(String[] args) {
-        System.out.println("Hello world!");
-    }
+public interface ProxyMetadataService {
+    long queryTopicId(String name);
+
+    long queryConsumeGroupId(String name);
+
+    long queryConsumerOffset(long consumerGroupId, long topicId, int queueId);
+
+    // Each time pop will advance the consumer offset by batch size.
+    // Metadata service will cache the consumer offset in memory, and periodically commit to Controller.
+    void updateConsumerOffset(long consumerGroupId, long topicId, int queueId, long offset);
 }
