@@ -38,7 +38,7 @@ public interface BrokerMapper {
      * @param id ID of the broker whose term should be increased
      * @return Number of rows affected, expected to be 1.
      */
-    int increaseTerm(int id);
+    int increaseEpoch(int id);
 
     List<Broker> list();
 
