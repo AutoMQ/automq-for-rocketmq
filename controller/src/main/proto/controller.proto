@@ -265,7 +265,7 @@ message ListOpenStreamsRequest {
 message ListOpeningStreamsReply {
   Status status = 1;
 
-  repeated Stream stream = 2;
+  repeated StreamMetadata stream = 2;
 }
 
 // Request to prepare S3 objects before uploading.
