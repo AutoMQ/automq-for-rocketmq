@@ -15,20 +15,22 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.metadata;
+package com.automq.rocketmq.proxy.util;
 
-import java.util.Set;
+import com.automq.rocketmq.common.model.MessageExt;
+import java.net.InetSocketAddress;
+import java.util.List;
 
-public interface ProxyMetadataService {
-    long queryTopicId(String name);
-
-    Set<Integer> queryAssignmentQueueSet(long topicId);
-
-    long queryConsumerGroupId(String name);
-
-    long queryConsumerOffset(long consumerGroupId, long topicId, int queueId);
-
-    // Each time pop will advance the consumer offset by batch size.
-    // Metadata service will cache the consumer offset in memory, and periodically commit to Controller.
-    void updateConsumerOffset(long consumerGroupId, long topicId, int queueId, long offset);
+public class RocketMQMessageUtil {
+    public static List<org.apache.rocketmq.common.message.MessageExt> transformMessageExt(
+        List<MessageExt> messageList) {
+        return messageList.stream()
+            .map(messageExt -> new org.apache.rocketmq.common.message.MessageExt(
+                messageExt.message().queueId(),
+                0L, new InetSocketAddress("127.0.0.1", 8080),
+                0L, new InetSocketAddress("127.0.0.1", 10911),
+                ""
+            ))
+            .toList();
+    }
 }

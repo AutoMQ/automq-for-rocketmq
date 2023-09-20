@@ -273,6 +273,10 @@ public class MessageStoreImpl implements MessageStore {
             try {
                 long nextVisibleTimestamp = operationTimestamp + invisibleDuration;
 
+                if (messageList.size() > batchSize) {
+                    messageList = messageList.subList(0, batchSize);
+                }
+
                 // If pop orderly, check whether the message is already consumed.
                 Map<Long, CheckPoint> fifoCheckPointMap = new HashMap<>();
                 if (fifo) {
