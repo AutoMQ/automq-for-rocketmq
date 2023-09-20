@@ -67,9 +67,4 @@ public class MockStoreMetadataService implements StoreMetadataService {
     public int getMaxRetryTimes(long consumerGroupId) {
         return 1;
     }
-
-    @Override
-    public void advanceConsumeOffset(long consumerGroupId, long topicId, int queueId, long offset) {
-
-    }
 }

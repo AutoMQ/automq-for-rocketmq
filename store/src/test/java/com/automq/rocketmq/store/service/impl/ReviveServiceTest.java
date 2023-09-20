@@ -61,7 +61,7 @@ class ReviveServiceTest {
     }
 
     @Test
-    void tryRevive() throws StoreException {
+    void tryRevive() throws StoreException, InterruptedException {
         // Append mock message.
         long streamId = metadataService.getStreamId(32, 32);
         streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(32, 32, ""))).join();
@@ -80,7 +80,7 @@ class ReviveServiceTest {
         FetchResult fetchResult = streamStore.fetch(retryStreamId, 0, 100).join();
         assertEquals(1, fetchResult.recordBatchList().size());
 
-        MessageExt messageExt = MessageUtil.transferToMessage(fetchResult.recordBatchList().get(0));
+        MessageExt messageExt = MessageUtil.transferToMessageExt(fetchResult.recordBatchList().get(0));
         assertEquals(1, messageExt.reconsumeCount());
         assertEquals(32, messageExt.message().topicId());
         assertEquals(32, messageExt.message().queueId());
@@ -95,22 +95,23 @@ class ReviveServiceTest {
         assertEquals(1, timerTagCount.get());
 
         // Append timer tag of retry message.
-        kvService.put(KV_NAMESPACE_TIMER_TAG, SerializeUtil.buildTimerTagKey(System.currentTimeMillis() - 100, 32, 32, 0, Long.MAX_VALUE),
-            SerializeUtil.buildTimerTagValue(System.currentTimeMillis() - 100, 32, 32, 32, retryStreamId, 0, Long.MAX_VALUE));
+        long nextVisibleTimestamp = System.currentTimeMillis() - 100;
+        kvService.put(KV_NAMESPACE_TIMER_TAG, SerializeUtil.buildTimerTagKey(nextVisibleTimestamp, 32, 32, 0, Long.MAX_VALUE),
+            SerializeUtil.buildTimerTagValue(nextVisibleTimestamp, 32, 32, 32, retryStreamId, 0, Long.MAX_VALUE));
         reviveService.tryRevive();
 
         long deadLetterStreamId = metadataService.getDeadLetterStreamId(32, 32, 32);
         fetchResult = streamStore.fetch(deadLetterStreamId, 0, 100).join();
         assertEquals(1, fetchResult.recordBatchList().size());
 
-        messageExt = MessageUtil.transferToMessage(fetchResult.recordBatchList().get(0));
+        messageExt = MessageUtil.transferToMessageExt(fetchResult.recordBatchList().get(0));
         assertEquals(2, messageExt.reconsumeCount());
         assertEquals(32, messageExt.message().topicId());
         assertEquals(32, messageExt.message().queueId());
         assertEquals(0, messageExt.offset());
 
         timerTagCount.set(0);
-        kvService.iterate(KV_NAMESPACE_TIMER_TAG, (key, value) -> timerTagCount.getAndIncrement());
+        kvService.iterate(KV_NAMESPACE_TIMER_TAG, (key, value) -> timerTagCount.incrementAndGet());
         assertEquals(1, timerTagCount.get());
     }
 }

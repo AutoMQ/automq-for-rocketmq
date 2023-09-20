@@ -27,8 +27,4 @@ public interface StoreMetadataService {
     long getDeadLetterStreamId(long consumerGroupId, long topicId, int queueId);
 
     int getMaxRetryTimes(long consumerGroupId);
-
-    // Each time pop will advance the consumer offset by batch size.
-    // Metadata service will cache the consumer offset in memory, and periodically commit to Controller.
-    void advanceConsumeOffset(long consumerGroupId, long topicId, int queueId, long offset);
 }

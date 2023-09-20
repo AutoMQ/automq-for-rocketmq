@@ -103,11 +103,12 @@ public class ReviveService implements Runnable {
             // Message has already been deleted.
             if (result.recordBatchList().isEmpty()) {
                 // TODO: log the probable bug.
+                System.out.println("not found message in revive");
                 return;
             }
 
             // Build the retry message and append it to retry stream or dead letter stream.
-            MessageExt messageExt = MessageUtil.transferToMessage(result.recordBatchList().get(0));
+            MessageExt messageExt = MessageUtil.transferToMessageExt(result.recordBatchList().get(0));
             messageExt.setReconsumeCount(messageExt.reconsumeCount() + 1);
             if (messageExt.reconsumeCount() <= metadataService.getMaxRetryTimes(timerTag.consumerGroupId())) {
                 long retryStreamId = metadataService.getRetryStreamId(timerTag.consumerGroupId(), timerTag.originTopicId(), timerTag.originQueueId());
@@ -127,6 +128,7 @@ public class ReviveService implements Runnable {
                 kvService.batch(deleteCheckPointRequest, deleteTimerTagRequest);
             } catch (StoreException e) {
                 // TODO: log exception
+                System.out.println("delete timer tag failed in revive");
             }
         });
     }
