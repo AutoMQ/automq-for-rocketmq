@@ -24,12 +24,12 @@ import com.automq.rocketmq.controller.metadata.ControllerClient;
 import com.automq.rocketmq.controller.metadata.ControllerConfig;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.Role;
-import com.automq.rocketmq.controller.metadata.database.mapper.BrokerMapper;
+import com.automq.rocketmq.controller.metadata.database.dao.Node;
+import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.LeaseMapper;
-import com.automq.rocketmq.controller.metadata.database.dao.Broker;
 import com.automq.rocketmq.controller.metadata.database.dao.Lease;
 import com.automq.rocketmq.controller.metadata.database.tasks.LeaseTask;
-import com.automq.rocketmq.controller.metadata.database.tasks.ScanBrokerTask;
+import com.automq.rocketmq.controller.metadata.database.tasks.ScanNodeTask;
 import com.google.common.base.Strings;
 import java.io.Closeable;
 import java.io.IOException;
@@ -55,7 +55,7 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
 
     private Role role;
 
-    private final ConcurrentHashMap<Integer, Broker> brokers;
+    private final ConcurrentHashMap<Integer, Node> brokers;
 
     private final ScheduledExecutorService executorService;
 
@@ -75,12 +75,12 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
 
     public void start() {
         this.executorService.scheduleAtFixedRate(new LeaseTask(this), 1, config.scanIntervalInSecs(), TimeUnit.SECONDS);
-        this.executorService.scheduleWithFixedDelay(new ScanBrokerTask(this), 1, config.scanIntervalInSecs(), TimeUnit.SECONDS);
+        this.executorService.scheduleWithFixedDelay(new ScanNodeTask(this), 1, config.scanIntervalInSecs(), TimeUnit.SECONDS);
         LOGGER.info("MetadataStore tasks scheduled");
     }
 
     @Override
-    public Broker registerBroker(String name, String address, String instanceId) throws ControllerException {
+    public Node registerBrokerNode(String name, String address, String instanceId) throws ControllerException {
         if (Strings.isNullOrEmpty(name)) {
             throw new ControllerException(Code.BAD_REQUEST_VALUE, "Broker name is null or empty");
         }
@@ -96,12 +96,12 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
         for (;;) {
             if (this.isLeader()) {
                 try (SqlSession session = this.sessionFactory.openSession(false)) {
-                    BrokerMapper brokerMapper = session.getMapper(BrokerMapper.class);
-                    Broker broker = brokerMapper.getByInstanceId(instanceId);
-                    if (null != broker) {
-                        brokerMapper.increaseEpoch(broker.getId());
-                        broker.setEpoch(broker.getEpoch() + 1);
-                        return broker;
+                    NodeMapper nodeMapper = session.getMapper(NodeMapper.class);
+                    Node node = nodeMapper.getByInstanceId(instanceId);
+                    if (null != node) {
+                        nodeMapper.increaseEpoch(node.getId());
+                        node.setEpoch(node.getEpoch() + 1);
+                        return node;
                     } else {
                         LeaseMapper leaseMapper = session.getMapper(LeaseMapper.class);
                         Lease lease = leaseMapper.currentWithShareLock();
@@ -110,13 +110,13 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
                             LOGGER.info("Controller has yielded its leader role");
                             continue;
                         }
-                        broker = new Broker();
-                        broker.setName(name);
-                        broker.setAddress(address);
-                        broker.setInstanceId(instanceId);
-                        brokerMapper.create(broker);
+                        node = new Node();
+                        node.setName(name);
+                        node.setAddress(address);
+                        node.setInstanceId(instanceId);
+                        nodeMapper.create(node);
                         session.commit();
-                        return broker;
+                        return node;
                     }
                 }
             } else {
@@ -137,14 +137,14 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
             throw new ControllerException(Code.NO_LEADER_VALUE);
         }
 
-        Broker broker = brokers.get(this.lease.getBrokerId());
-        if (null == broker) {
-            LOGGER.error("Address for Broker with brokerId={} is missing", this.lease.getBrokerId());
+        Node node = brokers.get(this.lease.getNodeId());
+        if (null == node) {
+            LOGGER.error("Address for Broker with brokerId={} is missing", this.lease.getNodeId());
             throw new ControllerException(Code.NOT_FOUND_VALUE,
-                String.format("Broker is unexpected missing with brokerId=%d", this.lease.getBrokerId()));
+                String.format("Broker is unexpected missing with brokerId=%d", this.lease.getNodeId()));
         }
 
-        return broker.getAddress();
+        return node.getAddress();
     }
 
     @Override
@@ -164,11 +164,11 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
         return lease;
     }
 
-    public void addBroker(Broker broker) {
-        this.brokers.put(broker.getId(), broker);
+    public void addBroker(Node node) {
+        this.brokers.put(node.getId(), node);
     }
 
-    public ConcurrentMap<Integer, Broker> getBrokers() {
+    public ConcurrentMap<Integer, Node> getBrokers() {
         return brokers;
     }
 

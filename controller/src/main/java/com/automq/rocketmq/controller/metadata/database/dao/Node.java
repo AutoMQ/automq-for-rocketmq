@@ -19,12 +19,45 @@ package com.automq.rocketmq.controller.metadata.database.dao;
 
 import java.util.Date;
 
-public class Broker {
+public class Node {
+    /**
+     * Node ID
+     */
     private int id;
+
+    /**
+     * Node name, required.
+     */
     private String name;
+
+    /**
+     * Optional EC2 instance-id
+     */
     private String instanceId;
+
+    /**
+     * Optional EBS volume-id
+     */
+    private String volumeId;
+
+    /**
+     * Optional host-name
+     */
+    private String hostName;
+
+    /**
+     * Optional vpc-id
+     */
+    private String vpcId;
+
+    /**
+     * Address of the node, through which to accept TCP connections.
+     */
     private String address;
 
+    /**
+     * Epoch of the current broker process. Each registration increase it by one.
+     */
     private long epoch;
 
     private Date createTime = new Date();
@@ -54,6 +87,30 @@ public class Broker {
 
     public void setInstanceId(String instanceId) {
         this.instanceId = instanceId;
+    }
+
+    public String getVolumeId() {
+        return volumeId;
+    }
+
+    public void setVolumeId(String volumeId) {
+        this.volumeId = volumeId;
+    }
+
+    public String getHostName() {
+        return hostName;
+    }
+
+    public void setHostName(String hostName) {
+        this.hostName = hostName;
+    }
+
+    public String getVpcId() {
+        return vpcId;
+    }
+
+    public void setVpcId(String vpcId) {
+        this.vpcId = vpcId;
     }
 
     public String getAddress() {

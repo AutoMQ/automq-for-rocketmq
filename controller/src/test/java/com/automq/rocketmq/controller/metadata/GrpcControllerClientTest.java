@@ -21,7 +21,7 @@ import apache.rocketmq.controller.v1.Code;
 import com.automq.rocketmq.controller.ControllerServiceImpl;
 import com.automq.rocketmq.controller.ControllerTestServer;
 import com.automq.rocketmq.controller.exception.ControllerException;
-import com.automq.rocketmq.controller.metadata.database.dao.Broker;
+import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import java.io.IOException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -36,17 +36,17 @@ class GrpcControllerClientTest {
         String address = "localhost:1234";
         String instanceId = "i-ctrl";
         MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
-        Broker broker = new Broker();
-        broker.setId(1);
-        broker.setEpoch(1);
-        Mockito.when(metadataStore.registerBroker(ArgumentMatchers.anyString(), ArgumentMatchers.anyString(),
-            ArgumentMatchers.anyString())).thenReturn(broker);
+        Node node = new Node();
+        node.setId(1);
+        node.setEpoch(1);
+        Mockito.when(metadataStore.registerBrokerNode(ArgumentMatchers.anyString(), ArgumentMatchers.anyString(),
+            ArgumentMatchers.anyString())).thenReturn(node);
         ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
         try (ControllerTestServer testServer = new ControllerTestServer(0, svc)) {
             testServer.start();
             int port = testServer.getPort();
             ControllerClient client = new GrpcControllerClient();
-            Broker result = client.registerBroker(String.format("localhost:%d", port), name, address, instanceId);
+            Node result = client.registerBroker(String.format("localhost:%d", port), name, address, instanceId);
             Assertions.assertEquals(1, result.getId());
             Assertions.assertEquals(1, result.getEpoch());
             Assertions.assertEquals(name, result.getName());
@@ -61,11 +61,11 @@ class GrpcControllerClientTest {
         String address = "localhost:1234";
         String instanceId = "i-ctrl";
         MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
-        Broker broker = new Broker();
-        broker.setId(1);
-        broker.setEpoch(1);
-        Mockito.when(metadataStore.registerBroker(ArgumentMatchers.anyString(), ArgumentMatchers.anyString(),
-            ArgumentMatchers.anyString())).thenReturn(broker);
+        Node node = new Node();
+        node.setId(1);
+        node.setEpoch(1);
+        Mockito.when(metadataStore.registerBrokerNode(ArgumentMatchers.anyString(), ArgumentMatchers.anyString(),
+            ArgumentMatchers.anyString())).thenReturn(node);
         ControllerClient client = new GrpcControllerClient();
         Assertions.assertThrows(ControllerException.class,
             () -> client.registerBroker(null, name, address, instanceId));
@@ -77,10 +77,10 @@ class GrpcControllerClientTest {
         String address = "localhost:1234";
         String instanceId = "i-ctrl";
         MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
-        Broker broker = new Broker();
-        broker.setId(1);
-        broker.setEpoch(1);
-        Mockito.when(metadataStore.registerBroker(ArgumentMatchers.anyString(), ArgumentMatchers.anyString(),
+        Node node = new Node();
+        node.setId(1);
+        node.setEpoch(1);
+        Mockito.when(metadataStore.registerBrokerNode(ArgumentMatchers.anyString(), ArgumentMatchers.anyString(),
             ArgumentMatchers.anyString())).thenThrow(new ControllerException(Code.MOCK_FAILURE_VALUE));
         ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
         try (ControllerTestServer testServer = new ControllerTestServer(0, svc)) {

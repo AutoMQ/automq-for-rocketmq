@@ -21,8 +21,8 @@ import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.ControllerClient;
 import com.automq.rocketmq.controller.metadata.ControllerConfig;
 import com.automq.rocketmq.controller.metadata.DatabaseTestBase;
-import com.automq.rocketmq.controller.metadata.database.mapper.BrokerMapper;
-import com.automq.rocketmq.controller.metadata.database.dao.Broker;
+import com.automq.rocketmq.controller.metadata.database.dao.Node;
+import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import org.apache.ibatis.session.SqlSession;
@@ -54,11 +54,11 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             String name = "broker-0";
             String address = "localhost:1234";
             String instanceId = "i-register";
-            Broker broker = metadataStore.registerBroker(name, address, instanceId);
-            Assertions.assertTrue(broker.getId() > 0);
+            Node node = metadataStore.registerBrokerNode(name, address, instanceId);
+            Assertions.assertTrue(node.getId() > 0);
             try (SqlSession session = getSessionFactory().openSession()) {
-                BrokerMapper brokerMapper = session.getMapper(BrokerMapper.class);
-                brokerMapper.delete(broker.getId());
+                NodeMapper nodeMapper = session.getMapper(NodeMapper.class);
+                nodeMapper.delete(node.getId());
             }
         }
     }
@@ -77,9 +77,9 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             String name = "test-broker -0";
             String address = "localhost:1234";
             String instanceId = "i-register";
-            Assertions.assertThrows(ControllerException.class, () -> metadataStore.registerBroker("", address, instanceId));
-            Assertions.assertThrows(ControllerException.class, () -> metadataStore.registerBroker(name, null, instanceId));
-            Assertions.assertThrows(ControllerException.class, () -> metadataStore.registerBroker(name, address, ""));
+            Assertions.assertThrows(ControllerException.class, () -> metadataStore.registerBrokerNode("", address, instanceId));
+            Assertions.assertThrows(ControllerException.class, () -> metadataStore.registerBrokerNode(name, null, instanceId));
+            Assertions.assertThrows(ControllerException.class, () -> metadataStore.registerBrokerNode(name, address, ""));
         }
     }
 
@@ -119,13 +119,13 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         String address = "localhost:1234";
         int brokerId;
         try (SqlSession session = getSessionFactory().openSession()) {
-            BrokerMapper brokerMapper = session.getMapper(BrokerMapper.class);
-            Broker broker = new Broker();
-            broker.setAddress(address);
-            broker.setName("broker-test-name");
-            broker.setInstanceId("i-leader-address");
-            brokerMapper.create(broker);
-            brokerId = broker.getId();
+            NodeMapper nodeMapper = session.getMapper(NodeMapper.class);
+            Node node = new Node();
+            node.setAddress(address);
+            node.setName("broker-test-name");
+            node.setInstanceId("i-leader-address");
+            nodeMapper.create(node);
+            brokerId = node.getId();
             session.commit();
         }
 
@@ -146,15 +146,15 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
                 .atMost(10, TimeUnit.SECONDS)
                 .pollInterval(100, TimeUnit.MILLISECONDS).until(() -> !metadataStore.getBrokers().isEmpty());
 
-            Assertions.assertEquals(metadataStore.getLease().getBrokerId(), brokerId);
+            Assertions.assertEquals(metadataStore.getLease().getNodeId(), brokerId);
 
             String addr = metadataStore.leaderAddress();
             Assertions.assertEquals(address, addr);
         }
 
         try (SqlSession session = getSessionFactory().openSession(true)) {
-            BrokerMapper brokerMapper = session.getMapper(BrokerMapper.class);
-            brokerMapper.delete(brokerId);
+            NodeMapper nodeMapper = session.getMapper(NodeMapper.class);
+            nodeMapper.delete(brokerId);
         }
     }
 

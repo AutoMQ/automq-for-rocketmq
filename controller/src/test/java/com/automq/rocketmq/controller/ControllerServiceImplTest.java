@@ -17,12 +17,12 @@
 
 package com.automq.rocketmq.controller;
 
-import apache.rocketmq.controller.v1.BrokerHeartbeatReply;
-import apache.rocketmq.controller.v1.BrokerHeartbeatRequest;
-import apache.rocketmq.controller.v1.BrokerRegistrationReply;
-import apache.rocketmq.controller.v1.BrokerRegistrationRequest;
 import apache.rocketmq.controller.v1.Code;
 import apache.rocketmq.controller.v1.ControllerServiceGrpc;
+import apache.rocketmq.controller.v1.HeartbeatReply;
+import apache.rocketmq.controller.v1.HeartbeatRequest;
+import apache.rocketmq.controller.v1.NodeRegistrationReply;
+import apache.rocketmq.controller.v1.NodeRegistrationRequest;
 import com.automq.rocketmq.controller.metadata.ControllerClient;
 import com.automq.rocketmq.controller.metadata.ControllerConfig;
 import com.automq.rocketmq.controller.metadata.DatabaseTestBase;
@@ -56,13 +56,13 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
                 .atMost(10, TimeUnit.SECONDS)
                 .until(metadataStore::isLeader);
-            BrokerRegistrationRequest request = BrokerRegistrationRequest.newBuilder()
+            NodeRegistrationRequest request = NodeRegistrationRequest.newBuilder()
                 .setBrokerName("broker-name")
                 .setAddress("localhost:1234")
                 .setInstanceId("i-reg-broker")
                 .build();
 
-            StreamObserver<BrokerRegistrationReply> observer = new StreamObserver() {
+            StreamObserver<NodeRegistrationReply> observer = new StreamObserver() {
                 @Override
                 public void onNext(Object value) {
 
@@ -79,13 +79,12 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 }
             };
 
-            svc.registerBroker(request, observer);
+            svc.registerNode(request, observer);
 
             // It should work if register the broker multiple times. The only side effect is epoch is incremented.
-            svc.registerBroker(request, observer);
+            svc.registerNode(request, observer);
         }
     }
-
 
     @Test
     public void testRegisterBroker_BadRequest() throws IOException {
@@ -102,13 +101,13 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
                 .atMost(10, TimeUnit.SECONDS)
                 .until(metadataStore::isLeader);
-            BrokerRegistrationRequest request = BrokerRegistrationRequest.newBuilder()
+            NodeRegistrationRequest request = NodeRegistrationRequest.newBuilder()
                 .setBrokerName("")
                 .setAddress("localhost:1234")
                 .setInstanceId("i-reg-broker")
                 .build();
 
-            StreamObserver<BrokerRegistrationReply> observer = new StreamObserver() {
+            StreamObserver<NodeRegistrationReply> observer = new StreamObserver() {
                 @Override
                 public void onNext(Object value) {
                     Assertions.fail("Should have raised an exception");
@@ -124,7 +123,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                     Assertions.fail("Should have raised an exception");
                 }
             };
-            svc.registerBroker(request, observer);
+            svc.registerNode(request, observer);
         }
     }
 
@@ -137,8 +136,8 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
         int port = testServer.getPort();
         ManagedChannel channel = Grpc.newChannelBuilderForAddress("localhost", port, InsecureChannelCredentials.create()).build();
         ControllerServiceGrpc.ControllerServiceBlockingStub blockingStub = ControllerServiceGrpc.newBlockingStub(channel);
-        BrokerHeartbeatRequest request = BrokerHeartbeatRequest.newBuilder().setId(1).setTerm(1).build();
-        BrokerHeartbeatReply reply = blockingStub.processBrokerHeartbeat(request);
+        HeartbeatRequest request = HeartbeatRequest.newBuilder().setId(1).setEpoch(1).build();
+        HeartbeatReply reply = blockingStub.processHeartbeat(request);
         Assertions.assertEquals(Code.OK, reply.getStatus().getCode());
         channel.shutdownNow();
         testServer.stop();

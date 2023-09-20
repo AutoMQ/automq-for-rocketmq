@@ -18,10 +18,10 @@
 package com.automq.rocketmq.controller.metadata;
 
 import com.automq.rocketmq.controller.exception.ControllerException;
-import com.automq.rocketmq.controller.metadata.database.dao.Broker;
+import com.automq.rocketmq.controller.metadata.database.dao.Node;
 
 public interface ControllerClient {
 
-    Broker registerBroker(String target, String name, String address,
+    Node registerBroker(String target, String name, String address,
         String instanceId) throws ControllerException;
 }

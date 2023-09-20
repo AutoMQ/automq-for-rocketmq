@@ -19,35 +19,36 @@
     PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<mapper namespace="com.automq.rocketmq.controller.metadata.database.mapper.BrokerMapper">
-    <insert id="create" parameterType="Broker" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
-        INSERT INTO broker (name, instance_id, address) VALUES (#{name}, #{instanceId}, #{address})
+<mapper namespace="com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper">
+    <insert id="create" parameterType="Node" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO node (name, instance_id, volume_id, hostname, vpc_id, address)
+        VALUES (#{name}, #{instanceId}, #{volumeId}, #{hostName}, #{vpcId}, #{address})
     </insert>
 
     <update id="increaseEpoch" parameterType="int">
-        UPDATE broker
+        UPDATE node
         SET epoch = epoch + 1
         WHERE id = #{id}
     </update>
 
     <delete id="delete" parameterType="int">
-        DELETE FROM broker WHERE id = #{id}
+        DELETE FROM node WHERE id = #{id}
     </delete>
 
-    <select id="list" resultType="Broker" >
-        SELECT id, name, instance_id, address, epoch
-        FROM broker
+    <select id="list" resultType="Node" >
+        SELECT id, name, instance_id, volume_id, hostname, vpc_id, address, epoch
+        FROM node
     </select>
 
-    <select id="deltaList" parameterType="date" resultType="Broker">
-        SELECT id, name, instance_id, address, epoch
-        FROM broker
+    <select id="deltaList" parameterType="date" resultType="Node">
+        SELECT id, name, instance_id, volume_id, hostname, vpc_id, address, epoch
+        FROM node
         WHERE update_time >= #{updateTime}
     </select>
 
-    <select id="getByInstanceId" resultType="Broker" parameterType="string">
-        SELECT id, name, instance_id, address, epoch
-        FROM broker
+    <select id="getByInstanceId" resultType="Node" parameterType="string">
+        SELECT id, name, instance_id, volume_id, hostname, vpc_id, address, epoch
+        FROM node
         WHERE instance_id = #{instanceId}
     </select>
 
