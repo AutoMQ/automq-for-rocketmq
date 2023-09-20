@@ -20,6 +20,7 @@ package com.automq.rocketmq.controller.metadata.database;
 import apache.rocketmq.controller.v1.Code;
 import com.automq.rocketmq.common.PrefixThreadFactory;
 import com.automq.rocketmq.controller.exception.ControllerException;
+import com.automq.rocketmq.controller.metadata.ControllerClient;
 import com.automq.rocketmq.controller.metadata.ControllerConfig;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.Role;
@@ -46,6 +47,8 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DefaultMetadataStore.class);
 
+    private final ControllerClient controllerClient;
+
     private final SqlSessionFactory sessionFactory;
 
     private final ControllerConfig config;
@@ -59,7 +62,8 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
     /// The following fields are runtime specific
     private Lease lease;
 
-    public DefaultMetadataStore(SqlSessionFactory sessionFactory, ControllerConfig config) {
+    public DefaultMetadataStore(ControllerClient client, SqlSessionFactory sessionFactory, ControllerConfig config) {
+        controllerClient = client;
         this.sessionFactory = sessionFactory;
         this.config = config;
         this.role = Role.Follower;
@@ -102,8 +106,9 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
                         LeaseMapper leaseMapper = session.getMapper(LeaseMapper.class);
                         Lease lease = leaseMapper.currentWithShareLock();
                         if (lease.getEpoch() != this.lease.getEpoch()) {
+                            this.lease = lease;
                             LOGGER.info("Controller has yielded its leader role");
-                            break;
+                            continue;
                         }
                         broker = new Broker();
                         broker.setName(name);
@@ -115,12 +120,9 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
                     }
                 }
             } else {
-                // TODO: RPC to leader controller
-                break;
+                return controllerClient.registerBroker(this.leaderAddress(), name, address, instanceId);
             }
         }
-
-        return null;
     }
 
     @Override
