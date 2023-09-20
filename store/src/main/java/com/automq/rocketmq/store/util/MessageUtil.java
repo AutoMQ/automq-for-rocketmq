@@ -23,6 +23,7 @@ import com.automq.rocketmq.common.model.generated.Message;
 import com.automq.rocketmq.stream.api.RecordBatchWithContext;
 import com.google.flatbuffers.FlatBufferBuilder;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 
 public class MessageUtil {
     public static MessageExt transferToMessageExt(RecordBatchWithContext recordBatch) {
@@ -43,8 +44,10 @@ public class MessageUtil {
                 builder.createString(entry.getKey()), builder.createString(entry.getValue())))
             .mapToInt(Integer::valueOf)
             .toArray();
-        int root = Message.createMessage(builder, topicId, queueId, builder.createString(tag),
-            builder.createVectorOfTables(userPropertiesOffsets), builder.createByteVector(body));
+        int root = Message.createMessage(builder, topicId, queueId,
+            builder.createString(StringUtils.isNotBlank(tag) ? tag : ""),
+            builder.createVectorOfTables(userPropertiesOffsets),
+            builder.createByteVector(body));
         builder.finish(root);
         return Message.getRootAsMessage(builder.dataBuffer());
     }
