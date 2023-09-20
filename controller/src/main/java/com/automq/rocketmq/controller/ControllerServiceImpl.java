@@ -73,7 +73,7 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
             BrokerRegistrationReply reply = BrokerRegistrationReply.newBuilder()
                 .setStatus(Status.newBuilder().setCode(Code.OK).build())
                 .setId(broker.getId())
-                .setTerm(broker.getTerm())
+                .setEpoch(broker.getEpoch())
                 .build();
             responseObserver.onNext(reply);
             responseObserver.onCompleted();

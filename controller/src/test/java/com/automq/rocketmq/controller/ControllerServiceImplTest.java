@@ -19,23 +19,67 @@ package com.automq.rocketmq.controller;
 
 import apache.rocketmq.controller.v1.BrokerHeartbeatReply;
 import apache.rocketmq.controller.v1.BrokerHeartbeatRequest;
+import apache.rocketmq.controller.v1.BrokerRegistrationReply;
+import apache.rocketmq.controller.v1.BrokerRegistrationRequest;
 import apache.rocketmq.controller.v1.Code;
 import apache.rocketmq.controller.v1.ControllerServiceGrpc;
+import com.automq.rocketmq.controller.metadata.ControllerConfig;
+import com.automq.rocketmq.controller.metadata.DatabaseTestBase;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
+import com.automq.rocketmq.controller.metadata.database.DefaultMetadataStore;
 import io.grpc.Grpc;
 import io.grpc.InsecureChannelCredentials;
 import io.grpc.ManagedChannel;
+import io.grpc.stub.StreamObserver;
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
+import org.awaitility.Awaitility;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import static org.junit.Assert.assertEquals;
 
-public class ControllerServiceImplTest {
+public class ControllerServiceImplTest extends DatabaseTestBase {
 
     @Test
-    public void testRegisterBroker() {
+    public void testRegisterBroker() throws IOException {
+        ControllerConfig config = Mockito.mock(ControllerConfig.class);
+        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(config.brokerId()).thenReturn(1);
+        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
 
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(getSessionFactory(), config)) {
+            metadataStore.start();
+            ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
+            Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
+                .atMost(10, TimeUnit.SECONDS)
+                .until(metadataStore::isLeader);
+            BrokerRegistrationRequest request = BrokerRegistrationRequest.newBuilder()
+                .setBrokerName("broker-name")
+                .setAddress("localhost:1234")
+                .setInstanceId("i-reg-broker")
+                .build();
+
+            StreamObserver<BrokerRegistrationReply> observer = new StreamObserver() {
+                @Override
+                public void onNext(Object value) {
+
+                }
+
+                @Override
+                public void onError(Throwable t) {
+                    Assertions.fail(t);
+                }
+
+                @Override
+                public void onCompleted() {
+
+                }
+            };
+
+            svc.registerBroker(request, observer);
+        }
     }
 
     @Test

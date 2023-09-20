@@ -95,13 +95,13 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
                     BrokerMapper brokerMapper = session.getMapper(BrokerMapper.class);
                     Broker broker = brokerMapper.getByInstanceId(instanceId);
                     if (null != broker) {
-                        brokerMapper.increaseTerm(broker.getId());
-                        broker.setTerm(broker.getTerm() + 1);
+                        brokerMapper.increaseEpoch(broker.getId());
+                        broker.setEpoch(broker.getEpoch() + 1);
                         return broker;
                     } else {
                         LeaseMapper leaseMapper = session.getMapper(LeaseMapper.class);
                         Lease lease = leaseMapper.currentWithShareLock();
-                        if (lease.getTerm() != this.lease.getTerm()) {
+                        if (lease.getEpoch() != this.lease.getEpoch()) {
                             LOGGER.info("Controller has yielded its leader role");
                             break;
                         }

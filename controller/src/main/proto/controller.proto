@@ -56,7 +56,7 @@ message BrokerRegistrationReply {
   int32 id = 2;
 
   // Term of the broker
-  int64 term = 3;
+  int64 epoch = 3;
 }
 
 message BrokerUnregistrationRequest {
