@@ -45,5 +45,8 @@
     <mappers>
         <mapper resource="database/mapper/LeaseMapper.xml" />
         <mapper resource="database/mapper/NodeMapper.xml" />
+        <mapper resource="database/mapper/StreamMapper.xml" />
+        <mapper resource="database/mapper/RangeMapper.xml" />
+        <mapper resource="database/mapper/S3ObjectMapper.xml" />
     </mappers>
 </configuration>
