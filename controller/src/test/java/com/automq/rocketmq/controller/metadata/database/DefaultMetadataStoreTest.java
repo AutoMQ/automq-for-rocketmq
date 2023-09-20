@@ -57,6 +57,22 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
     }
 
+    /**
+     * Dummy test, should be removed later
+     *
+     * @throws IOException
+     */
+    @Test
+    void testGetLease() throws IOException {
+        ControllerConfig config = Mockito.mock(ControllerConfig.class);
+        Mockito.when(config.brokerId()).thenReturn(1);
+        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(getSessionFactory(), config)) {
+            Assertions.assertNull(metadataStore.getLease());
+        }
+    }
+
     @Test
     void testIsLeader() throws IOException {
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
