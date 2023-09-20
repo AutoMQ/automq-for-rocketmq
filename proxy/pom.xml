@@ -30,6 +30,12 @@
 
     <dependencies>
         <dependency>
+            <groupId>${groupId}</groupId>
+            <artifactId>rocketmq-store</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
             <groupId>org.apache.rocketmq</groupId>
             <artifactId>rocketmq-proxy</artifactId>
             <version>${rocketmq.version}</version>
