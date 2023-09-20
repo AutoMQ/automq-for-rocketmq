@@ -76,3 +76,63 @@ CREATE TABLE IF NOT EXISTS subscription (
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS stream (
+    stream_id BIGINT NOT NULL PRIMARY KEY,
+    epoch BIGINT NOT NULL,
+    range_id INT NOT NULL,
+    start_offset BIGINT NOT NULL,
+    state TINYINT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS `range` (
+    range_id INT NOT NULL PRIMARY KEY,
+    stream_id BIGINT NOT NULL,
+    epoch BIGINT NOT NULL,
+    start_offset BIGINT NOT NULL,
+    end_offset BIGINT NOT NULL,
+    broker_id INT NOT NULL
+);
+
+CREATE INDEX idx_range_stream_id ON `range` (stream_id);
+CREATE INDEX idx_range_broker_id ON `range` (broker_id);
+
+CREATE TABLE IF NOT EXISTS s3object (
+    object_id BIGINT NOT NULL PRIMARY KEY,
+    object_size BIGINT NOT NULL,
+    prepared_timestamp BIGINT ,
+    committed_timestamp BIGINT,
+    expired_timestamp BIGINT,
+    marked_for_deletion_timestamp BIGINT,
+    state TINYINT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS s3streamobject (
+    stream_id BIGINT NOT NULL PRIMARY KEY,
+    start_offset BIGINT NOT NULL,
+    end_offset BIGINT NOT NULL,
+    object_id BIGINT NOT NULL
+);
+
+CREATE INDEX idx_s3streamobject_stream_id ON s3streamobject (stream_id);
+CREATE INDEX idx_s3streamobject_object_id ON s3streamobject (object_id);
+
+CREATE TABLE IF NOT EXISTS s3walobject (
+    sequence_id BIGINT NOT NULL PRIMARY KEY,
+    broker_id INT NOT NULL,
+    object_id BIGINT NOT NULL,
+    substream_id BIGINT NOT NULL
+);
+
+CREATE INDEX idx_s3walobject_broker_id ON s3walobject (broker_id);
+CREATE INDEX idx_s3walobject_object_id ON s3walobject (object_id);
+CREATE INDEX idx_s3walobject_substream_id ON s3walobject (substream_id);
+
+CREATE TABLE IF NOT EXISTS substream (
+    substream_id BIGINT NOT NULL PRIMARY KEY,
+    stream_id BIGINT NOT NULL,
+    start_offset BIGINT NOT NULL,
+    end_offset BIGINT NOT NULL
+);
+
+CREATE INDEX idx_substream_stream_id ON substream (stream_id);

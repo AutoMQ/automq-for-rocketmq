@@ -1,0 +1,64 @@
+<!--
+  ~ Licensed to the Apache Software Foundation (ASF) under one or more
+  ~ contributor license agreements.  See the NOTICE file distributed with
+  ~ this work for additional information regarding copyright ownership.
+  ~ The ASF licenses this file to You under the Apache License, Version 2.0
+  ~ (the "License"); you may not use this file except in compliance with
+  ~ the License.  You may obtain a copy of the License at
+  ~
+  ~     http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  -->
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.automq.rocketmq.controller.metadata.database.mapper.RangeMapper">
+    <resultMap id="BaseResultMap" type="apache.rocketmq.controller.v1.Range">
+        <id column="range_id" jdbcType="INTEGER" property="rangeId_" />
+        <result column="stream_id" jdbcType="BIGINT" property="streamId_" />
+        <result column="epoch" jdbcType="BIGINT" property="epoch_" />
+        <result column="start_offset" jdbcType="INTEGER" property="startOffset_" />
+        <result column="end_offset" jdbcType="BIGINT" property="endOffset_" />
+        <result column="broker_id" jdbcType="INTEGER" property="brokerId_" />
+    </resultMap>
+
+    <insert id="create" parameterType="apache.rocketmq.controller.v1.Range">
+        INSERT INTO `range` (range_id, stream_id, epoch, start_offset, end_offset, broker_id)
+        VALUES (#{rangeId_}, #{streamId_}, #{epoch_}, #{startOffset_}, #{endOffset_}, #{brokerId_})
+    </insert>
+
+    <select id="getByRangeId" resultMap="BaseResultMap">
+        SELECT range_id, stream_id, epoch, start_offset, end_offset, broker_id
+        FROM `range`
+        WHERE range_id = #{rangeId}
+    </select>
+
+    <delete id="delete" parameterType="int">
+        DELETE FROM `range` WHERE range_id = #{rangeId}
+    </delete>
+
+    <select id="listByStreamId" resultMap="BaseResultMap" >
+        SELECT range_id, stream_id, epoch, start_offset, end_offset, broker_id
+        FROM `range`
+        WHERE stream_id = #{streamId}
+    </select>
+
+    <select id="listByBrokerId" resultMap="BaseResultMap" >
+        SELECT range_id, stream_id, epoch, start_offset, end_offset, broker_id
+        FROM `range`
+        WHERE broker_id = #{brokerId}
+    </select>
+
+
+    <select id="list" resultMap="BaseResultMap" >
+        SELECT range_id, stream_id, epoch, start_offset, end_offset, broker_id
+        FROM `range`
+    </select>
+
+</mapper>
