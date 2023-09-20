@@ -17,9 +17,12 @@
 
 package com.automq.rocketmq.metadata;
 
-import apache.rocketmq.controller.v1.Stream;
+import apache.rocketmq.controller.v1.S3StreamObject;
+import apache.rocketmq.controller.v1.S3WALObject;
+import apache.rocketmq.controller.v1.StreamMetadata;
 import com.automq.rocketmq.common.exception.RocketMQException;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 public interface StoreMetadataService {
     long getStreamId(long topicId, int queueId);
@@ -32,26 +35,17 @@ public interface StoreMetadataService {
 
     int getMaxRetryTimes(long consumerGroupId);
 
-    StreamOffset openStream(long streamId, long streamEpoch, int brokerId, long brokerEpoch) throws RocketMQException;
+    CompletableFuture<Void> trimStream(long streamId, long streamEpoch, long newStartOffset) throws RocketMQException;
 
-    void closeStream(long streamId, long streamEpoch, int brokerId, long brokerEpoch) throws RocketMQException;
+    CompletableFuture<StreamMetadata> openStream(long streamId, long streamEpoch);
 
-    /**
-     * @param streamId
-     * @param streamEpoch
-     * @param brokerId
-     * @param brokerEpoch
-     * @param offset      The new start offset of the stream
-     */
-    void trimStream(long streamId, long streamEpoch, int brokerId, long brokerEpoch,
-        long offset) throws RocketMQException;
+    CompletableFuture<Void> closeStream(long streamId, long streamEpoch);
 
-    List<Stream> listOpenStreams(int brokerId, long brokerEpoch) throws RocketMQException;
+    CompletableFuture<List<StreamMetadata>> listOpenStreams(int brokerId, long brokerEpoch);
 
+    CompletableFuture<Long> prepareS3Objects(int count, int ttlInMinutes);
 
-    long prepareS3Objects(int count, int ttlInMinutes) throws RocketMQException;
+    CompletableFuture<Void> commitWalObject(S3WALObject walObject, List<S3StreamObject> streamObjects, List<Long> compactedObjects);
 
-    void commitWalObject(WalObject walObject) throws RocketMQException;
-
-    void commitStreamObject(StreamObject streamObject) throws RocketMQException;
+    CompletableFuture<Void> commitStreamObject(S3StreamObject streamObject);
 }
