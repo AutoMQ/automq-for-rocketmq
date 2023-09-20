@@ -15,31 +15,22 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.metadata;
+package com.automq.rocketmq.metadata;
 
-import com.automq.rocketmq.controller.exception.ControllerException;
-import com.automq.rocketmq.controller.metadata.database.dao.Broker;
+import apache.rocketmq.controller.v1.S3StreamObject;
+import apache.rocketmq.controller.v1.SubStream;
+import java.util.List;
 
-public interface MetadataStore {
+public class WalObject {
+    int brokerId;
+    long brokerEpoch;
+    long objectId;
+    long sequenceId;
+    long objectSize;
 
-    void start();
+    List<SubStream> subStreams;
 
-    /**
-     * Register broker into metadata store and return broker epoch
-     *
-     * @return broker epoch
-     * @throws ControllerException If there is an I/O error.
-     */
-    Broker registerBroker(String name, String address, String instanceId) throws ControllerException;
+    List<Long> compactedObjectIds;
 
-    /**
-     * Check if current controller is playing leader role
-     * @return true if leader; false otherwise
-     * @throws ControllerException If there is any I/O error
-     */
-    boolean isLeader() throws ControllerException;
-
-    String leaderAddress() throws ControllerException;
-
-
+    List<S3StreamObject> s3StreamObjects;
 }

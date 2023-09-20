@@ -17,6 +17,10 @@
 
 package com.automq.rocketmq.metadata;
 
+import apache.rocketmq.controller.v1.Stream;
+import com.automq.rocketmq.common.exception.RocketMQException;
+import java.util.List;
+
 public interface StoreMetadataService {
     long getStreamId(long topicId, int queueId);
 
@@ -27,4 +31,27 @@ public interface StoreMetadataService {
     long getDeadLetterStreamId(long consumerGroupId, long topicId, int queueId);
 
     int getMaxRetryTimes(long consumerGroupId);
+
+    StreamOffset openStream(long streamId, long streamEpoch, int brokerId, long brokerEpoch) throws RocketMQException;
+
+    void closeStream(long streamId, long streamEpoch, int brokerId, long brokerEpoch) throws RocketMQException;
+
+    /**
+     * @param streamId
+     * @param streamEpoch
+     * @param brokerId
+     * @param brokerEpoch
+     * @param offset      The new start offset of the stream
+     */
+    void trimStream(long streamId, long streamEpoch, int brokerId, long brokerEpoch,
+        long offset) throws RocketMQException;
+
+    List<Stream> listOpenStreams(int brokerId, long brokerEpoch) throws RocketMQException;
+
+
+    long prepareS3Objects(int count, int ttlInMinutes) throws RocketMQException;
+
+    void commitWalObject(WalObject walObject) throws RocketMQException;
+
+    void commitStreamObject(StreamObject streamObject) throws RocketMQException;
 }
