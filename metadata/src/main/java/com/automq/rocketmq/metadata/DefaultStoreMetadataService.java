@@ -17,7 +17,10 @@
 
 package com.automq.rocketmq.metadata;
 
+import apache.rocketmq.controller.v1.Stream;
+import com.automq.rocketmq.common.exception.RocketMQException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
+import java.util.List;
 
 public class DefaultStoreMetadataService implements StoreMetadataService {
 
@@ -50,5 +53,42 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
     @Override
     public int getMaxRetryTimes(long consumerGroupId) {
         return 0;
+    }
+
+    @Override
+    public StreamOffset openStream(long streamId, long streamEpoch, int brokerId,
+        long brokerEpoch) throws RocketMQException {
+        return null;
+    }
+
+    @Override
+    public void closeStream(long streamId, long streamEpoch, int brokerId, long brokerEpoch) throws RocketMQException {
+
+    }
+
+    @Override
+    public void trimStream(long streamId, long streamEpoch, int brokerId, long brokerEpoch,
+        long offset) throws RocketMQException {
+
+    }
+
+    @Override
+    public List<Stream> listOpenStreams(int brokerId, long brokerEpoch) throws RocketMQException {
+        return null;
+    }
+
+    @Override
+    public long prepareS3Objects(int count, int ttlInMinutes) throws RocketMQException {
+        return 0;
+    }
+
+    @Override
+    public void commitWalObject(WalObject walObject) throws RocketMQException {
+
+    }
+
+    @Override
+    public void commitStreamObject(StreamObject streamObject) throws RocketMQException {
+
     }
 }

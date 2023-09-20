@@ -17,8 +17,13 @@
 
 package com.automq.rocketmq.store.mock;
 
+import apache.rocketmq.controller.v1.Stream;
 import com.automq.rocketmq.metadata.StoreMetadataService;
+import com.automq.rocketmq.metadata.StreamObject;
+import com.automq.rocketmq.metadata.StreamOffset;
+import com.automq.rocketmq.metadata.WalObject;
 import java.nio.ByteBuffer;
+import java.util.List;
 
 public class MockStoreMetadataService implements StoreMetadataService {
     @Override
@@ -66,5 +71,40 @@ public class MockStoreMetadataService implements StoreMetadataService {
     @Override
     public int getMaxRetryTimes(long consumerGroupId) {
         return 1;
+    }
+
+    @Override
+    public StreamOffset openStream(long streamId, long streamEpoch, int brokerId, long brokerEpoch) {
+        return null;
+    }
+
+    @Override
+    public void closeStream(long streamId, long streamEpoch, int brokerId, long brokerEpoch) {
+
+    }
+
+    @Override
+    public void trimStream(long streamId, long streamEpoch, int brokerId, long brokerEpoch, long offset) {
+
+    }
+
+    @Override
+    public List<Stream> listOpenStreams(int brokerId, long brokerEpoch) {
+        return null;
+    }
+
+    @Override
+    public long prepareS3Objects(int count, int ttlInMinutes) {
+        return 0;
+    }
+
+    @Override
+    public void commitWalObject(WalObject walObject) {
+
+    }
+
+    @Override
+    public void commitStreamObject(StreamObject streamObject) {
+
     }
 }
