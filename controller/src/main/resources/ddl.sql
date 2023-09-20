@@ -15,12 +15,12 @@
  * limitations under the License.
  */
 CREATE TABLE IF NOT EXISTS lease (
-    broker_id INT NOT NULL ,
+    node_id INT NOT NULL ,
     epoch INT NOT NULL DEFAULT 0,
     expiration_time DATETIME NOT NULL
 );
 
-INSERT INTO lease(broker_id, epoch, expiration_time) VALUES (0, 0, TIMESTAMP('2023-01-01'));
+INSERT INTO lease(node_id, epoch, expiration_time) VALUES (0, 0, TIMESTAMP('2023-01-01'));
 
 CREATE TABLE IF NOT EXISTS node (
     id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
@@ -47,8 +47,8 @@ CREATE TABLE IF NOT EXISTS topic (
 CREATE TABLE IF NOT EXISTS queue_assignment (
     topic_id INT NOT NULL ,
     queue_id INT NOT NULL ,
-    src_broker_id INT NOT NULL ,
-    dst_broker_id INT NOT NULL ,
+    src_node_id INT NOT NULL ,
+    dst_node_id INT NOT NULL ,
     status TINYINT NOT NULL ,
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE  CURRENT_TIMESTAMP

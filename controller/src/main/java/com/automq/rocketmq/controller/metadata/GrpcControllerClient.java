@@ -17,8 +17,8 @@
 
 package com.automq.rocketmq.controller.metadata;
 
-import apache.rocketmq.controller.v1.BrokerRegistrationReply;
-import apache.rocketmq.controller.v1.BrokerRegistrationRequest;
+import apache.rocketmq.controller.v1.NodeRegistrationReply;
+import apache.rocketmq.controller.v1.NodeRegistrationRequest;
 import apache.rocketmq.controller.v1.Code;
 import apache.rocketmq.controller.v1.ControllerServiceGrpc;
 import com.automq.rocketmq.controller.exception.ControllerException;
@@ -51,15 +51,15 @@ public class GrpcControllerClient implements ControllerClient {
             ControllerServiceGrpc.ControllerServiceFutureStub stub = ControllerServiceGrpc.newFutureStub(channel);
             stubs.putIfAbsent(target, stub);
         }
-        BrokerRegistrationRequest request = BrokerRegistrationRequest.newBuilder()
+        NodeRegistrationRequest request = NodeRegistrationRequest.newBuilder()
             .setBrokerName(name)
             .setAddress(address)
             .setInstanceId(instanceId)
             .build();
 
-        ListenableFuture<BrokerRegistrationReply> future = stubs.get(target).registerBroker(request);
+        ListenableFuture<NodeRegistrationReply> future = stubs.get(target).registerNode(request);
         try {
-            BrokerRegistrationReply reply = future.get();
+            NodeRegistrationReply reply = future.get();
             if (reply.getStatus().getCode() == Code.OK) {
                 Node node = new Node();
                 node.setName(name);

@@ -17,12 +17,6 @@
 
 package com.automq.rocketmq.controller;
 
-import apache.rocketmq.controller.v1.BrokerHeartbeatReply;
-import apache.rocketmq.controller.v1.BrokerHeartbeatRequest;
-import apache.rocketmq.controller.v1.BrokerRegistrationReply;
-import apache.rocketmq.controller.v1.BrokerRegistrationRequest;
-import apache.rocketmq.controller.v1.BrokerUnregistrationReply;
-import apache.rocketmq.controller.v1.BrokerUnregistrationRequest;
 import apache.rocketmq.controller.v1.Code;
 import apache.rocketmq.controller.v1.CommitOffsetReply;
 import apache.rocketmq.controller.v1.CommitOffsetRequest;
@@ -33,12 +27,18 @@ import apache.rocketmq.controller.v1.DeleteTopicReply;
 import apache.rocketmq.controller.v1.DeleteTopicRequest;
 import apache.rocketmq.controller.v1.DescribeTopicReply;
 import apache.rocketmq.controller.v1.DescribeTopicRequest;
+import apache.rocketmq.controller.v1.HeartbeatReply;
+import apache.rocketmq.controller.v1.HeartbeatRequest;
 import apache.rocketmq.controller.v1.ListMessageQueueReassignmentsReply;
 import apache.rocketmq.controller.v1.ListMessageQueueReassignmentsRequest;
 import apache.rocketmq.controller.v1.ListTopicMessageQueueAssignmentsReply;
 import apache.rocketmq.controller.v1.ListTopicMessageQueueAssignmentsRequest;
 import apache.rocketmq.controller.v1.ListTopicsReply;
 import apache.rocketmq.controller.v1.ListTopicsRequest;
+import apache.rocketmq.controller.v1.NodeRegistrationReply;
+import apache.rocketmq.controller.v1.NodeRegistrationRequest;
+import apache.rocketmq.controller.v1.NodeUnregistrationReply;
+import apache.rocketmq.controller.v1.NodeUnregistrationRequest;
 import apache.rocketmq.controller.v1.NotifyMessageQueuesAssignableReply;
 import apache.rocketmq.controller.v1.NotifyMessageQueuesAssignableRequest;
 import apache.rocketmq.controller.v1.ReassignMessageQueueReply;
@@ -65,12 +65,12 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     }
 
     @Override
-    public void registerBroker(BrokerRegistrationRequest request,
-        StreamObserver<BrokerRegistrationReply> responseObserver) {
+    public void registerNode(NodeRegistrationRequest request,
+        StreamObserver<NodeRegistrationReply> responseObserver) {
         try {
             Node node = metadataStore.registerBrokerNode(request.getBrokerName(), request.getAddress(),
                 request.getInstanceId());
-            BrokerRegistrationReply reply = BrokerRegistrationReply.newBuilder()
+            NodeRegistrationReply reply = NodeRegistrationReply.newBuilder()
                 .setStatus(Status.newBuilder().setCode(Code.OK).build())
                 .setId(node.getId())
                 .setEpoch(node.getEpoch())
@@ -83,20 +83,20 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     }
 
     @Override
-    public void unregisterBroker(BrokerUnregistrationRequest request,
-        StreamObserver<BrokerUnregistrationReply> responseObserver) {
-        super.unregisterBroker(request, responseObserver);
+    public void unregisterNode(NodeUnregistrationRequest request,
+        StreamObserver<NodeUnregistrationReply> responseObserver) {
+        super.unregisterNode(request, responseObserver);
     }
 
     @Override
-    public void processBrokerHeartbeat(BrokerHeartbeatRequest request,
-                                       StreamObserver<BrokerHeartbeatReply> responseObserver) {
+    public void processHeartbeat(HeartbeatRequest request,
+        StreamObserver<HeartbeatReply> responseObserver) {
         if (null != request) {
             LOGGER.trace("Received BrokerHeartbeatRequest {}", TextFormat.shortDebugString(request));
         }
 
         Status status = Status.newBuilder().setCode(Code.OK).build();
-        BrokerHeartbeatReply reply = BrokerHeartbeatReply.newBuilder().setStatus(status).build();
+        HeartbeatReply reply = HeartbeatReply.newBuilder().setStatus(status).build();
         responseObserver.onNext(reply);
         responseObserver.onCompleted();
     }

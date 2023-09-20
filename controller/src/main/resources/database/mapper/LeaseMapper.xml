@@ -24,26 +24,26 @@
     <update id="renew" parameterType="Lease">
         UPDATE lease
         SET expiration_time = #{expirationTime}
-        WHERE broker_id = #{brokerId} AND epoch = #{epoch}
+        WHERE node_id = #{nodeId} AND epoch = #{epoch}
     </update>
 
     <update id="update" parameterType="Lease">
         UPDATE lease
-        SET broker_id = #{brokerId}, epoch = #{epoch}, expiration_time = #{expirationTime}
+        SET node_id = #{nodeId}, epoch = #{epoch}, expiration_time = #{expirationTime}
     </update>
 
     <select id="current" resultType="Lease">
-        SELECT broker_id, epoch, expiration_time
+        SELECT node_id, epoch, expiration_time
         FROM lease
     </select>
 
     <select id="currentWithWriteLock" resultType="Lease">
-        SELECT broker_id, epoch, expiration_time
+        SELECT node_id, epoch, expiration_time
         FROM lease FOR UPDATE
     </select>
 
     <select id="currentWithShareLock" resultType="Lease">
-        SELECT broker_id, epoch, expiration_time
+        SELECT node_id, epoch, expiration_time
         FROM lease FOR SHARE
     </select>
 

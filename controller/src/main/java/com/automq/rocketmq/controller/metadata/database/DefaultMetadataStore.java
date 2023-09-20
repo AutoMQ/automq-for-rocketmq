@@ -137,11 +137,11 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
             throw new ControllerException(Code.NO_LEADER_VALUE);
         }
 
-        Node node = brokers.get(this.lease.getBrokerId());
+        Node node = brokers.get(this.lease.getNodeId());
         if (null == node) {
-            LOGGER.error("Address for Broker with brokerId={} is missing", this.lease.getBrokerId());
+            LOGGER.error("Address for Broker with brokerId={} is missing", this.lease.getNodeId());
             throw new ControllerException(Code.NOT_FOUND_VALUE,
-                String.format("Broker is unexpected missing with brokerId=%d", this.lease.getBrokerId()));
+                String.format("Broker is unexpected missing with brokerId=%d", this.lease.getNodeId()));
         }
 
         return node.getAddress();

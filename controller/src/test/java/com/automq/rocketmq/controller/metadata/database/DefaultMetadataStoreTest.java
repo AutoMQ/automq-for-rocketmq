@@ -146,7 +146,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
                 .atMost(10, TimeUnit.SECONDS)
                 .pollInterval(100, TimeUnit.MILLISECONDS).until(() -> !metadataStore.getBrokers().isEmpty());
 
-            Assertions.assertEquals(metadataStore.getLease().getBrokerId(), brokerId);
+            Assertions.assertEquals(metadataStore.getLease().getNodeId(), brokerId);
 
             String addr = metadataStore.leaderAddress();
             Assertions.assertEquals(address, addr);
