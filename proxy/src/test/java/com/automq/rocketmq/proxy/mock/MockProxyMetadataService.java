@@ -20,23 +20,29 @@ package com.automq.rocketmq.proxy.mock;
 import com.automq.rocketmq.metadata.ProxyMetadataService;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 public class MockProxyMetadataService implements ProxyMetadataService {
     Map<Long, Long> offsetMap = new HashMap<>();
 
     @Override
     public long queryTopicId(String name) {
-        return 0;
+        return 2;
     }
 
     @Override
-    public long queryConsumeGroupId(String name) {
-        return 0;
+    public Set<Integer> queryAssignmentQueueSet(long topicId) {
+        return Set.of(0, 2, 4);
+    }
+
+    @Override
+    public long queryConsumerGroupId(String name) {
+        return 8;
     }
 
     @Override
     public long queryConsumerOffset(long consumerGroupId, long topicId, int queueId) {
-        if (offsetMap.containsKey(consumerGroupId + topicId)) {
+        if (offsetMap.containsKey(consumerGroupId + topicId + queueId)) {
             return offsetMap.get(consumerGroupId + topicId);
         }
         return 0;
@@ -44,6 +50,6 @@ public class MockProxyMetadataService implements ProxyMetadataService {
 
     @Override
     public void updateConsumerOffset(long consumerGroupId, long topicId, int queueId, long offset) {
-        offsetMap.put(consumerGroupId + topicId, offset);
+        offsetMap.put(consumerGroupId + topicId + queueId, offset);
     }
 }

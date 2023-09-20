@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.proxy.mock;
 
+import com.automq.rocketmq.common.model.MessageExt;
 import com.automq.rocketmq.common.model.generated.Message;
 import com.automq.rocketmq.store.MessageStore;
 import com.automq.rocketmq.store.model.message.AckResult;
@@ -24,15 +25,19 @@ import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
 import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PopResult;
 import com.automq.rocketmq.store.model.message.PutResult;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class MockMessageStore implements MessageStore {
-    private AtomicLong offset = new AtomicLong();
-    private Set<String> receiptHandleSet = new HashSet<>();
+    private final AtomicLong offset = new AtomicLong();
+    private final Set<String> receiptHandleSet = new HashSet<>();
+    private final Map<Long, List<MessageExt>> messageMap = new HashMap<>();
 
     public MockMessageStore() {
         receiptHandleSet.add("receiptHandle");
@@ -41,12 +46,32 @@ public class MockMessageStore implements MessageStore {
     @Override
     public CompletableFuture<PopResult> pop(long consumerGroupId, long topicId, int queueId, long offset, Filter filter,
         int batchSize, boolean fifo, boolean retry, long invisibleDuration) {
-        return null;
+        if (retry) {
+            return CompletableFuture.completedFuture(new PopResult(PopResult.Status.END_OF_QUEUE, 0L, 0L, new ArrayList<>()));
+        }
+
+        List<MessageExt> messageList = messageMap.computeIfAbsent(topicId + queueId, v -> new ArrayList<>());
+        int start = offset > messageList.size() ? -1 : (int) offset;
+        int end = offset + batchSize >= messageList.size() ? messageList.size() : (int) offset + batchSize;
+
+        PopResult.Status status;
+        if (start < 0) {
+            status = PopResult.Status.END_OF_QUEUE;
+            messageList = new ArrayList<>();
+        } else {
+            status = PopResult.Status.FOUND;
+            messageList = messageList.subList(start, end);
+        }
+        return CompletableFuture.completedFuture(new PopResult(status, 0L, 0L, messageList));
     }
 
     @Override
     public CompletableFuture<PutResult> put(Message message, Map<String, String> systemProperties) {
-        return CompletableFuture.completedFuture(new PutResult(offset.getAndIncrement()));
+        long offset = this.offset.getAndIncrement();
+        MessageExt messageExt = MessageExt.Builder.builder().message(message).offset(offset).build();
+        List<MessageExt> messageList = messageMap.computeIfAbsent(message.topicId() + message.queueId(), v -> new ArrayList<>());
+        messageList.add(messageExt);
+        return CompletableFuture.completedFuture(new PutResult(offset));
     }
 
     @Override

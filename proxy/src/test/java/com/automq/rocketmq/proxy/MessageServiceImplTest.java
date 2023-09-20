@@ -21,18 +21,24 @@ import com.automq.rocketmq.metadata.ProxyMetadataService;
 import com.automq.rocketmq.proxy.mock.MockMessageStore;
 import com.automq.rocketmq.proxy.mock.MockProxyMetadataService;
 import com.automq.rocketmq.store.MessageStore;
-import com.automq.rocketmq.store.exception.StoreException;
+import com.automq.rocketmq.store.model.message.TagFilter;
+import com.automq.rocketmq.store.util.MessageUtil;
+import java.util.HashMap;
 import java.util.List;
 import org.apache.rocketmq.client.consumer.AckResult;
 import org.apache.rocketmq.client.consumer.AckStatus;
+import org.apache.rocketmq.client.consumer.PopResult;
+import org.apache.rocketmq.client.consumer.PopStatus;
 import org.apache.rocketmq.client.producer.SendResult;
 import org.apache.rocketmq.client.producer.SendStatus;
+import org.apache.rocketmq.common.filter.ExpressionType;
 import org.apache.rocketmq.common.message.Message;
 import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.proxy.common.ProxyContext;
 import org.apache.rocketmq.proxy.service.message.MessageService;
 import org.apache.rocketmq.remoting.protocol.header.AckMessageRequestHeader;
 import org.apache.rocketmq.remoting.protocol.header.ChangeInvisibleTimeRequestHeader;
+import org.apache.rocketmq.remoting.protocol.header.PopMessageRequestHeader;
 import org.apache.rocketmq.remoting.protocol.header.QueryConsumerOffsetRequestHeader;
 import org.apache.rocketmq.remoting.protocol.header.SendMessageRequestHeader;
 import org.apache.rocketmq.remoting.protocol.header.UpdateConsumerOffsetRequestHeader;
@@ -47,7 +53,7 @@ class MessageServiceImplTest {
     private MessageService messageService;
 
     @BeforeEach
-    public void setUp() throws StoreException {
+    public void setUp() {
         metadataService = new MockProxyMetadataService();
         messageStore = new MockMessageStore();
         messageService = new MessageServiceImpl(metadataService, messageStore);
@@ -75,6 +81,36 @@ class MessageServiceImplTest {
 
     @Test
     void popMessage() {
+        // Pop queue 0.
+        PopMessageRequestHeader header = new PopMessageRequestHeader();
+        header.setConsumerGroup("group");
+        header.setTopic("topic");
+        header.setQueueId(0);
+        header.setMaxMsgNums(32);
+        PopResult result = messageService.popMessage(ProxyContext.create(), null, header, 0L).join();
+        assertEquals(PopStatus.NO_NEW_MSG, result.getPopStatus());
+
+        header.setExpType(ExpressionType.TAG);
+        header.setExp(TagFilter.SUB_ALL);
+        long topicId = metadataService.queryTopicId("topic");
+        messageStore.put(MessageUtil.transferToMessage(topicId, 0, "", new HashMap<>(), new byte[] {}), new HashMap<>());
+        messageStore.put(MessageUtil.transferToMessage(topicId, 0, "", new HashMap<>(), new byte[] {}), new HashMap<>());
+
+        result = messageService.popMessage(ProxyContext.create(), null, header, 0L).join();
+        assertEquals(PopStatus.FOUND, result.getPopStatus());
+        assertEquals(2, result.getMsgFoundList().size());
+
+        // Pop all queues.
+        header.setQueueId(-1);
+        header.setMaxMsgNums(4);
+        messageStore.put(MessageUtil.transferToMessage(topicId, 1, "", new HashMap<>(), new byte[] {}), new HashMap<>());
+        messageStore.put(MessageUtil.transferToMessage(topicId, 2, "", new HashMap<>(), new byte[] {}), new HashMap<>());
+        messageStore.put(MessageUtil.transferToMessage(topicId, 4, "", new HashMap<>(), new byte[] {}), new HashMap<>());
+        messageStore.put(MessageUtil.transferToMessage(topicId, 4, "", new HashMap<>(), new byte[] {}), new HashMap<>());
+
+        result = messageService.popMessage(ProxyContext.create(), null, header, 0L).join();
+        assertEquals(PopStatus.FOUND, result.getPopStatus());
+        assertEquals(4, result.getMsgFoundList().size());
     }
 
     @Test
