@@ -240,7 +240,7 @@ message TrimStreamReply {
 }
 
 // List all streams opened on a specific broker.
-message ListOpeningStreamsRequest {
+message ListOpenStreamsRequest {
   ControllerRequestContext context = 1;
 
   // The id of the broker to list streams on.
@@ -369,7 +369,7 @@ service ControllerService {
   rpc trimStream(TrimStreamRequest) returns (TrimStreamReply) {}
 
   // List all streams opened on a specific broker.
-  rpc listOpeningStreams(ListOpeningStreamsRequest) returns (ListOpeningStreamsReply) {}
+  rpc listOpenStreams(ListOpenStreamsRequest) returns (ListOpeningStreamsReply) {}
 
   // Prepare S3 objects before uploading.
   rpc prepareS3Objects(PrepareS3ObjectsRequest) returns (PrepareS3ObjectsReply) {}
