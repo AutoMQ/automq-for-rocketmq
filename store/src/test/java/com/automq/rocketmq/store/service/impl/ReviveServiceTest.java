@@ -23,16 +23,12 @@ import com.automq.rocketmq.store.StreamStore;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.impl.StreamStoreImpl;
 import com.automq.rocketmq.store.mock.MockStoreMetadataService;
-import com.automq.rocketmq.store.model.generated.TimerTag;
 import com.automq.rocketmq.store.model.stream.SingleRecord;
 import com.automq.rocketmq.store.service.KVService;
 import com.automq.rocketmq.store.util.MessageUtil;
 import com.automq.rocketmq.store.util.SerializeUtil;
 import com.automq.rocketmq.stream.api.FetchResult;
-import java.nio.ByteBuffer;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -99,8 +95,9 @@ class ReviveServiceTest {
         assertEquals(1, timerTagCount.get());
 
         // Append timer tag of retry message.
-        kvService.put(KV_NAMESPACE_TIMER_TAG, SerializeUtil.buildTimerTagKey(System.currentTimeMillis() - 100, 32, 32, 0, Long.MAX_VALUE),
-            SerializeUtil.buildTimerTagValue(System.currentTimeMillis() - 100, 32, 32, 32, retryStreamId, 0, Long.MAX_VALUE));
+        long nextVisibleTimestamp = System.currentTimeMillis() - 100;
+        kvService.put(KV_NAMESPACE_TIMER_TAG, SerializeUtil.buildTimerTagKey(nextVisibleTimestamp, 32, 32, 0, Long.MAX_VALUE),
+            SerializeUtil.buildTimerTagValue(nextVisibleTimestamp, 32, 32, 32, retryStreamId, 0, Long.MAX_VALUE));
         reviveService.tryRevive();
 
         long deadLetterStreamId = metadataService.getDeadLetterStreamId(32, 32, 32);
@@ -113,12 +110,8 @@ class ReviveServiceTest {
         assertEquals(32, messageExt.message().queueId());
         assertEquals(0, messageExt.offset());
 
-        kvService.flush(true);
-        Set<TimerTag> timerTagSet = new HashSet<>();
-        kvService.iterate(KV_NAMESPACE_TIMER_TAG, (key, value) -> timerTagSet.add(TimerTag.getRootAsTimerTag(ByteBuffer.wrap(value))));
-        for (TimerTag tag : timerTagSet) {
-            System.out.printf("topic: %d, queue: %d, offset: %d, time %d%n", tag.originTopicId(), tag.originQueueId(), tag.offset(), tag.nextVisibleTimestamp());
-        }
-        assertEquals(1, timerTagSet.size());
+        timerTagCount.set(0);
+        kvService.iterate(KV_NAMESPACE_TIMER_TAG, (key, value) -> timerTagCount.incrementAndGet());
+        assertEquals(1, timerTagCount.get());
     }
 }

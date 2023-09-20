@@ -103,6 +103,7 @@ public class ReviveService implements Runnable {
             // Message has already been deleted.
             if (result.recordBatchList().isEmpty()) {
                 // TODO: log the probable bug.
+                System.out.println("not found message in revive");
                 return;
             }
 
@@ -127,6 +128,7 @@ public class ReviveService implements Runnable {
                 kvService.batch(deleteCheckPointRequest, deleteTimerTagRequest);
             } catch (StoreException e) {
                 // TODO: log exception
+                System.out.println("delete timer tag failed in revive");
             }
         });
     }
