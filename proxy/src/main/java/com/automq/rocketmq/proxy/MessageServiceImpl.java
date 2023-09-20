@@ -125,16 +125,14 @@ public class MessageServiceImpl implements MessageService {
         // TODO: pop retry messages first sometimes to avoid starvation.
         // Try to pop retry messages.
         return popFuture.thenCompose(popOriginMessageResult -> {
-                // Add all origin messages into result list.
-                messageList.addAll(popOriginMessageResult);
-                if (popOriginMessageResult.size() < batchSize) {
-                    return store.pop(consumerGroupId, topicId, queueId, offset, filter, batchSize - messageList.size(), fifo, true, invisibleDuration)
-                        .thenApply(com.automq.rocketmq.store.model.message.PopResult::messageList);
-                }
-                return CompletableFuture.completedFuture(new ArrayList<MessageExt>());
-            })
-            // Add all retry messages into result list.
-            .thenAccept(messageList::addAll);
+            // Add all origin messages into result list.
+            messageList.addAll(popOriginMessageResult);
+            if (popOriginMessageResult.size() < batchSize) {
+                return store.pop(consumerGroupId, topicId, queueId, offset, filter, batchSize - messageList.size(), fifo, true, invisibleDuration)
+                    .thenApply(com.automq.rocketmq.store.model.message.PopResult::messageList);
+            }
+            return CompletableFuture.completedFuture(new ArrayList<MessageExt>());
+        }).thenAccept(messageList::addAll);
     }
 
     @Override
