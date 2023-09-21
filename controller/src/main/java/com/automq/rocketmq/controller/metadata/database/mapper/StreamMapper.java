@@ -18,16 +18,16 @@
 
 package com.automq.rocketmq.controller.metadata.database.mapper;
 
-import apache.rocketmq.controller.v1.Stream;
+import apache.rocketmq.controller.v1.StreamMetadata;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
 public interface StreamMapper {
 
-    int create(Stream stream);
+    int create(StreamMetadata stream);
 
-    Stream getByStreamId(long streamId);
+    StreamMetadata getByStreamId(long streamId);
 
     int increaseEpoch(long id);
 
@@ -37,5 +37,5 @@ public interface StreamMapper {
 
     void delete(long streamId);
 
-    List<Stream> list();
+    List<StreamMetadata> list();
 }
