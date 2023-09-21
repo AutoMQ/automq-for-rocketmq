@@ -17,12 +17,17 @@
 
 package com.automq.rocketmq.common.config;
 
+import java.time.Duration;
+
 public class ProxyConfig {
     private String name;
 
     // The proportion of messages that are popped from the retry queue first,
-    // available value from 0 to 100, default is 20
+    // default is 20, available value from 0 to 100.
     private int retryPriorityPercentage = 20;
+
+    // lock expire time, default is 15min, unit in nanoseconds.
+    private long lockExpireTime = Duration.ofMinutes(15).toNanos();
 
     public String name() {
         return name;
@@ -30,5 +35,9 @@ public class ProxyConfig {
 
     public int retryPriorityPercentage() {
         return retryPriorityPercentage;
+    }
+
+    public long lockExpireTime() {
+        return lockExpireTime;
     }
 }
