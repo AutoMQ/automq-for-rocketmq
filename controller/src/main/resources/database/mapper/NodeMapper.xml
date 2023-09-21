@@ -35,21 +35,29 @@
         DELETE FROM node WHERE id = #{id}
     </delete>
 
-    <select id="list" resultType="Node" >
+    <select id="list" resultType="Node">
         SELECT id, name, instance_id, volume_id, hostname, vpc_id, address, epoch
         FROM node
+        WHERE 1 = 1
+        <if test="null != updateTime">
+            AND update_time >= #{updateTime}
+        </if>
     </select>
 
-    <select id="deltaList" parameterType="date" resultType="Node">
+    <select id="get" resultType="Node" >
         SELECT id, name, instance_id, volume_id, hostname, vpc_id, address, epoch
         FROM node
-        WHERE update_time >= #{updateTime}
-    </select>
+        WHERE 1 = 1
+        <if test="null != instanceId">
+            AND instance_id = #{instanceId}
+        </if>
+        <if test="null != name">
+            AND name = #{name}
+        </if>
 
-    <select id="getByInstanceId" resultType="Node" parameterType="string">
-        SELECT id, name, instance_id, volume_id, hostname, vpc_id, address, epoch
-        FROM node
-        WHERE instance_id = #{instanceId}
+        <if test="null != volumeId">
+            AND volume_id = #{volumeId}
+        </if>
     </select>
 
 </mapper>

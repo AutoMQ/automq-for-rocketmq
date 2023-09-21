@@ -32,7 +32,7 @@ public interface MetadataStore {
      */
     Node registerBrokerNode(String name, String address, String instanceId) throws ControllerException;
 
-    void createTopic(String topicName, int queueNum) throws ControllerException;
+    long createTopic(String topicName, int queueNum) throws ControllerException;
 
     /**
      * Check if current controller is playing leader role

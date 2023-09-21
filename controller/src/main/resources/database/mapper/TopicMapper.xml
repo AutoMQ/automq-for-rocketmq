@@ -36,11 +36,19 @@
         WHERE id = #{id}
     </update>
 
-    <select id="getById" resultType="Topic" parameterType="int">
+    <delete id="delete">
+        DELETE
+        FROM topic
+        WHERE id = #{id}
+    </delete>
+
+    <select id="getById" resultType="Topic" parameterType="long">
         SELECT id, name, queue_num, status, create_time, update_time
         FROM topic
         WHERE id = #{id}
     </select>
+
+
 
     <select id="list" resultType="Topic">
         SELECT id, name, queue_num, status, create_time, update_time
@@ -53,6 +61,12 @@
         <if test="updateTime != null">
             AND update_time >= #{updateTime}
         </if>
+    </select>
+
+    <select id="getByName" resultType="Topic" parameterType="string">
+        SELECT id, name, queue_num, status, create_time, update_time
+        FROM topic
+        WHERE name = #{name}
     </select>
 
 </mapper>

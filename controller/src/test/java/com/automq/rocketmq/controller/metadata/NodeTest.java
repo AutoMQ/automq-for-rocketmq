@@ -36,7 +36,7 @@ public class NodeTest extends DatabaseTestBase {
     public void testListNodes() throws IOException {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             NodeMapper nodeMapper = session.getMapper(NodeMapper.class);
-            List<Node> list = nodeMapper.list();
+            List<Node> list = nodeMapper.list(null);
             Assertions.assertTrue(list.isEmpty());
         }
     }
@@ -66,7 +66,7 @@ public class NodeTest extends DatabaseTestBase {
 
             Assertions.assertEquals(1, affectedRows);
 
-            List<Node> nodes = nodeMapper.list();
+            List<Node> nodes = nodeMapper.list(null);
             Assertions.assertEquals(1, nodes.size());
             Node node1 = nodes.get(0);
             Assertions.assertEquals(name, node1.getName());
@@ -79,7 +79,7 @@ public class NodeTest extends DatabaseTestBase {
 
             nodeMapper.delete(node.getId());
 
-            nodes = nodeMapper.list();
+            nodes = nodeMapper.list(null);
             Assertions.assertTrue(nodes.isEmpty());
         }
     }
@@ -96,13 +96,13 @@ public class NodeTest extends DatabaseTestBase {
             int affectedRows = nodeMapper.create(node);
             Assertions.assertEquals(1, affectedRows);
 
-            Node node1 = nodeMapper.getByInstanceId(node.getInstanceId());
+            Node node1 = nodeMapper.get(null, node.getInstanceId(), null);
             Assertions.assertEquals(1, node1.getEpoch());
             Assertions.assertEquals(node.getId(), node1.getId());
             affectedRows = nodeMapper.increaseEpoch(node.getId());
             Assertions.assertEquals(1, affectedRows);
 
-            node1 = nodeMapper.getByInstanceId(node1.getInstanceId());
+            node1 = nodeMapper.get(null, node1.getInstanceId(), null);
             Assertions.assertEquals(2, node1.getEpoch());
             nodeMapper.delete(affectedRows);
         }

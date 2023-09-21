@@ -33,18 +33,10 @@ public class ScanNodeTask extends ScanTask {
     public void run() {
         LOGGER.info("ScanNodeTask starts");
         try {
-            if (null == this.lastScanTime) {
-                try (SqlSession session = this.metadataStore.getSessionFactory().openSession()) {
-                    NodeMapper mapper = session.getMapper(NodeMapper.class);
-                    List<Node> nodes = mapper.list();
-                    updateBrokers(nodes);
-                }
-            } else {
-                try (SqlSession session = this.metadataStore.getSessionFactory().openSession()) {
-                    NodeMapper mapper = session.getMapper(NodeMapper.class);
-                    List<Node> nodes = mapper.deltaList(this.lastScanTime);
-                    updateBrokers(nodes);
-                }
+            try (SqlSession session = this.metadataStore.getSessionFactory().openSession()) {
+                NodeMapper mapper = session.getMapper(NodeMapper.class);
+                List<Node> nodes = mapper.list(this.lastScanTime);
+                updateBrokers(nodes);
             }
         } catch (Throwable e) {
             LOGGER.error("Failed to scan nodes from database", e);

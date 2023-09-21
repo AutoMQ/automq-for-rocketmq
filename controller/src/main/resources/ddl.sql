@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS topic (
     create_time DATETIME DEFAULT current_timestamp,
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
+CREATE UNIQUE INDEX idx_topic_name ON topic(name);
 
 CREATE TABLE IF NOT EXISTS queue_assignment (
     topic_id INT NOT NULL ,

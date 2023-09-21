@@ -26,7 +26,14 @@ public interface QueueAssignmentMapper {
 
     int create(QueueAssignment assignment);
 
-    List<QueueAssignment> list(@Param("topicId") Integer topicId, @Param("updateTime") Date updateTime);
+    List<QueueAssignment> list(@Param("topicId") Long topicId, @Param("updateTime") Date updateTime);
 
     int update(QueueAssignment assignment);
+
+    /**
+     * This method is for test only!!!
+     * @param topicId Optional topic-id to delete its queue assignments; If null, all assignments are deleted.
+     * @return Number of rows affected
+     */
+    int delete(Long topicId);
 }

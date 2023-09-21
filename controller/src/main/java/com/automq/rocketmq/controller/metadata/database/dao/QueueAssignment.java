@@ -20,7 +20,7 @@ package com.automq.rocketmq.controller.metadata.database.dao;
 import java.util.Date;
 
 public class QueueAssignment {
-    private int topicId;
+    private long topicId;
 
     private int queueId;
 
@@ -34,11 +34,11 @@ public class QueueAssignment {
 
     private Date updateTime;
 
-    public int getTopicId() {
+    public long getTopicId() {
         return topicId;
     }
 
-    public void setTopicId(int topicId) {
+    public void setTopicId(long topicId) {
         this.topicId = topicId;
     }
 

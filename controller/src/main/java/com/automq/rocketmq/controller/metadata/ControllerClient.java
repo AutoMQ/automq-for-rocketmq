@@ -19,9 +19,12 @@ package com.automq.rocketmq.controller.metadata;
 
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
+import java.util.concurrent.CompletableFuture;
 
 public interface ControllerClient {
 
-    Node registerBroker(String target, String name, String address,
-        String instanceId) throws ControllerException;
+    CompletableFuture<Node> registerBroker(String target, String name, String address, String instanceId)
+        throws ControllerException;
+
+    CompletableFuture<Long> createTopic(String target, String topicName, int queueNum) throws ControllerException;
 }

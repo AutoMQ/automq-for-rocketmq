@@ -21,18 +21,18 @@ import java.util.Date;
 import java.util.Objects;
 
 public class Topic {
-    private int id;
+    private long id;
     private String name;
     private int queueNum;
     private TopicStatus status = TopicStatus.ACTIVE;
     private Date createTime;
     private Date updateTime;
 
-    public int getId() {
+    public long getId() {
         return id;
     }
 
-    public void setId(int id) {
+    public void setId(long id) {
         this.id = id;
     }
 
