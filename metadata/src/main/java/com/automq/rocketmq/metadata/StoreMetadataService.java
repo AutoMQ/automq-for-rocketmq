@@ -104,4 +104,22 @@ public interface StoreMetadataService {
      * @return {@link CompletableFuture} of commit operation.
      */
     CompletableFuture<Void> commitStreamObject(S3StreamObject streamObject, List<Long> compactedObjects);
+
+    /**
+     * List the WAL objects served by the current server.
+     *
+     * @return list of {@link S3WALObject}
+     */
+    CompletableFuture<List<S3WALObject>> listWALObjects();
+
+    /**
+     * List stream objects by a specified stream range with a limit count.
+     *
+     * @param streamId the specified stream id
+     * @param startOffset the start offset of the specified stream range.
+     * @param endOffset the end offset of the specified stream range. NOOP_OFFSET(-1) represent endOffset is unlimited.
+     * @param limit the limit count of the returned stream objects.
+     * @return list of {@link S3StreamObject}
+     */
+    CompletableFuture<List<S3StreamObject>> listStreamObjects(long streamId, long startOffset, long endOffset, int limit);
 }
