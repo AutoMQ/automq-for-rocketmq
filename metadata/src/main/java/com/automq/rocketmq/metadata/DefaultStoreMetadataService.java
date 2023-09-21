@@ -93,4 +93,15 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
     public CompletableFuture<Void> commitStreamObject(S3StreamObject streamObject, List<Long> compactedObjects) {
         return null;
     }
+
+    @Override
+    public CompletableFuture<List<S3WALObject>> listWALObjects() {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<List<S3StreamObject>> listStreamObjects(long streamId, long startOffset, long endOffset,
+        int limit) {
+        return null;
+    }
 }
