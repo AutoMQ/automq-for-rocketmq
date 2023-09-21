@@ -155,7 +155,7 @@ message S3WALObject {
   // The size of the object.
   int64 object_size = 6;
   // The data of the WAL object consists of many sub streams.
-  repeated SubStream sub_streams = 7;
+  map<int64, SubStream> sub_streams = 7;
 }
 
 // The `SubStream` is used to represent a segment of a stream in the WAL.
