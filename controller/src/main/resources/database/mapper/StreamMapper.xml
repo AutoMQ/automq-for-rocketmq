@@ -20,7 +20,7 @@
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper">
-    <resultMap id="BaseResultMap" type="apache.rocketmq.controller.v1.Stream">
+    <resultMap id="BaseResultMap" type="apache.rocketmq.controller.v1.StreamMetadata">
         <id column="stream_id" jdbcType="BIGINT" property="streamId_" />
         <result column="epoch" jdbcType="BIGINT" property="epoch_" />
         <result column="range_id" jdbcType="INTEGER" property="rangeId_" />
@@ -28,7 +28,7 @@
         <result column="state" jdbcType="TINYINT" property="state_" />
     </resultMap>
 
-    <insert id="create" parameterType="apache.rocketmq.controller.v1.Stream">
+    <insert id="create" parameterType="apache.rocketmq.controller.v1.StreamMetadata">
         INSERT INTO stream (stream_id, epoch, range_id, start_offset, state)
         VALUES (#{streamId_}, #{epoch_}, #{rangeId_}, #{startOffset_}, #{state_})
     </insert>
