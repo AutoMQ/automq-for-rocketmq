@@ -19,6 +19,7 @@ package com.automq.rocketmq.proxy;
 
 import com.automq.rocketmq.common.config.ProxyConfig;
 import com.automq.rocketmq.common.model.MessageExt;
+import com.automq.rocketmq.common.util.CommonUtil;
 import com.automq.rocketmq.metadata.ProxyMetadataService;
 import com.automq.rocketmq.proxy.util.RocketMQMessageUtil;
 import com.automq.rocketmq.store.MessageStore;
@@ -32,7 +33,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
-import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import org.apache.commons.lang3.StringUtils;
@@ -66,7 +66,6 @@ import org.apache.rocketmq.remoting.protocol.header.SendMessageRequestHeader;
 import org.apache.rocketmq.remoting.protocol.header.UpdateConsumerOffsetRequestHeader;
 
 public class MessageServiceImpl implements MessageService {
-    private final Random random = new Random();
     private final ProxyConfig config;
     private final ProxyMetadataService metadataService;
     private final MessageStore store;
@@ -113,23 +112,11 @@ public class MessageServiceImpl implements MessageService {
         throw new UnsupportedOperationException();
     }
 
-    private boolean applyPercentage(int percentage) {
-        if (percentage <= 0) {
-            return false;
-        }
-
-        if (percentage >= 100) {
-            return true;
-        }
-
-        return random.nextInt(100) <= percentage;
-    }
-
     private CompletableFuture<Void> popSpecifiedQueue(long consumerGroupId, long topicId, int queueId,
         Filter filter, int batchSize, boolean fifo, long invisibleDuration, List<MessageExt> messageList) {
         long offset = metadataService.queryConsumerOffset(consumerGroupId, topicId, queueId);
 
-        boolean retryPriority = !fifo && applyPercentage(config.retryPriorityPercentage());
+        boolean retryPriority = !fifo && CommonUtil.applyPercentage(config.retryPriorityPercentage());
 
         // TODO: acquire lock if pop orderly.
         // Assume the variable retryPriority is false, so try to pop origin messages first.
