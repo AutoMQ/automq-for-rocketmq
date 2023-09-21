@@ -36,6 +36,12 @@
         WHERE id = #{id}
     </update>
 
+    <delete id="delete">
+        DELETE
+        FROM topic
+        WHERE id = #{id}
+    </delete>
+
     <select id="getById" resultType="Topic" parameterType="long">
         SELECT id, name, queue_num, status, create_time, update_time
         FROM topic

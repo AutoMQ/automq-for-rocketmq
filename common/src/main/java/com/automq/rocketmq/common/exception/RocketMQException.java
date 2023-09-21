@@ -44,4 +44,8 @@ public class RocketMQException extends Exception {
         super(message, cause, enableSuppression, writableStackTrace);
         this.errorCode = errorCode;
     }
+
+    public int getErrorCode() {
+        return errorCode;
+    }
 }

@@ -141,7 +141,7 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
     }
 
     @Override
-    public void createTopic(String topicName, int queueNum) throws ControllerException {
+    public long createTopic(String topicName, int queueNum) throws ControllerException {
         for (; ; ) {
             if (this.isLeader()) {
                 try (SqlSession session = getSessionFactory().openSession()) {
@@ -191,9 +191,20 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
 
                     // Commit transaction
                     session.commit();
+                    return topicId;
                 }
             } else {
-                return;
+                try {
+                    return controllerClient.createTopic(this.leaderAddress(), topicName, queueNum).get();
+                } catch (InterruptedException e) {
+                    throw new ControllerException(Code.INTERNAL_VALUE, e);
+                } catch (ExecutionException e) {
+                    if (e.getCause() instanceof ControllerException) {
+                        throw (ControllerException) e.getCause();
+                    } else {
+                        throw new ControllerException(Code.INTERNAL_VALUE, e);
+                    }
+                }
             }
         }
 

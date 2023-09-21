@@ -93,4 +93,37 @@ class GrpcControllerClientTest {
 
         }
     }
+
+    @Test
+    public void testCreateTopic() throws ControllerException, IOException, ExecutionException, InterruptedException {
+        String topicName = "t1";
+        int queueNum = 4;
+        MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
+        Mockito.when(metadataStore.createTopic(ArgumentMatchers.anyString(), ArgumentMatchers.anyInt())).thenReturn(1L);
+        ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
+        try (ControllerTestServer testServer = new ControllerTestServer(0, svc)) {
+            testServer.start();
+            int port = testServer.getPort();
+            ControllerClient client = new GrpcControllerClient();
+            long topicId = client.createTopic(String.format("localhost:%d", port), topicName, queueNum).get();
+            Assertions.assertEquals(1, topicId);
+        }
+    }
+
+    @Test
+    public void testCreateTopic_duplicate() throws ControllerException, IOException, ExecutionException, InterruptedException {
+        String topicName = "t1";
+        int queueNum = 4;
+        MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
+        Mockito.when(metadataStore.createTopic(ArgumentMatchers.anyString(), ArgumentMatchers.anyInt()))
+            .thenThrow(new ControllerException(Code.DUPLICATED_VALUE, "Topic name is taken"));
+        ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
+        try (ControllerTestServer testServer = new ControllerTestServer(0, svc)) {
+            testServer.start();
+            int port = testServer.getPort();
+            ControllerClient client = new GrpcControllerClient();
+            Assertions.assertThrows(ExecutionException.class,
+                () -> client.createTopic(String.format("localhost:%d", port), topicName, queueNum).get());
+        }
+    }
 }

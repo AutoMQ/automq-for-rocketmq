@@ -111,7 +111,28 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
             return;
         }
 
-        super.createTopic(request, responseObserver);
+        try {
+            long topicId = this.metadataStore.createTopic(request.getTopic(), request.getCount());
+            CreateTopicReply reply = CreateTopicReply.newBuilder()
+                .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                .setTopicId(topicId)
+                .build();
+            responseObserver.onNext(reply);
+            responseObserver.onCompleted();
+        } catch (ControllerException e) {
+            if (Code.DUPLICATED_VALUE == e.getErrorCode()) {
+                CreateTopicReply reply = CreateTopicReply.newBuilder()
+                    .setStatus(Status.newBuilder()
+                        .setCode(Code.DUPLICATED)
+                        .setMessage(String.format("%s is already taken", request.getTopic()))
+                        .build())
+                    .build();
+                responseObserver.onNext(reply);
+                responseObserver.onCompleted();
+                return;
+            }
+            responseObserver.onError(e);
+        }
     }
 
     @Override

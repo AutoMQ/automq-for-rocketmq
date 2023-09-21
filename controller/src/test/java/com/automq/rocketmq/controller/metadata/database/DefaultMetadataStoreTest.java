@@ -23,6 +23,8 @@ import com.automq.rocketmq.controller.metadata.ControllerConfig;
 import com.automq.rocketmq.controller.metadata.DatabaseTestBase;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import org.apache.ibatis.session.SqlSession;
@@ -118,7 +120,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     @Test
     void testLeaderAddress() throws IOException, ControllerException {
         String address = "localhost:1234";
-        int brokerId;
+        int nodeId;
         try (SqlSession session = getSessionFactory().openSession()) {
             NodeMapper nodeMapper = session.getMapper(NodeMapper.class);
             Node node = new Node();
@@ -126,12 +128,12 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             node.setName("broker-test-name");
             node.setInstanceId("i-leader-address");
             nodeMapper.create(node);
-            brokerId = node.getId();
+            nodeId = node.getId();
             session.commit();
         }
 
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.nodeId()).thenReturn(brokerId);
+        Mockito.when(config.nodeId()).thenReturn(nodeId);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
         Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
 
@@ -147,7 +149,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
                 .atMost(10, TimeUnit.SECONDS)
                 .pollInterval(100, TimeUnit.MILLISECONDS).until(() -> !metadataStore.getBrokers().isEmpty());
 
-            Assertions.assertEquals(metadataStore.getLease().getNodeId(), brokerId);
+            Assertions.assertEquals(metadataStore.getLease().getNodeId(), nodeId);
 
             String addr = metadataStore.leaderAddress();
             Assertions.assertEquals(address, addr);
@@ -155,7 +157,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
         try (SqlSession session = getSessionFactory().openSession(true)) {
             NodeMapper nodeMapper = session.getMapper(NodeMapper.class);
-            nodeMapper.delete(brokerId);
+            nodeMapper.delete(nodeId);
         }
     }
 
@@ -184,6 +186,51 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
                 .pollInterval(100, TimeUnit.MILLISECONDS).until(metadataStore::isLeader);
 
             Assertions.assertThrows(ControllerException.class, metadataStore::leaderAddress);
+        }
+    }
+
+    @Test
+    void testCreateTopic() throws ControllerException, IOException {
+
+        String address = "localhost:1234";
+        int nodeId;
+        try (SqlSession session = getSessionFactory().openSession()) {
+            NodeMapper nodeMapper = session.getMapper(NodeMapper.class);
+            Node node = new Node();
+            node.setAddress(address);
+            node.setName("broker-test-name");
+            node.setInstanceId("i-leader-address");
+            nodeMapper.create(node);
+            nodeId = node.getId();
+            session.commit();
+        }
+
+        ControllerConfig config = Mockito.mock(ControllerConfig.class);
+        Mockito.when(config.nodeId()).thenReturn(nodeId);
+        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            metadataStore.start();
+            Awaitility.await().with().atMost(10, TimeUnit.SECONDS)
+                .pollInterval(100, TimeUnit.MILLISECONDS)
+                .until(metadataStore::isLeader);
+
+            String topicName = "t1";
+            int queueNum = 4;
+            long topicId = metadataStore.createTopic(topicName, queueNum);
+
+            try (SqlSession session = getSessionFactory().openSession()) {
+                TopicMapper mapper = session.getMapper(TopicMapper.class);
+                mapper.delete(topicId);
+
+                NodeMapper nodeMapper = session.getMapper(NodeMapper.class);
+                nodeMapper.delete(nodeId);
+
+                QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
+                assignmentMapper.delete(null);
+
+                session.commit();
+            }
         }
     }
 }

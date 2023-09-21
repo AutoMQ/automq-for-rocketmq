@@ -35,4 +35,6 @@ public interface TopicMapper {
 
     List<Topic> list(@Param("status") TopicStatus status, @Param("updateTime") Date updateTime);
 
+    int delete(long topicId);
+
 }
