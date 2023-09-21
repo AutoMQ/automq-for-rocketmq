@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.proxy;
 
+import com.automq.rocketmq.common.config.ProxyConfig;
 import com.automq.rocketmq.metadata.ProxyMetadataService;
 import com.automq.rocketmq.proxy.mock.MockMessageStore;
 import com.automq.rocketmq.proxy.mock.MockProxyMetadataService;
@@ -33,6 +34,7 @@ import org.apache.rocketmq.client.producer.SendResult;
 import org.apache.rocketmq.client.producer.SendStatus;
 import org.apache.rocketmq.common.filter.ExpressionType;
 import org.apache.rocketmq.common.message.Message;
+import org.apache.rocketmq.common.message.MessageExt;
 import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.proxy.common.ProxyContext;
 import org.apache.rocketmq.proxy.service.message.MessageService;
@@ -43,9 +45,11 @@ import org.apache.rocketmq.remoting.protocol.header.QueryConsumerOffsetRequestHe
 import org.apache.rocketmq.remoting.protocol.header.SendMessageRequestHeader;
 import org.apache.rocketmq.remoting.protocol.header.UpdateConsumerOffsetRequestHeader;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 
 class MessageServiceImplTest {
     private ProxyMetadataService metadataService;
@@ -56,7 +60,7 @@ class MessageServiceImplTest {
     public void setUp() {
         metadataService = new MockProxyMetadataService();
         messageStore = new MockMessageStore();
-        messageService = new MessageServiceImpl(metadataService, messageStore);
+        messageService = new MessageServiceImpl(new ProxyConfig(), metadataService, messageStore);
     }
 
     @Test
@@ -79,7 +83,7 @@ class MessageServiceImplTest {
         assertEquals(header.getQueueId(), queue.getQueueId());
     }
 
-    @Test
+    @RepeatedTest(100)
     void popMessage() {
         // Pop queue 0.
         PopMessageRequestHeader header = new PopMessageRequestHeader();
@@ -92,6 +96,7 @@ class MessageServiceImplTest {
 
         header.setExpType(ExpressionType.TAG);
         header.setExp(TagFilter.SUB_ALL);
+        long consumerGroupId = metadataService.queryConsumerGroupId("group");
         long topicId = metadataService.queryTopicId("topic");
         messageStore.put(MessageUtil.transferToMessage(topicId, 0, "", new HashMap<>(), new byte[] {}), new HashMap<>());
         messageStore.put(MessageUtil.transferToMessage(topicId, 0, "", new HashMap<>(), new byte[] {}), new HashMap<>());
@@ -99,6 +104,8 @@ class MessageServiceImplTest {
         result = messageService.popMessage(ProxyContext.create(), null, header, 0L).join();
         assertEquals(PopStatus.FOUND, result.getPopStatus());
         assertEquals(2, result.getMsgFoundList().size());
+        // All messages in queue 0 has been consumed
+        assertEquals(2, metadataService.queryConsumerOffset(consumerGroupId, topicId, 0));
 
         // Pop all queues.
         header.setQueueId(-1);
@@ -108,16 +115,45 @@ class MessageServiceImplTest {
         messageStore.put(MessageUtil.transferToMessage(topicId, 2, "", new HashMap<>(), new byte[] {}), new HashMap<>());
         messageStore.put(MessageUtil.transferToMessage(topicId, 4, "", new HashMap<>(), new byte[] {}), new HashMap<>());
         messageStore.put(MessageUtil.transferToMessage(topicId, 4, "", new HashMap<>(), new byte[] {}), new HashMap<>());
+        messageStore.put(MessageUtil.transferToMessage(topicId, 4, "", new HashMap<>(), new byte[] {}), new HashMap<>());
 
         result = messageService.popMessage(ProxyContext.create(), null, header, 0L).join();
         assertEquals(PopStatus.FOUND, result.getPopStatus());
         assertEquals(4, result.getMsgFoundList().size());
+        // Queue 1 should not be touched because it is not assigned.
+        assertEquals(0, metadataService.queryConsumerOffset(consumerGroupId, topicId, 1));
 
-        // Pop partial queues.
+        // The priorities of queues 2 and 4 are not fixed, so there are the following two results:
+        // 1. pop one message from queue 2 and three messages from queue 4
+        // 2. pop two messages each from queue 2 and 4
+        int messageFromQueue2 = 0;
+        int messageFromQueue4 = 0;
+        for (MessageExt messageExt : result.getMsgFoundList()) {
+            switch (messageExt.getQueueId()) {
+                case 2 -> messageFromQueue2++;
+                case 4 -> messageFromQueue4++;
+                default -> fail("All messages should be popped from queue 2 or 4.");
+            }
+        }
+        assertEquals(messageFromQueue2, metadataService.queryConsumerOffset(consumerGroupId, topicId, 2));
+        assertEquals(messageFromQueue4, metadataService.queryConsumerOffset(consumerGroupId, topicId, 4));
+
+        // Pop remaining messages.
         header.setMaxMsgNums(1);
         result = messageService.popMessage(ProxyContext.create(), null, header, 0L).join();
         assertEquals(PopStatus.FOUND, result.getPopStatus());
         assertEquals(1, result.getMsgFoundList().size());
+
+        int remainingQueue;
+        if (messageFromQueue4 == 3) {
+            remainingQueue = 2;
+        } else {
+            remainingQueue = 4;
+        }
+
+        MessageExt messageExt = result.getMsgFoundList().get(0);
+        assertEquals(remainingQueue, messageExt.getQueueId());
+        assertEquals(remainingQueue == 2 ? 1 : 2, messageExt.getQueueOffset());
     }
 
     @Test

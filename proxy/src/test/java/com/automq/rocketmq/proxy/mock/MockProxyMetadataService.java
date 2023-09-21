@@ -43,13 +43,13 @@ public class MockProxyMetadataService implements ProxyMetadataService {
     @Override
     public long queryConsumerOffset(long consumerGroupId, long topicId, int queueId) {
         if (offsetMap.containsKey(consumerGroupId + topicId + queueId)) {
-            return offsetMap.get(consumerGroupId + topicId);
+            return offsetMap.get(consumerGroupId + topicId + queueId);
         }
         return 0;
     }
 
     @Override
-    public void updateConsumerOffset(long consumerGroupId, long topicId, int queueId, long offset) {
+    public void updateConsumerOffset(long consumerGroupId, long topicId, int queueId, long offset, boolean retry) {
         offsetMap.put(consumerGroupId + topicId + queueId, offset);
     }
 }

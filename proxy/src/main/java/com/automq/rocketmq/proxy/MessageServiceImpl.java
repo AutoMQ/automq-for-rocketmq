@@ -17,7 +17,9 @@
 
 package com.automq.rocketmq.proxy;
 
+import com.automq.rocketmq.common.config.ProxyConfig;
 import com.automq.rocketmq.common.model.MessageExt;
+import com.automq.rocketmq.common.util.CommonUtil;
 import com.automq.rocketmq.metadata.ProxyMetadataService;
 import com.automq.rocketmq.proxy.util.RocketMQMessageUtil;
 import com.automq.rocketmq.store.MessageStore;
@@ -64,10 +66,12 @@ import org.apache.rocketmq.remoting.protocol.header.SendMessageRequestHeader;
 import org.apache.rocketmq.remoting.protocol.header.UpdateConsumerOffsetRequestHeader;
 
 public class MessageServiceImpl implements MessageService {
+    private final ProxyConfig config;
     private final ProxyMetadataService metadataService;
     private final MessageStore store;
 
-    public MessageServiceImpl(ProxyMetadataService metadataService, MessageStore store) {
+    public MessageServiceImpl(ProxyConfig config, ProxyMetadataService metadataService, MessageStore store) {
+        this.config = config;
         this.metadataService = metadataService;
         this.store = store;
     }
@@ -112,28 +116,44 @@ public class MessageServiceImpl implements MessageService {
         Filter filter, int batchSize, boolean fifo, long invisibleDuration, List<MessageExt> messageList) {
         long offset = metadataService.queryConsumerOffset(consumerGroupId, topicId, queueId);
 
+        boolean retryPriority = !fifo && CommonUtil.applyPercentage(config.retryPriorityPercentage());
+
         // TODO: acquire lock if pop orderly.
-        // Try to pop origin messages.
-        CompletableFuture<List<MessageExt>> popFuture = store.pop(consumerGroupId, topicId, queueId, offset, filter, batchSize, fifo, false, invisibleDuration)
-            .thenApply(com.automq.rocketmq.store.model.message.PopResult::messageList);
-        // TODO: advance consume offset.
+        // Assume the variable retryPriority is false, so try to pop origin messages first.
+        CompletableFuture<List<MessageExt>> popFuture = store.pop(consumerGroupId, topicId, queueId, offset, filter, batchSize, fifo, retryPriority, invisibleDuration)
+            .thenApply(popResult -> {
+                // Advance consumer offset for origin topic.
+                List<MessageExt> resultList = popResult.messageList();
+                if (!resultList.isEmpty()) {
+                    MessageExt lastMessage = resultList.get(resultList.size() - 1);
+                    metadataService.updateConsumerOffset(consumerGroupId, topicId, queueId, lastMessage.offset() + 1, retryPriority);
+                }
+                // Add all messages popped from origin topic into result list.
+                messageList.addAll(resultList);
+                return resultList;
+            });
 
         // There is no retry message when pop orderly. So that return origin messages directly.
         if (fifo) {
             return popFuture.thenAccept(messageList::addAll);
         }
 
-        // TODO: pop retry messages first sometimes to avoid starvation.
         // Try to pop retry messages.
-        return popFuture.thenCompose(popOriginMessageResult -> {
-            // Add all origin messages into result list.
-            messageList.addAll(popOriginMessageResult);
-            if (popOriginMessageResult.size() < batchSize) {
-                return store.pop(consumerGroupId, topicId, queueId, offset, filter, batchSize - messageList.size(), fifo, true, invisibleDuration)
+        return popFuture.thenCompose(resultMessageList -> {
+            if (resultMessageList.size() < batchSize) {
+                return store.pop(consumerGroupId, topicId, queueId, offset, filter, batchSize - resultMessageList.size(), false, !retryPriority, invisibleDuration)
                     .thenApply(com.automq.rocketmq.store.model.message.PopResult::messageList);
             }
             return CompletableFuture.completedFuture(new ArrayList<MessageExt>());
-        }).thenAccept(messageList::addAll);
+        }).thenAccept(resultMessageList -> {
+            // Advance consumer offset for retry topic.
+            if (!resultMessageList.isEmpty()) {
+                MessageExt lastMessage = resultMessageList.get(resultMessageList.size() - 1);
+                metadataService.updateConsumerOffset(consumerGroupId, topicId, queueId, lastMessage.offset() + 1, !retryPriority);
+            }
+            // Add all messages popped from retry topic into result list.
+            messageList.addAll(resultMessageList);
+        });
     }
 
     @Override
@@ -248,7 +268,8 @@ public class MessageServiceImpl implements MessageService {
         UpdateConsumerOffsetRequestHeader requestHeader, long timeoutMillis) {
         long consumeGroupId = metadataService.queryConsumerGroupId(requestHeader.getConsumerGroup());
         long topicId = metadataService.queryTopicId(requestHeader.getTopic());
-        metadataService.updateConsumerOffset(consumeGroupId, topicId, requestHeader.getQueueId(), requestHeader.getCommitOffset());
+        // TODO: support retry topic.
+        metadataService.updateConsumerOffset(consumeGroupId, topicId, requestHeader.getQueueId(), requestHeader.getCommitOffset(), false);
         return CompletableFuture.completedFuture(null);
     }
 

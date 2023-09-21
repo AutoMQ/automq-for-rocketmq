@@ -28,9 +28,12 @@ coverage:
         if_ci_failed: error
 
 ignore:
+  - "**/config/**"
   - "**/generated/**"
+  - "**/model/**"
   - "**/metadata/database/dao/*"
   - "**/*Exception*"
+  - "apache/rocketmq/controller/**/*"
 
 comment:
   layout: "diff, components, tree"

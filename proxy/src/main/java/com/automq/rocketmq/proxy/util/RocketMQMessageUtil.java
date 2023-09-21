@@ -25,12 +25,16 @@ public class RocketMQMessageUtil {
     public static List<org.apache.rocketmq.common.message.MessageExt> transformMessageExt(
         List<MessageExt> messageList) {
         return messageList.stream()
-            .map(messageExt -> new org.apache.rocketmq.common.message.MessageExt(
-                messageExt.message().queueId(),
-                0L, new InetSocketAddress("127.0.0.1", 8080),
-                0L, new InetSocketAddress("127.0.0.1", 10911),
-                ""
-            ))
+            .map(messageExt -> {
+                org.apache.rocketmq.common.message.MessageExt rocketmqMessage = new org.apache.rocketmq.common.message.MessageExt(
+                    messageExt.message().queueId(),
+                    0L, new InetSocketAddress("127.0.0.1", 8080),
+                    0L, new InetSocketAddress("127.0.0.1", 10911),
+                    ""
+                );
+                rocketmqMessage.setQueueOffset(messageExt.offset());
+                return rocketmqMessage;
+            })
             .toList();
     }
 }

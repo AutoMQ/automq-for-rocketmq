@@ -15,20 +15,34 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.common.config;
+package com.automq.rocketmq.common.util;
 
-public class ProxyConfig {
-    private String name;
+import org.junit.jupiter.api.Test;
 
-    // The proportion of messages that are popped from the retry queue first,
-    // available value from 0 to 100, default is 20
-    private int retryPriorityPercentage = 20;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-    public String name() {
-        return name;
-    }
+class CommonUtilTest {
 
-    public int retryPriorityPercentage() {
-        return retryPriorityPercentage;
+    @Test
+    void applyPercentage() {
+        assertFalse(CommonUtil.applyPercentage(-1));
+        assertFalse(CommonUtil.applyPercentage(0));
+
+        int trueCount = 0;
+        int falseCount = 0;
+
+        for (int i = 0; i < 100; i++) {
+            if (CommonUtil.applyPercentage(50)) {
+                trueCount++;
+            } else {
+                falseCount++;
+            }
+        }
+        assertTrue(trueCount > 0);
+        assertTrue(falseCount > 0);
+
+        assertTrue(CommonUtil.applyPercentage(100));
+        assertTrue(CommonUtil.applyPercentage(200));
     }
 }
