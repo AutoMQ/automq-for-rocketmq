@@ -22,10 +22,13 @@ import com.automq.rocketmq.controller.metadata.ControllerClient;
 import com.automq.rocketmq.controller.metadata.ControllerConfig;
 import com.automq.rocketmq.controller.metadata.DatabaseTestBase;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
+import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
+import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignmentStatus;
 import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.ibatis.session.SqlSession;
 import org.awaitility.Awaitility;
@@ -231,6 +234,41 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
                 session.commit();
             }
+        }
+    }
+
+    @Test
+    public void testListAssignments() throws IOException {
+
+        try (SqlSession session = getSessionFactory().openSession()) {
+            QueueAssignmentMapper mapper = session.getMapper(QueueAssignmentMapper.class);
+            QueueAssignment assignment = new QueueAssignment();
+            assignment.setTopicId(1);
+            assignment.setStatus(QueueAssignmentStatus.ASSIGNED);
+            assignment.setDstNodeId(2);
+            assignment.setSrcNodeId(3);
+            assignment.setQueueId(4);
+            int affectedRows = mapper.create(assignment);
+            Assertions.assertEquals(1, affectedRows);
+            session.commit();
+        }
+
+        ControllerConfig config = Mockito.mock(ControllerConfig.class);
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            List<QueueAssignment> assignmentList = metadataStore.listAssignments(null, null, null, null);
+            Assertions.assertEquals(1, assignmentList.size());
+            QueueAssignment assignment = assignmentList.get(0);
+            Assertions.assertEquals(1, assignment.getTopicId());
+            Assertions.assertEquals(QueueAssignmentStatus.ASSIGNED, assignment.getStatus());
+            Assertions.assertEquals(2, assignment.getDstNodeId());
+            Assertions.assertEquals(3, assignment.getSrcNodeId());
+            Assertions.assertEquals(4, assignment.getQueueId());
+        }
+
+        try (SqlSession session = getSessionFactory().openSession()) {
+            QueueAssignmentMapper mapper = session.getMapper(QueueAssignmentMapper.class);
+            mapper.delete(1L);
+            session.commit();
         }
     }
 }

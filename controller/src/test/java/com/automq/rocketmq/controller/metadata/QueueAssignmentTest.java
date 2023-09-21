@@ -49,7 +49,7 @@ public class QueueAssignmentTest extends DatabaseTestBase {
             int affectedRows = mapper.create(assignment);
             Assertions.assertEquals(1, affectedRows);
 
-            List<QueueAssignment> assignments = mapper.list(null, null);
+            List<QueueAssignment> assignments = mapper.list(null, null, null, null, null);
             Assertions.assertEquals(1, assignments.size());
 
             QueueAssignment got = assignments.get(0);
@@ -59,14 +59,14 @@ public class QueueAssignmentTest extends DatabaseTestBase {
             Assertions.assertEquals(dstNodeId, got.getDstNodeId());
             Assertions.assertEquals(status, got.getStatus());
 
-            assignments = mapper.list(topicId, null);
+            assignments = mapper.list(topicId, null, null, null, null);
             Assertions.assertEquals(1, assignments.size());
 
             got.setStatus(QueueAssignmentStatus.ASSIGNED);
             affectedRows = mapper.update(got);
             Assertions.assertEquals(1, affectedRows);
 
-            assignments = mapper.list(topicId, null);
+            assignments = mapper.list(topicId, null, null, null, null);
             got = assignments.get(0);
             Assertions.assertEquals(got.getStatus(), QueueAssignmentStatus.ASSIGNED);
 

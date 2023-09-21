@@ -54,6 +54,19 @@
         <if test="topicId != null">
             AND topic_id = #{topicId}
         </if>
+
+        <if test="null != srcNodeId">
+            AND src_node_id = #{srcNodeId}
+        </if>
+
+        <if test="null != dstNodeId">
+            AND dst_node_id = #{dstNodeId}
+        </if>
+
+        <if test="null != status">
+            AND status = #{status}
+        </if>
+
         <if test="updateTime != null">
             AND update_time >= #{updateTime}
         </if>
