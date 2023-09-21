@@ -23,18 +23,20 @@ import java.util.Properties;
 import org.apache.ibatis.io.Resources;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.apache.ibatis.session.SqlSessionFactoryBuilder;
+import org.junit.jupiter.api.BeforeAll;
 import org.testcontainers.containers.MySQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
-@Testcontainers
 public class DatabaseTestBase {
 
-    @Container
     static MySQLContainer mySQLContainer = new MySQLContainer<>(DockerImageName.parse("mysql:8"))
         .withInitScript("ddl.sql")
         .withReuse(true);
+
+    @BeforeAll
+    public static void startMySQLContainer() {
+        mySQLContainer.start();
+    }
 
     protected SqlSessionFactory getSessionFactory() throws IOException {
         String resource = "database/mybatis-config.xml";
@@ -42,9 +44,7 @@ public class DatabaseTestBase {
 
         Properties properties = new Properties();
         properties.put("password", "test");
-        properties.put("jdbcUrl", mySQLContainer.getJdbcUrl());
+        properties.put("jdbcUrl", mySQLContainer.getJdbcUrl() + "?TC_REUSABLE=true");
         return new SqlSessionFactoryBuilder().build(inputStream, properties);
     }
-
-
 }

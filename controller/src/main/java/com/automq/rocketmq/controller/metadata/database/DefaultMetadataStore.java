@@ -127,6 +127,11 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
     }
 
     @Override
+    public void createTopic(String topicName, int queueNum) throws ControllerException {
+
+    }
+
+    @Override
     public boolean isLeader() throws ControllerException {
         return this.role == Role.Leader;
     }

@@ -1,0 +1,54 @@
+<!--
+  ~ Licensed to the Apache Software Foundation (ASF) under one or more
+  ~ contributor license agreements.  See the NOTICE file distributed with
+  ~ this work for additional information regarding copyright ownership.
+  ~ The ASF licenses this file to You under the Apache License, Version 2.0
+  ~ (the "License"); you may not use this file except in compliance with
+  ~ the License.  You may obtain a copy of the License at
+  ~
+  ~     http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  -->
+
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper">
+
+    <insert id="create" parameterType="QueueAssignment" >
+        INSERT INTO queue_assignment(topic_id, queue_id, src_node_id, dst_node_id, status)
+        VALUES (
+            #{topicId},
+            #{queueId},
+            #{srcNodeId},
+            #{dstNodeId},
+            #{status}
+        )
+    </insert>
+
+    <update id="update" parameterType="QueueAssignment">
+        UPDATE queue_assignment
+        SET src_node_id = #{srcNodeId}, dst_node_id = #{dstNodeId}, status = #{status}
+        WHERE topic_id = #{topicId} AND queue_id = #{queueId}
+    </update>
+
+    <select id="list" resultType="QueueAssignment">
+        SELECT topic_id, queue_id, src_node_id, dst_node_id, status, create_time, update_time
+        FROM queue_assignment
+        WHERE 1 = 1
+        <if test="topicId != null">
+            AND topic_id = #{topicId}
+        </if>
+        <if test="updateTime != null">
+            AND update_time >= #{updateTime}
+        </if>
+    </select>
+
+
+</mapper>

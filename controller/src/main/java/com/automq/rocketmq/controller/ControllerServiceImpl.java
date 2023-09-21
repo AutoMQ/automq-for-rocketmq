@@ -91,9 +91,7 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     @Override
     public void processHeartbeat(HeartbeatRequest request,
         StreamObserver<HeartbeatReply> responseObserver) {
-        if (null != request) {
-            LOGGER.trace("Received BrokerHeartbeatRequest {}", TextFormat.shortDebugString(request));
-        }
+        LOGGER.trace("Received HeartbeatRequest {}", TextFormat.shortDebugString(request));
 
         Status status = Status.newBuilder().setCode(Code.OK).build();
         HeartbeatReply reply = HeartbeatReply.newBuilder().setStatus(status).build();
@@ -103,6 +101,16 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
 
     @Override
     public void createTopic(CreateTopicRequest request, StreamObserver<CreateTopicReply> responseObserver) {
+        LOGGER.trace("Received CreateTopicRequest {}", TextFormat.shortDebugString(request));
+        if (request.getCount() <= 0) {
+            CreateTopicReply reply = CreateTopicReply.newBuilder()
+                .setStatus(Status.newBuilder().setCode(Code.BAD_REQUEST).setMessage("Topic queue number needs to be positive").build())
+                .build();
+            responseObserver.onNext(reply);
+            responseObserver.onCompleted();
+            return;
+        }
+
         super.createTopic(request, responseObserver);
     }
 

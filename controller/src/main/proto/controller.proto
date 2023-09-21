@@ -84,7 +84,11 @@ message HeartbeatReply {
 
 message CreateTopicRequest {
   ControllerRequestContext context = 1;
+
+  // Topic name
   string topic = 2;
+
+  // Number of message queues to create for this topic
   int32 count = 3;
 }
 

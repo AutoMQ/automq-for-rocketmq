@@ -33,7 +33,7 @@ public class NodeTest extends DatabaseTestBase {
 
     @Test
     @Order(1)
-    public void testListBrokers() throws IOException {
+    public void testListNodes() throws IOException {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             NodeMapper nodeMapper = session.getMapper(NodeMapper.class);
             List<Node> list = nodeMapper.list();
@@ -43,7 +43,7 @@ public class NodeTest extends DatabaseTestBase {
 
     @Test
     @Order(2)
-    public void testBroker_CRUD() throws IOException {
+    public void testNode_CRUD() throws IOException {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             NodeMapper nodeMapper = session.getMapper(NodeMapper.class);
             Node node = new Node();

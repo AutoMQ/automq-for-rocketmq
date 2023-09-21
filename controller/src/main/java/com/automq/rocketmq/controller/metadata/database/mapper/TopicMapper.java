@@ -15,27 +15,22 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.metadata.database;
+package com.automq.rocketmq.controller.metadata.database.mapper;
 
-import com.zaxxer.hikari.HikariConfig;
-import com.zaxxer.hikari.HikariDataSource;
-import java.util.Properties;
-import javax.sql.DataSource;
-import org.apache.ibatis.datasource.pooled.PooledDataSourceFactory;
+import com.automq.rocketmq.controller.metadata.database.dao.Topic;
+import com.automq.rocketmq.controller.metadata.database.dao.TopicStatus;
+import java.util.Date;
+import java.util.List;
+import org.apache.ibatis.annotations.Param;
 
-public class HikariCPDataSourceFactory extends PooledDataSourceFactory {
-    private HikariDataSource dataSource;
+public interface TopicMapper {
 
-    @Override
-    public void setProperties(Properties properties) {
-        HikariConfig config = new HikariConfig(properties);
-        config.setMaximumPoolSize(2);
-        config.setIdleTimeout(1000);
-        this.dataSource = new HikariDataSource(config);
-    }
+    int create(Topic topic);
 
-    @Override
-    public DataSource getDataSource() {
-        return this.dataSource;
-    }
+    Topic getById(int id);
+
+    int updateStatusById(@Param("id") int id, @Param("status") TopicStatus status);
+
+    List<Topic> list(@Param("status") TopicStatus status, @Param("updateTime") Date updateTime);
+
 }

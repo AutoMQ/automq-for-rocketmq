@@ -40,7 +40,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    void testRegisterBroker() throws ControllerException, IOException {
+    void testRegisterNode() throws ControllerException, IOException {
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.nodeId()).thenReturn(1);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
@@ -59,12 +59,13 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             try (SqlSession session = getSessionFactory().openSession()) {
                 NodeMapper nodeMapper = session.getMapper(NodeMapper.class);
                 nodeMapper.delete(node.getId());
+                session.commit();
             }
         }
     }
 
     @Test
-    void testRegisterBroker_badArguments() throws ControllerException, IOException {
+    void testRegisterBroker_badArguments() throws IOException {
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.nodeId()).thenReturn(1);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
@@ -159,7 +160,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    void testLeaderAddress_NoLeader() throws IOException, ControllerException {
+    void testLeaderAddress_NoLeader() throws IOException {
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.nodeId()).thenReturn(1);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
@@ -170,7 +171,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    void testLeaderAddress_NoLeaderBroker() throws IOException, ControllerException {
+    void testLeaderAddress_NoLeaderNode() throws IOException {
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.nodeId()).thenReturn(1);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);

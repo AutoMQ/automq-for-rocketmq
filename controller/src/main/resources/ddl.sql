@@ -38,8 +38,8 @@ CREATE TABLE IF NOT EXISTS node (
 CREATE TABLE IF NOT EXISTS topic (
     id INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
     name VARCHAR(255) NOT NULL,
-    queue_num INT NOT NULL ,
-    deleted BOOL DEFAULT FALSE,
+    queue_num INT NOT NULL,
+    status tinyint DEFAULT 0,
     create_time DATETIME DEFAULT current_timestamp,
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
