@@ -20,7 +20,6 @@ package com.automq.rocketmq.store.mock;
 import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
-import com.automq.rocketmq.common.exception.RocketMQException;
 import com.automq.rocketmq.metadata.StoreMetadataService;
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -76,7 +75,7 @@ public class MockStoreMetadataService implements StoreMetadataService {
 
     @Override
     public CompletableFuture<Void> trimStream(long streamId, long streamEpoch,
-        long newStartOffset) throws RocketMQException {
+        long newStartOffset) {
         return null;
     }
 
@@ -91,7 +90,7 @@ public class MockStoreMetadataService implements StoreMetadataService {
     }
 
     @Override
-    public CompletableFuture<List<StreamMetadata>> listOpenStreams(int brokerId, long brokerEpoch) {
+    public CompletableFuture<List<StreamMetadata>> listOpenStreams() {
         return null;
     }
 
@@ -107,7 +106,7 @@ public class MockStoreMetadataService implements StoreMetadataService {
     }
 
     @Override
-    public CompletableFuture<Void> commitStreamObject(S3StreamObject streamObject) {
+    public CompletableFuture<Void> commitStreamObject(S3StreamObject streamObject, List<Long> compactedObjects) {
         return null;
     }
 }
