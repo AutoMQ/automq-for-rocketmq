@@ -113,6 +113,17 @@ public interface StoreMetadataService {
     CompletableFuture<List<S3WALObject>> listWALObjects();
 
     /**
+     * List the WAL objects by a specified stream range with a limit count.
+     *
+     * @param streamId the specified stream id
+     * @param startOffset the start offset of the specified stream range.
+     * @param endOffset the end offset of the specified stream range. NOOP_OFFSET(-1) represent endOffset is unlimited.
+     * @param limit the limit count of the returned WAL objects.
+     * @return list of {@link S3WALObject}
+     */
+    CompletableFuture<List<S3WALObject>> listWALObjects(long streamId, long startOffset, long endOffset, int limit);
+
+    /**
      * List stream objects by a specified stream range with a limit count.
      *
      * @param streamId the specified stream id
