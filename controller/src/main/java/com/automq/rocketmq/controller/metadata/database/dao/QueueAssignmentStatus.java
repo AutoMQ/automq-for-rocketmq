@@ -19,7 +19,10 @@ package com.automq.rocketmq.controller.metadata.database.dao;
 
 public enum QueueAssignmentStatus {
     YIELDING,
+
     ASSIGNABLE,
+
     ASSIGNED,
+
     DELETED,
 }

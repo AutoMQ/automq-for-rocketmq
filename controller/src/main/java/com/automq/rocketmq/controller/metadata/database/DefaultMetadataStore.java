@@ -232,6 +232,16 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
         return brokerNode.getNode().getAddress();
     }
 
+
+    @Override
+    public List<QueueAssignment> listAssignments(Long topicId, Integer srcNodeId, Integer dstNodeId,
+        QueueAssignmentStatus status) {
+        try (SqlSession session = getSessionFactory().openSession()) {
+            QueueAssignmentMapper mapper = session.getMapper(QueueAssignmentMapper.class);
+            return mapper.list(topicId, srcNodeId, dstNodeId, status, null);
+        }
+    }
+
     @Override
     public void close() throws IOException {
         this.executorService.shutdown();
