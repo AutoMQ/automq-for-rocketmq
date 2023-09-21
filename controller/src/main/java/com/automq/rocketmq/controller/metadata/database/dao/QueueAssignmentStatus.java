@@ -15,27 +15,11 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.metadata.database;
+package com.automq.rocketmq.controller.metadata.database.dao;
 
-import com.zaxxer.hikari.HikariConfig;
-import com.zaxxer.hikari.HikariDataSource;
-import java.util.Properties;
-import javax.sql.DataSource;
-import org.apache.ibatis.datasource.pooled.PooledDataSourceFactory;
-
-public class HikariCPDataSourceFactory extends PooledDataSourceFactory {
-    private HikariDataSource dataSource;
-
-    @Override
-    public void setProperties(Properties properties) {
-        HikariConfig config = new HikariConfig(properties);
-        config.setMaximumPoolSize(2);
-        config.setIdleTimeout(1000);
-        this.dataSource = new HikariDataSource(config);
-    }
-
-    @Override
-    public DataSource getDataSource() {
-        return this.dataSource;
-    }
+public enum QueueAssignmentStatus {
+    YIELDING,
+    ASSIGNABLE,
+    ASSIGNED,
+    DELETED,
 }

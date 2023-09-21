@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.Calendar;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,21 @@ import org.junit.jupiter.api.TestMethodOrder;
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class LeaseTest extends DatabaseTestBase {
+
+    @BeforeEach
+    public void setUp() throws IOException {
+        try (SqlSession session = getSessionFactory().openSession()) {
+            LeaseMapper mapper = session.getMapper(LeaseMapper.class);
+            Lease lease = new Lease();
+            lease.setNodeId(0);
+            lease.setEpoch(0);
+            Calendar calendar = Calendar.getInstance();
+            calendar.set(2023, Calendar.JANUARY, 1);
+            lease.setExpirationTime(calendar.getTime());
+            mapper.update(lease);
+            session.commit();
+        }
+    }
 
     @Test
     @Order(1)
