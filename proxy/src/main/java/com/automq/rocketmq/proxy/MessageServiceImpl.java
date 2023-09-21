@@ -21,6 +21,7 @@ import com.automq.rocketmq.common.config.ProxyConfig;
 import com.automq.rocketmq.common.model.MessageExt;
 import com.automq.rocketmq.common.util.CommonUtil;
 import com.automq.rocketmq.metadata.ProxyMetadataService;
+import com.automq.rocketmq.proxy.service.LockService;
 import com.automq.rocketmq.proxy.util.RocketMQMessageUtil;
 import com.automq.rocketmq.store.MessageStore;
 import com.automq.rocketmq.store.model.message.Filter;
@@ -28,6 +29,7 @@ import com.automq.rocketmq.store.model.message.PutResult;
 import com.automq.rocketmq.store.model.message.SQLFilter;
 import com.automq.rocketmq.store.model.message.TagFilter;
 import com.automq.rocketmq.store.util.MessageUtil;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -35,6 +37,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.rocketmq.client.consumer.AckResult;
 import org.apache.rocketmq.client.consumer.AckStatus;
@@ -69,11 +72,14 @@ public class MessageServiceImpl implements MessageService {
     private final ProxyConfig config;
     private final ProxyMetadataService metadataService;
     private final MessageStore store;
+    private final LockService lockService;
 
-    public MessageServiceImpl(ProxyConfig config, ProxyMetadataService metadataService, MessageStore store) {
+    public MessageServiceImpl(ProxyConfig config, MessageStore store, ProxyMetadataService metadataService,
+        LockService lockService) {
         this.config = config;
-        this.metadataService = metadataService;
         this.store = store;
+        this.metadataService = metadataService;
+        this.lockService = lockService;
     }
 
     @Override
@@ -112,7 +118,7 @@ public class MessageServiceImpl implements MessageService {
         throw new UnsupportedOperationException();
     }
 
-    private CompletableFuture<Void> popSpecifiedQueue(long consumerGroupId, long topicId, int queueId,
+    private CompletableFuture<Void> popSpecifiedQueueUnsafe(long consumerGroupId, long topicId, int queueId,
         Filter filter, int batchSize, boolean fifo, long invisibleDuration, List<MessageExt> messageList) {
         long offset = metadataService.queryConsumerOffset(consumerGroupId, topicId, queueId);
 
@@ -135,7 +141,8 @@ public class MessageServiceImpl implements MessageService {
 
         // There is no retry message when pop orderly. So that return origin messages directly.
         if (fifo) {
-            return popFuture.thenAccept(messageList::addAll);
+            return popFuture.thenAccept(resultMessageList -> {
+            });
         }
 
         // Try to pop retry messages.
@@ -156,11 +163,26 @@ public class MessageServiceImpl implements MessageService {
         });
     }
 
+    private CompletableFuture<Void> popSpecifiedQueue(long consumerGroupId, String clientId, long topicId, int queueId,
+        Filter filter, int batchSize, boolean fifo, long invisibleDuration, List<MessageExt> messageList) {
+        if (lockService.tryLock(topicId, queueId, clientId, fifo)) {
+            return popSpecifiedQueueUnsafe(consumerGroupId, topicId, queueId, filter, batchSize, fifo, invisibleDuration, messageList)
+                .orTimeout(invisibleDuration, TimeUnit.NANOSECONDS)
+                .whenComplete((v, throwable) -> {
+                    // TODO: log exception.
+                    // Release lock since complete or timeout.
+                    lockService.release(topicId, queueId);
+                });
+        }
+        return CompletableFuture.completedFuture(null);
+    }
+
     @Override
     public CompletableFuture<PopResult> popMessage(ProxyContext ctx, AddressableMessageQueue messageQueue,
         PopMessageRequestHeader requestHeader, long timeoutMillis) {
         long consumerGroupId = metadataService.queryConsumerGroupId(requestHeader.getConsumerGroup());
         long topicId = metadataService.queryTopicId(requestHeader.getTopic());
+        String clientId = ctx.getClientID();
         Set<Integer> assignmentQueueSet = metadataService.queryAssignmentQueueSet(topicId);
 
         Filter filter;
@@ -185,7 +207,7 @@ public class MessageServiceImpl implements MessageService {
                 throw new RuntimeException(String.format("this proxy does not deal with topic %s queue %d",
                     requestHeader.getTopic(), requestHeader.getQueueId()));
             }
-            popMessageFuture = popSpecifiedQueue(consumerGroupId, topicId, requestHeader.getQueueId(), filter,
+            popMessageFuture = popSpecifiedQueue(consumerGroupId, clientId, topicId, requestHeader.getQueueId(), filter,
                 requestHeader.getMaxMsgNums(), requestHeader.isOrder(), requestHeader.getInvisibleTime(), messageList);
         } else {
             // Shuffle queue list to prevent constantly popping messages from the queue at the front.
@@ -204,7 +226,7 @@ public class MessageServiceImpl implements MessageService {
                         return CompletableFuture.completedFuture(null);
                     }
 
-                    return popSpecifiedQueue(consumerGroupId, topicId, queueId, filter,
+                    return popSpecifiedQueue(consumerGroupId, clientId, topicId, queueId, filter,
                         batchSize, requestHeader.isOrder(), requestHeader.getInvisibleTime(), messageList);
                 });
             }
@@ -240,6 +262,14 @@ public class MessageServiceImpl implements MessageService {
         AckMessageRequestHeader requestHeader, long timeoutMillis) {
         return store.ack(requestHeader.getExtraInfo())
             .thenApply(ackResult -> {
+                long topicId = metadataService.queryTopicId(requestHeader.getTopic());
+                Integer queueId = requestHeader.getQueueId();
+
+                // Expire the lock later to allow other client preempted when all inflight messages are acked.
+                if (store.getInflightStatsByQueue(topicId, queueId) == 0) {
+                    lockService.tryExpire(topicId, queueId, Duration.ofSeconds(1).toMillis());
+                }
+
                 org.apache.rocketmq.client.consumer.AckResult result = new org.apache.rocketmq.client.consumer.AckResult();
                 switch (ackResult.status()) {
                     case SUCCESS -> result.setStatus(AckStatus.OK);

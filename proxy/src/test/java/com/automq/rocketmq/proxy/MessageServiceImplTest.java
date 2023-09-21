@@ -21,6 +21,7 @@ import com.automq.rocketmq.common.config.ProxyConfig;
 import com.automq.rocketmq.metadata.ProxyMetadataService;
 import com.automq.rocketmq.proxy.mock.MockMessageStore;
 import com.automq.rocketmq.proxy.mock.MockProxyMetadataService;
+import com.automq.rocketmq.proxy.service.LockService;
 import com.automq.rocketmq.store.MessageStore;
 import com.automq.rocketmq.store.model.message.TagFilter;
 import com.automq.rocketmq.store.util.MessageUtil;
@@ -60,7 +61,8 @@ class MessageServiceImplTest {
     public void setUp() {
         metadataService = new MockProxyMetadataService();
         messageStore = new MockMessageStore();
-        messageService = new MessageServiceImpl(new ProxyConfig(), metadataService, messageStore);
+        ProxyConfig config = new ProxyConfig();
+        messageService = new MessageServiceImpl(config, messageStore, metadataService, new LockService(config));
     }
 
     @Test
