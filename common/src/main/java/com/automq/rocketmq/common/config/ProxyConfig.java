@@ -20,7 +20,15 @@ package com.automq.rocketmq.common.config;
 public class ProxyConfig {
     private String name;
 
+    // The proportion of messages that are popped from the retry queue first,
+    // available value from 0 to 100, default is 20
+    private int retryPriorityPercentage = 20;
+
     public String name() {
         return name;
+    }
+
+    public int retryPriorityPercentage() {
+        return retryPriorityPercentage;
     }
 }

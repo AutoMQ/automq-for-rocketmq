@@ -30,5 +30,5 @@ public interface ProxyMetadataService {
 
     // Each time pop will advance the consumer offset by batch size.
     // Metadata service will cache the consumer offset in memory, and periodically commit to Controller.
-    void updateConsumerOffset(long consumerGroupId, long topicId, int queueId, long offset);
+    void updateConsumerOffset(long consumerGroupId, long topicId, int queueId, long offset, boolean retry);
 }
