@@ -15,20 +15,22 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.common.config;
+package com.automq.rocketmq.common.util;
 
-public class ProxyConfig {
-    private String name;
+import java.util.Random;
 
-    // The proportion of messages that are popped from the retry queue first,
-    // available value from 0 to 100, default is 20
-    private int retryPriorityPercentage = 20;
+public class CommonUtil {
+    private static final Random RANDOM = new Random();
 
-    public String name() {
-        return name;
-    }
+    public static boolean applyPercentage(int percentage) {
+        if (percentage <= 0) {
+            return false;
+        }
 
-    public int retryPriorityPercentage() {
-        return retryPriorityPercentage;
+        if (percentage >= 100) {
+            return true;
+        }
+
+        return RANDOM.nextInt(100) <= percentage;
     }
 }

@@ -35,7 +35,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class MockMessageStore implements MessageStore {
-    private final AtomicLong offset = new AtomicLong();
+    private final HashMap<Integer, AtomicLong> offsetMap = new HashMap<>();
     private final Set<String> receiptHandleSet = new HashSet<>();
     private final Map<Long, List<MessageExt>> messageMap = new HashMap<>();
 
@@ -67,7 +67,7 @@ public class MockMessageStore implements MessageStore {
 
     @Override
     public CompletableFuture<PutResult> put(Message message, Map<String, String> systemProperties) {
-        long offset = this.offset.getAndIncrement();
+        long offset = this.offsetMap.computeIfAbsent(message.queueId(), queueId -> new AtomicLong()).getAndIncrement();
         MessageExt messageExt = MessageExt.Builder.builder().message(message).offset(offset).build();
         List<MessageExt> messageList = messageMap.computeIfAbsent(message.topicId() + message.queueId(), v -> new ArrayList<>());
         messageList.add(messageExt);
