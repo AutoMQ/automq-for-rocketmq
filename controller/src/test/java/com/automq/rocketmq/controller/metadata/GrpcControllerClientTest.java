@@ -23,6 +23,7 @@ import com.automq.rocketmq.controller.ControllerTestServer;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import java.io.IOException;
+import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
@@ -31,7 +32,7 @@ import org.mockito.Mockito;
 class GrpcControllerClientTest {
 
     @Test
-    public void testRegisterBroker() throws IOException, ControllerException {
+    public void testRegisterBroker() throws IOException, ControllerException, ExecutionException, InterruptedException {
         String name = "broker-name";
         String address = "localhost:1234";
         String instanceId = "i-ctrl";
@@ -46,7 +47,7 @@ class GrpcControllerClientTest {
             testServer.start();
             int port = testServer.getPort();
             ControllerClient client = new GrpcControllerClient();
-            Node result = client.registerBroker(String.format("localhost:%d", port), name, address, instanceId);
+            Node result = client.registerBroker(String.format("localhost:%d", port), name, address, instanceId).get();
             Assertions.assertEquals(1, result.getId());
             Assertions.assertEquals(1, result.getEpoch());
             Assertions.assertEquals(name, result.getName());
@@ -87,8 +88,8 @@ class GrpcControllerClientTest {
             testServer.start();
             int port = testServer.getPort();
             ControllerClient client = new GrpcControllerClient();
-            Assertions.assertThrows(ControllerException.class,
-                () -> client.registerBroker(String.format("localhost:%d", port), name, address, instanceId));
+            Assertions.assertThrows(ExecutionException.class,
+                () -> client.registerBroker(String.format("localhost:%d", port), name, address, instanceId).get());
 
         }
     }

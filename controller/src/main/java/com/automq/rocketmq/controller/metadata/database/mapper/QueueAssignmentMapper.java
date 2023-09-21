@@ -26,7 +26,7 @@ public interface QueueAssignmentMapper {
 
     int create(QueueAssignment assignment);
 
-    List<QueueAssignment> list(@Param("topicId") Integer topicId, @Param("updateTime") Date updateTime);
+    List<QueueAssignment> list(@Param("topicId") Long topicId, @Param("updateTime") Date updateTime);
 
     int update(QueueAssignment assignment);
 }

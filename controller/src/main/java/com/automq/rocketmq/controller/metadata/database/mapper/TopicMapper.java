@@ -27,11 +27,11 @@ public interface TopicMapper {
 
     int create(Topic topic);
 
-    Topic getById(int id);
+    Topic getById(long id);
 
     Topic getByName(String name);
 
-    int updateStatusById(@Param("id") int id, @Param("status") TopicStatus status);
+    int updateStatusById(@Param("id") long id, @Param("status") TopicStatus status);
 
     List<Topic> list(@Param("status") TopicStatus status, @Param("updateTime") Date updateTime);
 

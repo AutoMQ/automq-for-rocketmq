@@ -41,15 +41,13 @@ import com.google.common.base.Strings;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.slf4j.Logger;
@@ -109,7 +107,7 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
             if (this.isLeader()) {
                 try (SqlSession session = this.sessionFactory.openSession(false)) {
                     NodeMapper nodeMapper = session.getMapper(NodeMapper.class);
-                    Node node = nodeMapper.getByInstanceId(instanceId);
+                    Node node = nodeMapper.get(null, instanceId, null);
                     if (null != node) {
                         nodeMapper.increaseEpoch(node.getId());
                         node.setEpoch(node.getEpoch() + 1);
@@ -133,7 +131,11 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
                     return node;
                 }
             } else {
-                return controllerClient.registerBroker(this.leaderAddress(), name, address, instanceId);
+                try {
+                    return controllerClient.registerBroker(this.leaderAddress(), name, address, instanceId).get();
+                } catch (InterruptedException | ExecutionException e) {
+                    throw new ControllerException(Code.INTERRUPTED_VALUE, e);
+                }
             }
         }
     }
@@ -164,7 +166,7 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
 
                     QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
 
-                    int topicId = topic.getId();
+                    long topicId = topic.getId();
                     List<Integer> aliveNodeIds =
                         this.brokers.values()
                             .stream()
