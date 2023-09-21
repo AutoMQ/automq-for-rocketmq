@@ -32,6 +32,11 @@
         <package name="com.automq.rocketmq.controller.metadata.database.dao"/>
     </typeAliases>
 
+    <typeHandlers>
+        <typeHandler handler="org.apache.ibatis.type.EnumOrdinalTypeHandler"
+                     javaType="com.automq.rocketmq.controller.metadata.database.dao.TopicStatus" />
+    </typeHandlers>
+
     <environments default="development">
         <environment id="development">
             <transactionManager type="JDBC"/>
@@ -42,11 +47,13 @@
             </dataSource>
         </environment>
     </environments>
+
     <mappers>
         <mapper resource="database/mapper/LeaseMapper.xml" />
         <mapper resource="database/mapper/NodeMapper.xml" />
         <mapper resource="database/mapper/StreamMapper.xml" />
         <mapper resource="database/mapper/RangeMapper.xml" />
         <mapper resource="database/mapper/S3ObjectMapper.xml" />
+        <mapper resource="database/mapper/TopicMapper.xml" />
     </mappers>
 </configuration>
