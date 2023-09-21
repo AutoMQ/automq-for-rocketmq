@@ -30,14 +30,14 @@ public interface LeaseMapper {
 
 
     /**
-     * Retrieve current lease with WRITE locking
+     * Retrieve current lease with SHARE lock
      *
      * @return Current lease
      */
     Lease currentWithShareLock();
 
     /**
-     * Retrieve current lease with WRITE locking
+     * Retrieve current lease with WRITE lock
      *
      * @return Current lease
      */

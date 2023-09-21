@@ -42,7 +42,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     @Test
     void testRegisterBroker() throws ControllerException, IOException {
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.brokerId()).thenReturn(1);
+        Mockito.when(config.nodeId()).thenReturn(1);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
         Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
@@ -66,7 +66,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     @Test
     void testRegisterBroker_badArguments() throws ControllerException, IOException {
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.brokerId()).thenReturn(1);
+        Mockito.when(config.nodeId()).thenReturn(1);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
         Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
@@ -91,7 +91,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     @Test
     void testGetLease() throws IOException {
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.brokerId()).thenReturn(1);
+        Mockito.when(config.nodeId()).thenReturn(1);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
         Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
@@ -102,7 +102,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     @Test
     void testIsLeader() throws IOException {
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.brokerId()).thenReturn(1);
+        Mockito.when(config.nodeId()).thenReturn(1);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
         Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
@@ -130,7 +130,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         }
 
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.brokerId()).thenReturn(brokerId);
+        Mockito.when(config.nodeId()).thenReturn(brokerId);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
         Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
 
@@ -161,7 +161,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     @Test
     void testLeaderAddress_NoLeader() throws IOException, ControllerException {
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.brokerId()).thenReturn(1);
+        Mockito.when(config.nodeId()).thenReturn(1);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
         Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
@@ -172,7 +172,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     @Test
     void testLeaderAddress_NoLeaderBroker() throws IOException, ControllerException {
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.brokerId()).thenReturn(1);
+        Mockito.when(config.nodeId()).thenReturn(1);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
         Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
