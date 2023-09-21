@@ -175,6 +175,8 @@ class MessageServiceImplTest {
     void ackMessage() {
         AckMessageRequestHeader header = new AckMessageRequestHeader();
         header.setExtraInfo("receiptHandle");
+        header.setTopic("topic");
+        header.setQueueId(0);
         AckResult ackResult = messageService.ackMessage(ProxyContext.create(), null, null, header, 0).join();
         assertEquals(AckStatus.OK, ackResult.getStatus());
 
