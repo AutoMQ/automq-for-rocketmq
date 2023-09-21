@@ -59,8 +59,8 @@ public class S3ObjectManager implements ObjectManager {
         // Build S3WALObject
         S3WALObject.Builder builder = S3WALObject.newBuilder();
         builder.setObjectId(request.getObjectId());
-        builder.setBrokerId(-1); // TODO: fill broker id
         builder.setSequenceId(request.getOrderId());
+        builder.setObjectSize(request.getObjectSize());
 
         // Collect SubStream from request
         Map<Long, SubStream> subStreams = request
@@ -138,16 +138,14 @@ public class S3ObjectManager implements ObjectManager {
                         startOffsetPtr = streamObject.getEndOffset();
                         sIndex++;
                         moved = true;
-                    }
-
-                    if (streamObject.getEndOffset() <= startOffsetPtr) {
+                    } else if (streamObject.getEndOffset() <= startOffsetPtr) {
                         // Don't need this stream object.
                         sIndex++;
                         moved = true;
                     }
                 }
 
-                if (wIndex < streamObjects.size()) {
+                if (wIndex < walObjects.size()) {
                     S3WALObject walObject = walObjects.get(wIndex);
                     long walStart = walObject.getSubStreamsMap().get(streamId).getStartOffset();
                     long walEnd = walObject.getSubStreamsMap().get(streamId).getEndOffset();
@@ -156,8 +154,7 @@ public class S3ObjectManager implements ObjectManager {
                         startOffsetPtr = walEnd;
                         wIndex++;
                         moved = true;
-                    }
-                    if (walEnd <= startOffsetPtr) {
+                    } else if (walEnd <= startOffsetPtr) {
                         // Don't need this wal object.
                         wIndex++;
                         moved = true;
