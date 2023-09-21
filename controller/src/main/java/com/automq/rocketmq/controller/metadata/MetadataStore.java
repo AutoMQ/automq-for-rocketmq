@@ -19,6 +19,9 @@ package com.automq.rocketmq.controller.metadata;
 
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
+import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
+import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignmentStatus;
+import java.util.List;
 
 public interface MetadataStore {
 
@@ -36,6 +39,7 @@ public interface MetadataStore {
 
     /**
      * Check if current controller is playing leader role
+     *
      * @return true if leader; false otherwise
      * @throws ControllerException If there is any I/O error
      */
@@ -43,5 +47,15 @@ public interface MetadataStore {
 
     String leaderAddress() throws ControllerException;
 
-
+    /**
+     * List queue assignments according to criteria.
+     *
+     * @param topicId Optional topic-id
+     * @param srcNodeId Optional source node-id
+     * @param dstNodeId Optional destination node-id
+     * @param status Optional queue assignment status
+     * @return List of the queue assignments meeting the specified criteria
+     */
+    List<QueueAssignment> listAssignments(Long topicId, Integer srcNodeId, Integer dstNodeId,
+        QueueAssignmentStatus status);
 }
