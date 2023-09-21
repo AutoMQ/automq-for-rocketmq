@@ -133,6 +133,10 @@ message S3StreamObject {
   int64 object_id = 4;
   // The size of the object.
   int64 object_size = 5;
+  // A rough base data timestamp of the WAL object.
+  int64 base_data_timestamp = 6;
+  // The committed timestamp in milliseconds of the object.
+  int64 committed_timestamp = 7;
 }
 
 // Each broker WAL consists of a sequence of WAL objects.
@@ -144,8 +148,14 @@ message S3WALObject {
   int64 object_id = 2;
   // The sequence id of the WAL object.
   int64 sequence_id = 3;
+  // A rough base data timestamp of the WAL object.
+  int64 base_data_timestamp = 4;
+  // The committed timestamp in milliseconds of the object.
+  int64 committed_timestamp = 5;
+  // The size of the object.
+  int64 object_size = 6;
   // The data of the WAL object consists of many sub streams.
-  repeated SubStream sub_streams = 4;
+  repeated SubStream sub_streams = 7;
 }
 
 // The `SubStream` is used to represent a segment of a stream in the WAL.
