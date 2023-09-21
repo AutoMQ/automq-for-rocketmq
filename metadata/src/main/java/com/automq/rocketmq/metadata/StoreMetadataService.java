@@ -20,7 +20,6 @@ package com.automq.rocketmq.metadata;
 import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
-import com.automq.rocketmq.common.exception.RocketMQException;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -35,17 +34,74 @@ public interface StoreMetadataService {
 
     int getMaxRetryTimes(long consumerGroupId);
 
-    CompletableFuture<Void> trimStream(long streamId, long streamEpoch, long newStartOffset) throws RocketMQException;
+    /**
+     * Trim stream to new start offset. The old data will be deleted or marked as deleted.
+     *
+     * @param streamId stream id.
+     * @param streamEpoch stream epoch.
+     * @param newStartOffset new start offset.
+     * @return {@link CompletableFuture} of trim operation.
+     */
+    CompletableFuture<Void> trimStream(long streamId, long streamEpoch, long newStartOffset);
 
+    /**
+     * Open stream with newer epoch. The controller will:
+     * 1. update stream epoch to fence old stream writer to commit object.
+     * 2. calculate the last range endOffset.
+     *
+     * @param streamId stream id.
+     * @param streamEpoch stream epoch.
+     * @return {@link StreamMetadata}
+     */
     CompletableFuture<StreamMetadata> openStream(long streamId, long streamEpoch);
 
+    /**
+     * Mark the specified stream as closed.
+     *
+     * @param streamId stream id.
+     * @param streamEpoch stream epoch.
+     * @return {@link CompletableFuture} of close operation.
+     */
     CompletableFuture<Void> closeStream(long streamId, long streamEpoch);
 
-    CompletableFuture<List<StreamMetadata>> listOpenStreams(int brokerId, long brokerEpoch);
+    /**
+     * List the open streams of current server.
+     *
+     * @return list of {@link StreamMetadata}
+     */
+    CompletableFuture<List<StreamMetadata>> listOpenStreams();
 
+    /**
+     * Request to prepare S3 objects before uploading.
+     * <p>
+     * The prepare and commit APIs follow the 2-phase commit manner to avoid leaving garbage in S3.
+     *
+     * @param count number of objects to prepare.
+     * @param ttlInMinutes time to live in minutes. The uncommitted objects will be deleted after ttl.
+     * @return the first object id.
+     */
     CompletableFuture<Long> prepareS3Objects(int count, int ttlInMinutes);
 
+    /**
+     * Commit an uploaded or compacted S3 WAL object.
+     * <p>
+     * This operation will be triggered in upload or compaction process.
+     *
+     * @param walObject the new WAL object.
+     * @param streamObjects the stream objects that split from the compaction process.
+     * @param compactedObjects the compacted objects that should be deleted.
+     * @return {@link CompletableFuture} of commit operation.
+     */
     CompletableFuture<Void> commitWalObject(S3WALObject walObject, List<S3StreamObject> streamObjects, List<Long> compactedObjects);
 
-    CompletableFuture<Void> commitStreamObject(S3StreamObject streamObject);
+    /**
+     * Commit a compacted S3 stream object.
+     * <p>
+     * This operation will only be triggered in stream object compaction process.
+     *
+     * @param streamObject the new stream object.
+     * @param compactedObjects the compacted objects that should be deleted.
+     * @return {@link CompletableFuture} of commit operation.
+     */
+    CompletableFuture<Void> commitStreamObject(S3StreamObject streamObject, List<Long> compactedObjects);
 }
