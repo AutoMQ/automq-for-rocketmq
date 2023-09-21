@@ -28,12 +28,15 @@ import com.automq.rocketmq.controller.metadata.ControllerConfig;
 import com.automq.rocketmq.controller.metadata.DatabaseTestBase;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.DefaultMetadataStore;
+import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
 import io.grpc.Grpc;
 import io.grpc.InsecureChannelCredentials;
 import io.grpc.ManagedChannel;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.ibatis.session.SqlSession;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -42,7 +45,7 @@ import org.mockito.Mockito;
 public class ControllerServiceImplTest extends DatabaseTestBase {
 
     @Test
-    public void testRegisterBroker() throws IOException {
+    public void testRegisterBrokerNode() throws IOException {
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
         Mockito.when(config.nodeId()).thenReturn(1);
@@ -62,10 +65,12 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .setInstanceId("i-reg-broker")
                 .build();
 
-            StreamObserver<NodeRegistrationReply> observer = new StreamObserver() {
-                @Override
-                public void onNext(Object value) {
+            AtomicInteger nodeId = new AtomicInteger(0);
 
+            StreamObserver<NodeRegistrationReply> observer = new StreamObserver<NodeRegistrationReply>() {
+                @Override
+                public void onNext(NodeRegistrationReply reply) {
+                    nodeId.set(reply.getId());
                 }
 
                 @Override
@@ -83,6 +88,12 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
             // It should work if register the broker multiple times. The only side effect is epoch is incremented.
             svc.registerNode(request, observer);
+
+            try (SqlSession session = getSessionFactory().openSession()) {
+                NodeMapper mapper = session.getMapper(NodeMapper.class);
+                mapper.delete(nodeId.get());
+                session.commit();
+            }
         }
     }
 
