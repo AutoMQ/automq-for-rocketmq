@@ -75,6 +75,10 @@ public class GrpcControllerClient implements ControllerClient {
         } catch (ExecutionException | InterruptedException e) {
             throw new ControllerException(Code.BAD_REQUEST_VALUE, e);
         }
+    }
+
+    @Override
+    public void createTopic(String target, String topicName, int queueNum) throws ControllerException {
 
     }
 }

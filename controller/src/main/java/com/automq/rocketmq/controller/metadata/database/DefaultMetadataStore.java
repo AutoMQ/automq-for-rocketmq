@@ -20,24 +20,36 @@ package com.automq.rocketmq.controller.metadata.database;
 import apache.rocketmq.controller.v1.Code;
 import com.automq.rocketmq.common.PrefixThreadFactory;
 import com.automq.rocketmq.controller.exception.ControllerException;
+import com.automq.rocketmq.controller.metadata.BrokerNode;
 import com.automq.rocketmq.controller.metadata.ControllerClient;
 import com.automq.rocketmq.controller.metadata.ControllerConfig;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.Role;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
+import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
+import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignmentStatus;
+import com.automq.rocketmq.controller.metadata.database.dao.Topic;
+import com.automq.rocketmq.controller.metadata.database.dao.TopicStatus;
 import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.LeaseMapper;
 import com.automq.rocketmq.controller.metadata.database.dao.Lease;
+import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 import com.automq.rocketmq.controller.metadata.database.tasks.LeaseTask;
 import com.automq.rocketmq.controller.metadata.database.tasks.ScanNodeTask;
 import com.google.common.base.Strings;
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.slf4j.Logger;
@@ -55,7 +67,7 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
 
     private Role role;
 
-    private final ConcurrentHashMap<Integer, Node> brokers;
+    private final ConcurrentHashMap<Integer, BrokerNode> brokers;
 
     private final ScheduledExecutorService executorService;
 
@@ -93,7 +105,7 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
             throw new ControllerException(Code.BAD_REQUEST_VALUE, "Broker instance-id is null or empty");
         }
 
-        for (;;) {
+        for (; ; ) {
             if (this.isLeader()) {
                 try (SqlSession session = this.sessionFactory.openSession(false)) {
                     NodeMapper nodeMapper = session.getMapper(NodeMapper.class);
@@ -128,6 +140,60 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
 
     @Override
     public void createTopic(String topicName, int queueNum) throws ControllerException {
+        for (; ; ) {
+            if (this.isLeader()) {
+                try (SqlSession session = getSessionFactory().openSession()) {
+                    LeaseMapper leaseMapper = session.getMapper(LeaseMapper.class);
+                    Lease current = leaseMapper.currentWithShareLock();
+                    if (current.getEpoch() != this.lease.getEpoch()) {
+                        // Current node is not leader any longer, forward to the new leader in the next iteration.
+                        this.lease = current;
+                        continue;
+                    }
+
+                    TopicMapper topicMapper = session.getMapper(TopicMapper.class);
+                    if (null != topicMapper.getByName(topicName)) {
+                        throw new ControllerException(Code.DUPLICATED_VALUE, String.format("Topic %s was taken", topicName));
+                    }
+
+                    Topic topic = new Topic();
+                    topic.setName(topicName);
+                    topic.setQueueNum(queueNum);
+                    topic.setStatus(TopicStatus.ACTIVE);
+                    topicMapper.create(topic);
+
+                    QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
+
+                    int topicId = topic.getId();
+                    List<Integer> aliveNodeIds =
+                        this.brokers.values()
+                            .stream()
+                            .filter(brokerNode ->
+                                brokerNode.isAlive(TimeUnit.SECONDS.toMillis(config.nodeAliveIntervalInSecs())) ||
+                                    brokerNode.getNode().getId() == config.nodeId())
+                            .map(node -> node.getNode().getId())
+                            .toList();
+
+                    IntStream.range(0, queueNum).forEach(n -> {
+                        int idx = n % aliveNodeIds.size();
+                        int nodeId = aliveNodeIds.get(idx);
+                        QueueAssignment assignment = new QueueAssignment();
+                        assignment.setTopicId(topicId);
+                        assignment.setStatus(QueueAssignmentStatus.ASSIGNED);
+                        assignment.setQueueId(n);
+                        // On creation, both src and dst node_id are the same.
+                        assignment.setSrcNodeId(nodeId);
+                        assignment.setDstNodeId(nodeId);
+                        assignmentMapper.create(assignment);
+                    });
+
+                    // Commit transaction
+                    session.commit();
+                }
+            } else {
+                return;
+            }
+        }
 
     }
 
@@ -143,14 +209,14 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
             throw new ControllerException(Code.NO_LEADER_VALUE);
         }
 
-        Node node = brokers.get(this.lease.getNodeId());
-        if (null == node) {
+        BrokerNode brokerNode = brokers.get(this.lease.getNodeId());
+        if (null == brokerNode) {
             LOGGER.error("Address for Broker with brokerId={} is missing", this.lease.getNodeId());
             throw new ControllerException(Code.NOT_FOUND_VALUE,
                 String.format("Broker is unexpected missing with brokerId=%d", this.lease.getNodeId()));
         }
 
-        return node.getAddress();
+        return brokerNode.getNode().getAddress();
     }
 
     @Override
@@ -171,10 +237,10 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
     }
 
     public void addBroker(Node node) {
-        this.brokers.put(node.getId(), node);
+        this.brokers.put(node.getId(), new BrokerNode(node));
     }
 
-    public ConcurrentMap<Integer, Node> getBrokers() {
+    public ConcurrentMap<Integer, BrokerNode> getBrokers() {
         return brokers;
     }
 

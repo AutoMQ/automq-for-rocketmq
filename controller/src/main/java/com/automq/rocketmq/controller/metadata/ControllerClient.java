@@ -24,4 +24,6 @@ public interface ControllerClient {
 
     Node registerBroker(String target, String name, String address,
         String instanceId) throws ControllerException;
+
+    void createTopic(String target, String topicName, int queueNum) throws ControllerException;
 }

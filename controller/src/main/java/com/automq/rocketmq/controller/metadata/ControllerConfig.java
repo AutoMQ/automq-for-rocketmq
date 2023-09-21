@@ -24,4 +24,6 @@ public interface ControllerConfig {
 
     int leaseLifeSpanInSecs();
 
+    int nodeAliveIntervalInSecs();
+
 }

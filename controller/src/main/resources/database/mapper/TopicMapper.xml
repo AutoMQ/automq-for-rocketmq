@@ -42,6 +42,8 @@
         WHERE id = #{id}
     </select>
 
+
+
     <select id="list" resultType="Topic">
         SELECT id, name, queue_num, status, create_time, update_time
         FROM topic
@@ -53,6 +55,12 @@
         <if test="updateTime != null">
             AND update_time >= #{updateTime}
         </if>
+    </select>
+
+    <select id="getByName" resultType="Topic" parameterType="string">
+        SELECT id, name, queue_num, status, create_time, update_time
+        FROM topic
+        WHERE name = #{name}
     </select>
 
 </mapper>

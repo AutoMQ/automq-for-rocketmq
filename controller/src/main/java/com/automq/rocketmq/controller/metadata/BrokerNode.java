@@ -15,24 +15,33 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.metadata.database.mapper;
+package com.automq.rocketmq.controller.metadata;
 
-import com.automq.rocketmq.controller.metadata.database.dao.Topic;
-import com.automq.rocketmq.controller.metadata.database.dao.TopicStatus;
-import java.util.Date;
-import java.util.List;
-import org.apache.ibatis.annotations.Param;
+import com.automq.rocketmq.controller.metadata.database.dao.Node;
+import java.util.concurrent.TimeUnit;
 
-public interface TopicMapper {
+/**
+ * Node with runtime information.
+ */
+public class BrokerNode {
+    private final Node node;
 
-    int create(Topic topic);
+    private long lastKeepAlive;
 
-    Topic getById(int id);
+    public BrokerNode(Node node) {
+        this.node = node;
+    }
 
-    Topic getByName(String name);
+    public void keepAlive() {
+        this.lastKeepAlive = System.nanoTime();
+    }
 
-    int updateStatusById(@Param("id") int id, @Param("status") TopicStatus status);
+    public boolean isAlive(long tolerationInMillis) {
+        long nanos = System.nanoTime() - this.lastKeepAlive;
+        return TimeUnit.NANOSECONDS.toMillis(nanos) <= tolerationInMillis;
+    }
 
-    List<Topic> list(@Param("status") TopicStatus status, @Param("updateTime") Date updateTime);
-
+    public Node getNode() {
+        return node;
+    }
 }
