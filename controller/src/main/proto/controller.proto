@@ -20,9 +20,11 @@ enum Code {
   OK = 0;
   INTERRUPTED = 1;
   NOT_FOUND = 404;
+  INTERNAL = 500;
   NO_LEADER = 1000;
   BAD_REQUEST = 1001;
   MOCK_FAILURE = 1002;
+  DUPLICATED = 1003;
 }
 
 message Status {

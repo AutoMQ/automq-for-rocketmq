@@ -20,6 +20,7 @@ package com.automq.rocketmq.controller.metadata.database.mapper;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import java.util.Date;
 import java.util.List;
+import org.apache.ibatis.annotations.Param;
 
 public interface NodeMapper {
     /**
@@ -30,7 +31,10 @@ public interface NodeMapper {
      */
     int create(Node node);
 
-    Node getByInstanceId(String instanceId);
+    Node get(@Param("name") String name,
+        @Param("instanceId") String instanceId,
+        @Param("volumeId") String volumeId
+    );
 
     /**
      * Increase term of the node for each registration.
@@ -40,9 +44,7 @@ public interface NodeMapper {
      */
     int increaseEpoch(int id);
 
-    List<Node> list();
-
-    List<Node> deltaList(Date updateTime);
+    List<Node> list(@Param("updateTime") Date updateTime);
 
     void delete(int id);
 }

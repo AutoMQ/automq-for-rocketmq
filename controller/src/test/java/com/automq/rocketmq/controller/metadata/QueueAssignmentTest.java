@@ -36,7 +36,7 @@ public class QueueAssignmentTest extends DatabaseTestBase {
             QueueAssignmentMapper mapper = session.getMapper(QueueAssignmentMapper.class);
 
             QueueAssignment assignment = new QueueAssignment();
-            int topicId = 1;
+            long topicId = 1;
             int queueId = 2;
             int srcNodeId = 1;
             int dstNodeId = 2;

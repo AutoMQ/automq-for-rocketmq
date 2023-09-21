@@ -38,6 +38,15 @@
         WHERE topic_id = #{topicId} AND queue_id = #{queueId}
     </update>
 
+    <delete id="delete">
+        DELETE
+        FROM queue_assignment
+        WHERE 1 = 1
+        <if test="null != topicId">
+            AND topic_id = #{topicId}
+        </if>
+    </delete>
+
     <select id="list" resultType="QueueAssignment">
         SELECT topic_id, queue_id, src_node_id, dst_node_id, status, create_time, update_time
         FROM queue_assignment
