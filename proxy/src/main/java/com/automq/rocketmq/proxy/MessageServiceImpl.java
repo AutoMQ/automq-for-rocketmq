@@ -262,19 +262,21 @@ public class MessageServiceImpl implements MessageService {
         AckMessageRequestHeader requestHeader, long timeoutMillis) {
         return store.ack(requestHeader.getExtraInfo())
             .thenApply(ackResult -> {
+                long consumerGroupId = metadataService.queryConsumerGroupId(requestHeader.getConsumerGroup());
                 long topicId = metadataService.queryTopicId(requestHeader.getTopic());
                 Integer queueId = requestHeader.getQueueId();
-
-                // Expire the lock later to allow other client preempted when all inflight messages are acked.
-                if (store.getInflightStatsByQueue(topicId, queueId) == 0) {
-                    lockService.tryExpire(topicId, queueId, Duration.ofSeconds(1).toMillis());
-                }
 
                 org.apache.rocketmq.client.consumer.AckResult result = new org.apache.rocketmq.client.consumer.AckResult();
                 switch (ackResult.status()) {
                     case SUCCESS -> result.setStatus(AckStatus.OK);
                     case ERROR -> result.setStatus(AckStatus.NO_EXIST);
                 }
+
+                // Expire the lock later to allow other client preempted when all inflight messages are acked.
+                if (store.getInflightStats(consumerGroupId, topicId, queueId) == 0) {
+                    lockService.tryExpire(topicId, queueId, Duration.ofSeconds(1).toMillis());
+                }
+
                 return result;
             });
     }

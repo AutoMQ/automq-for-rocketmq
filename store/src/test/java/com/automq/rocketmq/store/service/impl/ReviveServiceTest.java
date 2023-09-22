@@ -42,17 +42,19 @@ class ReviveServiceTest {
     protected static final String KV_NAMESPACE_CHECK_POINT = "check_point";
     protected static final String KV_NAMESPACE_TIMER_TAG = "timer_tag";
 
-    private static KVService kvService;
-    private static StoreMetadataService metadataService;
-    private static StreamStore streamStore;
-    private static ReviveService reviveService;
+    private KVService kvService;
+    private StoreMetadataService metadataService;
+    private StreamStore streamStore;
+    private InflightService inflightService;
+    private ReviveService reviveService;
 
     @BeforeEach
     public void setUp() throws StoreException {
         kvService = new RocksDBKVService(PATH);
         metadataService = new MockStoreMetadataService();
         streamStore = new StreamStoreImpl();
-        reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, KV_NAMESPACE_TIMER_TAG, kvService, metadataService, streamStore);
+        inflightService = new InflightService();
+        reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, KV_NAMESPACE_TIMER_TAG, kvService, metadataService, inflightService, streamStore);
     }
 
     @AfterEach
@@ -61,20 +63,24 @@ class ReviveServiceTest {
     }
 
     @Test
-    void tryRevive() throws StoreException, InterruptedException {
+    void tryRevive() throws StoreException {
         // Append mock message.
         long streamId = metadataService.getStreamId(32, 32);
         streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(32, 32, ""))).join();
 
         // Append mock check point and timer tag.
         kvService.put(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(32, 32, 0, Long.MAX_VALUE), new byte[0]);
-
         kvService.put(KV_NAMESPACE_TIMER_TAG, SerializeUtil.buildTimerTagKey(0, 32, 32, 0, Long.MAX_VALUE),
             SerializeUtil.buildTimerTagValue(0, 32, 32, 32, streamId, 0, Long.MAX_VALUE));
+        inflightService.increaseInflightCount(32, 32, 32, 1);
+
         kvService.put(KV_NAMESPACE_TIMER_TAG, SerializeUtil.buildTimerTagKey(Long.MAX_VALUE, 0, 0, 0, 0),
             SerializeUtil.buildTimerTagValue(Long.MAX_VALUE, 0, 0, 0, 0, 0, 0));
+        inflightService.increaseInflightCount(0, 0, 0, 1);
 
         reviveService.tryRevive();
+
+        assertEquals(1, inflightService.getInflightCount(0, 0, 0));
 
         long retryStreamId = metadataService.getRetryStreamId(32, 32, 32);
         FetchResult fetchResult = streamStore.fetch(retryStreamId, 0, 100).join();
@@ -98,7 +104,11 @@ class ReviveServiceTest {
         long nextVisibleTimestamp = System.currentTimeMillis() - 100;
         kvService.put(KV_NAMESPACE_TIMER_TAG, SerializeUtil.buildTimerTagKey(nextVisibleTimestamp, 32, 32, 0, Long.MAX_VALUE),
             SerializeUtil.buildTimerTagValue(nextVisibleTimestamp, 32, 32, 32, retryStreamId, 0, Long.MAX_VALUE));
+        inflightService.increaseInflightCount(32, 32, 32, 1);
+
         reviveService.tryRevive();
+
+        assertEquals(1, inflightService.getInflightCount(0, 0, 0));
 
         long deadLetterStreamId = metadataService.getDeadLetterStreamId(32, 32, 32);
         fetchResult = streamStore.fetch(deadLetterStreamId, 0, 100).join();
