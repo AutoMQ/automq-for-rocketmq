@@ -427,8 +427,14 @@ public class MessageStoreImpl implements MessageStore {
     }
 
     @Override
-    public boolean cleanMetadata(long topicId, int queueId) {
-        // clean all check points and timer tags of specified topic and queue
-        return false;
+    public long startOffset(long topicId, int queueId) {
+        long streamId = metadataService.getStreamId(topicId, queueId);
+        return streamStore.startOffset(streamId);
+    }
+
+    @Override
+    public long nextOffset(long topicId, int queueId) {
+        long streamId = metadataService.getStreamId(topicId, queueId);
+        return streamStore.nextOffset(streamId);
     }
 }

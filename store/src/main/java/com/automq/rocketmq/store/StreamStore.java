@@ -29,18 +29,29 @@ public interface StreamStore {
     /**
      * Fetch records from stream store.
      *
-     * @param streamId the target stream id.
+     * @param streamId    the target stream id.
      * @param startOffset the start offset of the fetch.
-     * @param maxCount the max return count of the fetch.
+     * @param maxCount    the max return count of the fetch.
      * @return the future of fetch result.
      */
     CompletableFuture<FetchResult> fetch(long streamId, long startOffset, int maxCount);
 
     /**
      * Append record batch to stream store.
-     * @param streamId the target stream id.
+     *
+     * @param streamId    the target stream id.
      * @param recordBatch the record batch to append.
      * @return the future of append result.
      */
     CompletableFuture<AppendResult> append(long streamId, RecordBatch recordBatch);
+
+    /**
+     * Get stream start record offset.
+     */
+    long startOffset(long streamId);
+
+    /**
+     * Get stream next record offset.
+     */
+    long nextOffset(long streamId);
 }
