@@ -152,7 +152,24 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
 
     @Override
     public void deleteTopic(DeleteTopicRequest request, StreamObserver<DeleteTopicReply> responseObserver) {
-        super.deleteTopic(request, responseObserver);
+        try {
+            this.metadataStore.deleteTopic(request.getTopicId());
+            DeleteTopicReply reply = DeleteTopicReply.newBuilder()
+                .setStatus(Status.newBuilder().setCode(Code.OK).build()
+                ).build();
+            responseObserver.onNext(reply);
+            responseObserver.onCompleted();
+        } catch (ControllerException e) {
+            if (e.getErrorCode() == Code.NOT_FOUND_VALUE) {
+                DeleteTopicReply reply = DeleteTopicReply.newBuilder()
+                    .setStatus(Status.newBuilder().setCode(Code.NOT_FOUND).build()
+                    ).build();
+                responseObserver.onNext(reply);
+                responseObserver.onCompleted();
+                return;
+            }
+            responseObserver.onError(e);
+        }
     }
 
     @Override

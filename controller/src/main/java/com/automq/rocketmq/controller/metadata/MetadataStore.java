@@ -37,6 +37,8 @@ public interface MetadataStore {
 
     long createTopic(String topicName, int queueNum) throws ControllerException;
 
+    void deleteTopic(long topicId) throws ControllerException;
+
     /**
      * Check if current controller is playing leader role
      *

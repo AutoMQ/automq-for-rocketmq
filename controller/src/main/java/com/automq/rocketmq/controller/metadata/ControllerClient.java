@@ -27,4 +27,6 @@ public interface ControllerClient {
         throws ControllerException;
 
     CompletableFuture<Long> createTopic(String target, String topicName, int queueNum) throws ControllerException;
+
+    CompletableFuture<Void> deleteTopic(String target, long topicId) throws ControllerException;
 }

@@ -19,7 +19,8 @@ package com.automq.rocketmq.controller.metadata.database.dao;
 
 public enum StreamRole {
     DATA,
+
     OPS,
-    DLQ,
+
     RETRY,
 }

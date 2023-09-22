@@ -24,7 +24,7 @@ import org.apache.ibatis.annotations.Param;
 public interface QueueMapper {
     int create(Queue queue);
 
-    List<Queue> list(@Param("topicId") Long topicId, @Param("queueId") Integer queueId);
+    List<Queue> list(@Param("topicId") Long topicId, @Param("queueId") Integer queueId, @Param("groupId") Long groupId);
 
     int delete(@Param("topicId") Long topicId, @Param("queueId") Integer queueId);
 }

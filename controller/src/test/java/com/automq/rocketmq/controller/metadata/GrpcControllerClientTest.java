@@ -111,7 +111,7 @@ class GrpcControllerClientTest {
     }
 
     @Test
-    public void testCreateTopic_duplicate() throws ControllerException, IOException, ExecutionException, InterruptedException {
+    public void testCreateTopic_duplicate() throws ControllerException, IOException {
         String topicName = "t1";
         int queueNum = 4;
         MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
@@ -124,6 +124,34 @@ class GrpcControllerClientTest {
             ControllerClient client = new GrpcControllerClient();
             Assertions.assertThrows(ExecutionException.class,
                 () -> client.createTopic(String.format("localhost:%d", port), topicName, queueNum).get());
+        }
+    }
+
+    @Test
+    public void testDeleteTopic() throws ControllerException, IOException, ExecutionException, InterruptedException {
+        long topicId = 1;
+        MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
+        Mockito.doNothing().when(metadataStore).deleteTopic(ArgumentMatchers.anyLong());
+        ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
+        try (ControllerTestServer testServer = new ControllerTestServer(0, svc)) {
+            testServer.start();
+            int port = testServer.getPort();
+            ControllerClient client = new GrpcControllerClient();
+            client.deleteTopic(String.format("localhost:%d", port), topicId).get();
+        }
+    }
+
+    @Test
+    public void testDeleteTopic_NotFound() throws ControllerException, IOException, ExecutionException, InterruptedException {
+        long topicId = 1;
+        MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
+        Mockito.doThrow(new ControllerException(Code.NOT_FOUND_VALUE, "Not found")).when(metadataStore).deleteTopic(ArgumentMatchers.anyLong());
+        ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
+        try (ControllerTestServer testServer = new ControllerTestServer(0, svc)) {
+            testServer.start();
+            int port = testServer.getPort();
+            ControllerClient client = new GrpcControllerClient();
+            Assertions.assertThrows(ExecutionException.class, () -> client.deleteTopic(String.format("localhost:%d", port), topicId).get());
         }
     }
 }
