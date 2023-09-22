@@ -32,13 +32,13 @@ public class LockService {
         this.config = config;
     }
 
-    private Lock findLock(long topicId, int queueId) {
+    private Lock getLock(long topicId, int queueId) {
         return lockMap.computeIfAbsent(topicId, v -> new ConcurrentHashMap<>())
             .computeIfAbsent(queueId, v -> new Lock(topicId, queueId));
     }
 
     public boolean tryLock(long topicId, int queueId, String clientId, boolean fifo) {
-        Lock lock = findLock(topicId, queueId);
+        Lock lock = getLock(topicId, queueId);
         if (fifo) {
             return lock.tryPreempt(clientId, config.lockExpireTime());
         }
@@ -46,12 +46,12 @@ public class LockService {
     }
 
     public void release(long topicId, int queueId) {
-        findLock(topicId, queueId)
+        getLock(topicId, queueId)
             .release();
     }
 
     public void tryExpire(long topicId, int queueId, long later) {
-        findLock(topicId, queueId)
+        getLock(topicId, queueId)
             .tryExpire(later, config.lockExpireTime());
     }
 

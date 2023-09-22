@@ -15,34 +15,21 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.metadata;
+package com.automq.rocketmq.store.service.impl;
 
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-class DefaultStoreMetadataServiceTest {
-
-    @Test
-    void testGetStreamId() {
-    }
+class InflightServiceTest {
 
     @Test
-    void testGetOperationLogStreamId() {
-    }
+    void inflight() {
+        InflightService inflightService = new InflightService();
+        inflightService.increaseInflightCount(0, 0, 0, 10);
+        assertEquals(10, inflightService.getInflightCount(0, 0, 0));
 
-    @Test
-    void testGetRetryStreamId() {
-    }
-
-    @Test
-    void testGetDeadLetterStreamId() {
-    }
-
-    @Test
-    void testGetMaxRetryTimes() {
-    }
-
-    @Test
-    void testAdvanceConsumeOffset() {
+        inflightService.decreaseInflightCount(0, 0, 0, 5);
+        assertEquals(5, inflightService.getInflightCount(0, 0, 0));
     }
 }

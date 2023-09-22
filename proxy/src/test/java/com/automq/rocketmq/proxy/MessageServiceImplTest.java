@@ -27,6 +27,7 @@ import com.automq.rocketmq.store.model.message.TagFilter;
 import com.automq.rocketmq.store.util.MessageUtil;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import org.apache.rocketmq.client.consumer.AckResult;
 import org.apache.rocketmq.client.consumer.AckStatus;
 import org.apache.rocketmq.client.consumer.PopResult;
@@ -49,10 +50,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
 class MessageServiceImplTest {
+    public static final String RECEIPT_HANDLE = "FAAAAAAAAAAMABwABAAAAAwAFAAMAAAAAgAAAAAAAAACAAAAAAAAAAMAAAAAAAAA";
+
     private ProxyMetadataService metadataService;
     private MessageStore messageStore;
     private MessageService messageService;
@@ -159,9 +163,57 @@ class MessageServiceImplTest {
     }
 
     @Test
+    void pop_withFifo() {
+        PopMessageRequestHeader header = new PopMessageRequestHeader();
+        header.setConsumerGroup("group");
+        header.setTopic("topic");
+        header.setQueueId(0);
+        header.setMaxMsgNums(1);
+        header.setOrder(true);
+
+        long topicId = metadataService.queryTopicId("topic");
+        messageStore.put(MessageUtil.transferToMessage(topicId, 0, "", new HashMap<>(), new byte[] {}), new HashMap<>());
+        messageStore.put(MessageUtil.transferToMessage(topicId, 0, "", new HashMap<>(), new byte[] {}), new HashMap<>());
+        messageStore.put(MessageUtil.transferToMessage(topicId, 0, "", new HashMap<>(), new byte[] {}), new HashMap<>());
+
+        // Pop message with client id "client1".
+        ProxyContext context = ProxyContext.create();
+        context.setClientID("client1");
+        PopResult result = messageService.popMessage(context, null, header, 0L).join();
+        assertEquals(PopStatus.FOUND, result.getPopStatus());
+        assertEquals(1, result.getMsgFoundList().size());
+
+        // Pop again with the same client id.
+        result = messageService.popMessage(context, null, header, 0L).join();
+        assertEquals(PopStatus.FOUND, result.getPopStatus());
+        assertEquals(1, result.getMsgFoundList().size());
+
+        // Pop with client id "client2".
+        context.setClientID("client2");
+        result = messageService.popMessage(context, null, header, 0L).join();
+        assertEquals(PopStatus.NO_NEW_MSG, result.getPopStatus());
+        assertEquals(0, result.getMsgFoundList().size());
+
+        AckMessageRequestHeader ackHeader = new AckMessageRequestHeader();
+        ackHeader.setExtraInfo(RECEIPT_HANDLE);
+        ackHeader.setTopic("topic");
+        ackHeader.setQueueId(0);
+        messageService.ackMessage(context, null, "", ackHeader, 0L);
+        messageService.ackMessage(context, null, "", ackHeader, 0L);
+
+        // Pop with client id "client2" after all message acked.
+        context.setClientID("client2");
+        await().atMost(3, TimeUnit.SECONDS)
+            .until(() -> {
+                PopResult client2Result = messageService.popMessage(context, null, header, 0L).join();
+                return client2Result.getPopStatus() == PopStatus.FOUND && client2Result.getMsgFoundList().size() == 1;
+            });
+    }
+
+    @Test
     void changeInvisibleTime() {
         ChangeInvisibleTimeRequestHeader header = new ChangeInvisibleTimeRequestHeader();
-        header.setExtraInfo("receiptHandle");
+        header.setExtraInfo(RECEIPT_HANDLE);
         header.setInvisibleTime(100L);
         AckResult ackResult = messageService.changeInvisibleTime(ProxyContext.create(), null, null, header, 0).join();
         assertEquals(AckStatus.OK, ackResult.getStatus());
@@ -174,7 +226,7 @@ class MessageServiceImplTest {
     @Test
     void ackMessage() {
         AckMessageRequestHeader header = new AckMessageRequestHeader();
-        header.setExtraInfo("receiptHandle");
+        header.setExtraInfo(RECEIPT_HANDLE);
         header.setTopic("topic");
         header.setQueueId(0);
         AckResult ackResult = messageService.ackMessage(ProxyContext.create(), null, null, header, 0).join();

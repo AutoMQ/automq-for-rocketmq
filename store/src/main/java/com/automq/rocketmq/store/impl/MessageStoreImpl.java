@@ -37,6 +37,7 @@ import com.automq.rocketmq.store.model.message.PutResult;
 import com.automq.rocketmq.store.model.stream.SingleRecord;
 import com.automq.rocketmq.store.service.KVService;
 import com.automq.rocketmq.store.service.OperationLogService;
+import com.automq.rocketmq.store.service.impl.InflightService;
 import com.automq.rocketmq.store.service.impl.ReviveService;
 import com.automq.rocketmq.store.util.SerializeUtil;
 import java.nio.ByteBuffer;
@@ -70,6 +71,7 @@ public class MessageStoreImpl implements MessageStore {
     private final KVService kvService;
 
     private ReviveService reviveService;
+    private final InflightService inflightService = new InflightService();
 
     public MessageStoreImpl(StoreConfig config, StreamStore streamStore, OperationLogService operationLogService,
         StoreMetadataService metadataService, KVService kvService) {
@@ -81,13 +83,13 @@ public class MessageStoreImpl implements MessageStore {
     }
 
     public void startReviveService() {
-        reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, KV_NAMESPACE_TIMER_TAG, kvService, metadataService, streamStore);
+        reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, KV_NAMESPACE_TIMER_TAG, kvService, metadataService, inflightService, streamStore);
         reviveService.start();
     }
 
     public void writeCheckPoint(long topicId, int queueId, long streamId, long offset, long consumerGroupId,
-        long operationId,
-        boolean fifo, boolean retry, long operationTimestamp, long nextVisibleTimestamp) throws StoreException {
+        long operationId, boolean fifo, boolean retry, long operationTimestamp,
+        long nextVisibleTimestamp) throws StoreException {
         // If this message is not orderly or has not been consumed, write check point and timer tag to KV service atomically.
         List<BatchRequest> requestList = new ArrayList<>();
         BatchWriteRequest writeCheckPointRequest = new BatchWriteRequest(KV_NAMESPACE_CHECK_POINT,
@@ -296,6 +298,7 @@ public class MessageStoreImpl implements MessageStore {
                     } else {
                         writeCheckPoint(topicId, queueId, streamId, messageExt.offset(), consumerGroupId, operationId,
                             fifo, retry, operationTimestamp, nextVisibleTimestamp);
+                        inflightService.increaseInflightCount(consumerGroupId, topicId, queueId, 1);
                     }
                 }
 
@@ -354,6 +357,7 @@ public class MessageStoreImpl implements MessageStore {
                     }
 
                     kvService.batch(requestList.toArray(new BatchRequest[0]));
+                    inflightService.decreaseInflightCount(checkPoint.consumerGroupId(), handle.topicId(), handle.queueId(), 1);
                 } catch (StoreException e) {
                     return new AckResult(AckResult.Status.ERROR);
                 }
@@ -417,9 +421,9 @@ public class MessageStoreImpl implements MessageStore {
     }
 
     @Override
-    public int getInflightStatsByQueue(long topicId, int queueId) {
-        // get check point count of specified topic and queue
-        return 0;
+    public int getInflightStats(long consumerGroupId, long topicId, int queueId) {
+        // Get check point count of specified consumer, topic and queue.
+        return inflightService.getInflightCount(consumerGroupId, topicId, queueId);
     }
 
     @Override

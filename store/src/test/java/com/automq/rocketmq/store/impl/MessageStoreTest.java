@@ -75,9 +75,10 @@ class MessageStoreTest {
         Message message = Message.getRootAsMessage(buildMessage(1, 1, "TagA"));
         messageStore.put(message, new HashMap<>());
 
-        PopResult popResult = messageStore.pop(1, 1, 1, 0, Filter.DEFAULT_FILTER,1, false, false, 100).join();
+        PopResult popResult = messageStore.pop(1, 1, 1, 0, Filter.DEFAULT_FILTER, 1, false, false, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertFalse(popResult.messageList().isEmpty());
+        assertEquals(popResult.messageList().size(), messageStore.getInflightStats(1, 1, 1));
 
         MessageExt messageExt = popResult.messageList().get(0);
         assertEquals(message.topicId(), messageExt.message().topicId());
@@ -98,6 +99,7 @@ class MessageStoreTest {
         PopResult popResult = messageStore.pop(1, 1, 1, 0, Filter.DEFAULT_FILTER, 1, false, false, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertFalse(popResult.messageList().isEmpty());
+        assertEquals(popResult.messageList().size(), messageStore.getInflightStats(1, 1, 1));
 
         MessageExt messageExt = popResult.messageList().get(0);
         byte[] bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(1, 1, 0, popResult.operationId()));
@@ -113,6 +115,7 @@ class MessageStoreTest {
         assertEquals(messageExt.offset(), checkPoint.messageOffset());
 
         messageStore.pop(1, 1, 2, 0, Filter.DEFAULT_FILTER, 1, false, false, 100).join();
+        assertEquals(1, messageStore.getInflightStats(1, 1, 2));
 
         List<CheckPoint> allCheckPointList = new ArrayList<>();
         kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, (key, value) ->
@@ -142,6 +145,7 @@ class MessageStoreTest {
         PopResult popResult = messageStore.pop(1, 1, 1, 0, Filter.DEFAULT_FILTER, 32, true, false, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(5, popResult.messageList().size());
+        assertEquals(5, messageStore.getInflightStats(1, 1, 1));
 
         for (int i = 0; i < 5; i++) {
             assertEquals(i, popResult.messageList().get(i).offset());
@@ -163,6 +167,7 @@ class MessageStoreTest {
         popResult = messageStore.pop(1, 1, 1, 0, Filter.DEFAULT_FILTER, 32, true, false, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(5, popResult.messageList().size());
+        assertEquals(5, messageStore.getInflightStats(1, 1, 1));
 
         for (int i = 0; i < 5; i++) {
             assertEquals(i, popResult.messageList().get(i).offset());
@@ -191,6 +196,8 @@ class MessageStoreTest {
             messageStore.changeInvisibleDuration(messageExt.receiptHandle().get(), 1000).join();
             messageStore.ack(messageExt.receiptHandle().get()).join();
         }
+
+        assertEquals(0, messageStore.getInflightStats(1, 1, 1));
 
         checkPointCount.set(0);
         kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, (key, value) -> checkPointCount.getAndIncrement());
@@ -225,6 +232,7 @@ class MessageStoreTest {
         PopResult popResult = messageStore.pop(1, 1, 1, 0, new TagFilter("tagB || tagC"), 2, true, false, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(2, popResult.messageList().size());
+        assertEquals(2, messageStore.getInflightStats(1, 1, 1));
 
         MessageExt firstMessageExt = popResult.messageList().get(0);
         assertEquals(4, firstMessageExt.offset());
@@ -249,6 +257,8 @@ class MessageStoreTest {
             messageStore.ack(messageExt.receiptHandle().get()).join();
         }
 
+        assertEquals(0, messageStore.getInflightStats(1, 1, 1));
+
         checkPointCount.set(0);
         kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, (key, value) -> checkPointCount.getAndIncrement());
         assertEquals(0, checkPointCount.get());
@@ -267,6 +277,7 @@ class MessageStoreTest {
         PopResult popResult = messageStore.pop(1, 1, 1, 0, Filter.DEFAULT_FILTER, 1, true, false, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertFalse(popResult.messageList().isEmpty());
+        assertEquals(1, messageStore.getInflightStats(1, 1, 1));
 
         MessageExt messageExt = popResult.messageList().get(0);
         byte[] bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(1, 1, messageExt.offset(), popResult.operationId()));
@@ -286,6 +297,8 @@ class MessageStoreTest {
 
         // Pop the same message again.
         popResult = messageStore.pop(1, 1, 1, 0, Filter.DEFAULT_FILTER, 1, true, false, 100).join();
+
+        assertEquals(1, messageStore.getInflightStats(1, 1, 1));
 
         messageExt = popResult.messageList().get(0);
         bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(1, 1, messageExt.offset(), popResult.operationId()));
@@ -325,9 +338,12 @@ class MessageStoreTest {
         PopResult popResult = messageStore.pop(1, 1, 1, 0, Filter.DEFAULT_FILTER, 1, true, false, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertFalse(popResult.messageList().isEmpty());
+        assertEquals(1, messageStore.getInflightStats(1, 1, 1));
 
         MessageExt messageExt = popResult.messageList().get(0);
         messageStore.ack(SerializeUtil.encodeReceiptHandle(1, 1, messageExt.offset(), popResult.operationId())).join();
+
+        assertEquals(0, messageStore.getInflightStats(1, 1, 1));
 
         AtomicInteger checkPointCount = new AtomicInteger();
         kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, (key, value) -> checkPointCount.getAndIncrement());
@@ -352,6 +368,7 @@ class MessageStoreTest {
         PopResult popResult = messageStore.pop(1, 1, 1, 0, Filter.DEFAULT_FILTER, 1, false, false, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertFalse(popResult.messageList().isEmpty());
+        assertEquals(1, messageStore.getInflightStats(1, 1, 1));
 
         byte[] checkPointKey = SerializeUtil.buildCheckPointKey(1, 1, 0, popResult.operationId());
         byte[] bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, checkPointKey);
@@ -367,6 +384,8 @@ class MessageStoreTest {
         MessageExt messageExt = popResult.messageList().get(0);
         String receiptHandle = SerializeUtil.encodeReceiptHandle(1, 1, messageExt.offset(), popResult.operationId());
         messageStore.changeInvisibleDuration(receiptHandle, 100_000_000_000L).join();
+
+        assertEquals(1, messageStore.getInflightStats(1, 1, 1));
 
         bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, checkPointKey);
         assertNotNull(bytes);

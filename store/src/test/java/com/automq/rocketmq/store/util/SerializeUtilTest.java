@@ -69,8 +69,8 @@ public class SerializeUtilTest {
 
     @Test
     void buildTimerTagKey() {
-//        byte[] key = SerializeUtil.encodeTimerTag(new TimerTag(NEXT_VISIBLE_TIMESTAMP, CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, OFFSET, OPERATION_ID));
-//        assertEquals(28, key.length);
+        byte[] key = SerializeUtil.buildTimerTagKey(NEXT_VISIBLE_TIMESTAMP, TOPIC_ID, QUEUE_ID, OFFSET, OPERATION_ID);
+        assertEquals(36, key.length);
     }
 
     @Test
