@@ -73,5 +73,21 @@ public interface MessageStore {
 
     int getInflightStatsByQueue(long topicId, int queueId);
 
-    boolean cleanMetadata(long topicId, int queueId);
+    /**
+     * Get start record offset in queue.
+     *
+     * @param topicId topic id to query
+     * @param queueId queue id to query
+     * @return start offset in queue
+     */
+    long startOffset(long topicId, int queueId);
+
+    /**
+     * Get next offset in queue.
+     *
+     * @param topicId topic id to query
+     * @param queueId queue id to query
+     * @return next offset in queue
+     */
+    long nextOffset(long topicId, int queueId);
 }

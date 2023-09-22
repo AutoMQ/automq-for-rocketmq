@@ -35,7 +35,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class MockMessageStore implements MessageStore {
-    private final HashMap<Integer, AtomicLong> offsetMap = new HashMap<>();
+    private final HashMap<Long, AtomicLong> offsetMap = new HashMap<>();
     private final Set<String> receiptHandleSet = new HashSet<>();
     private final Map<Long, List<MessageExt>> messageMap = new HashMap<>();
 
@@ -67,7 +67,7 @@ public class MockMessageStore implements MessageStore {
 
     @Override
     public CompletableFuture<PutResult> put(Message message, Map<String, String> systemProperties) {
-        long offset = this.offsetMap.computeIfAbsent(message.queueId(), queueId -> new AtomicLong()).getAndIncrement();
+        long offset = this.offsetMap.computeIfAbsent(message.topicId() + message.queueId(), queueId -> new AtomicLong()).getAndIncrement();
         MessageExt messageExt = MessageExt.Builder.builder().message(message).offset(offset).build();
         List<MessageExt> messageList = messageMap.computeIfAbsent(message.topicId() + message.queueId(), v -> new ArrayList<>());
         messageList.add(messageExt);
@@ -103,7 +103,16 @@ public class MockMessageStore implements MessageStore {
     }
 
     @Override
-    public boolean cleanMetadata(long topicId, int queueId) {
-        return false;
+    public long startOffset(long topicId, int queueId) {
+        List<MessageExt> messageList = messageMap.computeIfAbsent(topicId + queueId, v -> new ArrayList<>());
+        if (messageList.isEmpty()) {
+            return 0;
+        }
+        return messageList.get(0).offset();
+    }
+
+    @Override
+    public long nextOffset(long topicId, int queueId) {
+        return offsetMap.computeIfAbsent(topicId + queueId, v -> new AtomicLong()).get();
     }
 }
