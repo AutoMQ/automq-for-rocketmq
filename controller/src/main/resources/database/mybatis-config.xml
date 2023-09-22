@@ -34,9 +34,13 @@
 
     <typeHandlers>
         <typeHandler handler="org.apache.ibatis.type.EnumOrdinalTypeHandler"
+                     javaType="com.automq.rocketmq.controller.metadata.database.dao.GroupStatus" />
+        <typeHandler handler="org.apache.ibatis.type.EnumOrdinalTypeHandler"
                      javaType="com.automq.rocketmq.controller.metadata.database.dao.TopicStatus" />
         <typeHandler handler="org.apache.ibatis.type.EnumOrdinalTypeHandler"
                      javaType="com.automq.rocketmq.controller.metadata.database.dao.QueueAssignmentStatus" />
+        <typeHandler handler="org.apache.ibatis.type.EnumOrdinalTypeHandler"
+                     javaType="com.automq.rocketmq.controller.metadata.database.dao.StreamRole" />
     </typeHandlers>
 
     <environments default="development">

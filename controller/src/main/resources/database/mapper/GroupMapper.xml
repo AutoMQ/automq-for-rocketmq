@@ -1,0 +1,58 @@
+<!--
+  ~ Licensed to the Apache Software Foundation (ASF) under one or more
+  ~ contributor license agreements.  See the NOTICE file distributed with
+  ~ this work for additional information regarding copyright ownership.
+  ~ The ASF licenses this file to You under the Apache License, Version 2.0
+  ~ (the "License"); you may not use this file except in compliance with
+  ~ the License.  You may obtain a copy of the License at
+  ~
+  ~     http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  -->
+
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper">
+
+
+    <insert id="create" parameterType="Group" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO consumer_group (name, status) VALUES (#{name}, #{status})
+    </insert>
+
+    <update id="update" parameterType="Group">
+        UPDATE consumer_group
+        SET name = #{name}, status = #{status}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="delete">
+        DELETE FROM consumer_group
+        WHERE 1 = 1
+        <if test="null != id">
+            AND id = #{id}
+        </if>
+    </delete>
+
+    <select id="list" resultType="Group">
+        SELECT id, name, status, create_time, update_time
+        FROM consumer_group
+        WHERE 1 = 1
+        <if test="null != id">
+            AND id = #{id}
+        </if>
+        <if test="null != status">
+            AND status = #{status}
+        </if>
+        <if test="null != updateTime">
+            AND update_time >= #{updateTime}
+        </if>
+    </select>
+
+</mapper>
