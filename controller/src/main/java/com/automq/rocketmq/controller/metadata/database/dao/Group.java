@@ -69,4 +69,12 @@ public class Group {
     public void setUpdateTime(Date updateTime) {
         this.updateTime = updateTime;
     }
+
+    public long getDeadLetterTopicId() {
+        return deadLetterTopicId;
+    }
+
+    public void setDeadLetterTopicId(long deadLetterTopicId) {
+        this.deadLetterTopicId = deadLetterTopicId;
+    }
 }
