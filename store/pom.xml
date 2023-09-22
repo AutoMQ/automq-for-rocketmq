@@ -61,8 +61,9 @@
             <artifactId>flatbuffers-java</artifactId>
         </dependency>
 
+        <!-- Temporary dependency to allow for testing of the new S3 stream -->
         <dependency>
-            <groupId>com.automq.stream</groupId>
+            <groupId>com.automq.elasticstream</groupId>
             <artifactId>s3stream</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
