@@ -38,9 +38,9 @@ public class RangeTest extends DatabaseTestBase {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
             Range range = Range.newBuilder().
-                    setRangeId(22).setStreamId(11).
-                    setEpoch(1).setStartOffset(1234).
-                    setEndOffset(2345).build();
+                setRangeId(22).setStreamId(11).
+                setEpoch(1).setStartOffset(1234).
+                setEndOffset(2345).build();
 
             int affectedRows = rangeMapper.create(range);
             Assertions.assertEquals(1, affectedRows);
@@ -64,9 +64,9 @@ public class RangeTest extends DatabaseTestBase {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
             Range range = Range.newBuilder().
-                    setRangeId(1).setStreamId(11).
-                    setEpoch(1).setStartOffset(1234).
-                    setEndOffset(2345).build();
+                setRangeId(1).setStreamId(11).
+                setEpoch(1).setStartOffset(1234).
+                setEndOffset(2345).build();
 
             int affectedRows = rangeMapper.create(range);
             Assertions.assertEquals(1, affectedRows);
@@ -86,9 +86,9 @@ public class RangeTest extends DatabaseTestBase {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
             Range range = Range.newBuilder().
-                    setRangeId(1).setStreamId(11).
-                    setEpoch(1).setStartOffset(1234).
-                    setEndOffset(2345).build();
+                setRangeId(1).setStreamId(11).
+                setEpoch(1).setStartOffset(1234).
+                setEndOffset(2345).build();
 
             int affectedRows = rangeMapper.create(range);
             Assertions.assertEquals(1, affectedRows);
