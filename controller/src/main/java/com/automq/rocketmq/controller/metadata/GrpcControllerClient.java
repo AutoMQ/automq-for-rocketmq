@@ -19,6 +19,8 @@ package com.automq.rocketmq.controller.metadata;
 
 import apache.rocketmq.controller.v1.CreateTopicReply;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
+import apache.rocketmq.controller.v1.DeleteTopicReply;
+import apache.rocketmq.controller.v1.DeleteTopicRequest;
 import apache.rocketmq.controller.v1.NodeRegistrationReply;
 import apache.rocketmq.controller.v1.NodeRegistrationRequest;
 import apache.rocketmq.controller.v1.Code;
@@ -48,8 +50,7 @@ public class GrpcControllerClient implements ControllerClient {
         stubs = new ConcurrentHashMap<>();
     }
 
-    public CompletableFuture<Node> registerBroker(String target, String name, String address,
-        String instanceId) throws ControllerException {
+    private void buildStubForTarget(String target) throws ControllerException {
         if (Strings.isNullOrEmpty(target)) {
             throw new ControllerException(Code.NO_LEADER_VALUE, "Target address to leader controller is null or empty");
         }
@@ -60,6 +61,11 @@ public class GrpcControllerClient implements ControllerClient {
             ControllerServiceGrpc.ControllerServiceFutureStub stub = ControllerServiceGrpc.newFutureStub(channel);
             stubs.putIfAbsent(target, stub);
         }
+    }
+
+    public CompletableFuture<Node> registerBroker(String target, String name, String address,
+        String instanceId) throws ControllerException {
+        this.buildStubForTarget(target);
         NodeRegistrationRequest request = NodeRegistrationRequest.newBuilder()
             .setBrokerName(name)
             .setAddress(address)
@@ -98,15 +104,7 @@ public class GrpcControllerClient implements ControllerClient {
     @Override
     public CompletableFuture<Long> createTopic(String target, String topicName, int queueNum)
         throws ControllerException {
-        if (Strings.isNullOrEmpty(target)) {
-            throw new ControllerException(Code.NO_LEADER_VALUE, "Target address to leader node is null or empty");
-        }
-
-        if (!stubs.containsKey(target)) {
-            ManagedChannel channel = Grpc.newChannelBuilder(target, InsecureChannelCredentials.create()).build();
-            ControllerServiceGrpc.ControllerServiceFutureStub stub = ControllerServiceGrpc.newFutureStub(channel);
-            stubs.putIfAbsent(target, stub);
-        }
+        this.buildStubForTarget(target);
 
         ControllerServiceGrpc.ControllerServiceFutureStub stub = stubs.get(target);
         CreateTopicRequest request = CreateTopicRequest.newBuilder().setTopic(topicName).setCount(queueNum).build();
@@ -137,6 +135,42 @@ public class GrpcControllerClient implements ControllerClient {
                 LOGGER.error("Leader node failed to create topic on behalf", t);
             }
         }, MoreExecutors.directExecutor());
+        return future;
+    }
+
+    @Override
+    public CompletableFuture<Void> deleteTopic(String target, long topicId) throws ControllerException {
+        this.buildStubForTarget(target);
+
+        ControllerServiceGrpc.ControllerServiceFutureStub stub = stubs.get(target);
+        DeleteTopicRequest request = DeleteTopicRequest.newBuilder().setTopicId(topicId).build();
+
+        CompletableFuture<Void> future = new CompletableFuture<>();
+
+        Futures.addCallback(stub.deleteTopic(request), new FutureCallback<DeleteTopicReply>() {
+            @Override
+            public void onSuccess(DeleteTopicReply result) {
+                switch (result.getStatus().getCode()) {
+                    case OK -> {
+                        future.complete(null);
+                    }
+                    case NOT_FOUND -> {
+                        future.completeExceptionally(new ControllerException(Code.NOT_FOUND_VALUE,
+                            "Topic to delete is not found"));
+                    }
+                    default -> {
+                        future.completeExceptionally(new ControllerException(result.getStatus().getCode().getNumber(),
+                            result.getStatus().getMessage()));
+                    }
+                }
+            }
+
+            @Override
+            public void onFailure(Throwable t) {
+                future.completeExceptionally(t);
+            }
+        }, MoreExecutors.directExecutor());
+
         return future;
     }
 }

@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS topic
     id          BIGINT       NOT NULL PRIMARY KEY AUTO_INCREMENT,
     name        VARCHAR(255) NOT NULL,
     queue_num   INT          NOT NULL,
-    status      tinyint  DEFAULT 0,
+    status      TINYINT  DEFAULT 0,
     create_time DATETIME DEFAULT current_timestamp,
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -65,18 +65,20 @@ CREATE TABLE IF NOT EXISTS queue
     topic_id    BIGINT  NOT NULL,
     queue_id    INT     NOT NULL,
     stream_id   BIGINT  NOT NULL,
-    stream_role TINYINT NOT NULL DEFAULT 0
+    stream_role TINYINT NOT NULL DEFAULT 0,
+    group_id    BIGINT
 );
-CREATE UNIQUE INDEX idx_queue_stream_id ON queue(stream_id);
-CREATE UNIQUE INDEX idx_queue ON queue(topic_id, queue_id, stream_role);
+CREATE UNIQUE INDEX idx_queue_stream_id ON queue (stream_id);
+CREATE UNIQUE INDEX idx_queue ON queue (topic_id, queue_id, stream_role);
 
 CREATE TABLE IF NOT EXISTS consumer_group
 (
-    id          BIGINT       NOT NULL PRIMARY KEY AUTO_INCREMENT,
-    name        VARCHAR(255) NOT NULL,
-    status      TINYINT      NOT NULL DEFAULT 0,
-    create_time DATETIME              DEFAULT CURRENT_TIMESTAMP,
-    update_time DATETIME              DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    id                   BIGINT       NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    name                 VARCHAR(255) NOT NULL,
+    status               TINYINT      NOT NULL DEFAULT 0,
+    dead_letter_topic_id BIGINT,
+    create_time          DATETIME              DEFAULT CURRENT_TIMESTAMP,
+    update_time          DATETIME              DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 CREATE UNIQUE INDEX idx_consumer_group_name ON consumer_group (name);
 

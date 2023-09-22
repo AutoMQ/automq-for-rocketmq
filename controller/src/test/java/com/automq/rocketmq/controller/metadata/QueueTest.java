@@ -38,7 +38,7 @@ public class QueueTest extends DatabaseTestBase {
             queue.setStreamRole(StreamRole.OPS);
             int rowsAffected = mapper.create(queue);
             Assertions.assertEquals(1, rowsAffected);
-            List<Queue> queues = mapper.list(null, null);
+            List<Queue> queues = mapper.list(null, null, null);
             Assertions.assertEquals(1, queues.size());
             Queue got = queues.get(0);
             Assertions.assertEquals(1, got.getTopicId());

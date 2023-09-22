@@ -23,6 +23,11 @@ public class Queue {
     private long streamId;
     private StreamRole streamRole;
 
+    /**
+     * If {@link #streamRole} is {@link StreamRole#RETRY}, this field represents owner of this retry queue.
+     */
+    private long groupId;
+
     public long getTopicId() {
         return topicId;
     }
@@ -53,5 +58,13 @@ public class Queue {
 
     public void setStreamRole(StreamRole streamRole) {
         this.streamRole = streamRole;
+    }
+
+    public long getGroupId() {
+        return groupId;
+    }
+
+    public void setGroupId(long groupId) {
+        this.groupId = groupId;
     }
 }

@@ -25,6 +25,8 @@ public class Group {
 
     private GroupStatus status;
 
+    private long deadLetterTopicId;
+
     private Date createTime;
     private Date updateTime;
 
