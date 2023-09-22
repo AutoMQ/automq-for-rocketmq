@@ -152,7 +152,11 @@ class S3ObjectManagerTest {
             .thenReturn(CompletableFuture.completedFuture(new ArrayList<>()));
 
         CompletableFuture<List<S3ObjectMetadata>> objects = objectManager.getObjects(1, 10, 100, 10);
-        assertTrue(objects.join().isEmpty());
+        // Assert a runtime exception is thrown
+        objects.handle((rst, ex) -> {
+            assertTrue(ex.getCause() instanceof RuntimeException);
+            return null;
+        }).join();
 
         // Stream object contains stream range [20, 100) and no WAL object
         S3StreamObject.Builder soBuilder = S3StreamObject.newBuilder();
@@ -166,7 +170,10 @@ class S3ObjectManagerTest {
             .thenReturn(CompletableFuture.completedFuture(new ArrayList<>()));
 
         objects = objectManager.getObjects(1, 10, 100, 10);
-        assertTrue(objects.join().isEmpty());
+        objects.handle((rst, ex) -> {
+            assertTrue(ex.getCause() instanceof RuntimeException);
+            return null;
+        }).join();
     }
 
     @Test
