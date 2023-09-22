@@ -23,12 +23,12 @@
 
 
     <insert id="create" parameterType="Group" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
-        INSERT INTO consumer_group (name, status) VALUES (#{name}, #{status})
+        INSERT INTO consumer_group (name, status, dead_letter_topic_id) VALUES (#{name}, #{status}, #{deadLetterTopicId})
     </insert>
 
     <update id="update" parameterType="Group">
         UPDATE consumer_group
-        SET name = #{name}, status = #{status}
+        SET name = #{name}, status = #{status}, dead_letter_topic_id = #{deadLetterTopicId}
         WHERE id = #{id}
     </update>
 
@@ -41,7 +41,7 @@
     </delete>
 
     <select id="list" resultType="Group">
-        SELECT id, name, status, create_time, update_time
+        SELECT id, name, status, dead_letter_topic_id, create_time, update_time
         FROM consumer_group
         WHERE 1 = 1
         <if test="null != id">
