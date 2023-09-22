@@ -55,6 +55,10 @@
     </environments>
 
     <mappers>
+        <mapper resource="database/mapper/GroupMapper.xml" />
+        <mapper resource="database/mapper/GroupProgressMapper.xml" />
+        <mapper resource="database/mapper/QueueMapper.xml" />
+        <mapper resource="database/mapper/SubscriptionMapper.xml" />
         <mapper resource="database/mapper/LeaseMapper.xml" />
         <mapper resource="database/mapper/NodeMapper.xml" />
         <mapper resource="database/mapper/StreamMapper.xml" />
