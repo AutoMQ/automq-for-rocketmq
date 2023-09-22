@@ -16,26 +16,27 @@
   -->
 
 <!DOCTYPE mapper
-        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
-        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.automq.rocketmq.controller.metadata.database.mapper.S3ObjectMapper">
     <resultMap id="BaseResultMap" type="apache.rocketmq.controller.v1.S3Object">
-        <id column="object_id" jdbcType="BIGINT" property="objectId_" />
-        <result column="object_size" jdbcType="BIGINT" property="objectSize_" />
-        <result column="prepared_timestamp" jdbcType="BIGINT" property="preparedTimestamp_" />
-        <result column="committed_timestamp" jdbcType="BIGINT" property="committedTimestamp_" />
-        <result column="expired_timestamp" jdbcType="BIGINT" property="expiredTimestamp_" />
-        <result column="marked_for_deletion_timestamp" jdbcType="BIGINT" property="markedForDeletionTimestamp_" />
-        <result column="state" jdbcType="TINYINT" property="state_" />
+        <id column="object_id" jdbcType="BIGINT" property="objectId_"/>
+        <result column="object_size" jdbcType="BIGINT" property="objectSize_"/>
+        <result column="prepared_timestamp" jdbcType="BIGINT" property="preparedTimestamp_"/>
+        <result column="committed_timestamp" jdbcType="BIGINT" property="committedTimestamp_"/>
+        <result column="expired_timestamp" jdbcType="BIGINT" property="expiredTimestamp_"/>
+        <result column="marked_for_deletion_timestamp" jdbcType="BIGINT" property="markedForDeletionTimestamp_"/>
+        <result column="state" jdbcType="TINYINT" property="state_"/>
     </resultMap>
 
-    <insert id="create" parameterType="apache.rocketmq.controller.v1.S3Object"  useGeneratedKeys="true" keyProperty="object_id" keyColumn="object_id">
+    <insert id="create" parameterType="apache.rocketmq.controller.v1.S3Object">
         INSERT INTO s3object (object_id, object_size, state)
         VALUES (#{objectId_}, #{objectSize_}, #{state_})
     </insert>
 
     <select id="getByObjectId" resultMap="BaseResultMap">
-        SELECT object_id, object_size, prepared_timestamp, committed_timestamp, expired_timestamp, marked_for_deletion_timestamp, state
+        SELECT object_id, object_size, prepared_timestamp, committed_timestamp, expired_timestamp,
+        marked_for_deletion_timestamp, state
         FROM s3object
         WHERE object_id = #{objectId}
     </select>
@@ -65,7 +66,8 @@
     </update>
 
     <select id="list" resultMap="BaseResultMap">
-        SELECT object_id, object_size, prepared_timestamp, committed_timestamp, expired_timestamp, marked_for_deletion_timestamp, state
+        SELECT object_id, object_size, prepared_timestamp, committed_timestamp, expired_timestamp,
+        marked_for_deletion_timestamp, state
         FROM s3object
     </select>
 </mapper>
