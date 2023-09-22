@@ -30,7 +30,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class StreamStoreImpl implements StreamStore {
     private final StreamClient streamClient;
-    private Map<Long, Stream> openedStreams = new ConcurrentHashMap<>();
+    private final Map<Long, Stream> openedStreams = new ConcurrentHashMap<>();
 
     public StreamStoreImpl() {
         streamClient = new MemoryStreamClient();
@@ -46,6 +46,18 @@ public class StreamStoreImpl implements StreamStore {
     public CompletableFuture<AppendResult> append(long streamId, RecordBatch recordBatch) {
         Stream stream = openStream(streamId);
         return stream.append(recordBatch);
+    }
+
+    @Override
+    public long startOffset(long streamId) {
+        Stream stream = openStream(streamId);
+        return stream.startOffset();
+    }
+
+    @Override
+    public long nextOffset(long streamId) {
+        Stream stream = openStream(streamId);
+        return stream.nextOffset();
     }
 
     /**
