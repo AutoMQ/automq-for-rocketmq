@@ -35,7 +35,8 @@ public class QueueTest extends DatabaseTestBase {
             queue.setTopicId(1);
             queue.setQueueId(2);
             queue.setStreamId(3);
-            queue.setStreamRole(StreamRole.OPS);
+            queue.setStreamRole(StreamRole.RETRY);
+            queue.setGroupId(4);
             int rowsAffected = mapper.create(queue);
             Assertions.assertEquals(1, rowsAffected);
             List<Queue> queues = mapper.list(null, null, null);
@@ -44,7 +45,8 @@ public class QueueTest extends DatabaseTestBase {
             Assertions.assertEquals(1, got.getTopicId());
             Assertions.assertEquals(2, got.getQueueId());
             Assertions.assertEquals(3, got.getStreamId());
-            Assertions.assertEquals(StreamRole.OPS, got.getStreamRole());
+            Assertions.assertEquals(StreamRole.RETRY, got.getStreamRole());
+            Assertions.assertEquals(4, got.getGroupId());
 
             rowsAffected = mapper.delete(null, null);
             Assertions.assertEquals(1, rowsAffected);

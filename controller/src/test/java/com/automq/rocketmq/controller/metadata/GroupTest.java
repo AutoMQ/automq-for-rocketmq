@@ -34,14 +34,20 @@ public class GroupTest extends DatabaseTestBase {
             Group group = new Group();
             group.setName("G1");
             group.setStatus(GroupStatus.ACTIVE);
+            group.setDeadLetterTopicId(1);
             int rowsAffected = mapper.create(group);
             Assertions.assertEquals(1, rowsAffected);
 
             group.setStatus(GroupStatus.DELETED);
+            group.setDeadLetterTopicId(2);
             mapper.update(group);
 
             List<Group> groups = mapper.list(null, null, null);
             Assertions.assertEquals(1, groups.size());
+            Group got = groups.get(0);
+            Assertions.assertEquals("G1", got.getName());
+            Assertions.assertEquals(GroupStatus.DELETED, got.getStatus());
+            Assertions.assertEquals(2, got.getDeadLetterTopicId());
 
             groups = mapper.list(null, GroupStatus.ACTIVE, null);
             Assertions.assertTrue(groups.isEmpty());
