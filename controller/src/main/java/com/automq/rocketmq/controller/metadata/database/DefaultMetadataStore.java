@@ -40,7 +40,9 @@ import com.automq.rocketmq.controller.metadata.database.tasks.ScanNodeTask;
 import com.google.common.base.Strings;
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
@@ -140,16 +142,24 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
         }
     }
 
+    private boolean maintainLeadershipWithSharedLock(SqlSession session) {
+        LeaseMapper leaseMapper = session.getMapper(LeaseMapper.class);
+        Lease current = leaseMapper.currentWithShareLock();
+        if (current.getEpoch() != this.lease.getEpoch()) {
+            // Current node is not leader any longer, forward to the new leader in the next iteration.
+            this.lease = current;
+            return false;
+        }
+        return true;
+    }
+
     @Override
     public long createTopic(String topicName, int queueNum) throws ControllerException {
         for (; ; ) {
             if (this.isLeader()) {
+                Set<Integer> toNotify = new HashSet<>();
                 try (SqlSession session = getSessionFactory().openSession()) {
-                    LeaseMapper leaseMapper = session.getMapper(LeaseMapper.class);
-                    Lease current = leaseMapper.currentWithShareLock();
-                    if (current.getEpoch() != this.lease.getEpoch()) {
-                        // Current node is not leader any longer, forward to the new leader in the next iteration.
-                        this.lease = current;
+                    if (!maintainLeadershipWithSharedLock(session)) {
                         continue;
                     }
 
@@ -179,6 +189,7 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
                     IntStream.range(0, queueNum).forEach(n -> {
                         int idx = n % aliveNodeIds.size();
                         int nodeId = aliveNodeIds.get(idx);
+                        toNotify.add(nodeId);
                         QueueAssignment assignment = new QueueAssignment();
                         assignment.setTopicId(topicId);
                         assignment.setStatus(QueueAssignmentStatus.ASSIGNED);
@@ -191,6 +202,7 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
 
                     // Commit transaction
                     session.commit();
+                    this.notifyOnResourceChange(toNotify);
                     return topicId;
                 }
             } else {
@@ -207,6 +219,59 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
                 }
             }
         }
+    }
+
+    @Override
+    public void deleteTopic(long topicId) throws ControllerException {
+
+        for (; ; ) {
+            if (this.isLeader()) {
+                Set<Integer> toNotify = new HashSet<>();
+                try (SqlSession session = getSessionFactory().openSession()) {
+                    if (!maintainLeadershipWithSharedLock(session)) {
+                        continue;
+                    }
+
+                    TopicMapper topicMapper = session.getMapper(TopicMapper.class);
+                    Topic topic = topicMapper.getById(topicId);
+                    if (null == topic) {
+                        throw new ControllerException(Code.NOT_FOUND_VALUE, String.format("This is no topic with topic-id %d", topicId));
+                    }
+                    topicMapper.updateStatusById(topicId, TopicStatus.DELETED);
+
+                    QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
+                    List<QueueAssignment> assignments = assignmentMapper.list(topicId, null, null, null, null);
+                    assignments.stream().filter(assignment -> assignment.getStatus() != QueueAssignmentStatus.DELETED)
+                        .forEach(assignment -> {
+                            switch (assignment.getStatus()) {
+                                case ASSIGNED -> {
+                                    toNotify.add(assignment.getDstNodeId());
+                                }
+                                case YIELDING -> {
+                                    toNotify.add(assignment.getSrcNodeId());
+                                }
+                                default -> {
+                                }
+                            }
+                            assignment.setStatus(QueueAssignmentStatus.DELETED);
+                            assignmentMapper.update(assignment);
+                        });
+                    session.commit();
+                }
+                this.notifyOnResourceChange(toNotify);
+            } else {
+                controllerClient.deleteTopic(this.leaderAddress(), topicId);
+            }
+            break;
+        }
+    }
+
+    /**
+     * Notify nodes that some resources are changed by leader controller.
+     *
+     * @param nodes Nodes to notify
+     */
+    private void notifyOnResourceChange(Set<Integer> nodes) {
 
     }
 
@@ -231,7 +296,6 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
 
         return brokerNode.getNode().getAddress();
     }
-
 
     @Override
     public List<QueueAssignment> listAssignments(Long topicId, Integer srcNodeId, Integer dstNodeId,

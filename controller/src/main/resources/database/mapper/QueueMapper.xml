@@ -21,10 +21,9 @@
 
 <mapper namespace="com.automq.rocketmq.controller.metadata.database.mapper.QueueMapper">
 
-
     <insert id="create" parameterType="Queue">
-        INSERT INTO queue(topic_id, queue_id, stream_id, stream_role)
-        VALUES (#{topicId}, #{queueId}, #{streamId}, #{streamRole})
+        INSERT INTO queue(topic_id, queue_id, stream_id, stream_role, group_id)
+        VALUES (#{topicId}, #{queueId}, #{streamId}, #{streamRole}, #{groupId})
     </insert>
 
     <delete id="delete">
@@ -39,7 +38,7 @@
     </delete>
 
     <select id="list" resultType="Queue">
-        SELECT topic_id, queue_id, stream_id, stream_role
+        SELECT topic_id, queue_id, stream_id, stream_role, group_id
         FROM queue
         WHERE 1 = 1
         <if test="null != topicId">
@@ -47,6 +46,9 @@
         </if>
         <if test="null != queueId">
             AND queue_id = #{queueId}
+        </if>
+        <if test="null != groupId">
+            AND group_id = #{groupId}
         </if>
     </select>
 
