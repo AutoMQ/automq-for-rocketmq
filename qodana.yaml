@@ -31,3 +31,4 @@ projectJDK: 17 #(Applied in CI/CD pipeline)
 linter: jetbrains/qodana-jvm:latest
 include:
   - name: CheckDependencyLicenses
+  - name: VulnerableLibrariesGlobal
