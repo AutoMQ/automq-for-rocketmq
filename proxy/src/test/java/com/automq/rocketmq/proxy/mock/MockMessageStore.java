@@ -25,6 +25,7 @@ import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
 import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PopResult;
 import com.automq.rocketmq.store.model.message.PutResult;
+import com.automq.rocketmq.store.service.impl.InflightService;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -38,9 +39,10 @@ public class MockMessageStore implements MessageStore {
     private final HashMap<Integer, AtomicLong> offsetMap = new HashMap<>();
     private final Set<String> receiptHandleSet = new HashSet<>();
     private final Map<Long, List<MessageExt>> messageMap = new HashMap<>();
+    private final InflightService inflightService = new InflightService();
 
     public MockMessageStore() {
-        receiptHandleSet.add("receiptHandle");
+        receiptHandleSet.add("FAAAAAAAAAAMABwABAAAAAwAFAAMAAAAAgAAAAAAAAACAAAAAAAAAAMAAAAAAAAA");
     }
 
     @Override
@@ -61,6 +63,7 @@ public class MockMessageStore implements MessageStore {
         } else {
             status = PopResult.Status.FOUND;
             messageList = messageList.subList(start, end);
+            inflightService.increaseInflightCount(consumerGroupId, topicId, queueId, messageList.size());
         }
         return CompletableFuture.completedFuture(new PopResult(status, 0L, 0L, messageList));
     }
@@ -79,6 +82,7 @@ public class MockMessageStore implements MessageStore {
         AckResult.Status status;
         if (receiptHandleSet.contains(receiptHandle)) {
             status = AckResult.Status.SUCCESS;
+            inflightService.decreaseInflightCount(8, 2, 0, 1);
         } else {
             status = AckResult.Status.ERROR;
         }
@@ -98,8 +102,8 @@ public class MockMessageStore implements MessageStore {
     }
 
     @Override
-    public int getInflightStatsByQueue(long topicId, int queueId) {
-        return 0;
+    public int getInflightStats(long consumerGroupId, long topicId, int queueId) {
+        return inflightService.getInflightCount(consumerGroupId, topicId, queueId);
     }
 
     @Override

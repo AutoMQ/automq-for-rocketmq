@@ -41,15 +41,16 @@ public class ReviveService implements Runnable {
     private final String timerTagNamespace;
     private final KVService kvService;
     private final StoreMetadataService metadataService;
+    private final InflightService inflightService;
     private final StreamStore streamStore;
 
     public ReviveService(String checkPointNamespace, String timerTagNamespace, KVService kvService,
-        StoreMetadataService metadataService,
-        StreamStore streamStore) {
+        StoreMetadataService metadataService, InflightService inflightService, StreamStore streamStore) {
         this.checkPointNamespace = checkPointNamespace;
         this.timerTagNamespace = timerTagNamespace;
         this.kvService = kvService;
         this.metadataService = metadataService;
+        this.inflightService = inflightService;
         this.streamStore = streamStore;
     }
 
@@ -126,6 +127,7 @@ public class ReviveService implements Runnable {
                 BatchDeleteRequest deleteTimerTagRequest = new BatchDeleteRequest(timerTagNamespace,
                     SerializeUtil.buildTimerTagKey(timerTag.nextVisibleTimestamp(), timerTag.originTopicId(), timerTag.originQueueId(), timerTag.offset(), timerTag.operationId()));
                 kvService.batch(deleteCheckPointRequest, deleteTimerTagRequest);
+                inflightService.decreaseInflightCount(timerTag.consumerGroupId(), timerTag.originTopicId(), timerTag.originQueueId(), 1);
             } catch (StoreException e) {
                 // TODO: log exception
                 System.out.println("delete timer tag failed in revive");

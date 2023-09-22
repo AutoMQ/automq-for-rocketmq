@@ -71,7 +71,7 @@ public interface MessageStore {
     CompletableFuture<ChangeInvisibleDurationResult> changeInvisibleDuration(String receiptHandle,
         long invisibleDuration);
 
-    int getInflightStatsByQueue(long topicId, int queueId);
+    int getInflightStats(long consumerGroupId, long topicId, int queueId);
 
     boolean cleanMetadata(long topicId, int queueId);
 }
