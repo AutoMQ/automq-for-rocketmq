@@ -39,10 +39,10 @@ public class StreamTest extends DatabaseTestBase {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
             StreamMetadata stream = StreamMetadata.newBuilder().
-                    setStreamId(123).
-                    setEpoch(1).
-                    setRangeId(2).
-                    setState(StreamState.OPEN).build();
+                setStreamId(123).
+                setEpoch(1).
+                setRangeId(2).
+                setState(StreamState.OPEN).build();
 
             int affectedRows = streamMapper.create(stream);
             Assertions.assertEquals(1, affectedRows);
@@ -67,10 +67,10 @@ public class StreamTest extends DatabaseTestBase {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
             StreamMetadata stream = StreamMetadata.newBuilder().
-                    setStreamId(123).
-                    setEpoch(1).
-                    setRangeId(2).
-                    setState(StreamState.OPEN).build();
+                setStreamId(123).
+                setEpoch(1).
+                setRangeId(2).
+                setState(StreamState.OPEN).build();
             int affectedRows = streamMapper.create(stream);
             Assertions.assertEquals(1, affectedRows);
 
@@ -91,10 +91,10 @@ public class StreamTest extends DatabaseTestBase {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
             StreamMetadata stream = StreamMetadata.newBuilder().
-                    setStreamId(123).
-                    setEpoch(1).
-                    setRangeId(2).
-                    setState(StreamState.OPEN).build();
+                setStreamId(123).
+                setEpoch(1).
+                setRangeId(2).
+                setState(StreamState.OPEN).build();
             int affectedRows = streamMapper.create(stream);
             Assertions.assertEquals(1, affectedRows);
 
@@ -116,10 +116,10 @@ public class StreamTest extends DatabaseTestBase {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
             StreamMetadata stream = StreamMetadata.newBuilder().
-                    setStreamId(123).
-                    setEpoch(1).
-                    setRangeId(2).
-                    setState(StreamState.OPEN).build();
+                setStreamId(123).
+                setEpoch(1).
+                setRangeId(2).
+                setState(StreamState.OPEN).build();
             int affectedRows = streamMapper.create(stream);
             Assertions.assertEquals(1, affectedRows);
 

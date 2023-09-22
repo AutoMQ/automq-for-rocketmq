@@ -1,0 +1,74 @@
+<!--
+  ~ Licensed to the Apache Software Foundation (ASF) under one or more
+  ~ contributor license agreements.  See the NOTICE file distributed with
+  ~ this work for additional information regarding copyright ownership.
+  ~ The ASF licenses this file to You under the Apache License, Version 2.0
+  ~ (the "License"); you may not use this file except in compliance with
+  ~ the License.  You may obtain a copy of the License at
+  ~
+  ~     http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  -->
+
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.automq.rocketmq.controller.metadata.database.mapper.S3StreamObjectMapper">
+    <resultMap id="BaseResultMap" type="apache.rocketmq.controller.v1.S3StreamObject">
+        <result column="stream_id" jdbcType="BIGINT" property="streamId_"/>
+        <result column="start_offset" jdbcType="BIGINT" property="startOffset_"/>
+        <result column="end_offset" jdbcType="BIGINT" property="endOffset_"/>
+        <result column="object_id" jdbcType="BIGINT" property="objectId_"/>
+        <result column="object_size" jdbcType="BIGINT" property="objectSize_"/>
+        <result column="base_data_timestamp" jdbcType="BIGINT" property="baseDataTimestamp_"/>
+        <result column="committed_timestamp" jdbcType="BIGINT" property="committedTimestamp_"/>
+    </resultMap>
+
+    <insert id="create" parameterType="apache.rocketmq.controller.v1.S3StreamObject">
+        INSERT
+        INTO s3streamobject (object_id, object_size, stream_id, start_offset, end_offset, base_data_timestamp,
+        committed_timestamp)
+        VALUES (#{objectId_}, #{objectSize_}, #{streamId_}, #{startOffset_}, #{endOffset_}, #{baseDataTimestamp_},
+        #{committedTimestamp_})
+    </insert>
+
+    <select id="listByStreamId" resultMap="BaseResultMap">
+        SELECT object_id, object_size, stream_id, start_offset, end_offset, base_data_timestamp, committed_timestamp
+        FROM s3streamobject
+        WHERE stream_id = #{streamId}
+    </select>
+
+    <select id="listByObjectId" resultMap="BaseResultMap">
+        SELECT object_id, object_size, stream_id, start_offset, end_offset, base_data_timestamp, committed_timestamp
+        FROM s3streamobject
+        WHERE object_id = #{objectId}
+    </select>
+
+    <update id="commit" parameterType="apache.rocketmq.controller.v1.S3StreamObject">
+        UPDATE s3streamobject
+        SET committed_timestamp = #{committedTimestamp_}
+        WHERE object_id = #{objectId_} and stream_id = #{streamId_}
+    </update>
+
+    <delete id="delete">
+        DELETE
+        FROM s3streamobject
+        WHERE object_id = #{objectId} and stream_id = #{streamId}
+    </delete>
+
+    <select id="getByStreamAndObject" resultMap="BaseResultMap">
+        SELECT object_id, object_size, stream_id, start_offset, end_offset, base_data_timestamp, committed_timestamp
+        FROM s3streamobject
+        WHERE object_id = #{objectId} and stream_id = #{streamId}
+    </select>
+
+    <select id="list" resultMap="BaseResultMap">
+        SELECT object_id, object_size, stream_id, start_offset, end_offset, base_data_timestamp, committed_timestamp
+        FROM s3streamobject
+    </select>
+</mapper>

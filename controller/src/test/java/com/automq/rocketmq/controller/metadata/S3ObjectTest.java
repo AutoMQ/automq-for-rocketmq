@@ -38,8 +38,8 @@ public class S3ObjectTest extends DatabaseTestBase {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
             S3Object s3Object = S3Object.newBuilder().
-                    setObjectId(987).setObjectSize(555).
-                    setState(S3ObjectState.BOS_COMMITTED).build();
+                setObjectId(987).setObjectSize(555).
+                setState(S3ObjectState.BOS_COMMITTED).build();
 
             int affectedRows = s3ObjectMapper.create(s3Object);
             Assertions.assertEquals(1, affectedRows);
@@ -59,8 +59,8 @@ public class S3ObjectTest extends DatabaseTestBase {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
             S3Object s3Object = S3Object.newBuilder().
-                    setObjectId(987).setObjectSize(555).
-                    setState(S3ObjectState.BOS_COMMITTED).build();
+                setObjectId(987).setObjectSize(555).
+                setState(S3ObjectState.BOS_COMMITTED).build();
             int affectedRows = s3ObjectMapper.create(s3Object);
             Assertions.assertEquals(1, affectedRows);
 
@@ -84,8 +84,8 @@ public class S3ObjectTest extends DatabaseTestBase {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
             S3Object s3Object = S3Object.newBuilder().
-                    setObjectId(987).setObjectSize(555).
-                    setState(S3ObjectState.BOS_COMMITTED).build();
+                setObjectId(987).setObjectSize(555).
+                setState(S3ObjectState.BOS_COMMITTED).build();
             int affectedRows = s3ObjectMapper.create(s3Object);
             Assertions.assertEquals(1, affectedRows);
 
@@ -109,8 +109,8 @@ public class S3ObjectTest extends DatabaseTestBase {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
             S3Object s3Object = S3Object.newBuilder().
-                    setObjectId(987).setObjectSize(555).
-                    setState(S3ObjectState.BOS_COMMITTED).build();
+                setObjectId(987).setObjectSize(555).
+                setState(S3ObjectState.BOS_COMMITTED).build();
             int affectedRows = s3ObjectMapper.create(s3Object);
             Assertions.assertEquals(1, affectedRows);
 
