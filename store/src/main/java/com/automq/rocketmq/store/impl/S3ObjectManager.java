@@ -164,7 +164,10 @@ public class S3ObjectManager implements ObjectManager {
                 if (!moved) {
                     // No object can be added, break the loop
                     // Consider we need [100, 300), but the first object is [200, 300), then we need to break the loop
-                    break;
+                    LOGGER.error("Found a hole in the returned S3Object list, streamId: {}, startOffset: {}, streamObjects: {}, walObjects: {}",
+                        streamId, startOffset, streamObjects, walObjects);
+                    // Throw exception to trigger the retry
+                    throw new RuntimeException("Found a hole in the returned S3Object list for current getObjects request");
                 }
 
                 if (objectMetadatas.size() >= limit) {
