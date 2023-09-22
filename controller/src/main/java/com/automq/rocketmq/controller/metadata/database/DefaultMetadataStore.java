@@ -142,17 +142,24 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
         }
     }
 
+    private boolean maintainLeadershipWithSharedLock(SqlSession session) {
+        LeaseMapper leaseMapper = session.getMapper(LeaseMapper.class);
+        Lease current = leaseMapper.currentWithShareLock();
+        if (current.getEpoch() != this.lease.getEpoch()) {
+            // Current node is not leader any longer, forward to the new leader in the next iteration.
+            this.lease = current;
+            return false;
+        }
+        return true;
+    }
+
     @Override
     public long createTopic(String topicName, int queueNum) throws ControllerException {
         for (; ; ) {
             if (this.isLeader()) {
                 Set<Integer> toNotify = new HashSet<>();
                 try (SqlSession session = getSessionFactory().openSession()) {
-                    LeaseMapper leaseMapper = session.getMapper(LeaseMapper.class);
-                    Lease current = leaseMapper.currentWithShareLock();
-                    if (current.getEpoch() != this.lease.getEpoch()) {
-                        // Current node is not leader any longer, forward to the new leader in the next iteration.
-                        this.lease = current;
+                    if (!maintainLeadershipWithSharedLock(session)) {
                         continue;
                     }
 
@@ -219,15 +226,9 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
 
         for (; ; ) {
             if (this.isLeader()) {
-
                 Set<Integer> toNotify = new HashSet<>();
-
                 try (SqlSession session = getSessionFactory().openSession()) {
-                    LeaseMapper leaseMapper = session.getMapper(LeaseMapper.class);
-                    Lease current = leaseMapper.currentWithShareLock();
-                    if (current.getEpoch() != this.lease.getEpoch()) {
-                        // Current node is not leader any longer, forward to the new leader in the next iteration.
-                        this.lease = current;
+                    if (!maintainLeadershipWithSharedLock(session)) {
                         continue;
                     }
 
@@ -260,8 +261,8 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
                 this.notifyOnResourceChange(toNotify);
             } else {
                 controllerClient.deleteTopic(this.leaderAddress(), topicId);
-                break;
             }
+            break;
         }
     }
 
