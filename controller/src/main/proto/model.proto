@@ -50,8 +50,11 @@ message StreamMetadata {
   int32 range_id = 3;
   // The start offset of the stream, inclusive.
   int64 start_offset = 4;
+  // End offset of this stream, exclusive.
+  // This filed is equal to the end offset of the last range of the stream.
+  int64 end_offset = 5;
   // The stream state.
-  StreamState state = 5;
+  StreamState state = 6;
 }
 
 enum StreamState {
