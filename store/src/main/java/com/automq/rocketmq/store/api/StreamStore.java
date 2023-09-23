@@ -15,17 +15,18 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.store;
+package com.automq.rocketmq.store.api;
 
-import com.automq.rocketmq.stream.api.AppendResult;
-import com.automq.rocketmq.stream.api.FetchResult;
-import com.automq.rocketmq.stream.api.RecordBatch;
+import com.automq.rocketmq.common.util.Lifecycle;
+import com.automq.stream.api.AppendResult;
+import com.automq.stream.api.FetchResult;
+import com.automq.stream.api.RecordBatch;
 import java.util.concurrent.CompletableFuture;
 
 /**
  * A high level abstraction of stream store, hidden the details of S3Stream module.
  */
-public interface StreamStore {
+public interface StreamStore extends Lifecycle {
     /**
      * Fetch records from stream store.
      *

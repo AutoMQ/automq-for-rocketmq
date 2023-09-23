@@ -17,7 +17,7 @@
 
 package com.automq.rocketmq.store.model.stream;
 
-import com.automq.rocketmq.stream.api.RecordBatch;
+import com.automq.stream.api.RecordBatch;
 import java.nio.ByteBuffer;
 import java.util.Map;
 

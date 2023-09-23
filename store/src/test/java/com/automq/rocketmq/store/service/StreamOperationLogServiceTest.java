@@ -1,12 +1,12 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements. See the NOTICE file distributed with
+ * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
  * The ASF licenses this file to You under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
- * the License. You may obtain a copy of the License at
+ * the License.  You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,21 +15,21 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.store.service.impl;
+package com.automq.rocketmq.store.service;
 
 import com.automq.rocketmq.metadata.StoreMetadataService;
-import com.automq.rocketmq.store.StreamStore;
-import com.automq.rocketmq.store.impl.StreamStoreImpl;
+import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.rocketmq.store.mock.MockStoreMetadataService;
+import com.automq.rocketmq.store.mock.MockStreamStore;
 import com.automq.rocketmq.store.model.generated.AckOperation;
 import com.automq.rocketmq.store.model.generated.ChangeInvisibleDurationOperation;
 import com.automq.rocketmq.store.model.generated.Operation;
 import com.automq.rocketmq.store.model.generated.OperationLogItem;
 import com.automq.rocketmq.store.model.generated.PopOperation;
-import com.automq.rocketmq.store.service.OperationLogService;
+import com.automq.rocketmq.store.service.api.OperationLogService;
 import com.automq.rocketmq.store.util.SerializeUtil;
-import com.automq.rocketmq.stream.api.FetchResult;
-import com.automq.rocketmq.stream.api.RecordBatchWithContext;
+import com.automq.stream.api.FetchResult;
+import com.automq.stream.api.RecordBatchWithContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -53,7 +53,7 @@ class StreamOperationLogServiceTest {
     @BeforeEach
     public void setUp() {
         metadataService = new MockStoreMetadataService();
-        streamStore = new StreamStoreImpl();
+        streamStore = new MockStreamStore();
         operationLogService = new StreamOperationLogService(streamStore, metadataService);
     }
 

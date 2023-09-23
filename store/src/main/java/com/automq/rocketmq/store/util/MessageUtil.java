@@ -20,7 +20,7 @@ package com.automq.rocketmq.store.util;
 import com.automq.rocketmq.common.model.MessageExt;
 import com.automq.rocketmq.common.model.generated.KeyValue;
 import com.automq.rocketmq.common.model.generated.Message;
-import com.automq.rocketmq.stream.api.RecordBatchWithContext;
+import com.automq.stream.api.RecordBatchWithContext;
 import com.google.flatbuffers.FlatBufferBuilder;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;

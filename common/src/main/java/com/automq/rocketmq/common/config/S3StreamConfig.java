@@ -15,8 +15,27 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.store;
+package com.automq.rocketmq.common.config;
 
-// A wrapper of StreamStore
-public interface CacheStore {
+public class S3StreamConfig {
+    private String s3Endpoint;
+    private String s3Region;
+    private String s3Bucket;
+    private String s3WALPath = "/tmp/s3stream_wal";
+
+    public String s3Endpoint() {
+        return s3Endpoint;
+    }
+
+    public String s3Region() {
+        return s3Region;
+    }
+
+    public String s3Bucket() {
+        return s3Bucket;
+    }
+
+    public String s3WALPath() {
+        return s3WALPath;
+    }
 }

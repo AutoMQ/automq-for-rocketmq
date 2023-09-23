@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.store;
+package com.automq.rocketmq.store.api;
 
 import com.automq.rocketmq.common.model.generated.Message;
 import com.automq.rocketmq.store.model.message.AckResult;

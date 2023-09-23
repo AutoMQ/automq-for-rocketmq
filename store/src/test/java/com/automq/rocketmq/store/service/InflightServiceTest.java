@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.store.service.impl;
+package com.automq.rocketmq.store.service;
 
 import org.junit.jupiter.api.Test;
 

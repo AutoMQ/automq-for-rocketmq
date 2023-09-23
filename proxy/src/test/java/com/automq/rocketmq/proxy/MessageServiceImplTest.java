@@ -22,7 +22,7 @@ import com.automq.rocketmq.metadata.ProxyMetadataService;
 import com.automq.rocketmq.proxy.mock.MockMessageStore;
 import com.automq.rocketmq.proxy.mock.MockProxyMetadataService;
 import com.automq.rocketmq.proxy.service.LockService;
-import com.automq.rocketmq.store.MessageStore;
+import com.automq.rocketmq.store.api.MessageStore;
 import com.automq.rocketmq.store.model.message.TagFilter;
 import com.automq.rocketmq.store.util.MessageUtil;
 import java.util.HashMap;

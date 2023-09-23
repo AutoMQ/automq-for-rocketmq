@@ -15,24 +15,24 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.store.impl;
+package com.automq.rocketmq.store.mock;
 
-import com.automq.rocketmq.store.StreamStore;
-import com.automq.rocketmq.stream.MemoryStreamClient;
-import com.automq.rocketmq.stream.api.AppendResult;
-import com.automq.rocketmq.stream.api.FetchResult;
-import com.automq.rocketmq.stream.api.RecordBatch;
-import com.automq.rocketmq.stream.api.Stream;
-import com.automq.rocketmq.stream.api.StreamClient;
+import com.automq.rocketmq.store.api.StreamStore;
+import com.automq.stream.api.AppendResult;
+import com.automq.stream.api.FetchResult;
+import com.automq.stream.api.RecordBatch;
+import com.automq.stream.api.Stream;
+import com.automq.stream.api.StreamClient;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class StreamStoreImpl implements StreamStore {
+public class MockStreamStore implements StreamStore {
+
     private final StreamClient streamClient;
     private final Map<Long, Stream> openedStreams = new ConcurrentHashMap<>();
 
-    public StreamStoreImpl() {
+    public MockStreamStore() {
         streamClient = new MemoryStreamClient();
     }
 
@@ -70,5 +70,15 @@ public class StreamStoreImpl implements StreamStore {
         // Open the specified stream if not opened yet.
         // TODO: Build a real OpenStreamOptions
         return openedStreams.computeIfAbsent(streamId, id -> streamClient.openStream(id, null).join());
+    }
+
+    @Override
+    public void start() throws Exception {
+
+    }
+
+    @Override
+    public void shutdown() throws Exception {
+
     }
 }

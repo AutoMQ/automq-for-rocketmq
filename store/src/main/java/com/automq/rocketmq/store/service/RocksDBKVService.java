@@ -1,12 +1,12 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements. See the NOTICE file distributed with
+ * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
  * The ASF licenses this file to You under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
- * the License. You may obtain a copy of the License at
+ * the License.  You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,13 +15,13 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.store.service.impl;
+package com.automq.rocketmq.store.service;
 
 import com.automq.rocketmq.store.exception.StoreErrorCode;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.kv.BatchRequest;
 import com.automq.rocketmq.store.model.kv.IteratorCallback;
-import com.automq.rocketmq.store.service.KVService;
+import com.automq.rocketmq.store.service.api.KVService;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;

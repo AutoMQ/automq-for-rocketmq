@@ -15,24 +15,25 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.store.impl;
+package com.automq.rocketmq.store;
 
 import com.automq.rocketmq.common.config.StoreConfig;
 import com.automq.rocketmq.common.model.MessageExt;
 import com.automq.rocketmq.common.model.generated.Message;
 import com.automq.rocketmq.metadata.StoreMetadataService;
-import com.automq.rocketmq.store.MessageStore;
-import com.automq.rocketmq.store.StreamStore;
+import com.automq.rocketmq.store.api.MessageStore;
+import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.mock.MockOperationLogService;
 import com.automq.rocketmq.store.mock.MockStoreMetadataService;
+import com.automq.rocketmq.store.mock.MockStreamStore;
 import com.automq.rocketmq.store.model.generated.CheckPoint;
 import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PopResult;
 import com.automq.rocketmq.store.model.message.TagFilter;
 import com.automq.rocketmq.store.model.stream.SingleRecord;
-import com.automq.rocketmq.store.service.KVService;
-import com.automq.rocketmq.store.service.impl.RocksDBKVService;
+import com.automq.rocketmq.store.service.api.KVService;
+import com.automq.rocketmq.store.service.RocksDBKVService;
 import com.automq.rocketmq.store.util.SerializeUtil;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -61,7 +62,7 @@ class MessageStoreTest {
     public void setUp() throws StoreException {
         kvService = new RocksDBKVService(PATH);
         metadataService = new MockStoreMetadataService();
-        streamStore = new StreamStoreImpl();
+        streamStore = new MockStreamStore();
         messageStore = new MessageStoreImpl(new StoreConfig(), streamStore, new MockOperationLogService(), metadataService, kvService);
     }
 

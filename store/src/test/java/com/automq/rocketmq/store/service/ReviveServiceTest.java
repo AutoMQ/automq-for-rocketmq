@@ -15,19 +15,19 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.store.service.impl;
+package com.automq.rocketmq.store.service;
 
 import com.automq.rocketmq.common.model.MessageExt;
 import com.automq.rocketmq.metadata.StoreMetadataService;
-import com.automq.rocketmq.store.StreamStore;
+import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.rocketmq.store.exception.StoreException;
-import com.automq.rocketmq.store.impl.StreamStoreImpl;
 import com.automq.rocketmq.store.mock.MockStoreMetadataService;
+import com.automq.rocketmq.store.mock.MockStreamStore;
 import com.automq.rocketmq.store.model.stream.SingleRecord;
-import com.automq.rocketmq.store.service.KVService;
+import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.util.MessageUtil;
 import com.automq.rocketmq.store.util.SerializeUtil;
-import com.automq.rocketmq.stream.api.FetchResult;
+import com.automq.stream.api.FetchResult;
 import java.util.HashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
@@ -52,7 +52,7 @@ class ReviveServiceTest {
     public void setUp() throws StoreException {
         kvService = new RocksDBKVService(PATH);
         metadataService = new MockStoreMetadataService();
-        streamStore = new StreamStoreImpl();
+        streamStore = new MockStreamStore();
         inflightService = new InflightService();
         reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, KV_NAMESPACE_TIMER_TAG, kvService, metadataService, inflightService, streamStore);
     }

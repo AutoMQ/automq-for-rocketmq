@@ -15,16 +15,16 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.stream;
+package com.automq.rocketmq.store.mock;
 
-import com.automq.rocketmq.stream.api.AppendResult;
-import com.automq.rocketmq.stream.api.CreateStreamOptions;
-import com.automq.rocketmq.stream.api.FetchResult;
-import com.automq.rocketmq.stream.api.OpenStreamOptions;
-import com.automq.rocketmq.stream.api.RecordBatch;
-import com.automq.rocketmq.stream.api.RecordBatchWithContext;
-import com.automq.rocketmq.stream.api.Stream;
-import com.automq.rocketmq.stream.api.StreamClient;
+import com.automq.stream.api.AppendResult;
+import com.automq.stream.api.CreateStreamOptions;
+import com.automq.stream.api.FetchResult;
+import com.automq.stream.api.OpenStreamOptions;
+import com.automq.stream.api.RecordBatch;
+import com.automq.stream.api.RecordBatchWithContext;
+import com.automq.stream.api.Stream;
+import com.automq.stream.api.StreamClient;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;

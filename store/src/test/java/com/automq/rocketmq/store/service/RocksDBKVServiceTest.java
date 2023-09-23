@@ -15,12 +15,12 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.store.service.impl;
+package com.automq.rocketmq.store.service;
 
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.kv.BatchDeleteRequest;
 import com.automq.rocketmq.store.model.kv.BatchWriteRequest;
-import com.automq.rocketmq.store.service.KVService;
+import com.automq.rocketmq.store.service.api.KVService;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;

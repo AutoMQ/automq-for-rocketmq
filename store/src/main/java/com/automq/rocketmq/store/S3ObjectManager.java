@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.store.impl;
+package com.automq.rocketmq.store;
 
 import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;

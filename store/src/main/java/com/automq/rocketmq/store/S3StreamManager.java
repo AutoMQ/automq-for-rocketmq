@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.store.impl;
+package com.automq.rocketmq.store;
 
 import com.automq.rocketmq.metadata.StoreMetadataService;
 import com.automq.stream.s3.metadata.StreamMetadata;

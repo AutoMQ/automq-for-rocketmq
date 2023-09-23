@@ -15,19 +15,19 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.store.service.impl;
+package com.automq.rocketmq.store.service;
 
 import com.automq.rocketmq.common.model.MessageExt;
 import com.automq.rocketmq.metadata.StoreMetadataService;
-import com.automq.rocketmq.store.StreamStore;
+import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.generated.TimerTag;
 import com.automq.rocketmq.store.model.kv.BatchDeleteRequest;
 import com.automq.rocketmq.store.model.stream.SingleRecord;
-import com.automq.rocketmq.store.service.KVService;
+import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.util.MessageUtil;
 import com.automq.rocketmq.store.util.SerializeUtil;
-import com.automq.rocketmq.stream.api.FetchResult;
+import com.automq.stream.api.FetchResult;
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicBoolean;
 

@@ -22,6 +22,8 @@ public class YamlConfig {
     private ProxyConfig proxy;
     private StoreConfig store;
 
+    private S3StreamConfig s3Stream;
+
     public BrokerConfig broker() {
         return broker;
     }
@@ -32,5 +34,9 @@ public class YamlConfig {
 
     public StoreConfig store() {
         return store;
+    }
+
+    public S3StreamConfig s3Stream() {
+        return s3Stream;
     }
 }
