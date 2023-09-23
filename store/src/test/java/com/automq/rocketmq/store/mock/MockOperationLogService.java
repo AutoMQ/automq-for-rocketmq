@@ -18,7 +18,7 @@
 package com.automq.rocketmq.store.mock;
 
 import com.automq.rocketmq.store.model.generated.ReceiptHandle;
-import com.automq.rocketmq.store.service.OperationLogService;
+import com.automq.rocketmq.store.service.api.OperationLogService;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
 

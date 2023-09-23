@@ -23,7 +23,7 @@ import com.automq.rocketmq.common.util.CommonUtil;
 import com.automq.rocketmq.metadata.ProxyMetadataService;
 import com.automq.rocketmq.proxy.service.LockService;
 import com.automq.rocketmq.proxy.util.RocketMQMessageUtil;
-import com.automq.rocketmq.store.MessageStore;
+import com.automq.rocketmq.store.api.MessageStore;
 import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PutResult;
 import com.automq.rocketmq.store.model.message.SQLFilter;
