@@ -19,13 +19,13 @@ package com.automq.rocketmq.proxy.mock;
 
 import com.automq.rocketmq.common.model.MessageExt;
 import com.automq.rocketmq.common.model.generated.Message;
-import com.automq.rocketmq.store.MessageStore;
+import com.automq.rocketmq.store.api.MessageStore;
 import com.automq.rocketmq.store.model.message.AckResult;
 import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
 import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PopResult;
 import com.automq.rocketmq.store.model.message.PutResult;
-import com.automq.rocketmq.store.service.impl.InflightService;
+import com.automq.rocketmq.store.service.InflightService;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;

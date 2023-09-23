@@ -15,28 +15,21 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.common.config;
+package com.automq.rocketmq.store.service;
 
-public class YamlConfig {
-    private BrokerConfig broker;
-    private ProxyConfig proxy;
-    private StoreConfig store;
+import org.junit.jupiter.api.Test;
 
-    private S3StreamConfig s3Stream;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-    public BrokerConfig broker() {
-        return broker;
-    }
+class InflightServiceTest {
 
-    public ProxyConfig proxy() {
-        return proxy;
-    }
+    @Test
+    void inflight() {
+        InflightService inflightService = new InflightService();
+        inflightService.increaseInflightCount(0, 0, 0, 10);
+        assertEquals(10, inflightService.getInflightCount(0, 0, 0));
 
-    public StoreConfig store() {
-        return store;
-    }
-
-    public S3StreamConfig s3Stream() {
-        return s3Stream;
+        inflightService.decreaseInflightCount(0, 0, 0, 5);
+        assertEquals(5, inflightService.getInflightCount(0, 0, 0));
     }
 }

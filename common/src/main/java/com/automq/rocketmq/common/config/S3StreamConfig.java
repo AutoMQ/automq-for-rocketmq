@@ -1,12 +1,12 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements. See the NOTICE file distributed with
+ * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
  * The ASF licenses this file to You under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
- * the License. You may obtain a copy of the License at
+ * the License.  You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,20 +15,27 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.store.model.stream;
+package com.automq.rocketmq.common.config;
 
-import com.automq.stream.api.RecordBatch;
-import java.nio.ByteBuffer;
-import java.util.Map;
+public class S3StreamConfig {
+    private String s3Endpoint;
+    private String s3Region;
+    private String s3Bucket;
+    private String s3WALPath = "/tmp/s3stream_wal";
 
-public record SingleRecord(Map<String, String> properties, ByteBuffer rawPayload) implements RecordBatch {
-    @Override
-    public int count() {
-        return 1;
+    public String s3Endpoint() {
+        return s3Endpoint;
     }
 
-    @Override
-    public long baseTimestamp() {
-        return 0;
+    public String s3Region() {
+        return s3Region;
+    }
+
+    public String s3Bucket() {
+        return s3Bucket;
+    }
+
+    public String s3WALPath() {
+        return s3WALPath;
     }
 }

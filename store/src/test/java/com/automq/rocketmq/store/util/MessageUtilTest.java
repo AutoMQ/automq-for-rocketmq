@@ -20,7 +20,7 @@ package com.automq.rocketmq.store.util;
 import com.automq.rocketmq.common.model.MessageExt;
 import com.automq.rocketmq.common.model.generated.Message;
 import com.automq.rocketmq.store.model.stream.SingleRecord;
-import com.automq.rocketmq.stream.MemoryStreamClient;
+import com.automq.rocketmq.store.mock.MemoryStreamClient;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import org.junit.jupiter.api.Test;
