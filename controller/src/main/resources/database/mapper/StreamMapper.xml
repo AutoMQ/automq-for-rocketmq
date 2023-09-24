@@ -20,17 +20,16 @@
     "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper">
-    <resultMap id="BaseResultMap" type="apache.rocketmq.controller.v1.StreamMetadata">
-        <id column="stream_id" jdbcType="BIGINT" property="streamId_"/>
-        <result column="epoch" jdbcType="BIGINT" property="epoch_"/>
-        <result column="range_id" jdbcType="INTEGER" property="rangeId_"/>
-        <result column="start_offset" jdbcType="BIGINT" property="startOffset_"/>
-        <result column="state" jdbcType="TINYINT" property="state_"/>
-    </resultMap>
 
-    <insert id="create" parameterType="apache.rocketmq.controller.v1.StreamMetadata">
+    <insert id="create" parameterType="StreamMetadata">
         INSERT INTO stream (stream_id, epoch, range_id, start_offset, state)
-        VALUES (#{streamId_}, #{epoch_}, #{rangeId_}, #{startOffset_}, #{state_})
+        VALUES (
+        #{streamId},
+        #{epoch},
+        #{rangeId},
+        #{startOffset},
+        #{state}
+        )
     </insert>
 
     <update id="increaseEpoch" parameterType="long">
@@ -39,7 +38,7 @@
         WHERE stream_id = #{id}
     </update>
 
-    <select id="getByStreamId" resultMap="BaseResultMap" parameterType="long">
+    <select id="getByStreamId" resultType="StreamMetadata" parameterType="long">
         SELECT stream_id, epoch, range_id, start_offset, state
         FROM stream
         WHERE stream_id = #{streamId, jdbcType=BIGINT}
@@ -58,10 +57,29 @@
     </update>
 
     <delete id="delete" parameterType="long">
-        DELETE FROM stream WHERE stream_id = #{streamId}
+        DELETE FROM stream
+        WHERE 1 = 1
+        <if test="null != streamId">
+            AND stream_id = #{streamId}
+        </if>
     </delete>
 
-    <select id="list" resultMap="BaseResultMap">
+    <select id="get" resultType="StreamMetadata">
+        SELECT stream_id, epoch, range_id, start_offset, state
+        FROM stream
+        WHERE 1 = 1
+        <if test="null != streamId">
+            AND stream_id = #{streamId}
+        </if>
+        <if test="null != rangeId">
+            AND range_id = #{rangeId}
+        </if>
+        <if test="null != state">
+            AND state = #{state}
+        </if>
+    </select>
+
+    <select id="list" resultType="StreamMetadata">
         SELECT stream_id, epoch, range_id, start_offset, state
         FROM stream
     </select>

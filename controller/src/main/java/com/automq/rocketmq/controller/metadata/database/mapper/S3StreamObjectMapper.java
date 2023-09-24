@@ -17,7 +17,7 @@
 
 package com.automq.rocketmq.controller.metadata.database.mapper;
 
-import apache.rocketmq.controller.v1.S3StreamObject;
+import com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
@@ -26,7 +26,11 @@ public interface S3StreamObjectMapper {
 
     int create(S3StreamObject s3StreamObject);
 
-    List<S3StreamObject> list();
+    List<S3StreamObject> list(@Param("objectId") Long objectId,
+        @Param("streamId") Long streamId,
+        @Param("offset") Long offset);
+
+    S3StreamObject getById(long id);
 
     List<S3StreamObject> listByStreamId(long streamId);
 
@@ -35,5 +39,6 @@ public interface S3StreamObjectMapper {
     int commit(S3StreamObject s3StreamObject);
 
     S3StreamObject getByStreamAndObject(@Param("streamId") long streamId, @Param("objectId") long objectId);
-    int delete(@Param("streamId") long streamId, @Param("objectId") long objectId);
+
+    int delete(@Param("id") Long id, @Param("streamId") Long streamId, @Param("objectId") Long objectId);
 }

@@ -17,7 +17,7 @@
 
 package com.automq.rocketmq.controller.metadata;
 
-import apache.rocketmq.controller.v1.S3StreamObject;
+import com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject;
 import com.automq.rocketmq.controller.metadata.database.mapper.S3StreamObjectMapper;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
@@ -34,68 +34,38 @@ import java.util.List;
 public class S3StreamObjectTest extends DatabaseTestBase {
 
     @Test
-    @Order(1)
-    public void testCreateS3StreamObject() throws IOException {
+    public void testS3StreamObjectCRUD() throws IOException {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
-            S3StreamObject s3StreamObject = S3StreamObject.newBuilder().
-                setObjectId(11).setObjectSize(123).
-                setStreamId(111).setStartOffset(1234).
-                setEndOffset(2345).build();
+
+            S3StreamObject s3StreamObject = new S3StreamObject();
+            s3StreamObject.setObjectId(11);
+            s3StreamObject.setObjectSize(123);
+            s3StreamObject.setStreamId(111);
+            s3StreamObject.setStartOffset(1234);
+            s3StreamObject.setEndOffset(2345);
+
+            Calendar calendar = Calendar.getInstance();
+            calendar.add(Calendar.SECOND, 30);
+            long time = calendar.getTime().getTime();
+
+            s3StreamObject.setBaseDataTimestamp(time);
 
             int affectedRows = s3StreamObjectMapper.create(s3StreamObject);
             Assertions.assertEquals(1, affectedRows);
+            Assertions.assertTrue(s3StreamObject.getId() > 0);
 
-            S3StreamObject s3StreamObject1 = s3StreamObjectMapper.getByStreamAndObject(s3StreamObject.getStreamId(), s3StreamObject.getObjectId());
-            Assertions.assertEquals(123, s3StreamObject1.getObjectSize());
-            Assertions.assertEquals(1234, s3StreamObject1.getStartOffset());
-            Assertions.assertEquals(2345, s3StreamObject1.getEndOffset());
+            // test getById
+            S3StreamObject s3StreamObject1 = s3StreamObjectMapper.getById(s3StreamObject.getId());
+            Assertions.assertEquals(s3StreamObject, s3StreamObject1);
 
-            s3StreamObjectMapper.delete(s3StreamObject1.getStreamId(), s3StreamObject1.getObjectId());
-            List<S3StreamObject> s3StreamObjects = s3StreamObjectMapper.list();
-            Assertions.assertTrue(s3StreamObjects.isEmpty());
-        }
-    }
+            // test getByStreamAndObject
+            S3StreamObject s3StreamObject2 = s3StreamObjectMapper.getByStreamAndObject(s3StreamObject.getStreamId(), s3StreamObject.getObjectId());
+            Assertions.assertEquals(123, s3StreamObject2.getObjectSize());
+            Assertions.assertEquals(1234, s3StreamObject2.getStartOffset());
+            Assertions.assertEquals(2345, s3StreamObject2.getEndOffset());
 
-    @Test
-    @Order(2)
-    public void testListS3StreamObjectsByStreamId() throws IOException {
-        try (SqlSession session = this.getSessionFactory().openSession()) {
-            S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
-            S3StreamObject s3StreamObject = S3StreamObject.newBuilder().
-                setObjectId(11).setObjectSize(123).
-                setStreamId(111).setStartOffset(1234).
-                setEndOffset(2345).build();
-
-            int affectedRows = s3StreamObjectMapper.create(s3StreamObject);
-            Assertions.assertEquals(1, affectedRows);
-
-            List<S3StreamObject> s3StreamObjects = s3StreamObjectMapper.listByStreamId(s3StreamObject.getStreamId());
-            Assertions.assertNotNull(s3StreamObjects);
-            Assertions.assertFalse(s3StreamObjects.isEmpty());
-            Assertions.assertEquals(123, s3StreamObjects.get(0).getObjectSize());
-            Assertions.assertEquals(1234, s3StreamObjects.get(0).getStartOffset());
-            Assertions.assertEquals(2345, s3StreamObjects.get(0).getEndOffset());
-
-            s3StreamObjectMapper.delete(s3StreamObjects.get(0).getStreamId(), s3StreamObjects.get(0).getObjectId());
-            s3StreamObjects = s3StreamObjectMapper.list();
-            Assertions.assertTrue(s3StreamObjects.isEmpty());
-        }
-    }
-
-    @Test
-    @Order(3)
-    public void testListS3StreamObjectsByObjectId() throws IOException {
-        try (SqlSession session = this.getSessionFactory().openSession()) {
-            S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
-            S3StreamObject s3StreamObject = S3StreamObject.newBuilder().
-                setObjectId(11).setObjectSize(123).
-                setStreamId(111).setStartOffset(1234).
-                setEndOffset(2345).build();
-
-            int affectedRows = s3StreamObjectMapper.create(s3StreamObject);
-            Assertions.assertEquals(1, affectedRows);
-
+            // test listByObjectId
             List<S3StreamObject> s3StreamObjects = s3StreamObjectMapper.listByObjectId(s3StreamObject.getObjectId());
             Assertions.assertNotNull(s3StreamObjects);
             Assertions.assertFalse(s3StreamObjects.isEmpty());
@@ -103,37 +73,61 @@ public class S3StreamObjectTest extends DatabaseTestBase {
             Assertions.assertEquals(1234, s3StreamObjects.get(0).getStartOffset());
             Assertions.assertEquals(2345, s3StreamObjects.get(0).getEndOffset());
 
-            s3StreamObjectMapper.delete(s3StreamObjects.get(0).getStreamId(), s3StreamObjects.get(0).getObjectId());
-            s3StreamObjects = s3StreamObjectMapper.list();
-            Assertions.assertTrue(s3StreamObjects.isEmpty());
+
+            // test listByStreamId
+            List<S3StreamObject> s3StreamObjects1 = s3StreamObjectMapper.listByStreamId(s3StreamObject.getStreamId());
+            Assertions.assertNotNull(s3StreamObjects);
+            Assertions.assertFalse(s3StreamObjects.isEmpty());
+            Assertions.assertEquals(123, s3StreamObjects1.get(0).getObjectSize());
+            Assertions.assertEquals(1234, s3StreamObjects1.get(0).getStartOffset());
+            Assertions.assertEquals(2345, s3StreamObjects1.get(0).getEndOffset());
+
+            // test list
+            s3StreamObjects = s3StreamObjectMapper.list(null, s3StreamObject.getStreamId(), 2000L);
+            Assertions.assertEquals(1, s3StreamObjects.size());
+            Assertions.assertEquals(s3StreamObject, s3StreamObjects.get(0));
+
+            // test delete
+            s3StreamObjectMapper.delete(s3StreamObject1.getId(), null, null);
+            List<S3StreamObject> s3StreamObjects3 = s3StreamObjectMapper.list(null, s3StreamObject1.getStreamId(), null);
+            Assertions.assertTrue(s3StreamObjects3.isEmpty());
         }
     }
 
     @Test
-    @Order(4)
+    @Order(1)
     public void testCommitS3StreamObject() throws IOException {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
-            S3StreamObject s3StreamObject = S3StreamObject.newBuilder().
-                setObjectId(11).setObjectSize(123).
-                setStreamId(111).setStartOffset(1234).
-                setEndOffset(2345).build();
+            S3StreamObject s3StreamObject = new S3StreamObject();
+            s3StreamObject.setObjectId(11);
+            s3StreamObject.setObjectSize(123);
+            s3StreamObject.setStreamId(111);
+            s3StreamObject.setStartOffset(1234);
+            s3StreamObject.setEndOffset(2345);
+
+
+            Calendar calendar = Calendar.getInstance();
+            calendar.add(Calendar.SECOND, 30);
+            long time = calendar.getTime().getTime();
+
+            s3StreamObject.setCommittedTimestamp(time);
 
             int affectedRows = s3StreamObjectMapper.create(s3StreamObject);
             Assertions.assertEquals(1, affectedRows);
 
             S3StreamObject s3StreamObject1 = s3StreamObjectMapper.getByStreamAndObject(s3StreamObject.getStreamId(), s3StreamObject.getObjectId());
 
-            Calendar calendar = Calendar.getInstance();
-            calendar.add(Calendar.SECOND, 30);
-            long time = calendar.getTime().getTime();
-            S3StreamObject s3StreamObject2 = s3StreamObject1.toBuilder().setCommittedTimestamp(time).build();
+            s3StreamObject1.setCommittedTimestamp(time + 10 * 1000);
 
-            affectedRows = s3StreamObjectMapper.commit(s3StreamObject2);
+            affectedRows = s3StreamObjectMapper.commit(s3StreamObject1);
+
+            S3StreamObject s3StreamObject2 = s3StreamObjectMapper.getById(s3StreamObject.getId());
             Assertions.assertEquals(1, affectedRows);
+            Assertions.assertEquals(s3StreamObject1, s3StreamObject2);
 
-            s3StreamObjectMapper.delete(s3StreamObject2.getStreamId(), s3StreamObject2.getObjectId());
-            List<S3StreamObject> s3StreamObjects = s3StreamObjectMapper.list();
+            s3StreamObjectMapper.delete(null, s3StreamObject2.getStreamId(), s3StreamObject2.getObjectId());
+            List<S3StreamObject> s3StreamObjects = s3StreamObjectMapper.list(s3StreamObject.getObjectId(), null, null);
             Assertions.assertTrue(s3StreamObjects.isEmpty());
         }
     }

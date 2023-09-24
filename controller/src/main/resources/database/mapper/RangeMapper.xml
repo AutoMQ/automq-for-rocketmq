@@ -19,46 +19,74 @@
     PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.automq.rocketmq.controller.metadata.database.mapper.RangeMapper">
-    <resultMap id="BaseResultMap" type="apache.rocketmq.controller.v1.Range">
-        <id column="range_id" jdbcType="INTEGER" property="rangeId_"/>
-        <result column="stream_id" jdbcType="BIGINT" property="streamId_"/>
-        <result column="epoch" jdbcType="BIGINT" property="epoch_"/>
-        <result column="start_offset" jdbcType="INTEGER" property="startOffset_"/>
-        <result column="end_offset" jdbcType="BIGINT" property="endOffset_"/>
-        <result column="broker_id" jdbcType="INTEGER" property="brokerId_"/>
-    </resultMap>
 
-    <insert id="create" parameterType="apache.rocketmq.controller.v1.Range">
+    <insert id="create" parameterType="Range" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
         INSERT INTO `range` (range_id, stream_id, epoch, start_offset, end_offset, broker_id)
-        VALUES (#{rangeId_}, #{streamId_}, #{epoch_}, #{startOffset_}, #{endOffset_}, #{brokerId_})
+        VALUES (
+            #{rangeId},
+            #{streamId},
+            #{epoch},
+            #{startOffset},
+            #{endOffset},
+            #{brokerId}
+        )
     </insert>
 
-    <select id="getByRangeId" resultMap="BaseResultMap">
-        SELECT range_id, stream_id, epoch, start_offset, end_offset, broker_id
+    <select id="getByRangeId" resultType="Range">
+        SELECT id, range_id, stream_id, epoch, start_offset, end_offset, broker_id
         FROM `range`
         WHERE range_id = #{rangeId}
+    </select>
+
+    <select id="getById" resultType="Range" parameterType="long">
+        SELECT id, range_id, stream_id, epoch, start_offset, end_offset, broker_id
+        FROM `range`
+        WHERE id = #{id}
+    </select>
+
+    <select id="get" resultType="Range">
+        SELECT id, range_id, stream_id, epoch, start_offset, end_offset, broker_id
+        FROM `range`
+        WHERE 1 = 1
+        <if test="null != rangeId">
+            AND range_id = #{rangeId}
+        </if>
+        <if test="null != streamId and null != brokerId">
+            AND stream_id = #{streamId}
+            AND broker_id = #{brokerId}
+        </if>
     </select>
 
     <delete id="delete" parameterType="int">
         DELETE FROM `range` WHERE range_id = #{rangeId}
     </delete>
 
-    <select id="listByStreamId" resultMap="BaseResultMap">
-        SELECT range_id, stream_id, epoch, start_offset, end_offset, broker_id
+    <select id="listByStreamId" resultType="Range">
+        SELECT id, range_id, stream_id, epoch, start_offset, end_offset, broker_id
         FROM `range`
         WHERE stream_id = #{streamId}
     </select>
 
-    <select id="listByBrokerId" resultMap="BaseResultMap">
-        SELECT range_id, stream_id, epoch, start_offset, end_offset, broker_id
+    <select id="listByBrokerId" resultType="Range">
+        SELECT id, range_id, stream_id, epoch, start_offset, end_offset, broker_id
         FROM `range`
         WHERE broker_id = #{brokerId}
     </select>
 
-
-    <select id="list" resultMap="BaseResultMap">
-        SELECT range_id, stream_id, epoch, start_offset, end_offset, broker_id
+    <select id="list" resultType="Range">
+        SELECT id, range_id, stream_id, epoch, start_offset, end_offset, broker_id
         FROM `range`
+        WHERE 1 = 1
+        <if test="null != brokerId">
+            AND broker_id = #{brokerId}
+        </if>
+        <if test="null != streamId">
+            AND stream_id = #{streamId}
+        </if>
+        <if test="null != offset">
+            AND start_offset &lt;= #{offset}
+            AND end_offset &gt; #{offset}
+        </if>
     </select>
 
 </mapper>
