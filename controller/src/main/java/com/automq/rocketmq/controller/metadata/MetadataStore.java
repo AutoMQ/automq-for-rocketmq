@@ -68,4 +68,6 @@ public interface MetadataStore extends Closeable {
      */
     List<QueueAssignment> listAssignments(Long topicId, Integer srcNodeId, Integer dstNodeId,
         QueueAssignmentStatus status);
+
+    void markMessageQueueAssignable(long topicId, int queueId) throws ControllerException;
 }

@@ -358,4 +358,36 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Assertions.assertEquals(1, topic.getReassignmentsCount());
         }
     }
+
+    @Test
+    public void testMarkMessageQueueAssignable() throws IOException, ControllerException {
+        try (SqlSession session = getSessionFactory().openSession()) {
+            QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
+            QueueAssignment assignment = new QueueAssignment();
+            assignment.setQueueId(1);
+            assignment.setTopicId(2);
+            assignment.setStatus(QueueAssignmentStatus.YIELDING);
+            assignmentMapper.create(assignment);
+            session.commit();
+        }
+
+        ControllerConfig config = Mockito.mock(ControllerConfig.class);
+        Mockito.when(config.nodeId()).thenReturn(1);
+        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
+        try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            metadataStore.start();
+            Awaitility.await().with().atMost(10, TimeUnit.SECONDS).pollInterval(100, TimeUnit.MILLISECONDS)
+                .until(metadataStore::isLeader);
+            metadataStore.markMessageQueueAssignable(2, 1);
+
+            List<QueueAssignment> assignments = metadataStore.listAssignments(2L, null, null, null);
+            for (QueueAssignment assignment : assignments) {
+                if (assignment.getQueueId() == 1) {
+                    Assertions.assertEquals(QueueAssignmentStatus.ASSIGNABLE, assignment.getStatus());
+                }
+            }
+        }
+    }
+
 }

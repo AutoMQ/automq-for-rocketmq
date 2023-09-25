@@ -208,4 +208,22 @@ class GrpcControllerClientTest {
             });
         }
     }
+
+    @Test
+    public void testNotifyMessageQueueAssignable() throws IOException, ControllerException, ExecutionException, InterruptedException {
+        long topicId = 1L;
+        int queueId = 2;
+        MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
+        Mockito.doNothing().when(metadataStore)
+            .markMessageQueueAssignable(ArgumentMatchers.anyLong(), ArgumentMatchers.anyInt());
+        ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
+        try (ControllerTestServer testServer = new ControllerTestServer(0, svc)) {
+            testServer.start();
+            int port = testServer.getPort();
+            ControllerClient client = new GrpcControllerClient();
+            Assertions.assertDoesNotThrow(() -> {
+                client.notifyMessageQueueAssignable(String.format("localhost:%d", port), topicId, queueId).get();
+            });
+        }
+    }
 }
