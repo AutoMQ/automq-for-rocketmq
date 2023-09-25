@@ -28,10 +28,14 @@ import apache.rocketmq.controller.v1.NodeRegistrationRequest;
 import com.automq.rocketmq.controller.metadata.ControllerClient;
 import com.automq.rocketmq.controller.metadata.ControllerConfig;
 import com.automq.rocketmq.controller.metadata.DatabaseTestBase;
+import com.automq.rocketmq.controller.metadata.GrpcControllerClient;
+import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.DefaultMetadataStore;
+import com.automq.rocketmq.controller.metadata.database.dao.GroupProgress;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
 import com.automq.rocketmq.controller.metadata.database.dao.TopicStatus;
+import com.automq.rocketmq.controller.metadata.database.mapper.GroupProgressMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 import io.grpc.Grpc;
@@ -40,6 +44,7 @@ import io.grpc.ManagedChannel;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.Iterator;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.ibatis.session.SqlSession;
@@ -188,7 +193,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
     @Test
     public void testListTopics() throws IOException {
-
         try (SqlSession session = getSessionFactory().openSession()) {
             TopicMapper topicMapper = session.getMapper(TopicMapper.class);
             for (int i = 0; i < 3; i++) {
@@ -225,6 +229,43 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                     Assertions.assertEquals(Code.OK, reply.getStatus().getCode());
                 }
                 channel.shutdownNow();
+            }
+        }
+    }
+
+    @Test
+    public void testCommitOffset() throws IOException {
+        ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
+        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
+        Mockito.when(controllerConfig.nodeId()).thenReturn(1);
+        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
+        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
+
+        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
+            metadataStore.start();
+            Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
+                .atMost(10, TimeUnit.SECONDS)
+                .until(metadataStore::isLeader);
+
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore))) {
+                testServer.start();
+                int port = testServer.getPort();
+                ControllerClient client = new GrpcControllerClient();
+                Assertions.assertDoesNotThrow(() -> {
+                    client.commitOffset(String.format("localhost:%d", port), 1, 1, 1, 1).get();
+                });
+
+                try (SqlSession session = getSessionFactory().openSession()) {
+                    GroupProgressMapper mapper = session.getMapper(GroupProgressMapper.class);
+                    List<GroupProgress> list = mapper.list(1L, 1L);
+                    Assertions.assertFalse(list.isEmpty());
+                    for (GroupProgress progress : list) {
+                        if (1 == progress.getQueueId()) {
+                            Assertions.assertEquals(1, progress.getQueueOffset());
+                        }
+                    }
+                }
             }
         }
     }

@@ -248,7 +248,19 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
 
     @Override
     public void commitOffset(CommitOffsetRequest request, StreamObserver<CommitOffsetReply> responseObserver) {
-        super.commitOffset(request, responseObserver);
+        try {
+            metadataStore.commitOffset(request.getGroupId(),
+                request.getQueue().getTopicId(),
+                request.getQueue().getQueueId(),
+                request.getOffset());
+            CommitOffsetReply reply = CommitOffsetReply.newBuilder()
+                .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                .build();
+            responseObserver.onNext(reply);
+            responseObserver.onCompleted();
+        } catch (ControllerException e) {
+            responseObserver.onError(e);
+        }
     }
 
     @Override

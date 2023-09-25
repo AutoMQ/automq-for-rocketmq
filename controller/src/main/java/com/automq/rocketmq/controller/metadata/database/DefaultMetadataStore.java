@@ -28,11 +28,13 @@ import com.automq.rocketmq.controller.metadata.ControllerClient;
 import com.automq.rocketmq.controller.metadata.ControllerConfig;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.Role;
+import com.automq.rocketmq.controller.metadata.database.dao.GroupProgress;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignmentStatus;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
 import com.automq.rocketmq.controller.metadata.database.dao.TopicStatus;
+import com.automq.rocketmq.controller.metadata.database.mapper.GroupProgressMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.LeaseMapper;
 import com.automq.rocketmq.controller.metadata.database.dao.Lease;
@@ -472,6 +474,30 @@ public class DefaultMetadataStore implements MetadataStore {
                     }
                     throw new ControllerException(Code.INTERNAL_VALUE, e);
                 }
+            }
+        }
+    }
+
+    @Override
+    public void commitOffset(long groupId, long topicId, int queueId, long offset) throws ControllerException {
+        for (; ; ) {
+            if (isLeader()) {
+                try (SqlSession session = getSessionFactory().openSession()) {
+                    if (!maintainLeadershipWithSharedLock(session)) {
+                        continue;
+                    }
+                    GroupProgressMapper groupProgressMapper = session.getMapper(GroupProgressMapper.class);
+                    GroupProgress progress = new GroupProgress();
+                    progress.setGroupId(groupId);
+                    progress.setTopicId(topicId);
+                    progress.setQueueId(queueId);
+                    progress.setQueueOffset(offset);
+                    groupProgressMapper.createOrUpdate(progress);
+                    session.commit();
+                    break;
+                }
+            } else {
+                this.controllerClient.commitOffset(leaderAddress(), groupId, topicId, queueId, offset);
             }
         }
     }
