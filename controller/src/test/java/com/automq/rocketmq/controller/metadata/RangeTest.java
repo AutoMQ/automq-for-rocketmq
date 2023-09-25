@@ -17,11 +17,10 @@
 
 package com.automq.rocketmq.controller.metadata;
 
-import apache.rocketmq.controller.v1.Range;
+import com.automq.rocketmq.controller.metadata.database.dao.Range;
 import com.automq.rocketmq.controller.metadata.database.mapper.RangeMapper;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.MethodOrderer;
@@ -33,71 +32,56 @@ import java.util.List;
 public class RangeTest extends DatabaseTestBase {
 
     @Test
-    @Order(1)
-    public void testCreateRange() throws IOException {
+    public void testRangeCRUD() throws IOException {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
-            Range range = Range.newBuilder().
-                setRangeId(22).setStreamId(11).
-                setEpoch(1).setStartOffset(1234).
-                setEndOffset(2345).build();
+            Range range = new Range();
+            range.setRangeId(22);
+            range.setStreamId(11);
+            range.setEpoch(1);
+            range.setStartOffset(1234);
+            range.setEndOffset(2345);
+            range.setBrokerId(33);
 
             int affectedRows = rangeMapper.create(range);
             Assertions.assertEquals(1, affectedRows);
+            Assertions.assertTrue(range.getId() > 0);
 
-            Range range1 = rangeMapper.getByRangeId(range.getRangeId());
+            Range range1 = rangeMapper.getById(range.getId());
+            Assertions.assertEquals(range, range1);
+
+            // test getByRangeId
+            range1 = rangeMapper.getByRangeId(range.getRangeId());
             Assertions.assertEquals(22, range1.getRangeId());
             Assertions.assertEquals(11, range1.getStreamId());
             Assertions.assertEquals(1, range1.getEpoch());
             Assertions.assertEquals(1234, range1.getStartOffset());
             Assertions.assertEquals(2345, range1.getEndOffset());
+            Assertions.assertEquals(33, range1.getBrokerId());
 
-            rangeMapper.delete(range1.getRangeId());
-            List<Range> ranges = rangeMapper.list();
-            Assertions.assertTrue(ranges.isEmpty());
-        }
-    }
-
-    @Test
-    @Order(2)
-    public void testListByStreamId() throws IOException {
-        try (SqlSession session = this.getSessionFactory().openSession()) {
-            RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
-            Range range = Range.newBuilder().
-                setRangeId(1).setStreamId(11).
-                setEpoch(1).setStartOffset(1234).
-                setEndOffset(2345).build();
-
-            int affectedRows = rangeMapper.create(range);
-            Assertions.assertEquals(1, affectedRows);
-
-            Range range1 = rangeMapper.getByRangeId(range.getRangeId());
+            // test listByStreamId
             List<Range> ranges = rangeMapper.listByStreamId(range1.getStreamId());
             Assertions.assertNotNull(ranges);
             Assertions.assertEquals(1, ranges.size());
-            rangeMapper.delete(range1.getRangeId());
-        }
-    }
+            Assertions.assertEquals(range, ranges.get(0));
 
-
-    @Test
-    @Order(3)
-    public void testListByBrokerId() throws IOException {
-        try (SqlSession session = this.getSessionFactory().openSession()) {
-            RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
-            Range range = Range.newBuilder().
-                setRangeId(1).setStreamId(11).
-                setEpoch(1).setStartOffset(1234).
-                setEndOffset(2345).build();
-
-            int affectedRows = rangeMapper.create(range);
-            Assertions.assertEquals(1, affectedRows);
-
-            Range range1 = rangeMapper.getByRangeId(range.getRangeId());
-            List<Range> ranges = rangeMapper.listByBrokerId(range1.getBrokerId());
-            Assertions.assertNotNull(ranges);
+            // test listByBrokerId
+            List<Range> ranges1 = rangeMapper.listByBrokerId(range1.getBrokerId());
+            Assertions.assertNotNull(ranges1);
             Assertions.assertEquals(1, ranges.size());
+
+            // test get
+            Range range2 = rangeMapper.get(range.getRangeId(), null, range.getBrokerId());
+            Assertions.assertEquals(range, range2);
+
+            ranges = rangeMapper.list(null, range.getStreamId(), 2000L);
+            Assertions.assertEquals(1, ranges.size());
+            Assertions.assertEquals(range, ranges.get(0));
+
+            // test delete
             rangeMapper.delete(range1.getRangeId());
+            List<Range> ranges2 = rangeMapper.list(null, null, null);
+            Assertions.assertTrue(ranges2.isEmpty());
         }
     }
 }

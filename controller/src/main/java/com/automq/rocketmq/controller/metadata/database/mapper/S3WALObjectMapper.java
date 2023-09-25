@@ -15,32 +15,25 @@
  * limitations under the License.
  */
 
-
 package com.automq.rocketmq.controller.metadata.database.mapper;
 
-import com.automq.rocketmq.controller.metadata.database.dao.StreamMetadata;
+import com.automq.rocketmq.controller.metadata.database.dao.S3WALObject;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
-public interface StreamMapper {
+public interface S3WALObjectMapper {
 
-    int create(StreamMetadata stream);
+    int create(S3WALObject s3WALObject);
 
-    StreamMetadata getByStreamId(long streamId);
+    S3WALObject getByObjectId(long objectId);
 
-    int increaseEpoch(long id);
+    int delete(@Param("objectId") Long objectId,
+               @Param("brokerId") Integer brokerId,
+               @Param("sequenceId") Long sequenceId);
 
-    int updateLastRange(@Param("streamId") long streamId, @Param("lastRangeId") int lastRangeId);
+    List<S3WALObject> list(@Param("brokerId") Integer brokerId,
+        @Param("sequenceId") Long sequenceId);
 
-    int updateStreamState(@Param("streamId")long streamId, @Param("state")int state);
-
-    void delete(long streamId);
-
-    List<StreamMetadata> list();
-
-    StreamMetadata get(@Param("streamId") long streamId,
-        @Param("rangeId") int rangeId,
-        @Param("state") int state
-    );
+    int commit(S3WALObject s3WALObject);
 }

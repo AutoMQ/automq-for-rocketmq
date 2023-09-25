@@ -17,7 +17,8 @@
 
 package com.automq.rocketmq.controller.metadata.database.mapper;
 
-import apache.rocketmq.controller.v1.S3Object;
+import com.automq.rocketmq.controller.metadata.database.dao.S3Object;
+import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
@@ -25,15 +26,16 @@ public interface S3ObjectMapper {
 
     int create(S3Object s3Object);
 
-    S3Object getByObjectId(long objectId);
+    S3Object getById(long id);
 
-    int prepare(S3Object s3Object);
+    S3Object getByObjectId(long objectId);
 
     int expired(S3Object s3Object);
 
     int commit(S3Object s3Object);
 
-    int delete(long objectId);
+    int delete(S3Object s3Object);
 
-    List<S3Object> list();
+    List<S3Object> list(@Param("state") String state,
+        @Param("expiredTimestamp") Long expiredTimestamp);
 }

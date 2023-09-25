@@ -19,56 +19,88 @@
     PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.automq.rocketmq.controller.metadata.database.mapper.S3StreamObjectMapper">
-    <resultMap id="BaseResultMap" type="apache.rocketmq.controller.v1.S3StreamObject">
-        <result column="stream_id" jdbcType="BIGINT" property="streamId_"/>
-        <result column="start_offset" jdbcType="BIGINT" property="startOffset_"/>
-        <result column="end_offset" jdbcType="BIGINT" property="endOffset_"/>
-        <result column="object_id" jdbcType="BIGINT" property="objectId_"/>
-        <result column="object_size" jdbcType="BIGINT" property="objectSize_"/>
-        <result column="base_data_timestamp" jdbcType="BIGINT" property="baseDataTimestamp_"/>
-        <result column="committed_timestamp" jdbcType="BIGINT" property="committedTimestamp_"/>
-    </resultMap>
 
-    <insert id="create" parameterType="apache.rocketmq.controller.v1.S3StreamObject">
-        INSERT
-        INTO s3streamobject (object_id, object_size, stream_id, start_offset, end_offset, base_data_timestamp,
-        committed_timestamp)
-        VALUES (#{objectId_}, #{objectSize_}, #{streamId_}, #{startOffset_}, #{endOffset_}, #{baseDataTimestamp_},
-        #{committedTimestamp_})
+    <insert id="create" parameterType="S3StreamObject" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO
+        s3streamobject (object_id, object_size, stream_id, start_offset, end_offset, base_data_timestamp)
+        VALUES (
+        #{objectId},
+        #{objectSize},
+        #{streamId},
+        #{startOffset},
+        #{endOffset},
+        #{baseDataTimestamp}
+        )
     </insert>
 
-    <select id="listByStreamId" resultMap="BaseResultMap">
-        SELECT object_id, object_size, stream_id, start_offset, end_offset, base_data_timestamp, committed_timestamp
+    <select id="getById" resultType="S3StreamObject">
+        SELECT id, object_id, object_size, stream_id, start_offset, end_offset, base_data_timestamp, committed_timestamp
+        FROM s3streamobject
+        WHERE id = #{id}
+    </select>
+
+    <select id="listByStreamId" resultType="S3StreamObject">
+        SELECT id, object_id, object_size, stream_id, start_offset, end_offset, base_data_timestamp, committed_timestamp
         FROM s3streamobject
         WHERE stream_id = #{streamId}
     </select>
 
-    <select id="listByObjectId" resultMap="BaseResultMap">
-        SELECT object_id, object_size, stream_id, start_offset, end_offset, base_data_timestamp, committed_timestamp
+    <select id="listByObjectId" resultType="S3StreamObject">
+        SELECT id, object_id, object_size, stream_id, start_offset, end_offset, base_data_timestamp, committed_timestamp
         FROM s3streamobject
         WHERE object_id = #{objectId}
     </select>
 
-    <update id="commit" parameterType="apache.rocketmq.controller.v1.S3StreamObject">
+    <update id="commit" parameterType="S3StreamObject">
         UPDATE s3streamobject
-        SET committed_timestamp = #{committedTimestamp_}
-        WHERE object_id = #{objectId_} and stream_id = #{streamId_}
+        SET committed_timestamp = #{committedTimestamp}
+        WHERE 1 = 1
+        <if test="null != id">
+            AND id = #{id}
+        </if>
+        <if test="null != objectId">
+            AND object_id = #{objectId}
+        </if>
+        <if test="null != streamId">
+            AND stream_id = #{streamId}
+        </if>
     </update>
 
     <delete id="delete">
         DELETE
         FROM s3streamobject
-        WHERE object_id = #{objectId} and stream_id = #{streamId}
+        WHERE 1 = 1
+        <if test="null != id">
+            AND id = #{id}
+        </if>
+        <if test="null != objectId">
+            AND object_id = #{objectId}
+        </if>
+        <if test="null != streamId">
+            AND stream_id = #{streamId}
+        </if>
     </delete>
 
-    <select id="getByStreamAndObject" resultMap="BaseResultMap">
-        SELECT object_id, object_size, stream_id, start_offset, end_offset, base_data_timestamp, committed_timestamp
+    <select id="getByStreamAndObject" resultType="S3StreamObject">
+        SELECT id, object_id, object_size, stream_id, start_offset, end_offset, base_data_timestamp, committed_timestamp
         FROM s3streamobject
         WHERE object_id = #{objectId} and stream_id = #{streamId}
     </select>
 
-    <select id="list" resultMap="BaseResultMap">
-        SELECT object_id, object_size, stream_id, start_offset, end_offset, base_data_timestamp, committed_timestamp
+    <select id="list" resultType="S3StreamObject">
+        SELECT id, object_id, object_size, stream_id, start_offset, end_offset, base_data_timestamp, committed_timestamp
         FROM s3streamobject
+        WHERE 1 = 1
+        <if test="null != objectId">
+            AND object_id = #{objectId}
+        </if>
+        <if test="null != streamId">
+            AND stream_id = #{streamId}
+        </if>
+        <if test="null != offset">
+            AND start_offset &lt;= #{offset}
+            AND end_offset &gt; #{offset}
+        </if>
     </select>
+
 </mapper>
