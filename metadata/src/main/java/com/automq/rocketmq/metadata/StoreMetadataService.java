@@ -20,6 +20,7 @@ package com.automq.rocketmq.metadata;
 import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
+import com.automq.rocketmq.common.util.Pair;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -133,4 +134,15 @@ public interface StoreMetadataService {
      * @return list of {@link S3StreamObject}
      */
     CompletableFuture<List<S3StreamObject>> listStreamObjects(long streamId, long startOffset, long endOffset, int limit);
+
+    /**
+     * List stream objects and WAL objects by a specified stream range with a limit count (for each type of objects).
+     * @param streamId the specified stream id
+     * @param startOffset the start offset of the specified stream range.
+     * @param endOffset the end offset of the specified stream range. NOOP_OFFSET(-1) represent endOffset is unlimited.
+     * @param limit the limit count of the returned stream objects.
+     * @return list of {@link S3StreamObject} and {@link S3WALObject}
+     */
+    CompletableFuture<Pair<List<S3StreamObject>, List<S3WALObject>>> listObjects(long streamId, long startOffset,
+        long endOffset, int limit);
 }

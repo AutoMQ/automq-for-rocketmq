@@ -20,6 +20,7 @@ package com.automq.rocketmq.store;
 import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.SubStream;
+import com.automq.rocketmq.common.util.Pair;
 import com.automq.rocketmq.metadata.StoreMetadataService;
 import com.automq.stream.s3.metadata.S3ObjectMetadata;
 import com.automq.stream.s3.metadata.S3ObjectType;
@@ -150,6 +151,19 @@ class S3ObjectManagerTest {
             .thenReturn(CompletableFuture.completedFuture(new ArrayList<>(Collections.singletonList(builder.build()))));
         when(metadataService.listStreamObjects(anyLong(), anyLong(), anyLong(), anyInt()))
             .thenReturn(CompletableFuture.completedFuture(new ArrayList<>()));
+        when(metadataService.listObjects(anyLong(), anyLong(), anyLong(), anyInt()))
+            .thenAnswer(ink -> {
+                long streamId = ink.getArgument(0);
+                long startOffset = ink.getArgument(1);
+                long endOffset = ink.getArgument(2);
+                int limit = ink.getArgument(3);
+                return metadataService.listStreamObjects(streamId, startOffset, endOffset, limit).thenCombine(
+                    metadataService.listWALObjects(streamId, startOffset, endOffset, limit),
+                    (sObjects, wObjects) -> {
+                        return new Pair(sObjects, wObjects);
+                    }
+                );
+            });
 
         CompletableFuture<List<S3ObjectMetadata>> objects = objectManager.getObjects(1, 10, 100, 10);
         // Assert a runtime exception is thrown
@@ -218,7 +232,19 @@ class S3ObjectManagerTest {
         List<S3StreamObject> streamObjects = new ArrayList<>(Collections.singletonList(soBuilder.build()));
         when(metadataService.listStreamObjects(anyLong(), anyLong(), anyLong(), anyInt()))
             .thenReturn(CompletableFuture.completedFuture(streamObjects));
-
+        when(metadataService.listObjects(anyLong(), anyLong(), anyLong(), anyInt()))
+            .thenAnswer(ink -> {
+                long streamId = ink.getArgument(0);
+                long startOffset = ink.getArgument(1);
+                long endOffset = ink.getArgument(2);
+                int limit = ink.getArgument(3);
+                return metadataService.listStreamObjects(streamId, startOffset, endOffset, limit).thenCombine(
+                    metadataService.listWALObjects(streamId, startOffset, endOffset, limit),
+                    (sObjects, wObjects) -> {
+                        return new Pair(sObjects, wObjects);
+                    }
+                );
+            });
         objectManager.getObjects(1, 100, 500, 3).thenAccept(objects -> {
             assertEquals(3, objects.size());
             S3ObjectMetadata obj1 = objects.get(0);
@@ -241,7 +267,7 @@ class S3ObjectManagerTest {
         }).join();
 
         objectManager.getObjects(1, 100, 500, 2).thenAccept(objects -> {
-            assertEquals(3, objects.size());
+            assertEquals(2, objects.size());
             assertEquals(1, objects.get(0).objectId());
             assertEquals(3, objects.get(1).objectId());
         }).join();

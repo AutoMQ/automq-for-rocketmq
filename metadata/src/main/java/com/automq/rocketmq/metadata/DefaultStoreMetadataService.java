@@ -20,6 +20,7 @@ package com.automq.rocketmq.metadata;
 import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
+import com.automq.rocketmq.common.util.Pair;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -108,6 +109,11 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
     @Override
     public CompletableFuture<List<S3StreamObject>> listStreamObjects(long streamId, long startOffset, long endOffset,
         int limit) {
+        return null;
+    }
+
+    public CompletableFuture<Pair<List<S3StreamObject>, List<S3WALObject>>> listObjects(long streamId, long startOffset,
+        long endOffset, int limit) {
         return null;
     }
 }
