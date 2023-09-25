@@ -63,6 +63,8 @@ public class LeaseTask extends ControllerTask {
                         metadataStore.setLease(update);
                     } else {
                         metadataStore.setRole(Role.Follower);
+                        LOGGER.info("Node[id={}, epoch={}] is controller leader currently, expiring at {}",
+                            lease.getNodeId(), lease.getEpoch(), lease.getExpirationTime());
                     }
                 } else {
                     // Perform leader election campaign
@@ -73,14 +75,11 @@ public class LeaseTask extends ControllerTask {
                         Calendar calendar = Calendar.getInstance();
                         calendar.add(Calendar.SECOND, metadataStore.getConfig().leaseLifeSpanInSecs());
                         update.setExpirationTime(calendar.getTime());
-                        int rowsAffected = leaseMapper.update(update);
-                        if (1 == rowsAffected) {
-                            this.metadataStore.setLease(update);
-                            session.commit();
-                            metadataStore.setRole(Role.Leader);
-                        } else {
-                            LOGGER.error("Unexpected state: Affected {} rows when campaigning for leader", rowsAffected);
-                        }
+                        leaseMapper.update(update);
+                        this.metadataStore.setLease(update);
+                        session.commit();
+                        metadataStore.setRole(Role.Leader);
+                        LOGGER.info("Completes campaign and become controller leader");
                     } else {
                         LOGGER.info("Another controller has taken the lease");
                     }

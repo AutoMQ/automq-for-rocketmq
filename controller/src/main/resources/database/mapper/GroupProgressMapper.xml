@@ -27,6 +27,18 @@
             ON DUPLICATE KEY UPDATE queue_offset = #{queueOffset}
     </insert>
 
+    <delete id="delete">
+        DELETE
+        FROM group_progress
+        WHERE 1 = 1
+        <if test="null != groupId">
+            AND group_id = #{groupId}
+        </if>
+        <if test="null != topicId">
+            AND topic_id = #{topicId}
+        </if>
+    </delete>
+
     <select id="list" resultType="GroupProgress">
         SELECT group_id, topic_id, queue_id, queue_offset
         FROM group_progress

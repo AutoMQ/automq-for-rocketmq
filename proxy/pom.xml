@@ -30,7 +30,7 @@
 
     <dependencies>
         <dependency>
-            <groupId>${groupId}</groupId>
+            <groupId>${project.groupId}</groupId>
             <artifactId>rocketmq-store</artifactId>
             <version>${project.version}</version>
         </dependency>

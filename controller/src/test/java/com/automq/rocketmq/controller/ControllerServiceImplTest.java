@@ -26,8 +26,8 @@ import apache.rocketmq.controller.v1.NodeRegistrationRequest;
 import com.automq.rocketmq.controller.metadata.ControllerClient;
 import com.automq.rocketmq.controller.metadata.ControllerConfig;
 import com.automq.rocketmq.controller.metadata.DatabaseTestBase;
-import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.DefaultMetadataStore;
+import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
 import io.grpc.Grpc;
 import io.grpc.InsecureChannelCredentials;
@@ -139,19 +139,53 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testHeartbeatGrpc() throws IOException, InterruptedException {
-        MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
-        ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-        testServer.start();
+    public void testHeartbeatGrpc() throws IOException {
 
-        int port = testServer.getPort();
-        ManagedChannel channel = Grpc.newChannelBuilderForAddress("localhost", port, InsecureChannelCredentials.create()).build();
-        ControllerServiceGrpc.ControllerServiceBlockingStub blockingStub = ControllerServiceGrpc.newBlockingStub(channel);
-        HeartbeatRequest request = HeartbeatRequest.newBuilder().setId(1).setEpoch(1).build();
-        HeartbeatReply reply = blockingStub.processHeartbeat(request);
-        Assertions.assertEquals(Code.OK, reply.getStatus().getCode());
-        channel.shutdownNow();
-        testServer.stop();
+        int nodeId;
+        try (SqlSession session = getSessionFactory().openSession()) {
+            NodeMapper mapper = session.getMapper(NodeMapper.class);
+            Node node = new Node();
+            node.setName("b1");
+            node.setVolumeId("v-1");
+            node.setVpcId("vpc-1");
+            node.setAddress("localhost:1234");
+            node.setInstanceId("i-1");
+            node.setEpoch(1);
+            mapper.create(node);
+            nodeId = node.getId();
+            session.commit();
+        }
+
+        ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
+        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
+        Mockito.when(controllerConfig.nodeId()).thenReturn(1);
+        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(1);
+        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
+            metadataStore.start();
+            Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
+                .atMost(10, TimeUnit.SECONDS)
+                .until(metadataStore::isLeader);
+
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore))) {
+                testServer.start();
+                int port = testServer.getPort();
+                ManagedChannel channel = Grpc.newChannelBuilderForAddress("localhost", port, InsecureChannelCredentials.create()).build();
+                ControllerServiceGrpc.ControllerServiceBlockingStub blockingStub = ControllerServiceGrpc.newBlockingStub(channel);
+                HeartbeatRequest request = HeartbeatRequest.newBuilder().setId(nodeId).setEpoch(1).build();
+                HeartbeatReply reply = blockingStub.heartbeat(request);
+                Assertions.assertEquals(Code.OK, reply.getStatus().getCode());
+                channel.shutdownNow();
+            }
+
+            try (SqlSession session = getSessionFactory().openSession()) {
+                NodeMapper mapper = session.getMapper(NodeMapper.class);
+                mapper.delete(nodeId);
+                session.commit();
+            }
+        }
+
     }
 
 }

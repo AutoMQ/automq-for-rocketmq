@@ -28,12 +28,20 @@ public class BrokerNode {
 
     private long lastKeepAlive;
 
+    private boolean goingAway;
+
     public BrokerNode(Node node) {
         this.node = node;
+        this.lastKeepAlive = System.nanoTime();
     }
 
-    public void keepAlive() {
+    public void keepAlive(long epoch, boolean goingAway) {
+        if (epoch < node.getEpoch()) {
+            return;
+        }
+
         this.lastKeepAlive = System.nanoTime();
+        this.goingAway = goingAway;
     }
 
     public boolean isAlive(long tolerationInMillis) {
@@ -43,5 +51,13 @@ public class BrokerNode {
 
     public Node getNode() {
         return node;
+    }
+
+    public boolean isGoingAway() {
+        return goingAway;
+    }
+
+    public void setGoingAway(boolean goingAway) {
+        this.goingAway = goingAway;
     }
 }

@@ -46,5 +46,5 @@ public interface NodeMapper {
 
     List<Node> list(@Param("updateTime") Date updateTime);
 
-    void delete(int id);
+    void delete(Integer id);
 }

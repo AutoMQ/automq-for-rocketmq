@@ -29,8 +29,8 @@ public class HikariCPDataSourceFactory extends PooledDataSourceFactory {
     @Override
     public void setProperties(Properties properties) {
         HikariConfig config = new HikariConfig(properties);
-        config.setMaximumPoolSize(2);
-        config.setIdleTimeout(1000);
+        config.setMaximumPoolSize(1);
+        config.setIdleTimeout(100);
         this.dataSource = new HikariDataSource(config);
     }
 
