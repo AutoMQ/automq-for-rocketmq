@@ -17,13 +17,42 @@
 
 package com.automq.rocketmq.proxy.mock;
 
+import apache.rocketmq.controller.v1.ConsumerGroup;
+import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.metadata.ProxyMetadataService;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 
 public class MockProxyMetadataService implements ProxyMetadataService {
     Map<Long, Long> offsetMap = new HashMap<>();
+
+    @Override
+    public CompletableFuture<Topic> topicOf(String topicName) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<Set<Integer>> queueAssignmentsOf(long topicId) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<ConsumerGroup> consumerGroupOf(String groupName) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<Long> consumerOffsetOf(long consumerGroupId, long topicId, int queueId) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<Void> updateConsumerOffset(long consumerGroupId, long topicId, int queueId,
+        long newOffset) {
+        return null;
+    }
 
     @Override
     public long queryTopicId(String name) {

@@ -67,6 +67,11 @@ message OngoingMessageQueueReassignment {
   int32 dst_broker_id = 3;
 }
 
+message ConsumerGroup {
+  string name = 1;
+  int64 group_id = 2;
+}
+
 // Bellow messages are used to represent the `Stream` resource.
 // A stream is similar to a partition, typically each message queue has a linked stream.
 // The stream is the physical storage unit of the message queue in the cloud blob storage, like S3, GCS, etc.

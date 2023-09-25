@@ -25,15 +25,41 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 public interface StoreMetadataService {
-    long getStreamId(long topicId, int queueId);
+    /**
+     * Get the data stream metadata of the specified message queue.
+     *
+     * @param topicId topic id
+     * @param queueId the specified message queue id
+     * @return {@link CompletableFuture} of {@link StreamMetadata}
+     */
+    CompletableFuture<StreamMetadata> dataStreamOf(long topicId, int queueId);
 
-    long getOperationLogStreamId(long topicId, int queueId);
+    /**
+     * Get the operation log stream metadata of the specified message queue.
+     *
+     * @param topicId topic id
+     * @param queueId the specified message queue id
+     * @return {@link CompletableFuture} of {@link StreamMetadata}
+     */
+    CompletableFuture<StreamMetadata> operationStreamOf(long topicId, int queueId);
 
-    long getRetryStreamId(long consumerGroupId, long topicId, int queueId);
+    /**
+     * Get the retry stream metadata of the specified message queue and consumer group.
+     *
+     * @param consumerGroupId consumer group id
+     * @param topicId topic id
+     * @param queueId the specified message queue id
+     * @return {@link CompletableFuture} of {@link StreamMetadata}
+     */
+    CompletableFuture<StreamMetadata> retryStreamOf(long consumerGroupId, long topicId, int queueId);
 
-    long getDeadLetterStreamId(long consumerGroupId, long topicId, int queueId);
-
-    int getMaxRetryTimes(long consumerGroupId);
+    /**
+     * Get the configured max retry times of the specified consumer group.
+     *
+     * @param consumerGroupId consumer group id
+     * @return {@link CompletableFuture} of {@link Integer}
+     */
+    CompletableFuture<Integer> maxRetryTimesOf(long consumerGroupId);
 
     /**
      * Trim stream to new start offset. The old data will be deleted or marked as deleted.
@@ -145,4 +171,15 @@ public interface StoreMetadataService {
      */
     CompletableFuture<Pair<List<S3StreamObject>, List<S3WALObject>>> listObjects(long streamId, long startOffset,
         long endOffset, int limit);
+
+    @Deprecated
+    long getStreamId(long topicId, int queueId);
+    @Deprecated
+    long getOperationLogStreamId(long topicId, int queueId);
+    @Deprecated
+    long getRetryStreamId(long consumerGroupId, long topicId, int queueId);
+    @Deprecated
+    long getDeadLetterStreamId(long consumerGroupId, long topicId, int queueId);
+    @Deprecated
+    int getMaxRetryTimes(long consumerGroupId);
 }

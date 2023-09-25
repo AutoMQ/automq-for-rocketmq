@@ -75,6 +75,26 @@ public class MockStoreMetadataService implements StoreMetadataService {
     }
 
     @Override
+    public CompletableFuture<StreamMetadata> dataStreamOf(long topicId, int queueId) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<StreamMetadata> operationStreamOf(long topicId, int queueId) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<StreamMetadata> retryStreamOf(long consumerGroupId, long topicId, int queueId) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<Integer> maxRetryTimesOf(long consumerGroupId) {
+        return null;
+    }
+
+    @Override
     public CompletableFuture<Void> trimStream(long streamId, long streamEpoch,
         long newStartOffset) {
         return null;
