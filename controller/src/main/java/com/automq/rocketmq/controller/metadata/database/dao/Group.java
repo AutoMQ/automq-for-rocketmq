@@ -23,7 +23,7 @@ public class Group {
     private long id;
     private String name;
 
-    private GroupStatus status;
+    private GroupStatus status = GroupStatus.ACTIVE;
 
     private long deadLetterTopicId;
 

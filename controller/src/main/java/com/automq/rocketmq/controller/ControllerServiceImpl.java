@@ -27,6 +27,8 @@ import apache.rocketmq.controller.v1.CommitStreamObjectRequest;
 import apache.rocketmq.controller.v1.CommitWALObjectReply;
 import apache.rocketmq.controller.v1.CommitWALObjectRequest;
 import apache.rocketmq.controller.v1.ControllerServiceGrpc;
+import apache.rocketmq.controller.v1.CreateGroupReply;
+import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.CreateTopicReply;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.DeleteTopicReply;
@@ -254,6 +256,23 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
                 request.getQueue().getQueueId(),
                 request.getOffset());
             CommitOffsetReply reply = CommitOffsetReply.newBuilder()
+                .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                .build();
+            responseObserver.onNext(reply);
+            responseObserver.onCompleted();
+        } catch (ControllerException e) {
+            responseObserver.onError(e);
+        }
+    }
+
+    @Override
+    public void createGroup(CreateGroupRequest request, StreamObserver<CreateGroupReply> responseObserver) {
+
+        try {
+            long groupId = metadataStore.createGroup(request.getName(), request.getMaxRetryAttempt(),
+                request.getGroupType(), request.getDeadLetterTopicId());
+            CreateGroupReply reply = CreateGroupReply.newBuilder()
+                .setGroupId(groupId)
                 .setStatus(Status.newBuilder().setCode(Code.OK).build())
                 .build();
             responseObserver.onNext(reply);

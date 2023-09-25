@@ -17,6 +17,8 @@
 
 package com.automq.rocketmq.controller.metadata;
 
+import apache.rocketmq.controller.v1.CreateGroupReply;
+import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
@@ -38,6 +40,9 @@ public interface ControllerClient {
 
     CompletableFuture<Void> notifyMessageQueueAssignable(String target, long topicId,
         int queueId) throws ControllerException;
+
+    CompletableFuture<CreateGroupReply> createGroup(String target, CreateGroupRequest request)
+        throws ControllerException;
 
     CompletableFuture<Void> commitOffset(String target, long groupId, long topicId, int queueId,
         long offset) throws ControllerException;

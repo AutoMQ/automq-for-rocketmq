@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.controller.metadata;
 
+import apache.rocketmq.controller.v1.GroupType;
 import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
@@ -72,4 +73,6 @@ public interface MetadataStore extends Closeable {
     void markMessageQueueAssignable(long topicId, int queueId) throws ControllerException;
 
     void commitOffset(long groupId, long topicId, int queueId, long offset) throws ControllerException;
+
+    long createGroup(String groupName, int maxRetry, GroupType type, long dlq) throws ControllerException;
 }
