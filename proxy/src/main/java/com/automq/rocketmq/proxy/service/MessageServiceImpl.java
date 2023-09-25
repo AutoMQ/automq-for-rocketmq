@@ -15,13 +15,12 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.proxy;
+package com.automq.rocketmq.proxy.service;
 
 import com.automq.rocketmq.common.config.ProxyConfig;
 import com.automq.rocketmq.common.model.MessageExt;
 import com.automq.rocketmq.common.util.CommonUtil;
 import com.automq.rocketmq.metadata.ProxyMetadataService;
-import com.automq.rocketmq.proxy.service.LockService;
 import com.automq.rocketmq.proxy.util.RocketMQMessageUtil;
 import com.automq.rocketmq.store.api.MessageStore;
 import com.automq.rocketmq.store.model.message.Filter;
