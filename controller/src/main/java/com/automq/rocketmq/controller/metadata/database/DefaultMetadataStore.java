@@ -18,6 +18,9 @@
 package com.automq.rocketmq.controller.metadata.database;
 
 import apache.rocketmq.controller.v1.Code;
+import apache.rocketmq.controller.v1.CreateGroupReply;
+import apache.rocketmq.controller.v1.CreateGroupRequest;
+import apache.rocketmq.controller.v1.GroupType;
 import apache.rocketmq.controller.v1.MessageQueue;
 import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.OngoingMessageQueueReassignment;
@@ -28,12 +31,15 @@ import com.automq.rocketmq.controller.metadata.ControllerClient;
 import com.automq.rocketmq.controller.metadata.ControllerConfig;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.Role;
+import com.automq.rocketmq.controller.metadata.database.dao.Group;
 import com.automq.rocketmq.controller.metadata.database.dao.GroupProgress;
+import com.automq.rocketmq.controller.metadata.database.dao.GroupStatus;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignmentStatus;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
 import com.automq.rocketmq.controller.metadata.database.dao.TopicStatus;
+import com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.GroupProgressMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.LeaseMapper;
@@ -501,6 +507,61 @@ public class DefaultMetadataStore implements MetadataStore {
                 }
             } else {
                 this.controllerClient.commitOffset(leaderAddress(), groupId, topicId, queueId, offset);
+            }
+        }
+    }
+
+    @Override
+    public long createGroup(String groupName, int maxRetry, GroupType type,
+        long deadLetterTopicId) throws ControllerException {
+        for (; ; ) {
+            if (isLeader()) {
+                try (SqlSession session = getSessionFactory().openSession()) {
+                    if (!maintainLeadershipWithSharedLock(session)) {
+                        continue;
+                    }
+                    GroupMapper groupMapper = session.getMapper(GroupMapper.class);
+                    List<Group> groups = groupMapper.list(null, groupName, null, null);
+                    if (!groups.isEmpty()) {
+                        throw new ControllerException(Code.DUPLICATED_VALUE, String.format("Group name '%s' is not available", groupName));
+                    }
+
+                    Group group = new Group();
+                    group.setName(groupName);
+                    group.setMaxRetryAttempt(maxRetry);
+                    group.setDeadLetterTopicId(deadLetterTopicId);
+                    group.setStatus(GroupStatus.ACTIVE);
+                    switch (type) {
+                        case GROUP_TYPE_STANDARD ->
+                            group.setGroupType(com.automq.rocketmq.controller.metadata.database.dao.GroupType.STANDARD);
+                        case GROUP_TYPE_FIFO ->
+                            group.setGroupType(com.automq.rocketmq.controller.metadata.database.dao.GroupType.FIFO);
+                    }
+                    groupMapper.create(group);
+                    session.commit();
+                    return group.getId();
+                }
+            } else {
+                CreateGroupRequest request = CreateGroupRequest.newBuilder()
+                    .setName(groupName)
+                    .setMaxRetryAttempt(maxRetry)
+                    .setGroupType(type)
+                    .setDeadLetterTopicId(deadLetterTopicId)
+                    .build();
+                try {
+                    CreateGroupReply reply = controllerClient.createGroup(leaderAddress(), request).get();
+                    if (reply.getStatus().getCode() == Code.OK) {
+                        return reply.getGroupId();
+                    }
+                    throw new ControllerException(reply.getStatus().getCodeValue(), reply.getStatus().getMessage());
+                } catch (InterruptedException e) {
+                    throw new ControllerException(Code.INTERRUPTED_VALUE, e);
+                } catch (ExecutionException e) {
+                    if (e.getCause() instanceof ControllerException) {
+                        throw (ControllerException) e.getCause();
+                    }
+                    throw new ControllerException(Code.INTERNAL_VALUE, e);
+                }
             }
         }
     }

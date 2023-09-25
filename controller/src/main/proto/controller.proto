@@ -329,12 +329,17 @@ message CreateGroupRequest {
   // Type of the group, standard for max concurrency and FIFO for message-group scope ordering
   GroupType group_type = 4;
 
+  // Associated topic for dead letters.
+  int64 dead_letter_topic_id = 5;
+
   // How transactional messages are consumed.
-  IsolationLevel isolation = 5;
+  IsolationLevel isolation = 6;
 }
 
 message CreateGroupReply {
   Status status = 1;
+
+  int64 group_id = 2;
 }
 
 service ControllerService {

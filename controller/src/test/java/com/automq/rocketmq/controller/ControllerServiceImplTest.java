@@ -19,12 +19,16 @@ package com.automq.rocketmq.controller;
 
 import apache.rocketmq.controller.v1.Code;
 import apache.rocketmq.controller.v1.ControllerServiceGrpc;
+import apache.rocketmq.controller.v1.CreateGroupReply;
+import apache.rocketmq.controller.v1.CreateGroupRequest;
+import apache.rocketmq.controller.v1.GroupType;
 import apache.rocketmq.controller.v1.HeartbeatReply;
 import apache.rocketmq.controller.v1.HeartbeatRequest;
 import apache.rocketmq.controller.v1.ListTopicsReply;
 import apache.rocketmq.controller.v1.ListTopicsRequest;
 import apache.rocketmq.controller.v1.NodeRegistrationReply;
 import apache.rocketmq.controller.v1.NodeRegistrationRequest;
+import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.ControllerClient;
 import com.automq.rocketmq.controller.metadata.ControllerConfig;
 import com.automq.rocketmq.controller.metadata.DatabaseTestBase;
@@ -45,6 +49,7 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.ibatis.session.SqlSession;
@@ -78,7 +83,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
             AtomicInteger nodeId = new AtomicInteger(0);
 
-            StreamObserver<NodeRegistrationReply> observer = new StreamObserver<NodeRegistrationReply>() {
+            StreamObserver<NodeRegistrationReply> observer = new StreamObserver<>() {
                 @Override
                 public void onNext(NodeRegistrationReply reply) {
                     nodeId.set(reply.getId());
@@ -129,9 +134,9 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .setInstanceId("i-reg-broker")
                 .build();
 
-            StreamObserver<NodeRegistrationReply> observer = new StreamObserver() {
+            StreamObserver<NodeRegistrationReply> observer = new StreamObserver<>() {
                 @Override
-                public void onNext(Object value) {
+                public void onNext(NodeRegistrationReply value) {
                     Assertions.fail("Should have raised an exception");
                 }
 
@@ -270,4 +275,42 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
         }
     }
 
+    @Test
+    public void testCreateGroup() throws IOException, ControllerException, ExecutionException, InterruptedException {
+        ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
+        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
+        Mockito.when(controllerConfig.nodeId()).thenReturn(1);
+        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
+        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
+
+        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
+            metadataStore.start();
+            Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
+                .atMost(10, TimeUnit.SECONDS)
+                .until(metadataStore::isLeader);
+
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore))) {
+                testServer.start();
+                int port = testServer.getPort();
+                ControllerClient client = new GrpcControllerClient();
+
+                CreateGroupRequest request = CreateGroupRequest.newBuilder()
+                    .setGroupType(GroupType.GROUP_TYPE_STANDARD)
+                    .setName("G-abc")
+                    .setDeadLetterTopicId(1)
+                    .setMaxRetryAttempt(5)
+                    .build();
+
+                String target = String.format("localhost:%d", port);
+
+                CreateGroupReply reply = client.createGroup(target, request).get();
+                Assertions.assertEquals(reply.getStatus().getCode(), Code.OK);
+                Assertions.assertTrue(reply.getGroupId() > 0);
+
+                // Test duplication
+                Assertions.assertThrows(ExecutionException.class, () -> client.createGroup(target, request).get());
+            }
+        }
+    }
 }

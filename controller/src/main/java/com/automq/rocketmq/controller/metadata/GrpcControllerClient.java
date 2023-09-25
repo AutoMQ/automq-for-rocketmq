@@ -19,6 +19,8 @@ package com.automq.rocketmq.controller.metadata;
 
 import apache.rocketmq.controller.v1.CommitOffsetReply;
 import apache.rocketmq.controller.v1.CommitOffsetRequest;
+import apache.rocketmq.controller.v1.CreateGroupReply;
+import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.CreateTopicReply;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.DeleteTopicReply;
@@ -267,6 +269,26 @@ public class GrpcControllerClient implements ControllerClient {
                 }
             }, MoreExecutors.directExecutor());
 
+        return future;
+    }
+
+
+    @Override
+    public CompletableFuture<CreateGroupReply> createGroup(String target,
+        CreateGroupRequest request) throws ControllerException {
+
+        CompletableFuture<CreateGroupReply> future = new CompletableFuture<>();
+        Futures.addCallback(this.buildStubForTarget(target).createGroup(request), new FutureCallback<>() {
+            @Override
+            public void onSuccess(CreateGroupReply result) {
+                future.complete(result);
+            }
+
+            @Override
+            public void onFailure(@Nonnull Throwable t) {
+                future.completeExceptionally(t);
+            }
+        }, MoreExecutors.directExecutor());
         return future;
     }
 

@@ -42,14 +42,14 @@ public class GroupTest extends DatabaseTestBase {
             group.setDeadLetterTopicId(2);
             mapper.update(group);
 
-            List<Group> groups = mapper.list(null, null, null);
+            List<Group> groups = mapper.list(null, null, null, null);
             Assertions.assertEquals(1, groups.size());
             Group got = groups.get(0);
             Assertions.assertEquals("G1", got.getName());
             Assertions.assertEquals(GroupStatus.DELETED, got.getStatus());
             Assertions.assertEquals(2, got.getDeadLetterTopicId());
 
-            groups = mapper.list(null, GroupStatus.ACTIVE, null);
+            groups = mapper.list(null, null, GroupStatus.ACTIVE, null);
             Assertions.assertTrue(groups.isEmpty());
 
             rowsAffected = mapper.delete(group.getId());
