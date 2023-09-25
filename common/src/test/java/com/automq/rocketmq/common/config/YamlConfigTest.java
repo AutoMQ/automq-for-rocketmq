@@ -25,8 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class YamlConfigTest {
     private static final String CONFIG_STR = """
-        broker:
-          name: broker1
+        name: broker1
         proxy:
           name: proxy1
         store:
@@ -42,8 +41,8 @@ class YamlConfigTest {
     void load() {
         Yaml yaml = new Yaml();
         yaml.setBeanAccess(BeanAccess.FIELD);
-        YamlConfig config = yaml.loadAs(CONFIG_STR, YamlConfig.class);
-        assertEquals("broker1", config.broker().name());
+        BrokerConfig config = yaml.loadAs(CONFIG_STR, BrokerConfig.class);
+        assertEquals("broker1", config.name());
         assertEquals("proxy1", config.proxy().name());
         assertEquals(1, config.store().maxFetchCount());
         assertEquals(2, config.store().maxFetchBytes());

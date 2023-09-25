@@ -19,6 +19,21 @@ package com.automq.rocketmq.common.config;
 
 public class BrokerConfig {
     private String name;
+    private ProxyConfig proxy;
+    private StoreConfig store;
+    private S3StreamConfig s3Stream;
+
+    public ProxyConfig proxy() {
+        return proxy;
+    }
+
+    public StoreConfig store() {
+        return store;
+    }
+
+    public S3StreamConfig s3Stream() {
+        return s3Stream;
+    }
 
     public String name() {
         return name;
