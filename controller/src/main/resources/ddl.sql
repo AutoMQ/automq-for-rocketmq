@@ -77,6 +77,8 @@ CREATE TABLE IF NOT EXISTS consumer_group
     name                 VARCHAR(255) NOT NULL,
     status               TINYINT      NOT NULL DEFAULT 0,
     dead_letter_topic_id BIGINT,
+    max_retry_attempt    INT          NOT NULL DEFAULT 16,
+    group_type           TINYINT      NOT NULL,
     create_time          DATETIME              DEFAULT CURRENT_TIMESTAMP,
     update_time          DATETIME              DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -104,11 +106,11 @@ CREATE UNIQUE INDEX idx_group_progress ON group_progress (group_id, topic_id, qu
 
 CREATE TABLE IF NOT EXISTS stream
 (
-    stream_id    BIGINT  NOT NULL PRIMARY KEY,
-    epoch        BIGINT  NOT NULL,
-    range_id     INT     NOT NULL,
-    start_offset BIGINT  NOT NULL,
-    state        INT NOT NULL
+    stream_id    BIGINT NOT NULL PRIMARY KEY,
+    epoch        BIGINT NOT NULL,
+    range_id     INT    NOT NULL,
+    start_offset BIGINT NOT NULL,
+    state        INT    NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS `range`
@@ -135,16 +137,17 @@ CREATE TABLE IF NOT EXISTS s3object
     marked_for_deletion_timestamp BIGINT,
     state                         TINYINT NOT NULL
 );
-CREATE UNIQUE INDEX uk_s3_object_object_id ON s3object(object_id);
-CREATE INDEX idx_s3_object_state_expired_timestamp ON s3object(state, expired_timestamp);
+CREATE UNIQUE INDEX uk_s3_object_object_id ON s3object (object_id);
+CREATE INDEX idx_s3_object_state_expired_timestamp ON s3object (state, expired_timestamp);
 
-CREATE TABLE IF NOT EXISTS s3streamobject (
-    id                  BIGINT  NOT NULL PRIMARY KEY AUTO_INCREMENT,
-    stream_id           BIGINT  NOT NULL,
-    start_offset        BIGINT  NOT NULL,
-    end_offset          BIGINT  NOT NULL,
-    object_id           BIGINT  NOT NULL,
-    object_size         BIGINT  NOT NULL,
+CREATE TABLE IF NOT EXISTS s3streamobject
+(
+    id                  BIGINT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    stream_id           BIGINT NOT NULL,
+    start_offset        BIGINT NOT NULL,
+    end_offset          BIGINT NOT NULL,
+    object_id           BIGINT NOT NULL,
+    object_size         BIGINT NOT NULL,
     base_data_timestamp BIGINT,
     committed_timestamp BIGINT
 );
@@ -152,11 +155,12 @@ CREATE TABLE IF NOT EXISTS s3streamobject (
 CREATE INDEX idx_s3_stream_object_stream_id ON s3streamobject (stream_id, start_offset);
 CREATE UNIQUE INDEX uk_s3_stream_object_object_id ON s3streamobject (object_id);
 
-CREATE TABLE IF NOT EXISTS s3walobject (
-    object_id           BIGINT    NOT NULL,
-    broker_id           INT       NOT NULL,
-    sequence_id         BIGINT    NOT NULL,
-    sub_streams         LONGTEXT  NOT NULL, -- immutable
+CREATE TABLE IF NOT EXISTS s3walobject
+(
+    object_id           BIGINT   NOT NULL,
+    broker_id           INT      NOT NULL,
+    sequence_id         BIGINT   NOT NULL,
+    sub_streams         LONGTEXT NOT NULL, -- immutable
     base_data_timestamp BIGINT,
     committed_timestamp BIGINT
 );
