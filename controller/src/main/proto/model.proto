@@ -12,9 +12,10 @@ message Topic {
   string name = 1;
   int64 topic_id = 2;
   int32 count = 3;
-  repeated MessageQueueAssignment assignments = 4;
+  repeated MessageType accept_message_types = 4;
+  repeated MessageQueueAssignment assignments = 5;
   // Message queues that are in the progress of reassignment
-  repeated OngoingMessageQueueReassignment reassignments = 5;
+  repeated OngoingMessageQueueReassignment reassignments = 6;
 }
 
 message MessageQueue {
@@ -30,6 +31,22 @@ message MessageQueueAssignment {
 message OngoingTopicReassignment {
   string name = 1;
   repeated OngoingMessageQueueReassignment queues = 2;
+}
+
+enum MessageType {
+  MESSAGE_TYPE_UNSPECIFIED = 0;
+
+  NORMAL = 1;
+
+  // Sequenced message
+  FIFO = 2;
+
+  // Messages that are delivered after the specified duration.
+  DELAY = 3;
+
+  // Messages that are transactional. Only committed messages are delivered to
+  // subscribers.
+  TRANSACTION = 4;
 }
 
 message OngoingMessageQueueReassignment {
