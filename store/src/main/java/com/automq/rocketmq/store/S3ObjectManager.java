@@ -167,7 +167,7 @@ public class S3ObjectManager implements ObjectManager {
                 && nextStartOffset < endOffset
                 && (!streamObjects.isEmpty() || !walObjects.isEmpty())) {
                 S3ObjectMetadataWrapper cur = null;
-                if (walObjects.isEmpty() || (!streamObjects.isEmpty() && streamObjects.peek().getStartOffset() <= walObjects.peek().getStartOffset())) {
+                if (walObjects.isEmpty() || !streamObjects.isEmpty() && streamObjects.peek().getStartOffset() <= walObjects.peek().getStartOffset()) {
                     // Stream object has higher priority
                     cur = streamObjects.poll();
                 } else {
