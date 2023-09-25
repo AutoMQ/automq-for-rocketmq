@@ -18,6 +18,9 @@
 package com.automq.rocketmq.controller.metadata.database;
 
 import apache.rocketmq.controller.v1.Code;
+import apache.rocketmq.controller.v1.MessageQueue;
+import apache.rocketmq.controller.v1.MessageQueueAssignment;
+import apache.rocketmq.controller.v1.OngoingMessageQueueReassignment;
 import com.automq.rocketmq.common.PrefixThreadFactory;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.BrokerNode;
@@ -171,7 +174,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     }
 
                     TopicMapper topicMapper = session.getMapper(TopicMapper.class);
-                    if (null != topicMapper.getByName(topicName)) {
+                    if (null != topicMapper.get(null, topicName)) {
                         throw new ControllerException(Code.DUPLICATED_VALUE, String.format("Topic %s was taken", topicName));
                     }
 
@@ -239,7 +242,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     }
 
                     TopicMapper topicMapper = session.getMapper(TopicMapper.class);
-                    Topic topic = topicMapper.getById(topicId);
+                    Topic topic = topicMapper.get(topicId, null);
                     if (null == topic) {
                         throw new ControllerException(Code.NOT_FOUND_VALUE, String.format("This is no topic with topic-id %d", topicId));
                     }
@@ -269,6 +272,75 @@ public class DefaultMetadataStore implements MetadataStore {
                 controllerClient.deleteTopic(this.leaderAddress(), topicId);
             }
             break;
+        }
+    }
+
+    @Override
+    public apache.rocketmq.controller.v1.Topic describeTopic(Long topicId,
+        String topicName) throws ControllerException {
+        if (isLeader()) {
+            try (SqlSession session = getSessionFactory().openSession()) {
+                TopicMapper topicMapper = session.getMapper(TopicMapper.class);
+                Topic topic = topicMapper.get(topicId, topicName);
+
+                if (null == topic) {
+                    throw new ControllerException(Code.NOT_FOUND_VALUE,
+                        String.format("Topic not found for topic-id=%d, topic-name=%s", topicId, topicName));
+                }
+
+                QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
+                List<QueueAssignment> assignments = assignmentMapper.list(topic.getId(), null, null, null, null);
+
+                apache.rocketmq.controller.v1.Topic.Builder topicBuilder = apache.rocketmq.controller.v1.Topic
+                    .newBuilder()
+                    .setTopicId(topic.getId())
+                    .setCount(topic.getQueueNum())
+                    .setName(topic.getName());
+
+                if (null != assignments) {
+                    for (QueueAssignment assignment : assignments) {
+                        switch (assignment.getStatus()) {
+                            case DELETED -> {
+                            }
+
+                            case ASSIGNED -> {
+                                MessageQueueAssignment queueAssignment = MessageQueueAssignment.newBuilder()
+                                    .setQueue(MessageQueue.newBuilder()
+                                        .setTopicId(assignment.getTopicId())
+                                        .setQueueId(assignment.getQueueId()))
+                                    .setBrokerId(assignment.getDstNodeId())
+                                    .build();
+                                topicBuilder.addAssignments(queueAssignment);
+                            }
+
+                            case YIELDING, ASSIGNABLE -> {
+                                OngoingMessageQueueReassignment reassignment = OngoingMessageQueueReassignment.newBuilder()
+                                    .setQueue(MessageQueue.newBuilder()
+                                        .setTopicId(assignment.getTopicId())
+                                        .setQueueId(assignment.getQueueId())
+                                        .build())
+                                    .setSrcBrokerId(assignment.getSrcNodeId())
+                                    .setDstBrokerId(assignment.getDstNodeId())
+                                    .build();
+                                topicBuilder.addReassignments(reassignment);
+                            }
+                        }
+                    }
+                }
+                return topicBuilder.build();
+            }
+        } else {
+            try {
+                return this.controllerClient.describeTopic(leaderAddress(), topicId, topicName).get();
+            } catch (InterruptedException e) {
+                throw new ControllerException(Code.INTERRUPTED_VALUE, e);
+            } catch (ExecutionException e) {
+                if (e.getCause() instanceof ControllerException) {
+                    throw (ControllerException) e.getCause();
+                } else {
+                    throw new ControllerException(Code.INTERNAL_VALUE, e);
+                }
+            }
         }
     }
 

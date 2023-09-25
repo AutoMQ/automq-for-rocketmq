@@ -21,6 +21,7 @@ import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.ControllerClient;
 import com.automq.rocketmq.controller.metadata.ControllerConfig;
 import com.automq.rocketmq.controller.metadata.DatabaseTestBase;
+import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignmentStatus;
@@ -63,11 +64,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             String instanceId = "i-register";
             Node node = metadataStore.registerBrokerNode(name, address, instanceId);
             Assertions.assertTrue(node.getId() > 0);
-            try (SqlSession session = getSessionFactory().openSession()) {
-                NodeMapper nodeMapper = session.getMapper(NodeMapper.class);
-                nodeMapper.delete(node.getId());
-                session.commit();
-            }
         }
     }
 
@@ -113,7 +109,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         Mockito.when(config.nodeId()).thenReturn(1);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
         Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+        try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await()
                 .with()
@@ -160,11 +156,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             String addr = metadataStore.leaderAddress();
             Assertions.assertEquals(address, addr);
         }
-
-        try (SqlSession session = getSessionFactory().openSession(true)) {
-            NodeMapper nodeMapper = session.getMapper(NodeMapper.class);
-            nodeMapper.delete(nodeId);
-        }
     }
 
     @Test
@@ -173,7 +164,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         Mockito.when(config.nodeId()).thenReturn(1);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
         Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+        try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertThrows(ControllerException.class, metadataStore::leaderAddress);
         }
     }
@@ -184,7 +175,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         Mockito.when(config.nodeId()).thenReturn(1);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
         Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+        try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await()
                 .with()
@@ -215,7 +206,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
         Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
         Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+        try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().atMost(10, TimeUnit.SECONDS)
                 .pollInterval(100, TimeUnit.MILLISECONDS)
@@ -242,7 +233,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
     @Test
     public void testListAssignments() throws IOException {
-
         try (SqlSession session = getSessionFactory().openSession()) {
             QueueAssignmentMapper mapper = session.getMapper(QueueAssignmentMapper.class);
             QueueAssignment assignment = new QueueAssignment();
@@ -257,7 +247,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         }
 
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+        try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             List<QueueAssignment> assignmentList = metadataStore.listAssignments(null, null, null, null);
             Assertions.assertEquals(1, assignmentList.size());
             QueueAssignment assignment = assignmentList.get(0);
@@ -266,12 +256,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Assertions.assertEquals(2, assignment.getDstNodeId());
             Assertions.assertEquals(3, assignment.getSrcNodeId());
             Assertions.assertEquals(4, assignment.getQueueId());
-        }
-
-        try (SqlSession session = getSessionFactory().openSession()) {
-            QueueAssignmentMapper mapper = session.getMapper(QueueAssignmentMapper.class);
-            mapper.delete(1L);
-            session.commit();
         }
     }
 
@@ -296,7 +280,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             topic.setQueueNum(1);
             topicMapper.create(topic);
             topicId = topic.getId();
-
             session.commit();
         }
 
@@ -305,7 +288,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
         Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
         Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+        try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().atMost(10, TimeUnit.SECONDS).pollInterval(100, TimeUnit.MILLISECONDS)
                 .until(metadataStore::isLeader);
@@ -313,15 +296,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             metadataStore.deleteTopic(topicId);
         } catch (ControllerException e) {
             Assertions.fail(e);
-        } finally {
-            try (SqlSession session = getSessionFactory().openSession()) {
-                NodeMapper nodeMapper = session.getMapper(NodeMapper.class);
-                nodeMapper.delete(nodeId);
-
-                TopicMapper topicMapper = session.getMapper(TopicMapper.class);
-                topicMapper.delete(topicId);
-                session.commit();
-            }
         }
     }
 
@@ -330,12 +304,58 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.nodeId()).thenReturn(1);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
+        try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().atMost(10, TimeUnit.SECONDS).pollInterval(100, TimeUnit.MILLISECONDS)
                 .until(metadataStore::isLeader);
             Assertions.assertThrows(ControllerException.class, () -> metadataStore.deleteTopic(1));
+        }
+    }
+
+    @Test
+    public void testDescribeTopic() throws IOException, ControllerException {
+        long topicId;
+        try (SqlSession session = getSessionFactory().openSession()) {
+
+            TopicMapper topicMapper = session.getMapper(TopicMapper.class);
+            Topic topic = new Topic();
+            topic.setName("T1");
+            topic.setStatus(TopicStatus.ACTIVE);
+            topicMapper.create(topic);
+            topicId = topic.getId();
+
+            QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
+            QueueAssignment assignment = new QueueAssignment();
+            assignment.setTopicId(topicId);
+            assignment.setStatus(QueueAssignmentStatus.ASSIGNED);
+            assignment.setQueueId(1);
+            assignment.setDstNodeId(2);
+            assignment.setSrcNodeId(3);
+            assignmentMapper.create(assignment);
+
+            assignment = new QueueAssignment();
+            assignment.setTopicId(topicId);
+            assignment.setStatus(QueueAssignmentStatus.YIELDING);
+            assignment.setSrcNodeId(3);
+            assignment.setDstNodeId(2);
+            assignment.setQueueId(2);
+            assignmentMapper.create(assignment);
+            session.commit();
+        }
+
+        ControllerConfig config = Mockito.mock(ControllerConfig.class);
+        Mockito.when(config.nodeId()).thenReturn(1);
+        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
+        try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            metadataStore.start();
+            Awaitility.await().with().atMost(10, TimeUnit.SECONDS).pollInterval(100, TimeUnit.MILLISECONDS)
+                .until(metadataStore::isLeader);
+            apache.rocketmq.controller.v1.Topic topic = metadataStore.describeTopic(topicId, null);
+            Assertions.assertEquals("T1", topic.getName());
+            Assertions.assertEquals(1, topic.getAssignmentsCount());
+            Assertions.assertEquals(1, topic.getReassignmentsCount());
         }
     }
 }

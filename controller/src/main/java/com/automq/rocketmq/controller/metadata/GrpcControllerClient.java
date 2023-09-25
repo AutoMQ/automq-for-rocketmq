@@ -21,12 +21,15 @@ import apache.rocketmq.controller.v1.CreateTopicReply;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.DeleteTopicReply;
 import apache.rocketmq.controller.v1.DeleteTopicRequest;
+import apache.rocketmq.controller.v1.DescribeTopicReply;
+import apache.rocketmq.controller.v1.DescribeTopicRequest;
 import apache.rocketmq.controller.v1.HeartbeatReply;
 import apache.rocketmq.controller.v1.HeartbeatRequest;
 import apache.rocketmq.controller.v1.NodeRegistrationReply;
 import apache.rocketmq.controller.v1.NodeRegistrationRequest;
 import apache.rocketmq.controller.v1.Code;
 import apache.rocketmq.controller.v1.ControllerServiceGrpc;
+import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.google.common.base.Strings;
@@ -53,7 +56,8 @@ public class GrpcControllerClient implements ControllerClient {
         stubs = new ConcurrentHashMap<>();
     }
 
-    private void buildStubForTarget(String target) throws ControllerException {
+    private ControllerServiceGrpc.ControllerServiceFutureStub buildStubForTarget(
+        String target) throws ControllerException {
         if (Strings.isNullOrEmpty(target)) {
             throw new ControllerException(Code.NO_LEADER_VALUE, "Target address to leader controller is null or empty");
         }
@@ -64,11 +68,11 @@ public class GrpcControllerClient implements ControllerClient {
             ControllerServiceGrpc.ControllerServiceFutureStub stub = ControllerServiceGrpc.newFutureStub(channel);
             stubs.putIfAbsent(target, stub);
         }
+        return stubs.get(target);
     }
 
     public CompletableFuture<Node> registerBroker(String target, String name, String address,
         String instanceId) throws ControllerException {
-        this.buildStubForTarget(target);
         NodeRegistrationRequest request = NodeRegistrationRequest.newBuilder()
             .setBrokerName(name)
             .setAddress(address)
@@ -77,7 +81,7 @@ public class GrpcControllerClient implements ControllerClient {
 
         CompletableFuture<Node> future = new CompletableFuture<>();
 
-        Futures.addCallback(stubs.get(target).registerNode(request), new FutureCallback<>() {
+        Futures.addCallback(this.buildStubForTarget(target).registerNode(request), new FutureCallback<>() {
             @Override
             public void onSuccess(NodeRegistrationReply reply) {
                 if (reply.getStatus().getCode() == Code.OK) {
@@ -107,9 +111,7 @@ public class GrpcControllerClient implements ControllerClient {
     @Override
     public CompletableFuture<Long> createTopic(String target, String topicName, int queueNum)
         throws ControllerException {
-        this.buildStubForTarget(target);
-
-        ControllerServiceGrpc.ControllerServiceFutureStub stub = stubs.get(target);
+        ControllerServiceGrpc.ControllerServiceFutureStub stub = this.buildStubForTarget(target);
         CreateTopicRequest request = CreateTopicRequest.newBuilder().setTopic(topicName).setCount(queueNum).build();
 
         CompletableFuture<Long> future = new CompletableFuture<>();
@@ -141,9 +143,7 @@ public class GrpcControllerClient implements ControllerClient {
 
     @Override
     public CompletableFuture<Void> deleteTopic(String target, long topicId) throws ControllerException {
-        this.buildStubForTarget(target);
-
-        ControllerServiceGrpc.ControllerServiceFutureStub stub = stubs.get(target);
+        ControllerServiceGrpc.ControllerServiceFutureStub stub = this.buildStubForTarget(target);
         DeleteTopicRequest request = DeleteTopicRequest.newBuilder().setTopicId(topicId).build();
 
         CompletableFuture<Void> future = new CompletableFuture<>();
@@ -155,8 +155,9 @@ public class GrpcControllerClient implements ControllerClient {
                     case OK -> future.complete(null);
                     case NOT_FOUND -> future.completeExceptionally(new ControllerException(Code.NOT_FOUND_VALUE,
                         "Topic to delete is not found"));
-                    default -> future.completeExceptionally(new ControllerException(result.getStatus().getCode().getNumber(),
-                        result.getStatus().getMessage()));
+                    default ->
+                        future.completeExceptionally(new ControllerException(result.getStatus().getCode().getNumber(),
+                            result.getStatus().getMessage()));
                 }
             }
 
@@ -166,6 +167,36 @@ public class GrpcControllerClient implements ControllerClient {
             }
         }, MoreExecutors.directExecutor());
 
+        return future;
+    }
+
+    @Override
+    public CompletableFuture<Topic> describeTopic(String target, Long topicId,
+        String topicName) throws ControllerException {
+        ControllerServiceGrpc.ControllerServiceFutureStub stub = buildStubForTarget(target);
+
+        DescribeTopicRequest request = DescribeTopicRequest.newBuilder()
+            .setTopicId(topicId)
+            .setTopicName(topicName)
+            .build();
+
+        CompletableFuture<Topic> future = new CompletableFuture<>();
+        Futures.addCallback(stub.describeTopic(request), new FutureCallback<>() {
+            @Override
+            public void onSuccess(DescribeTopicReply result) {
+                if (result.getStatus().getCode() == Code.OK) {
+                    future.complete(result.getTopic());
+                } else {
+                    future.completeExceptionally(
+                        new ControllerException(result.getStatus().getCodeValue(), result.getStatus().getMessage()));
+                }
+            }
+
+            @Override
+            public void onFailure(@Nonnull Throwable t) {
+                future.completeExceptionally(t);
+            }
+        }, MoreExecutors.directExecutor());
         return future;
     }
 

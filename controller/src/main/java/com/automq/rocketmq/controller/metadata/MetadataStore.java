@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.controller.metadata;
 
+import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
@@ -41,6 +42,8 @@ public interface MetadataStore extends Closeable {
     long createTopic(String topicName, int queueNum) throws ControllerException;
 
     void deleteTopic(long topicId) throws ControllerException;
+
+    Topic describeTopic(Long topicId, String topicName) throws ControllerException;
 
     /**
      * Check if current controller is playing leader role
