@@ -30,6 +30,21 @@
 
     <dependencies>
         <dependency>
+            <groupId>${groupId}</groupId>
+            <artifactId>rocketmq-metadata</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>${groupId}</groupId>
+            <artifactId>rocketmq-proxy</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>${groupId}</groupId>
+            <artifactId>rocketmq-store</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>rocketmq-controller</artifactId>
             <version>${project.version}</version>
