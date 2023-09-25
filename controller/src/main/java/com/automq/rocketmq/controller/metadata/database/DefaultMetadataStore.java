@@ -39,6 +39,7 @@ import com.automq.rocketmq.controller.metadata.database.dao.Lease;
 import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 import com.automq.rocketmq.controller.metadata.database.tasks.LeaseTask;
+import com.automq.rocketmq.controller.metadata.database.tasks.ScanAssignableMessageQueuesTask;
 import com.automq.rocketmq.controller.metadata.database.tasks.ScanNodeTask;
 import com.google.common.base.Strings;
 import java.io.IOException;
@@ -91,6 +92,7 @@ public class DefaultMetadataStore implements MetadataStore {
     public void start() {
         this.executorService.scheduleAtFixedRate(new LeaseTask(this), 1, config.scanIntervalInSecs(), TimeUnit.SECONDS);
         this.executorService.scheduleWithFixedDelay(new ScanNodeTask(this), 1, config.scanIntervalInSecs(), TimeUnit.SECONDS);
+        this.executorService.scheduleAtFixedRate(new ScanAssignableMessageQueuesTask(this), 1, config.scanIntervalInSecs(), TimeUnit.SECONDS);
         LOGGER.info("MetadataStore tasks scheduled");
     }
 
@@ -151,6 +153,38 @@ public class DefaultMetadataStore implements MetadataStore {
         if (null != brokerNode) {
             brokerNode.keepAlive(epoch, goingAway);
         }
+    }
+
+    public boolean assignMessageQueues(List<QueueAssignment> assignments, SqlSession session) {
+        if (!maintainLeadershipWithSharedLock(session)) {
+            return false;
+        }
+
+        List<Integer> aliveNodeIds =
+            this.nodes.values()
+                .stream()
+                .filter(brokerNode ->
+                    brokerNode.isAlive(TimeUnit.SECONDS.toMillis(config.nodeAliveIntervalInSecs())) ||
+                        brokerNode.getNode().getId() == config.nodeId())
+                .map(node -> node.getNode().getId())
+                .toList();
+        if (aliveNodeIds.isEmpty()) {
+            return false;
+        }
+
+        QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
+
+        Set<Integer> toNotify = new HashSet<>();
+
+        for (int i = 0; i < assignments.size(); i++) {
+            int idx = i % aliveNodeIds.size();
+            QueueAssignment assignment = assignments.get(i);
+            assignment.setDstNodeId(aliveNodeIds.get(idx));
+            toNotify.add(aliveNodeIds.get(idx));
+            assignmentMapper.update(assignment);
+        }
+        this.notifyOnResourceChange(toNotify);
+        return true;
     }
 
     private boolean maintainLeadershipWithSharedLock(SqlSession session) {
@@ -403,6 +437,42 @@ public class DefaultMetadataStore implements MetadataStore {
         try (SqlSession session = getSessionFactory().openSession()) {
             QueueAssignmentMapper mapper = session.getMapper(QueueAssignmentMapper.class);
             return mapper.list(topicId, srcNodeId, dstNodeId, status, null);
+        }
+    }
+
+    @Override
+    public void markMessageQueueAssignable(long topicId, int queueId) throws ControllerException {
+        for (; ; ) {
+            if (isLeader()) {
+                try (SqlSession session = getSessionFactory().openSession()) {
+                    QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
+                    List<QueueAssignment> assignments = assignmentMapper.list(topicId, null, null, QueueAssignmentStatus.YIELDING, null);
+                    for (QueueAssignment assignment : assignments) {
+                        if (assignment.getQueueId() != queueId) {
+                            continue;
+                        }
+
+                        assignment.setSrcNodeId(assignment.getDstNodeId());
+                        assignment.setStatus(QueueAssignmentStatus.ASSIGNABLE);
+                        assignmentMapper.update(assignment);
+                        LOGGER.info("Mark queue[topic-id={}, queue-id={}] assignable", topicId, queueId);
+                        break;
+                    }
+                    session.commit();
+                }
+                break;
+            } else {
+                try {
+                    this.controllerClient.notifyMessageQueueAssignable(leaderAddress(), topicId, queueId).get();
+                } catch (InterruptedException e) {
+                    throw new ControllerException(Code.INTERRUPTED_VALUE, e);
+                } catch (ExecutionException e) {
+                    if (e.getCause() instanceof ControllerException) {
+                        throw (ControllerException) e.getCause();
+                    }
+                    throw new ControllerException(Code.INTERNAL_VALUE, e);
+                }
+            }
         }
     }
 

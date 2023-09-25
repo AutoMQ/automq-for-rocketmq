@@ -178,18 +178,6 @@ message NotifyMessageQueuesAssignableReply {
   Status status = 1;
 }
 
-message ListTopicMessageQueueAssignmentsRequest {
-  ControllerRequestContext context = 1;
-
-  // Use 'topic name' instead of 'topic_id' for the convenience of building toolset
-  string name = 2;
-}
-
-message ListTopicMessageQueueAssignmentsReply {
-  Status status = 1;
-  repeated MessageQueueAssignment assignments = 2;
-}
-
 message CommitOffsetRequest {
   ControllerRequestContext context = 1;
   int64 group_id = 2;
@@ -361,8 +349,6 @@ service ControllerService {
   rpc updateTopic(UpdateTopicRequest) returns (Topic) {}
 
   rpc deleteTopic(DeleteTopicRequest) returns (DeleteTopicReply) {}
-
-  rpc listTopicMessageQueues(ListTopicMessageQueueAssignmentsRequest) returns (ListTopicMessageQueueAssignmentsReply) {}
 
   // Reassign message queue from one broker to another.
   rpc reassignMessageQueue(ReassignMessageQueueRequest) returns (ReassignMessageQueueReply) {}
