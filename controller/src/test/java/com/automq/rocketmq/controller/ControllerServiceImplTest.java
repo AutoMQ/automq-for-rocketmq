@@ -21,6 +21,8 @@ import apache.rocketmq.controller.v1.Code;
 import apache.rocketmq.controller.v1.ControllerServiceGrpc;
 import apache.rocketmq.controller.v1.HeartbeatReply;
 import apache.rocketmq.controller.v1.HeartbeatRequest;
+import apache.rocketmq.controller.v1.ListTopicsReply;
+import apache.rocketmq.controller.v1.ListTopicsRequest;
 import apache.rocketmq.controller.v1.NodeRegistrationReply;
 import apache.rocketmq.controller.v1.NodeRegistrationRequest;
 import com.automq.rocketmq.controller.metadata.ControllerClient;
@@ -28,12 +30,16 @@ import com.automq.rocketmq.controller.metadata.ControllerConfig;
 import com.automq.rocketmq.controller.metadata.DatabaseTestBase;
 import com.automq.rocketmq.controller.metadata.database.DefaultMetadataStore;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
+import com.automq.rocketmq.controller.metadata.database.dao.Topic;
+import com.automq.rocketmq.controller.metadata.database.dao.TopicStatus;
 import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 import io.grpc.Grpc;
 import io.grpc.InsecureChannelCredentials;
 import io.grpc.ManagedChannel;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
+import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.ibatis.session.SqlSession;
@@ -140,7 +146,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
     @Test
     public void testHeartbeatGrpc() throws IOException {
-
         int nodeId;
         try (SqlSession session = getSessionFactory().openSession()) {
             NodeMapper mapper = session.getMapper(NodeMapper.class);
@@ -178,14 +183,50 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 Assertions.assertEquals(Code.OK, reply.getStatus().getCode());
                 channel.shutdownNow();
             }
+        }
+    }
 
-            try (SqlSession session = getSessionFactory().openSession()) {
-                NodeMapper mapper = session.getMapper(NodeMapper.class);
-                mapper.delete(nodeId);
-                session.commit();
+    @Test
+    public void testListTopics() throws IOException {
+
+        try (SqlSession session = getSessionFactory().openSession()) {
+            TopicMapper topicMapper = session.getMapper(TopicMapper.class);
+            for (int i = 0; i < 3; i++) {
+                Topic topic = new Topic();
+                topic.setStatus(TopicStatus.ACTIVE);
+                topic.setName("T" + i);
+                topicMapper.create(topic);
             }
+            session.commit();
         }
 
+        ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
+        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
+        Mockito.when(controllerConfig.nodeId()).thenReturn(1);
+        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
+        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
+
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
+            metadataStore.start();
+            Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
+                .atMost(10, TimeUnit.SECONDS)
+                .until(metadataStore::isLeader);
+
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore))) {
+                testServer.start();
+                int port = testServer.getPort();
+                ManagedChannel channel = Grpc.newChannelBuilderForAddress("localhost", port, InsecureChannelCredentials.create()).build();
+                ControllerServiceGrpc.ControllerServiceBlockingStub blockingStub = ControllerServiceGrpc.newBlockingStub(channel);
+                Iterator<ListTopicsReply> replies = blockingStub.listAllTopics(ListTopicsRequest.newBuilder().build());
+                while (replies.hasNext()) {
+                    ListTopicsReply reply = replies.next();
+                    Assertions.assertTrue(reply.getTopic().getName().startsWith("T"));
+                    Assertions.assertEquals(Code.OK, reply.getStatus().getCode());
+                }
+                channel.shutdownNow();
+            }
+        }
     }
 
 }
