@@ -19,55 +19,79 @@
     PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.automq.rocketmq.controller.metadata.database.mapper.S3ObjectMapper">
-    <resultMap id="BaseResultMap" type="apache.rocketmq.controller.v1.S3Object">
-        <id column="object_id" jdbcType="BIGINT" property="objectId_"/>
-        <result column="object_size" jdbcType="BIGINT" property="objectSize_"/>
-        <result column="prepared_timestamp" jdbcType="BIGINT" property="preparedTimestamp_"/>
-        <result column="committed_timestamp" jdbcType="BIGINT" property="committedTimestamp_"/>
-        <result column="expired_timestamp" jdbcType="BIGINT" property="expiredTimestamp_"/>
-        <result column="marked_for_deletion_timestamp" jdbcType="BIGINT" property="markedForDeletionTimestamp_"/>
-        <result column="state" jdbcType="TINYINT" property="state_"/>
-    </resultMap>
 
-    <insert id="create" parameterType="apache.rocketmq.controller.v1.S3Object">
-        INSERT INTO s3object (object_id, object_size, state)
-        VALUES (#{objectId_}, #{objectSize_}, #{state_})
+    <insert id="create" parameterType="S3Object" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO s3object (object_id, object_size, prepared_timestamp, expired_timestamp, state)
+        VALUES (
+            #{objectId},
+            #{objectSize},
+            #{preparedTimestamp},
+            #{expiredTimestamp},
+            #{state}
+        )
     </insert>
 
-    <select id="getByObjectId" resultMap="BaseResultMap">
-        SELECT object_id, object_size, prepared_timestamp, committed_timestamp, expired_timestamp,
+    <select id="getById" resultType="S3Object">
+        SELECT id, object_id, object_size, prepared_timestamp, committed_timestamp, expired_timestamp,
+        marked_for_deletion_timestamp, state
+        FROM s3object
+        WHERE id = #{id}
+    </select>
+
+    <select id="getByObjectId" resultType="S3Object">
+        SELECT id, object_id, object_size, prepared_timestamp, committed_timestamp, expired_timestamp,
         marked_for_deletion_timestamp, state
         FROM s3object
         WHERE object_id = #{objectId}
     </select>
 
-    <update id="delete" parameterType="long">
+    <update id="delete" parameterType="S3Object">
         UPDATE s3object
-        SET marked_for_deletion_timestamp = NOW()
-        WHERE object_id = #{objectId}
+        SET marked_for_deletion_timestamp = #{markedForDeletionTimestamp}
+        WHERE 1 = 1
+        <if test="null != id">
+            AND id = #{id}
+        </if>
+        <if test="null != objectId">
+            AND object_id = #{objectId}
+        </if>
     </update>
 
-    <update id="prepare" parameterType="apache.rocketmq.controller.v1.S3Object">
+    <update id="expired" parameterType="S3Object">
         UPDATE s3object
-        SET prepared_timestamp = #{preparedTimestamp_}
-        WHERE object_id = #{objectId_}
+        SET expired_timestamp = #{expiredTimestamp}
+        WHERE 1 = 1
+        <if test="null != id">
+            AND id = #{id}
+        </if>
+        <if test="null != objectId">
+            AND object_id = #{objectId}
+        </if>
     </update>
 
-    <update id="expired" parameterType="apache.rocketmq.controller.v1.S3Object">
+    <update id="commit" parameterType="S3Object">
         UPDATE s3object
-        SET expired_timestamp = #{expiredTimestamp_}
-        WHERE object_id = #{objectId_}
+        SET committed_timestamp = #{committedTimestamp}
+        WHERE 1 = 1
+        <if test="null != id">
+            AND id = #{id}
+        </if>
+        <if test="null != objectId">
+            AND object_id = #{objectId}
+        </if>
     </update>
 
-    <update id="commit" parameterType="apache.rocketmq.controller.v1.S3Object">
-        UPDATE s3object
-        SET committed_timestamp = #{committedTimestamp_}
-        WHERE object_id = #{objectId_}
-    </update>
-
-    <select id="list" resultMap="BaseResultMap">
-        SELECT object_id, object_size, prepared_timestamp, committed_timestamp, expired_timestamp,
+    <select id="list" resultType="S3Object">
+        SELECT id, object_id, object_size, prepared_timestamp, committed_timestamp, expired_timestamp,
         marked_for_deletion_timestamp, state
         FROM s3object
+        WHERE 1 = 1
+        <if test="null != state">
+            AND state = #{state}
+        </if>
+        <if test="null != expiredTimestamp">
+            AND expired_timestamp &lt;= #{expiredTimestamp}
+        </if>
     </select>
+    
 </mapper>

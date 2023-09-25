@@ -17,17 +17,22 @@
 
 package com.automq.rocketmq.controller.metadata.database.mapper;
 
-import apache.rocketmq.controller.v1.Range;
+import com.automq.rocketmq.controller.metadata.database.dao.Range;
+import org.apache.ibatis.annotations.Param;
+
 import java.util.List;
 
 public interface RangeMapper {
 
     /**
      * Create a new range record in database.
+     *
      * @param range
      * @return
      */
     int create(Range range);
+
+    Range getById(long id);
 
     Range getByRangeId(int rangeId);
 
@@ -37,5 +42,12 @@ public interface RangeMapper {
 
     List<Range> listByBrokerId(int brokerId);
 
-    List<Range> list();
+    Range get(@Param("rangeId") Integer rangeId,
+        @Param("streamId") Long streamId,
+        @Param("brokerId") Integer brokerId);
+
+    List<Range> list(@Param("brokerId") Integer brokerId,
+        @Param("streamId") Long streamId,
+        @Param("offset") Long offset);
+
 }

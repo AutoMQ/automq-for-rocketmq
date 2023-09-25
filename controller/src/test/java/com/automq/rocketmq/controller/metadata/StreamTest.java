@@ -17,8 +17,8 @@
 
 package com.automq.rocketmq.controller.metadata;
 
-import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.StreamState;
+import com.automq.rocketmq.controller.metadata.database.dao.StreamMetadata;
 import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
@@ -38,11 +38,12 @@ public class StreamTest extends DatabaseTestBase {
     public void testCreateStream() throws IOException {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
-            StreamMetadata stream = StreamMetadata.newBuilder().
-                setStreamId(123).
-                setEpoch(1).
-                setRangeId(2).
-                setState(StreamState.OPEN).build();
+            StreamMetadata stream = new StreamMetadata();
+            stream.setStreamId(123);
+            stream.setStartOffset(1234);
+            stream.setEpoch(1);
+            stream.setRangeId(2);
+            stream.setState(StreamState.OPEN);
 
             int affectedRows = streamMapper.create(stream);
             Assertions.assertEquals(1, affectedRows);
@@ -66,11 +67,13 @@ public class StreamTest extends DatabaseTestBase {
     public void testIncreaseEpoch() throws IOException {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
-            StreamMetadata stream = StreamMetadata.newBuilder().
-                setStreamId(123).
-                setEpoch(1).
-                setRangeId(2).
-                setState(StreamState.OPEN).build();
+            StreamMetadata stream = new StreamMetadata();
+            stream.setStreamId(123);
+            stream.setStartOffset(1234);
+            stream.setEpoch(1);
+            stream.setRangeId(2);
+            stream.setState(StreamState.OPEN);
+
             int affectedRows = streamMapper.create(stream);
             Assertions.assertEquals(1, affectedRows);
 
@@ -90,14 +93,14 @@ public class StreamTest extends DatabaseTestBase {
     public void testUpdateLastRange() throws IOException {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
-            StreamMetadata stream = StreamMetadata.newBuilder().
-                setStreamId(123).
-                setEpoch(1).
-                setRangeId(2).
-                setState(StreamState.OPEN).build();
+            StreamMetadata stream = new StreamMetadata();
+            stream.setStreamId(123);
+            stream.setStartOffset(1234);
+            stream.setEpoch(1);
+            stream.setRangeId(2);
+            stream.setState(StreamState.OPEN);
             int affectedRows = streamMapper.create(stream);
             Assertions.assertEquals(1, affectedRows);
-
 
             StreamMetadata stream1 = streamMapper.getByStreamId(stream.getStreamId());
             Assertions.assertEquals(2, stream1.getRangeId());
@@ -115,14 +118,14 @@ public class StreamTest extends DatabaseTestBase {
     public void testUpdateStreamState() throws IOException {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
-            StreamMetadata stream = StreamMetadata.newBuilder().
-                setStreamId(123).
-                setEpoch(1).
-                setRangeId(2).
-                setState(StreamState.OPEN).build();
+            StreamMetadata stream = new StreamMetadata();
+            stream.setStreamId(123);
+            stream.setStartOffset(1234);
+            stream.setEpoch(1);
+            stream.setRangeId(2);
+            stream.setState(StreamState.OPEN);
             int affectedRows = streamMapper.create(stream);
             Assertions.assertEquals(1, affectedRows);
-
 
             StreamMetadata stream1 = streamMapper.getByStreamId(stream.getStreamId());
             Assertions.assertEquals(StreamState.OPEN, stream1.getState());
@@ -130,7 +133,7 @@ public class StreamTest extends DatabaseTestBase {
             Assertions.assertEquals(1, affectedRows);
 
             stream1 = streamMapper.getByStreamId(stream.getStreamId());
-            Assertions.assertEquals(StreamState.CLOSED_VALUE, stream1.getStateValue());
+            Assertions.assertEquals(StreamState.forNumber(StreamState.CLOSED_VALUE), stream1.getState());
             streamMapper.delete(stream1.getStreamId());
         }
     }
