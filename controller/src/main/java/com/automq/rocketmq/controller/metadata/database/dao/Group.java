@@ -27,6 +27,10 @@ public class Group {
 
     private long deadLetterTopicId;
 
+    private int maxRetryAttempt;
+
+    private GroupType groupType = GroupType.STANDARD;
+
     private Date createTime;
     private Date updateTime;
 
@@ -76,5 +80,21 @@ public class Group {
 
     public void setDeadLetterTopicId(long deadLetterTopicId) {
         this.deadLetterTopicId = deadLetterTopicId;
+    }
+
+    public int getMaxRetryAttempt() {
+        return maxRetryAttempt;
+    }
+
+    public void setMaxRetryAttempt(int maxRetryAttempt) {
+        this.maxRetryAttempt = maxRetryAttempt;
+    }
+
+    public GroupType getGroupType() {
+        return groupType;
+    }
+
+    public void setGroupType(GroupType groupType) {
+        this.groupType = groupType;
     }
 }
