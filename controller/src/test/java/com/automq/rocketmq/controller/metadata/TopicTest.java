@@ -45,13 +45,13 @@ public class TopicTest extends DatabaseTestBase {
             Assertions.assertEquals(1, affectedRows);
             Assertions.assertTrue(topic.getId() > 0);
 
-            Topic got = topicMapper.getById(topic.getId());
+            Topic got = topicMapper.get(topic.getId(), null);
             Assertions.assertEquals(topic, got);
 
             affectedRows = topicMapper.updateStatusById(topic.getId(), TopicStatus.ACTIVE);
             Assertions.assertEquals(1, affectedRows);
 
-            got = topicMapper.getById(topic.getId());
+            got = topicMapper.get(topic.getId(),null);
             Assertions.assertEquals(TopicStatus.ACTIVE, got.getStatus());
 
             List<Topic> topics = topicMapper.list(null, null);

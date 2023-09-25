@@ -18,6 +18,7 @@
 package com.automq.rocketmq.controller.metadata;
 
 import apache.rocketmq.controller.v1.Code;
+import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.controller.ControllerServiceImpl;
 import com.automq.rocketmq.controller.ControllerTestServer;
 import com.automq.rocketmq.controller.exception.ControllerException;
@@ -164,6 +165,47 @@ class GrpcControllerClientTest {
             int port = testServer.getPort();
             ControllerClient client = new GrpcControllerClient();
             Assertions.assertThrows(ExecutionException.class, () -> client.deleteTopic(String.format("localhost:%d", port), topicId).get());
+        }
+    }
+
+    @Test
+    public void testDescribeTopic() throws IOException, ControllerException, ExecutionException, InterruptedException {
+        long topicId = 1L;
+        String topicName = "T-abc";
+        MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
+        Topic topic = Topic.newBuilder()
+            .setName(topicName)
+            .setTopicId(topicId)
+            .setCount(1)
+            .build();
+        Mockito.when(metadataStore.describeTopic(ArgumentMatchers.anyLong(), ArgumentMatchers.anyString()))
+            .thenReturn(topic);
+        ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
+        try (ControllerTestServer testServer = new ControllerTestServer(0, svc)) {
+            testServer.start();
+            int port = testServer.getPort();
+            ControllerClient client = new GrpcControllerClient();
+            Topic got = client.describeTopic(String.format("localhost:%d", port), topicId, topicName).get();
+            Assertions.assertEquals(topicId, got.getTopicId());
+            Assertions.assertEquals(topicName, got.getName());
+        }
+    }
+
+    @Test
+    public void testDescribeTopic_NotFound() throws IOException, ControllerException, ExecutionException, InterruptedException {
+        long topicId = 1L;
+        String topicName = "T-abc";
+        MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
+        Mockito.when(metadataStore.describeTopic(ArgumentMatchers.anyLong(), ArgumentMatchers.anyString()))
+            .thenThrow(new ControllerException(Code.NOT_FOUND_VALUE, "Not found"));
+        ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
+        try (ControllerTestServer testServer = new ControllerTestServer(0, svc)) {
+            testServer.start();
+            int port = testServer.getPort();
+            ControllerClient client = new GrpcControllerClient();
+            Assertions.assertThrows(ExecutionException.class, () -> {
+                client.describeTopic(String.format("localhost:%d", port), topicId, topicName).get();
+            });
         }
     }
 }

@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.controller.metadata;
 
+import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import java.util.concurrent.CompletableFuture;
@@ -29,6 +30,8 @@ public interface ControllerClient {
     CompletableFuture<Long> createTopic(String target, String topicName, int queueNum) throws ControllerException;
 
     CompletableFuture<Void> deleteTopic(String target, long topicId) throws ControllerException;
+
+    CompletableFuture<Topic> describeTopic(String target, Long topicId, String topicName) throws ControllerException;
 
     CompletableFuture<Void> heartbeat(String target, int nodeId, long epoch,
         boolean goingAway) throws ControllerException;
