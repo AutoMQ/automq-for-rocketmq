@@ -39,10 +39,9 @@ import apache.rocketmq.controller.v1.ListMessageQueueReassignmentsReply;
 import apache.rocketmq.controller.v1.ListMessageQueueReassignmentsRequest;
 import apache.rocketmq.controller.v1.ListOpenStreamsRequest;
 import apache.rocketmq.controller.v1.ListOpeningStreamsReply;
-import apache.rocketmq.controller.v1.ListTopicMessageQueueAssignmentsReply;
-import apache.rocketmq.controller.v1.ListTopicMessageQueueAssignmentsRequest;
 import apache.rocketmq.controller.v1.ListTopicsReply;
 import apache.rocketmq.controller.v1.ListTopicsRequest;
+import apache.rocketmq.controller.v1.MessageQueue;
 import apache.rocketmq.controller.v1.NodeRegistrationReply;
 import apache.rocketmq.controller.v1.NodeRegistrationRequest;
 import apache.rocketmq.controller.v1.NodeUnregistrationReply;
@@ -220,12 +219,6 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     }
 
     @Override
-    public void listTopicMessageQueues(ListTopicMessageQueueAssignmentsRequest request,
-        StreamObserver<ListTopicMessageQueueAssignmentsReply> responseObserver) {
-        super.listTopicMessageQueues(request, responseObserver);
-    }
-
-    @Override
     public void reassignMessageQueue(ReassignMessageQueueRequest request,
         StreamObserver<ReassignMessageQueueReply> responseObserver) {
         super.reassignMessageQueue(request, responseObserver);
@@ -234,7 +227,17 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     @Override
     public void notifyMessageQueueAssignable(NotifyMessageQueuesAssignableRequest request,
         StreamObserver<NotifyMessageQueuesAssignableReply> responseObserver) {
-        super.notifyMessageQueueAssignable(request, responseObserver);
+        try {
+            for (MessageQueue messageQueue : request.getQueuesList()) {
+                this.metadataStore.markMessageQueueAssignable(messageQueue.getTopicId(), messageQueue.getQueueId());
+            }
+            NotifyMessageQueuesAssignableReply reply = NotifyMessageQueuesAssignableReply.newBuilder()
+                .setStatus(Status.newBuilder().setCode(Code.OK).build()).build();
+            responseObserver.onNext(reply);
+            responseObserver.onCompleted();
+        } catch (ControllerException e) {
+            responseObserver.onError(e);
+        }
     }
 
     @Override

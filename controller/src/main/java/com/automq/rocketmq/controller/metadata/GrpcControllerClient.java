@@ -25,10 +25,13 @@ import apache.rocketmq.controller.v1.DescribeTopicReply;
 import apache.rocketmq.controller.v1.DescribeTopicRequest;
 import apache.rocketmq.controller.v1.HeartbeatReply;
 import apache.rocketmq.controller.v1.HeartbeatRequest;
+import apache.rocketmq.controller.v1.MessageQueue;
 import apache.rocketmq.controller.v1.NodeRegistrationReply;
 import apache.rocketmq.controller.v1.NodeRegistrationRequest;
 import apache.rocketmq.controller.v1.Code;
 import apache.rocketmq.controller.v1.ControllerServiceGrpc;
+import apache.rocketmq.controller.v1.NotifyMessageQueuesAssignableReply;
+import apache.rocketmq.controller.v1.NotifyMessageQueuesAssignableRequest;
 import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
@@ -206,7 +209,12 @@ public class GrpcControllerClient implements ControllerClient {
         buildStubForTarget(target);
 
         ControllerServiceGrpc.ControllerServiceFutureStub stub = stubs.get(target);
-        HeartbeatRequest request = HeartbeatRequest.newBuilder().setId(nodeId).setEpoch(epoch).setGoingAway(goingAway).build();
+        HeartbeatRequest request = HeartbeatRequest
+            .newBuilder()
+            .setId(nodeId)
+            .setEpoch(epoch)
+            .setGoingAway(goingAway)
+            .build();
         CompletableFuture<Void> future = new CompletableFuture<>();
         Futures.addCallback(stub.heartbeat(request), new FutureCallback<>() {
             @Override
@@ -214,7 +222,8 @@ public class GrpcControllerClient implements ControllerClient {
                 if (result.getStatus().getCode() == Code.OK) {
                     future.complete(null);
                 } else {
-                    future.completeExceptionally(new ControllerException(result.getStatus().getCodeValue(), result.getStatus().getMessage()));
+                    future.completeExceptionally(
+                        new ControllerException(result.getStatus().getCodeValue(), result.getStatus().getMessage()));
                 }
             }
 
@@ -223,6 +232,39 @@ public class GrpcControllerClient implements ControllerClient {
                 future.completeExceptionally(t);
             }
         }, MoreExecutors.directExecutor());
+        return future;
+    }
+
+    @Override
+    public CompletableFuture<Void> notifyMessageQueueAssignable(String target, long topicId,
+        int queueId) throws ControllerException {
+        CompletableFuture<Void> future = new CompletableFuture<>();
+
+        NotifyMessageQueuesAssignableRequest request = NotifyMessageQueuesAssignableRequest.newBuilder()
+            .addQueues(MessageQueue.newBuilder()
+                .setTopicId(topicId)
+                .setQueueId(queueId).build())
+            .build();
+
+        Futures.addCallback(buildStubForTarget(target).notifyMessageQueueAssignable(request),
+            new FutureCallback<>() {
+                @Override
+                public void onSuccess(NotifyMessageQueuesAssignableReply result) {
+                    if (result.getStatus().getCode() == Code.OK) {
+                        future.complete(null);
+                    } else {
+                        future.completeExceptionally(
+                            new ControllerException(result.getStatus().getCodeValue(), result.getStatus().getMessage())
+                        );
+                    }
+                }
+
+                @Override
+                public void onFailure(@Nonnull Throwable t) {
+                    future.completeExceptionally(t);
+                }
+            }, MoreExecutors.directExecutor());
+
         return future;
     }
 }

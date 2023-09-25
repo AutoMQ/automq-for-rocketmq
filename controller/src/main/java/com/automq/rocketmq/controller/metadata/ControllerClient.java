@@ -35,4 +35,7 @@ public interface ControllerClient {
 
     CompletableFuture<Void> heartbeat(String target, int nodeId, long epoch,
         boolean goingAway) throws ControllerException;
+
+    CompletableFuture<Void> notifyMessageQueueAssignable(String target, long topicId,
+        int queueId) throws ControllerException;
 }
