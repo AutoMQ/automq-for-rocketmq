@@ -42,6 +42,7 @@ import com.automq.rocketmq.controller.metadata.database.tasks.LeaseTask;
 import com.automq.rocketmq.controller.metadata.database.tasks.ScanNodeTask;
 import com.google.common.base.Strings;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -342,6 +343,27 @@ public class DefaultMetadataStore implements MetadataStore {
                 }
             }
         }
+    }
+
+    @Override
+    public List<apache.rocketmq.controller.v1.Topic> listTopics() {
+        List<apache.rocketmq.controller.v1.Topic> result = new ArrayList<>();
+        try (SqlSession session = getSessionFactory().openSession()) {
+            TopicMapper topicMapper = session.getMapper(TopicMapper.class);
+            List<Topic> topics = topicMapper.list(null, null);
+            for (Topic topic : topics) {
+                if (TopicStatus.DELETED == topic.getStatus()) {
+                    continue;
+                }
+                apache.rocketmq.controller.v1.Topic t = apache.rocketmq.controller.v1.Topic.newBuilder()
+                    .setTopicId(topic.getId())
+                    .setName(topic.getName())
+                    .setCount(topic.getQueueNum())
+                    .build();
+                result.add(t);
+            }
+        }
+        return result;
     }
 
     /**
