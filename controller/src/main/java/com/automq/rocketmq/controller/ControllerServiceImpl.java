@@ -153,7 +153,25 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
 
     @Override
     public void describeTopic(DescribeTopicRequest request, StreamObserver<DescribeTopicReply> responseObserver) {
-        super.describeTopic(request, responseObserver);
+        try {
+            Topic topic = metadataStore.describeTopic(request.getTopicId(), request.getTopicName());
+            DescribeTopicReply reply;
+            if (null != topic) {
+                reply = DescribeTopicReply.newBuilder()
+                    .setTopic(topic)
+                    .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                    .build();
+            } else {
+                reply = DescribeTopicReply.newBuilder()
+                    .setStatus(Status.newBuilder().setCode(Code.NOT_FOUND).build())
+                    .build();
+            }
+            responseObserver.onNext(reply);
+            responseObserver.onCompleted();
+        } catch (ControllerException e) {
+            responseObserver.onError(e);
+        }
+
     }
 
     @Override
@@ -245,7 +263,8 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     }
 
     @Override
-    public void commitWALObject(CommitWALObjectRequest request, StreamObserver<CommitWALObjectReply> responseObserver) {
+    public void commitWALObject(CommitWALObjectRequest
+        request, StreamObserver<CommitWALObjectReply> responseObserver) {
         super.commitWALObject(request, responseObserver);
     }
 

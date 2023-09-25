@@ -27,9 +27,7 @@ public interface TopicMapper {
 
     int create(Topic topic);
 
-    Topic getById(long id);
-
-    Topic getByName(String name);
+    Topic get(@Param("id") Long id, @Param("name") String name);
 
     int updateStatusById(@Param("id") long id, @Param("status") TopicStatus status);
 
