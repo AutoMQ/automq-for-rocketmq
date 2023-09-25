@@ -35,7 +35,10 @@ public interface GroupMapper {
      * @param updateTime Optionally update-time
      * @return
      */
-    List<Group> list(@Param("id") Long id, @Param("status") GroupStatus status, @Param("updateTime") Date updateTime);
+    List<Group> list(@Param("id") Long id,
+        @Param("name") String name,
+        @Param("status") GroupStatus status,
+        @Param("updateTime") Date updateTime);
 
     /**
      * Only group name can be modified.
