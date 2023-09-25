@@ -20,6 +20,7 @@ package com.automq.rocketmq.store.mock;
 import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
+import com.automq.rocketmq.common.util.Pair;
 import com.automq.rocketmq.metadata.StoreMetadataService;
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -124,6 +125,12 @@ public class MockStoreMetadataService implements StoreMetadataService {
     @Override
     public CompletableFuture<List<S3StreamObject>> listStreamObjects(long streamId, long startOffset, long endOffset,
         int limit) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<Pair<List<S3StreamObject>, List<S3WALObject>>> listObjects(long streamId, long startOffset,
+        long endOffset, int limit) {
         return null;
     }
 }
