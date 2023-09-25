@@ -17,6 +17,8 @@
 
 package com.automq.rocketmq.controller.metadata;
 
+import apache.rocketmq.controller.v1.CommitOffsetReply;
+import apache.rocketmq.controller.v1.CommitOffsetRequest;
 import apache.rocketmq.controller.v1.CreateTopicReply;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.DeleteTopicReply;
@@ -265,6 +267,37 @@ public class GrpcControllerClient implements ControllerClient {
                 }
             }, MoreExecutors.directExecutor());
 
+        return future;
+    }
+
+    @Override
+    public CompletableFuture<Void> commitOffset(String target, long groupId, long topicId, int queueId,
+        long offset) throws ControllerException {
+        CommitOffsetRequest request = CommitOffsetRequest.newBuilder()
+            .setGroupId(groupId)
+            .setQueue(MessageQueue.newBuilder()
+                .setTopicId(topicId)
+                .setQueueId(queueId).build())
+            .setOffset(offset)
+            .build();
+
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        Futures.addCallback(buildStubForTarget(target).commitOffset(request), new FutureCallback<>() {
+            @Override
+            public void onSuccess(CommitOffsetReply result) {
+                if (result.getStatus().getCode() == Code.OK) {
+                    future.complete(null);
+                } else {
+                    future.completeExceptionally(
+                        new ControllerException(result.getStatus().getCodeValue(), result.getStatus().getMessage()));
+                }
+            }
+
+            @Override
+            public void onFailure(@Nonnull Throwable t) {
+                future.completeExceptionally(t);
+            }
+        }, MoreExecutors.directExecutor());
         return future;
     }
 }

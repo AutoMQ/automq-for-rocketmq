@@ -70,4 +70,6 @@ public interface MetadataStore extends Closeable {
         QueueAssignmentStatus status);
 
     void markMessageQueueAssignable(long topicId, int queueId) throws ControllerException;
+
+    void commitOffset(long groupId, long topicId, int queueId, long offset) throws ControllerException;
 }

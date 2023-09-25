@@ -53,16 +53,17 @@
         SELECT id, name, instance_id, volume_id, hostname, vpc_id, address, epoch
         FROM node
         WHERE 1 = 1
+        <if test="null != id">
+            AND id = #{id}
+        </if>
         <if test="null != instanceId">
             AND instance_id = #{instanceId}
         </if>
         <if test="null != name">
             AND name = #{name}
         </if>
-
         <if test="null != volumeId">
             AND volume_id = #{volumeId}
         </if>
     </select>
-
 </mapper>

@@ -38,4 +38,7 @@ public interface ControllerClient {
 
     CompletableFuture<Void> notifyMessageQueueAssignable(String target, long topicId,
         int queueId) throws ControllerException;
+
+    CompletableFuture<Void> commitOffset(String target, long groupId, long topicId, int queueId,
+        long offset) throws ControllerException;
 }

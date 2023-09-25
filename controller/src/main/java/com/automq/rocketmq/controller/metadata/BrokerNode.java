@@ -44,9 +44,13 @@ public class BrokerNode {
         this.goingAway = goingAway;
     }
 
-    public boolean isAlive(long tolerationInMillis) {
+    public boolean isAlive(ControllerConfig config) {
+        if (node.getId() == config.nodeId()) {
+            return true;
+        }
+
         long nanos = System.nanoTime() - this.lastKeepAlive;
-        return TimeUnit.NANOSECONDS.toMillis(nanos) <= tolerationInMillis;
+        return TimeUnit.NANOSECONDS.toMillis(nanos) <= TimeUnit.SECONDS.toMillis(config.nodeAliveIntervalInSecs());
     }
 
     public Node getNode() {
