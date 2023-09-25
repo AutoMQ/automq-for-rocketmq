@@ -38,7 +38,6 @@ import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 import com.automq.rocketmq.controller.metadata.database.tasks.LeaseTask;
 import com.automq.rocketmq.controller.metadata.database.tasks.ScanNodeTask;
 import com.google.common.base.Strings;
-import java.io.Closeable;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
@@ -55,7 +54,7 @@ import org.apache.ibatis.session.SqlSessionFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class DefaultMetadataStore implements MetadataStore, Closeable {
+public class DefaultMetadataStore implements MetadataStore {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DefaultMetadataStore.class);
 
@@ -67,7 +66,7 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
 
     private Role role;
 
-    private final ConcurrentHashMap<Integer, BrokerNode> brokers;
+    private final ConcurrentHashMap<Integer, BrokerNode> nodes;
 
     private final ScheduledExecutorService executorService;
 
@@ -79,7 +78,7 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
         this.sessionFactory = sessionFactory;
         this.config = config;
         this.role = Role.Follower;
-        this.brokers = new ConcurrentHashMap<>();
+        this.nodes = new ConcurrentHashMap<>();
         this.executorService = new ScheduledThreadPoolExecutor(Runtime.getRuntime().availableProcessors(),
             new PrefixThreadFactory("Controller"));
 
@@ -142,6 +141,14 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
         }
     }
 
+    @Override
+    public void keepAlive(int nodeId, long epoch, boolean goingAway) {
+        BrokerNode brokerNode = nodes.get(nodeId);
+        if (null != brokerNode) {
+            brokerNode.keepAlive(epoch, goingAway);
+        }
+    }
+
     private boolean maintainLeadershipWithSharedLock(SqlSession session) {
         LeaseMapper leaseMapper = session.getMapper(LeaseMapper.class);
         Lease current = leaseMapper.currentWithShareLock();
@@ -178,7 +185,7 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
 
                     long topicId = topic.getId();
                     List<Integer> aliveNodeIds =
-                        this.brokers.values()
+                        this.nodes.values()
                             .stream()
                             .filter(brokerNode ->
                                 brokerNode.isAlive(TimeUnit.SECONDS.toMillis(config.nodeAliveIntervalInSecs())) ||
@@ -223,7 +230,6 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
 
     @Override
     public void deleteTopic(long topicId) throws ControllerException {
-
         for (; ; ) {
             if (this.isLeader()) {
                 Set<Integer> toNotify = new HashSet<>();
@@ -287,7 +293,7 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
             throw new ControllerException(Code.NO_LEADER_VALUE);
         }
 
-        BrokerNode brokerNode = brokers.get(this.lease.getNodeId());
+        BrokerNode brokerNode = nodes.get(this.lease.getNodeId());
         if (null == brokerNode) {
             LOGGER.error("Address for Broker with brokerId={} is missing", this.lease.getNodeId());
             throw new ControllerException(Code.NOT_FOUND_VALUE,
@@ -324,11 +330,11 @@ public class DefaultMetadataStore implements MetadataStore, Closeable {
     }
 
     public void addBroker(Node node) {
-        this.brokers.put(node.getId(), new BrokerNode(node));
+        this.nodes.put(node.getId(), new BrokerNode(node));
     }
 
-    public ConcurrentMap<Integer, BrokerNode> getBrokers() {
-        return brokers;
+    public ConcurrentMap<Integer, BrokerNode> getNodes() {
+        return nodes;
     }
 
     public SqlSessionFactory getSessionFactory() {

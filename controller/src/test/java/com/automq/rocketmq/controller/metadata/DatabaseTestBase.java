@@ -17,13 +17,24 @@
 
 package com.automq.rocketmq.controller.metadata;
 
+import com.automq.rocketmq.controller.metadata.database.dao.Lease;
+import com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.GroupProgressMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.LeaseMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.QueueMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Calendar;
 import java.util.Properties;
 import org.apache.ibatis.io.Resources;
+import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.apache.ibatis.session.SqlSessionFactoryBuilder;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
@@ -46,5 +57,26 @@ public class DatabaseTestBase {
         properties.put("password", "test");
         properties.put("jdbcUrl", mySQLContainer.getJdbcUrl() + "?TC_REUSABLE=true");
         return new SqlSessionFactoryBuilder().build(inputStream, properties);
+    }
+
+    @BeforeEach
+    protected void cleanTables() throws IOException {
+        try (SqlSession session = getSessionFactory().openSession(true)) {
+            session.getMapper(GroupMapper.class).delete(null);
+            session.getMapper(GroupProgressMapper.class).delete(null, null);
+            session.getMapper(NodeMapper.class).delete(null);
+            session.getMapper(QueueMapper.class).delete(null, null);
+            session.getMapper(QueueAssignmentMapper.class).delete(null);
+            session.getMapper(TopicMapper.class).delete(null);
+
+            LeaseMapper mapper = session.getMapper(LeaseMapper.class);
+            Lease lease = mapper.currentWithWriteLock();
+            lease.setNodeId(1);
+            lease.setEpoch(1);
+            Calendar calendar = Calendar.getInstance();
+            calendar.set(2023, Calendar.JANUARY, 1);
+            lease.setExpirationTime(calendar.getTime());
+            mapper.update(lease);
+        }
     }
 }

@@ -27,4 +27,5 @@ public interface GroupProgressMapper {
 
     List<GroupProgress> list(@Param("groupId") Long groupId, @Param("topicId") Long topicId);
 
+    int delete(@Param("groupId")Long groupId, @Param("topicId") Long topicId);
 }

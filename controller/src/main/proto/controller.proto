@@ -350,7 +350,7 @@ service ControllerService {
 
   rpc unregisterNode(NodeUnregistrationRequest) returns (NodeUnregistrationReply) {}
 
-  rpc processHeartbeat(HeartbeatRequest) returns (HeartbeatReply) {}
+  rpc heartbeat(HeartbeatRequest) returns (HeartbeatReply) {}
 
   rpc createTopic(CreateTopicRequest) returns (CreateTopicReply) {}
 

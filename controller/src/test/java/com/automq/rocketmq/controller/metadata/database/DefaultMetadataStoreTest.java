@@ -140,7 +140,8 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.nodeId()).thenReturn(nodeId);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
+        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
+        Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
@@ -152,7 +153,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Awaitility.await()
                 .with()
                 .atMost(10, TimeUnit.SECONDS)
-                .pollInterval(100, TimeUnit.MILLISECONDS).until(() -> !metadataStore.getBrokers().isEmpty());
+                .pollInterval(100, TimeUnit.MILLISECONDS).until(() -> !metadataStore.getNodes().isEmpty());
 
             Assertions.assertEquals(metadataStore.getLease().getNodeId(), nodeId);
 
@@ -171,7 +172,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.nodeId()).thenReturn(1);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
+        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertThrows(ControllerException.class, metadataStore::leaderAddress);
         }
@@ -182,7 +183,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.nodeId()).thenReturn(1);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
+        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await()
@@ -196,7 +197,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
     @Test
     void testCreateTopic() throws ControllerException, IOException {
-
         String address = "localhost:1234";
         int nodeId;
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -213,7 +213,8 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.nodeId()).thenReturn(nodeId);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
+        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
+        Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().atMost(10, TimeUnit.SECONDS)
@@ -302,7 +303,8 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.nodeId()).thenReturn(nodeId);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
+        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
+        Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().atMost(10, TimeUnit.SECONDS).pollInterval(100, TimeUnit.MILLISECONDS)
