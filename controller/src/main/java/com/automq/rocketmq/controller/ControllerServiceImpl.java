@@ -65,6 +65,7 @@ import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.google.protobuf.TextFormat;
 import io.grpc.stub.StreamObserver;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -176,7 +177,19 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
 
     @Override
     public void listAllTopics(ListTopicsRequest request, StreamObserver<ListTopicsReply> responseObserver) {
-        super.listAllTopics(request, responseObserver);
+        try {
+            List<Topic> topics = metadataStore.listTopics();
+            for (Topic topic : topics) {
+                ListTopicsReply reply = ListTopicsReply.newBuilder()
+                    .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                    .setTopic(topic)
+                    .build();
+                responseObserver.onNext(reply);
+            }
+            responseObserver.onCompleted();
+        } catch (ControllerException e) {
+            responseObserver.onError(e);
+        }
     }
 
     @Override

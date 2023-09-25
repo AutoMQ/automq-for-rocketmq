@@ -45,6 +45,8 @@ public interface MetadataStore extends Closeable {
 
     Topic describeTopic(Long topicId, String topicName) throws ControllerException;
 
+    List<Topic> listTopics() throws ControllerException;
+
     /**
      * Check if current controller is playing leader role
      *
