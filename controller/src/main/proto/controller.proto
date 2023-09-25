@@ -317,6 +317,26 @@ message CommitStreamObjectReply {
   Status status = 1;
 }
 
+message CreateGroupRequest {
+  ControllerRequestContext context = 1;
+
+  // Consumer group name
+  string name = 2;
+
+  // Maximum retry attempts before forwarding messages to dead-letter-queue
+  int32 max_retry_attempt = 3;
+
+  // Type of the group, standard for max concurrency and FIFO for message-group scope ordering
+  GroupType group_type = 4;
+
+  // How transactional messages are consumed.
+  IsolationLevel isolation = 5;
+}
+
+message CreateGroupReply {
+  Status status = 1;
+}
+
 service ControllerService {
   rpc registerNode(NodeRegistrationRequest) returns (NodeRegistrationReply) {}
 
@@ -343,6 +363,8 @@ service ControllerService {
 
   // List ongoing message queue reassignments.
   rpc listMessageQueueReassignments(ListMessageQueueReassignmentsRequest) returns (ListMessageQueueReassignmentsReply) {}
+
+  rpc createGroup(CreateGroupRequest) returns (CreateGroupReply) {}
 
   rpc commitOffset(CommitOffsetRequest) returns (CommitOffsetReply) {}
 

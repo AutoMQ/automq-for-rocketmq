@@ -49,6 +49,18 @@ enum MessageType {
   TRANSACTION = 4;
 }
 
+enum GroupType {
+  GROUP_TYPE_UNSPECIFIED = 0;
+  GROUP_TYPE_STANDARD = 1;
+  GROUP_TYPE_FIFO = 2;
+}
+
+enum IsolationLevel {
+  ISOLATION_LEVEL_UNSPECIFIED = 0;
+  READ_UNCOMMITTED = 1;
+  READ_COMMITTED = 2;
+}
+
 message OngoingMessageQueueReassignment {
   MessageQueue queue = 1;
   int32 src_broker_id = 2;
