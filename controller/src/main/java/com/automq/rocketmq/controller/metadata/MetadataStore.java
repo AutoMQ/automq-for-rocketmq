@@ -21,9 +21,10 @@ import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignmentStatus;
+import java.io.Closeable;
 import java.util.List;
 
-public interface MetadataStore {
+public interface MetadataStore extends Closeable {
 
     void start();
 
@@ -34,6 +35,8 @@ public interface MetadataStore {
      * @throws ControllerException If there is an I/O error.
      */
     Node registerBrokerNode(String name, String address, String instanceId) throws ControllerException;
+
+    void keepAlive(int nodeId, long epoch, boolean goingAway);
 
     long createTopic(String topicName, int queueNum) throws ControllerException;
 

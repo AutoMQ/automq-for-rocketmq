@@ -95,6 +95,18 @@ class GrpcControllerClientTest {
     }
 
     @Test
+    public void testHeartbeat() throws IOException {
+        MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
+        ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
+        try (ControllerTestServer testServer = new ControllerTestServer(0, svc)) {
+            testServer.start();
+            int port = testServer.getPort();
+            ControllerClient client = new GrpcControllerClient();
+            Assertions.assertDoesNotThrow(() -> client.heartbeat(String.format("localhost:%d", port), 1, 1, false).get());
+        }
+    }
+
+    @Test
     public void testCreateTopic() throws ControllerException, IOException, ExecutionException, InterruptedException {
         String topicName = "t1";
         int queueNum = 4;

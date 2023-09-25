@@ -21,6 +21,8 @@ import apache.rocketmq.controller.v1.CreateTopicReply;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.DeleteTopicReply;
 import apache.rocketmq.controller.v1.DeleteTopicRequest;
+import apache.rocketmq.controller.v1.HeartbeatReply;
+import apache.rocketmq.controller.v1.HeartbeatRequest;
 import apache.rocketmq.controller.v1.NodeRegistrationReply;
 import apache.rocketmq.controller.v1.NodeRegistrationRequest;
 import apache.rocketmq.controller.v1.Code;
@@ -37,6 +39,7 @@ import io.grpc.ManagedChannel;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import javax.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -93,7 +96,7 @@ public class GrpcControllerClient implements ControllerClient {
             }
 
             @Override
-            public void onFailure(Throwable t) {
+            public void onFailure(@Nonnull Throwable t) {
                 future.completeExceptionally(new ControllerException(Code.INTERRUPTED_VALUE, t));
             }
         }, MoreExecutors.directExecutor());
@@ -115,9 +118,7 @@ public class GrpcControllerClient implements ControllerClient {
             public void onSuccess(CreateTopicReply result) {
                 LOGGER.info("Leader has created topic for {} with topic-id={}", topicName, result.getTopicId());
                 switch (result.getStatus().getCode()) {
-                    case OK -> {
-                        future.complete(result.getTopicId());
-                    }
+                    case OK -> future.complete(result.getTopicId());
                     case DUPLICATED -> {
                         ControllerException e = new ControllerException(Code.DUPLICATED_VALUE, "Topic name is taken");
                         future.completeExceptionally(e);
@@ -130,7 +131,7 @@ public class GrpcControllerClient implements ControllerClient {
             }
 
             @Override
-            public void onFailure(Throwable t) {
+            public void onFailure(@Nonnull Throwable t) {
                 future.completeExceptionally(t);
                 LOGGER.error("Leader node failed to create topic on behalf", t);
             }
@@ -147,30 +148,50 @@ public class GrpcControllerClient implements ControllerClient {
 
         CompletableFuture<Void> future = new CompletableFuture<>();
 
-        Futures.addCallback(stub.deleteTopic(request), new FutureCallback<DeleteTopicReply>() {
+        Futures.addCallback(stub.deleteTopic(request), new FutureCallback<>() {
             @Override
             public void onSuccess(DeleteTopicReply result) {
                 switch (result.getStatus().getCode()) {
-                    case OK -> {
-                        future.complete(null);
-                    }
-                    case NOT_FOUND -> {
-                        future.completeExceptionally(new ControllerException(Code.NOT_FOUND_VALUE,
-                            "Topic to delete is not found"));
-                    }
-                    default -> {
-                        future.completeExceptionally(new ControllerException(result.getStatus().getCode().getNumber(),
-                            result.getStatus().getMessage()));
-                    }
+                    case OK -> future.complete(null);
+                    case NOT_FOUND -> future.completeExceptionally(new ControllerException(Code.NOT_FOUND_VALUE,
+                        "Topic to delete is not found"));
+                    default -> future.completeExceptionally(new ControllerException(result.getStatus().getCode().getNumber(),
+                        result.getStatus().getMessage()));
                 }
             }
 
             @Override
-            public void onFailure(Throwable t) {
+            public void onFailure(@Nonnull Throwable t) {
                 future.completeExceptionally(t);
             }
         }, MoreExecutors.directExecutor());
 
+        return future;
+    }
+
+    @Override
+    public CompletableFuture<Void> heartbeat(String target, int nodeId, long epoch,
+        boolean goingAway) throws ControllerException {
+        buildStubForTarget(target);
+
+        ControllerServiceGrpc.ControllerServiceFutureStub stub = stubs.get(target);
+        HeartbeatRequest request = HeartbeatRequest.newBuilder().setId(nodeId).setEpoch(epoch).setGoingAway(goingAway).build();
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        Futures.addCallback(stub.heartbeat(request), new FutureCallback<>() {
+            @Override
+            public void onSuccess(HeartbeatReply result) {
+                if (result.getStatus().getCode() == Code.OK) {
+                    future.complete(null);
+                } else {
+                    future.completeExceptionally(new ControllerException(result.getStatus().getCodeValue(), result.getStatus().getMessage()));
+                }
+            }
+
+            @Override
+            public void onFailure(@Nonnull Throwable t) {
+                future.completeExceptionally(t);
+            }
+        }, MoreExecutors.directExecutor());
         return future;
     }
 }

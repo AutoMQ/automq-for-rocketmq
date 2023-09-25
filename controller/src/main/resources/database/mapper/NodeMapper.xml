@@ -31,8 +31,13 @@
         WHERE id = #{id}
     </update>
 
-    <delete id="delete" parameterType="int">
-        DELETE FROM node WHERE id = #{id}
+    <delete id="delete">
+        DELETE
+        FROM node
+        WHERE 1 = 1
+        <if test="null != id">
+           AND id = #{id}
+        </if>
     </delete>
 
     <select id="list" resultType="Node">

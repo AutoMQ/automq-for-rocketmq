@@ -29,4 +29,7 @@ public interface ControllerClient {
     CompletableFuture<Long> createTopic(String target, String topicName, int queueNum) throws ControllerException;
 
     CompletableFuture<Void> deleteTopic(String target, long topicId) throws ControllerException;
+
+    CompletableFuture<Void> heartbeat(String target, int nodeId, long epoch,
+        boolean goingAway) throws ControllerException;
 }

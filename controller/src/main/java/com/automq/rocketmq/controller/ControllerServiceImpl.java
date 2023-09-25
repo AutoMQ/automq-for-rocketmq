@@ -17,9 +17,15 @@
 
 package com.automq.rocketmq.controller;
 
+import apache.rocketmq.controller.v1.CloseStreamReply;
+import apache.rocketmq.controller.v1.CloseStreamRequest;
 import apache.rocketmq.controller.v1.Code;
 import apache.rocketmq.controller.v1.CommitOffsetReply;
 import apache.rocketmq.controller.v1.CommitOffsetRequest;
+import apache.rocketmq.controller.v1.CommitStreamObjectReply;
+import apache.rocketmq.controller.v1.CommitStreamObjectRequest;
+import apache.rocketmq.controller.v1.CommitWALObjectReply;
+import apache.rocketmq.controller.v1.CommitWALObjectRequest;
 import apache.rocketmq.controller.v1.ControllerServiceGrpc;
 import apache.rocketmq.controller.v1.CreateTopicReply;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
@@ -31,6 +37,8 @@ import apache.rocketmq.controller.v1.HeartbeatReply;
 import apache.rocketmq.controller.v1.HeartbeatRequest;
 import apache.rocketmq.controller.v1.ListMessageQueueReassignmentsReply;
 import apache.rocketmq.controller.v1.ListMessageQueueReassignmentsRequest;
+import apache.rocketmq.controller.v1.ListOpenStreamsRequest;
+import apache.rocketmq.controller.v1.ListOpeningStreamsReply;
 import apache.rocketmq.controller.v1.ListTopicMessageQueueAssignmentsReply;
 import apache.rocketmq.controller.v1.ListTopicMessageQueueAssignmentsRequest;
 import apache.rocketmq.controller.v1.ListTopicsReply;
@@ -41,10 +49,16 @@ import apache.rocketmq.controller.v1.NodeUnregistrationReply;
 import apache.rocketmq.controller.v1.NodeUnregistrationRequest;
 import apache.rocketmq.controller.v1.NotifyMessageQueuesAssignableReply;
 import apache.rocketmq.controller.v1.NotifyMessageQueuesAssignableRequest;
+import apache.rocketmq.controller.v1.OpenStreamReply;
+import apache.rocketmq.controller.v1.OpenStreamRequest;
+import apache.rocketmq.controller.v1.PrepareS3ObjectsReply;
+import apache.rocketmq.controller.v1.PrepareS3ObjectsRequest;
 import apache.rocketmq.controller.v1.ReassignMessageQueueReply;
 import apache.rocketmq.controller.v1.ReassignMessageQueueRequest;
 import apache.rocketmq.controller.v1.Status;
 import apache.rocketmq.controller.v1.Topic;
+import apache.rocketmq.controller.v1.TrimStreamReply;
+import apache.rocketmq.controller.v1.TrimStreamRequest;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
@@ -89,9 +103,11 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     }
 
     @Override
-    public void processHeartbeat(HeartbeatRequest request,
+    public void heartbeat(HeartbeatRequest request,
         StreamObserver<HeartbeatReply> responseObserver) {
         LOGGER.trace("Received HeartbeatRequest {}", TextFormat.shortDebugString(request));
+
+        metadataStore.keepAlive(request.getId(), request.getEpoch(), request.getGoingAway());
 
         Status status = Status.newBuilder().setCode(Code.OK).build();
         HeartbeatReply reply = HeartbeatReply.newBuilder().setStatus(status).build();
@@ -199,5 +215,43 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     @Override
     public void commitOffset(CommitOffsetRequest request, StreamObserver<CommitOffsetReply> responseObserver) {
         super.commitOffset(request, responseObserver);
+    }
+
+    @Override
+    public void openStream(OpenStreamRequest request, StreamObserver<OpenStreamReply> responseObserver) {
+        super.openStream(request, responseObserver);
+    }
+
+    @Override
+    public void closeStream(CloseStreamRequest request, StreamObserver<CloseStreamReply> responseObserver) {
+        super.closeStream(request, responseObserver);
+    }
+
+    @Override
+    public void trimStream(TrimStreamRequest request, StreamObserver<TrimStreamReply> responseObserver) {
+        super.trimStream(request, responseObserver);
+    }
+
+    @Override
+    public void listOpenStreams(ListOpenStreamsRequest request,
+        StreamObserver<ListOpeningStreamsReply> responseObserver) {
+        super.listOpenStreams(request, responseObserver);
+    }
+
+    @Override
+    public void prepareS3Objects(PrepareS3ObjectsRequest request,
+        StreamObserver<PrepareS3ObjectsReply> responseObserver) {
+        super.prepareS3Objects(request, responseObserver);
+    }
+
+    @Override
+    public void commitWALObject(CommitWALObjectRequest request, StreamObserver<CommitWALObjectReply> responseObserver) {
+        super.commitWALObject(request, responseObserver);
+    }
+
+    @Override
+    public void commitStreamObject(CommitStreamObjectRequest request,
+        StreamObserver<CommitStreamObjectReply> responseObserver) {
+        super.commitStreamObject(request, responseObserver);
     }
 }
