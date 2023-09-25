@@ -19,7 +19,7 @@ package com.automq.rocketmq.common.config;
 
 import java.time.Duration;
 
-public class ProxyConfig {
+public class ProxyConfig extends BaseConfig {
     private String name;
 
     // The proportion of messages that are popped from the retry queue first,
@@ -28,6 +28,21 @@ public class ProxyConfig {
 
     // lock expire time, default is 15min, unit in nanoseconds.
     private long lockExpireTime = Duration.ofMinutes(15).toNanos();
+
+    private int grpcThreadPoolNums = 16 + PROCESSOR_NUMBER * 2;
+    private int grpcThreadPoolQueueCapacity = 100000;
+    private Integer grpcServerPort = 8081;
+    private int grpcBossLoopNum = 1;
+    private int grpcWorkerLoopNum = PROCESSOR_NUMBER * 2;
+    private boolean enableGrpcEpoll = false;
+    private long channelExpiredTimeout = 1000 * 120;
+
+    /**
+     * gRPC max message size
+     * 130M = 4M * 32 messages + 2M attributes
+     */
+    private int grpcMaxInboundMessageSize = 130 * 1024 * 1024;
+    private long grpcClientIdleTimeMills = Duration.ofSeconds(120).toMillis();
 
     public String name() {
         return name;
@@ -39,5 +54,41 @@ public class ProxyConfig {
 
     public long lockExpireTime() {
         return lockExpireTime;
+    }
+
+    public int grpcThreadPoolNums() {
+        return grpcThreadPoolNums;
+    }
+
+    public int grpcThreadPoolQueueCapacity() {
+        return grpcThreadPoolQueueCapacity;
+    }
+
+    public Integer grpcServerPort() {
+        return grpcServerPort;
+    }
+
+    public int grpcBossLoopNum() {
+        return grpcBossLoopNum;
+    }
+
+    public int grpcWorkerLoopNum() {
+        return grpcWorkerLoopNum;
+    }
+
+    public boolean enableGrpcEpoll() {
+        return enableGrpcEpoll;
+    }
+
+    public int grpcMaxInboundMessageSize() {
+        return grpcMaxInboundMessageSize;
+    }
+
+    public long grpcClientIdleTimeMills() {
+        return grpcClientIdleTimeMills;
+    }
+
+    public long channelExpiredTimeout() {
+        return channelExpiredTimeout;
     }
 }
