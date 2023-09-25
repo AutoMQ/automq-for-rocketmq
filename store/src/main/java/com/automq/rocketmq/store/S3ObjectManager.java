@@ -20,6 +20,7 @@ package com.automq.rocketmq.store;
 import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.SubStream;
+import com.automq.rocketmq.common.util.Pair;
 import com.automq.rocketmq.metadata.StoreMetadataService;
 import com.automq.stream.s3.metadata.S3ObjectMetadata;
 import com.automq.stream.s3.metadata.S3ObjectType;
@@ -31,8 +32,10 @@ import com.automq.stream.s3.objects.CommitWALObjectResponse;
 import com.automq.stream.s3.objects.ObjectManager;
 import com.automq.stream.s3.objects.ObjectStreamRange;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -112,56 +115,69 @@ public class S3ObjectManager implements ObjectManager {
         return metaService.commitStreamObject(object, request.getSourceObjectIds());
     }
 
+    static class S3ObjectMetadataWrapper {
+        private final S3ObjectMetadata metadata;
+        private final long startOffset;
+        private final long endOffset;
+
+        public S3ObjectMetadataWrapper(S3ObjectMetadata metadata, long startOffset, long endOffset) {
+            this.metadata = metadata;
+            this.startOffset = startOffset;
+            this.endOffset = endOffset;
+        }
+
+        public S3ObjectMetadata getMetadata() {
+            return metadata;
+        }
+
+        public long getStartOffset() {
+            return startOffset;
+        }
+
+        public long getEndOffset() {
+            return endOffset;
+        }
+    }
+
     @Override
     public CompletableFuture<List<S3ObjectMetadata>> getObjects(long streamId, long startOffset, long endOffset,
         int limit) {
-        CompletableFuture<List<S3StreamObject>> sf = metaService.listStreamObjects(streamId, startOffset, endOffset, limit);
-        CompletableFuture<List<S3WALObject>> wf = metaService.listWALObjects(streamId, startOffset, endOffset, limit);
-
+        CompletableFuture<Pair<List<S3StreamObject>, List<S3WALObject>>> cf = metaService.listObjects(streamId, startOffset, endOffset, limit);
         // Retrieve S3ObjectMetadata from stream objects and wal objects
-        return sf.thenCombine(wf, (streamObjects, walObjects) -> {
+        return cf.thenApply(pair -> {
             // Sort the streamObjects in ascending order of startOffset
-            streamObjects.sort((o1, o2) -> (int) (o1.getStartOffset() - o2.getStartOffset()));
+            pair.left().sort((o1, o2) -> (int) (o1.getStartOffset() - o2.getStartOffset()));
+            Queue<S3ObjectMetadataWrapper> streamObjects = pair.left().stream().map(obj -> {
+                long start = obj.getStartOffset();
+                long end = obj.getEndOffset();
+                return new S3ObjectMetadataWrapper(convertFrom(obj), start, end);
+            }).collect(Collectors.toCollection(LinkedList::new));
             // Sort the walObjects in ascending order of startOffset
-            walObjects.sort((o1, o2) -> (int) (o1.getSubStreamsMap().get(streamId).getStartOffset() - o2.getSubStreamsMap().get(streamId).getStartOffset()));
+            pair.right().sort((o1, o2) -> (int) (o1.getSubStreamsMap().get(streamId).getStartOffset() - o2.getSubStreamsMap().get(streamId).getStartOffset()));
+            Queue<S3ObjectMetadataWrapper> walObjects = pair.right().stream().map(obj -> {
+                long start = obj.getSubStreamsMap().get(streamId).getStartOffset();
+                long end = obj.getSubStreamsMap().get(streamId).getEndOffset();
+                return new S3ObjectMetadataWrapper(convertFrom(obj), start, end);
+            }).collect(Collectors.toCollection(LinkedList::new));
             // Merge sort the two object lists
-            List<S3ObjectMetadata> objectMetadatas = new ArrayList<>();
-            long startOffsetPtr = startOffset;
-            int sIndex = 0, wIndex = 0;
-            while (true) {
-                boolean moved = false;
-                // Stream object has higher priority
-                if (sIndex < streamObjects.size()) {
-                    S3StreamObject streamObject = streamObjects.get(sIndex);
-                    if (streamObject.getStartOffset() <= startOffsetPtr && streamObject.getEndOffset() > startOffsetPtr) {
-                        objectMetadatas.add(convertFrom(streamObject));
-                        startOffsetPtr = streamObject.getEndOffset();
-                        sIndex++;
-                        moved = true;
-                    } else if (streamObject.getEndOffset() <= startOffsetPtr) {
-                        // Don't need this stream object.
-                        sIndex++;
-                        moved = true;
-                    }
+            List<S3ObjectMetadata> objectMetadataList = new ArrayList<>();
+            long nextStartOffset = startOffset;
+            int need = limit;
+            while (need > 0
+                && nextStartOffset < endOffset
+                && (!streamObjects.isEmpty() || !walObjects.isEmpty())) {
+                S3ObjectMetadataWrapper cur = null;
+                if (walObjects.isEmpty() || (!streamObjects.isEmpty() && streamObjects.peek().getStartOffset() <= walObjects.peek().getStartOffset())) {
+                    // Stream object has higher priority
+                    cur = streamObjects.poll();
+                } else {
+                    cur = walObjects.poll();
                 }
-
-                if (wIndex < walObjects.size()) {
-                    S3WALObject walObject = walObjects.get(wIndex);
-                    long walStart = walObject.getSubStreamsMap().get(streamId).getStartOffset();
-                    long walEnd = walObject.getSubStreamsMap().get(streamId).getEndOffset();
-                    if (walStart <= startOffsetPtr && walEnd > startOffsetPtr) {
-                        objectMetadatas.add(convertFrom(walObject));
-                        startOffsetPtr = walEnd;
-                        wIndex++;
-                        moved = true;
-                    } else if (walEnd <= startOffsetPtr) {
-                        // Don't need this wal object.
-                        wIndex++;
-                        moved = true;
-                    }
+                // Skip the object if it is not in the range
+                if (cur.getEndOffset() <= nextStartOffset) {
+                    continue;
                 }
-
-                if (!moved) {
+                if (cur.getStartOffset() > nextStartOffset) {
                     // No object can be added, break the loop
                     // Consider we need [100, 300), but the first object is [200, 300), then we need to break the loop
                     LOGGER.error("Found a hole in the returned S3Object list, streamId: {}, startOffset: {}, streamObjects: {}, walObjects: {}",
@@ -169,18 +185,13 @@ public class S3ObjectManager implements ObjectManager {
                     // Throw exception to trigger the retry
                     throw new RuntimeException("Found a hole in the returned S3Object list for current getObjects request");
                 }
-
-                if (objectMetadatas.size() >= limit) {
-                    break;
-                }
-
-                if (sIndex >= streamObjects.size() && wIndex >= walObjects.size()) {
-                    break;
-                }
+                objectMetadataList.add(cur.getMetadata());
+                nextStartOffset = cur.getEndOffset();
+                need--;
             }
             LOGGER.trace("Get objects from streamId: {}, startOffset: {}, endOffset: {}, limit: {}, result: {}",
-                streamId, startOffset, endOffset, limit, objectMetadatas);
-            return objectMetadatas;
+                streamId, startOffset, endOffset, limit, objectMetadataList);
+            return objectMetadataList;
         });
     }
 
