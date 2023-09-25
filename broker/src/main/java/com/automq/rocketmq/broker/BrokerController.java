@@ -17,5 +17,23 @@
 
 package com.automq.rocketmq.broker;
 
-public class BrokerController {
+import com.automq.rocketmq.common.config.BrokerConfig;
+import com.automq.rocketmq.common.util.Lifecycle;
+
+public class BrokerController implements Lifecycle {
+    private final BrokerConfig brokerConfig;
+
+    public BrokerController(BrokerConfig brokerConfig) {
+        this.brokerConfig = brokerConfig;
+    }
+
+    @Override
+    public void start() throws Exception {
+
+    }
+
+    @Override
+    public void shutdown() throws Exception {
+
+    }
 }
