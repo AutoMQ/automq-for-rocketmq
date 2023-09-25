@@ -31,7 +31,9 @@ public interface NodeMapper {
      */
     int create(Node node);
 
-    Node get(@Param("name") String name,
+    Node get(
+        @Param("id") Integer id,
+        @Param("name") String name,
         @Param("instanceId") String instanceId,
         @Param("volumeId") String volumeId
     );

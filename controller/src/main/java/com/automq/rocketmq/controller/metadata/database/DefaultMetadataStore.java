@@ -81,14 +81,13 @@ public class DefaultMetadataStore implements MetadataStore {
     private Lease lease;
 
     public DefaultMetadataStore(ControllerClient client, SqlSessionFactory sessionFactory, ControllerConfig config) {
-        controllerClient = client;
+        this.controllerClient = client;
         this.sessionFactory = sessionFactory;
         this.config = config;
         this.role = Role.Follower;
         this.nodes = new ConcurrentHashMap<>();
         this.executorService = new ScheduledThreadPoolExecutor(Runtime.getRuntime().availableProcessors(),
             new PrefixThreadFactory("Controller"));
-
     }
 
     public void start() {
@@ -116,7 +115,7 @@ public class DefaultMetadataStore implements MetadataStore {
             if (this.isLeader()) {
                 try (SqlSession session = this.sessionFactory.openSession(false)) {
                     NodeMapper nodeMapper = session.getMapper(NodeMapper.class);
-                    Node node = nodeMapper.get(null, instanceId, null);
+                    Node node = nodeMapper.get(null, null, instanceId, null);
                     if (null != node) {
                         nodeMapper.increaseEpoch(node.getId());
                         node.setEpoch(node.getEpoch() + 1);
@@ -165,9 +164,7 @@ public class DefaultMetadataStore implements MetadataStore {
         List<Integer> aliveNodeIds =
             this.nodes.values()
                 .stream()
-                .filter(brokerNode ->
-                    brokerNode.isAlive(TimeUnit.SECONDS.toMillis(config.nodeAliveIntervalInSecs())) ||
-                        brokerNode.getNode().getId() == config.nodeId())
+                .filter(brokerNode -> brokerNode.isAlive(config))
                 .map(node -> node.getNode().getId())
                 .toList();
         if (aliveNodeIds.isEmpty()) {
@@ -228,25 +225,35 @@ public class DefaultMetadataStore implements MetadataStore {
                         this.nodes.values()
                             .stream()
                             .filter(brokerNode ->
-                                brokerNode.isAlive(TimeUnit.SECONDS.toMillis(config.nodeAliveIntervalInSecs())) ||
-                                    brokerNode.getNode().getId() == config.nodeId())
+                                brokerNode.isAlive(config))
                             .map(node -> node.getNode().getId())
                             .toList();
-
-                    IntStream.range(0, queueNum).forEach(n -> {
-                        int idx = n % aliveNodeIds.size();
-                        int nodeId = aliveNodeIds.get(idx);
-                        toNotify.add(nodeId);
-                        QueueAssignment assignment = new QueueAssignment();
-                        assignment.setTopicId(topicId);
-                        assignment.setStatus(QueueAssignmentStatus.ASSIGNED);
-                        assignment.setQueueId(n);
-                        // On creation, both src and dst node_id are the same.
-                        assignment.setSrcNodeId(nodeId);
-                        assignment.setDstNodeId(nodeId);
-                        assignmentMapper.create(assignment);
-                    });
-
+                    if (aliveNodeIds.isEmpty()) {
+                        IntStream.range(0, queueNum).forEach(n -> {
+                            QueueAssignment assignment = new QueueAssignment();
+                            assignment.setTopicId(topicId);
+                            assignment.setStatus(QueueAssignmentStatus.ASSIGNABLE);
+                            assignment.setQueueId(n);
+                            // On creation, both src and dst node_id are the same.
+                            assignment.setSrcNodeId(0);
+                            assignment.setDstNodeId(0);
+                            assignmentMapper.create(assignment);
+                        });
+                    } else {
+                        IntStream.range(0, queueNum).forEach(n -> {
+                            int idx = n % aliveNodeIds.size();
+                            int nodeId = aliveNodeIds.get(idx);
+                            toNotify.add(nodeId);
+                            QueueAssignment assignment = new QueueAssignment();
+                            assignment.setTopicId(topicId);
+                            assignment.setStatus(QueueAssignmentStatus.ASSIGNED);
+                            assignment.setQueueId(n);
+                            // On creation, both src and dst node_id are the same.
+                            assignment.setSrcNodeId(nodeId);
+                            assignment.setDstNodeId(nodeId);
+                            assignmentMapper.create(assignment);
+                        });
+                    }
                     // Commit transaction
                     session.commit();
                     this.notifyOnResourceChange(toNotify);
@@ -290,12 +297,8 @@ public class DefaultMetadataStore implements MetadataStore {
                     assignments.stream().filter(assignment -> assignment.getStatus() != QueueAssignmentStatus.DELETED)
                         .forEach(assignment -> {
                             switch (assignment.getStatus()) {
-                                case ASSIGNED -> {
-                                    toNotify.add(assignment.getDstNodeId());
-                                }
-                                case YIELDING -> {
-                                    toNotify.add(assignment.getSrcNodeId());
-                                }
+                                case ASSIGNED -> toNotify.add(assignment.getDstNodeId());
+                                case YIELDING -> toNotify.add(assignment.getSrcNodeId());
                                 default -> {
                                 }
                             }
@@ -412,7 +415,7 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public boolean isLeader() throws ControllerException {
+    public boolean isLeader() {
         return this.role == Role.Leader;
     }
 
