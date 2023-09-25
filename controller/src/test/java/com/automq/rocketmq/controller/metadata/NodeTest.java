@@ -96,13 +96,13 @@ public class NodeTest extends DatabaseTestBase {
             int affectedRows = nodeMapper.create(node);
             Assertions.assertEquals(1, affectedRows);
 
-            Node node1 = nodeMapper.get(null, node.getInstanceId(), null);
+            Node node1 = nodeMapper.get(null, null, node.getInstanceId(), null);
             Assertions.assertEquals(1, node1.getEpoch());
             Assertions.assertEquals(node.getId(), node1.getId());
             affectedRows = nodeMapper.increaseEpoch(node.getId());
             Assertions.assertEquals(1, affectedRows);
 
-            node1 = nodeMapper.get(null, node1.getInstanceId(), null);
+            node1 = nodeMapper.get(null, null, node1.getInstanceId(), null);
             Assertions.assertEquals(2, node1.getEpoch());
             nodeMapper.delete(affectedRows);
         }
