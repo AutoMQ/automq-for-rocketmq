@@ -161,8 +161,7 @@ message ListMessageQueueReassignmentsReply {
 message ReassignMessageQueueRequest {
   ControllerRequestContext context = 1;
   MessageQueue queue = 2;
-  int32 src_node_id = 3;
-  int32 dst_node_id = 4;
+  int32 dst_node_id = 3;
 }
 
 message ReassignMessageQueueReply {

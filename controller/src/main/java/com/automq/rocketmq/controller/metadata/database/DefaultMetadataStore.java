@@ -452,6 +452,44 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
+    public void reassignMessageQueue(long topicId, int queueId, int dstNodeId) throws ControllerException {
+        for (; ; ) {
+            if (isLeader()) {
+                try (SqlSession session = sessionFactory.openSession()) {
+                    if (!maintainLeadershipWithSharedLock(session)) {
+                        continue;
+                    }
+                    QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
+                    List<QueueAssignment> assignments = assignmentMapper.list(topicId, null, null, null, null);
+                    for (QueueAssignment assignment : assignments) {
+                        if (assignment.getQueueId() != queueId) {
+                            continue;
+                        }
+
+                        switch (assignment.getStatus()) {
+                            case ASSIGNABLE, YIELDING -> {
+                                assignment.setDstNodeId(dstNodeId);
+                                assignmentMapper.update(assignment);
+                            }
+                            case ASSIGNED -> {
+                                assignment.setDstNodeId(dstNodeId);
+                                assignment.setStatus(QueueAssignmentStatus.YIELDING);
+                                assignmentMapper.update(assignment);
+                            }
+                            case DELETED -> throw new ControllerException(Code.NOT_FOUND_VALUE, "Already deleted");
+                        }
+                        break;
+                    }
+                    session.commit();
+                }
+                break;
+            } else {
+                this.controllerClient.reassignMessageQueue(leaderAddress(), topicId, queueId, dstNodeId);
+            }
+        }
+    }
+
+    @Override
     public void markMessageQueueAssignable(long topicId, int queueId) throws ControllerException {
         for (; ; ) {
             if (isLeader()) {
