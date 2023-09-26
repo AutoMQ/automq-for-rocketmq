@@ -36,6 +36,8 @@ import apache.rocketmq.controller.v1.Code;
 import apache.rocketmq.controller.v1.ControllerServiceGrpc;
 import apache.rocketmq.controller.v1.NotifyMessageQueuesAssignableReply;
 import apache.rocketmq.controller.v1.NotifyMessageQueuesAssignableRequest;
+import apache.rocketmq.controller.v1.ReassignMessageQueueReply;
+import apache.rocketmq.controller.v1.ReassignMessageQueueRequest;
 import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
@@ -240,6 +242,35 @@ public class GrpcControllerClient implements ControllerClient {
     }
 
     @Override
+    public CompletableFuture<Void> reassignMessageQueue(String target, long topicId, int queueId,
+        int dstNodeId) throws ControllerException {
+        CompletableFuture<Void> future = new CompletableFuture<>();
+
+        ReassignMessageQueueRequest request = ReassignMessageQueueRequest.newBuilder()
+            .setQueue(MessageQueue.newBuilder().setTopicId(topicId).setQueueId(queueId).build())
+            .setDstNodeId(dstNodeId)
+            .build();
+
+        Futures.addCallback(buildStubForTarget(target).reassignMessageQueue(request), new FutureCallback<ReassignMessageQueueReply>() {
+            @Override
+            public void onSuccess(ReassignMessageQueueReply result) {
+                if (result.getStatus().getCode() == Code.OK) {
+                    future.complete(null);
+                } else {
+                    future.completeExceptionally(new ControllerException(result.getStatus().getCodeValue(), result.getStatus().getMessage()));
+                }
+            }
+
+            @Override
+            public void onFailure(@Nonnull Throwable t) {
+                future.completeExceptionally(t);
+            }
+        }, MoreExecutors.directExecutor());
+
+        return future;
+    }
+
+    @Override
     public CompletableFuture<Void> notifyMessageQueueAssignable(String target, long topicId,
         int queueId) throws ControllerException {
         CompletableFuture<Void> future = new CompletableFuture<>();
@@ -271,7 +302,6 @@ public class GrpcControllerClient implements ControllerClient {
 
         return future;
     }
-
 
     @Override
     public CompletableFuture<CreateGroupReply> createGroup(String target,
