@@ -21,6 +21,7 @@ import com.automq.rocketmq.common.util.Lifecycle;
 import com.automq.stream.api.AppendResult;
 import com.automq.stream.api.FetchResult;
 import com.automq.stream.api.RecordBatch;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -45,6 +46,14 @@ public interface StreamStore extends Lifecycle {
      * @return the future of append result.
      */
     CompletableFuture<AppendResult> append(long streamId, RecordBatch recordBatch);
+
+    /**
+     * Close streams.
+     *
+     * @param streamIds stream id list to close.
+     * @return the future of close result.
+     */
+    CompletableFuture<Void> close(List<Long> streamIds);
 
     /**
      * Get stream start record offset.

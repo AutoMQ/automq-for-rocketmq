@@ -39,6 +39,7 @@ import com.automq.stream.s3.operator.S3Operator;
 import com.automq.stream.s3.streams.StreamManager;
 import com.automq.stream.s3.wal.BlockWALService;
 import com.automq.stream.s3.wal.WriteAheadLog;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -90,6 +91,12 @@ public class StreamStoreImpl implements StreamStore {
     public CompletableFuture<AppendResult> append(long streamId, RecordBatch recordBatch) {
         Stream stream = openStream(streamId);
         return stream.append(recordBatch);
+    }
+
+    @Override
+    public CompletableFuture<Void> close(List<Long> streamIds) {
+        // TODO: Close Stream
+        return null;
     }
 
     @Override
