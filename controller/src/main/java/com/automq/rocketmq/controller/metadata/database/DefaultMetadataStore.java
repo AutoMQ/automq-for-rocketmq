@@ -105,7 +105,7 @@ public class DefaultMetadataStore implements MetadataStore {
     /// The following fields are runtime specific
     private Lease lease;
 
-    private Gson gson;
+    private final Gson gson;
 
     public DefaultMetadataStore(ControllerClient client, SqlSessionFactory sessionFactory, ControllerConfig config) {
         this.controllerClient = client;
@@ -718,7 +718,7 @@ public class DefaultMetadataStore implements MetadataStore {
 
             return s3WALObjects.stream()
                 .map(s3WALObject -> {
-                    TypeToken<Map<Long, SubStream>> typeToken = new TypeToken<Map<Long, SubStream>>() {
+                    TypeToken<Map<Long, SubStream>> typeToken = new TypeToken<>() {
 
                     };
                     Map<Long, SubStream> subStreams = gson.fromJson(new String(s3WALObject.getSubStreams().getBytes(StandardCharsets.UTF_8)), typeToken.getType());
