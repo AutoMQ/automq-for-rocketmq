@@ -18,8 +18,8 @@
 package com.automq.rocketmq.store;
 
 import com.automq.rocketmq.common.config.StoreConfig;
-import com.automq.rocketmq.common.model.MessageExt;
-import com.automq.rocketmq.common.model.generated.Message;
+import com.automq.rocketmq.common.model.FlatMessageExt;
+import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.metadata.StoreMetadataService;
 import com.automq.rocketmq.store.api.MessageStore;
 import com.automq.rocketmq.store.api.StreamStore;
@@ -156,7 +156,7 @@ public class MessageStoreImpl implements MessageStore {
         kvService.batch(deleteLastCheckPointRequest, deleteLastTimerTagRequest, writeCheckPointRequest, writeTimerTagRequest, writeOrderIndexRequest);
     }
 
-    public CompletableFuture<List<MessageExt>> fetchMessages(long streamId, long topicId, int queueId,
+    public CompletableFuture<List<FlatMessageExt>> fetchMessages(long streamId, long topicId, int queueId,
         long offset, int batchSize, long operationId) {
         return streamStore.fetch(streamId, offset, batchSize)
             .thenApply(fetchResult -> {
@@ -164,10 +164,10 @@ public class MessageStoreImpl implements MessageStore {
                 return fetchResult.recordBatchList()
                     .stream()
                     .map(batch -> {
-                        Message message = Message.getRootAsMessage(batch.rawPayload());
+                        FlatMessage message = FlatMessage.getRootAsFlatMessage(batch.rawPayload());
                         long messageOffset = batch.baseOffset();
                         String receiptHandle = SerializeUtil.encodeReceiptHandle(topicId, queueId, messageOffset, operationId);
-                        return MessageExt.Builder.builder()
+                        return FlatMessageExt.Builder.builder()
                             .message(message)
                             .offset(messageOffset)
                             .receiptHandle(receiptHandle)
@@ -178,8 +178,8 @@ public class MessageStoreImpl implements MessageStore {
     }
 
     // Fetch and filter messages until exceeding the limit.
-    public CompletableFuture<List<MessageExt>> fetchAndFilterMessages(long streamId, long topicId, int queueId,
-        long offset, int batchSize, int fetchBatchSize, Filter filter, List<MessageExt> messageList,
+    public CompletableFuture<List<FlatMessageExt>> fetchAndFilterMessages(long streamId, long topicId, int queueId,
+        long offset, int batchSize, int fetchBatchSize, Filter filter, List<FlatMessageExt> messageList,
         int fetchCount, long fetchBytes, long operationTimestamp, long operationId) {
         // Fetch more messages.
         return fetchMessages(streamId, topicId, queueId, offset, fetchBatchSize, operationId)
@@ -235,7 +235,7 @@ public class MessageStoreImpl implements MessageStore {
             fetchBatchSize = batchSize;
         }
 
-        CompletableFuture<List<MessageExt>> fetchAndFilterMessagesFuture =
+        CompletableFuture<List<FlatMessageExt>> fetchAndFilterMessagesFuture =
             // Fetch messages from stream store.
             logOperationFuture.thenCompose(operationId ->
                     fetchMessages(streamId, topicId, queueId, offset, fetchBatchSize, operationId)
@@ -243,12 +243,12 @@ public class MessageStoreImpl implements MessageStore {
                 )
                 // Apply filter to messages.
                 .thenCompose(fetchResultPair -> {
-                    List<MessageExt> fetchResult = fetchResultPair.getLeft();
+                    List<FlatMessageExt> fetchResult = fetchResultPair.getLeft();
                     long operationId = fetchResultPair.getRight();
 
                     // If a filter needs to be applied, fetch more messages and apply it to messages
                     // until exceeding the limit.
-                    List<MessageExt> messageList = new ArrayList<>(fetchResult);
+                    List<FlatMessageExt> messageList = new ArrayList<>(fetchResult);
                     if (filter.needApply()) {
                         int fetchCount = messageList.size();
                         long fetchBytes = messageList.stream()
@@ -289,7 +289,7 @@ public class MessageStoreImpl implements MessageStore {
                 }
 
                 // Insert or renew check point and timer tag into KVService.
-                for (MessageExt messageExt : messageList) {
+                for (FlatMessageExt messageExt : messageList) {
                     // If pop orderly, the message already consumed will not trigger writing new check point.
                     // But reconsume count should be increased.
                     if (fifo && fifoCheckPointMap.containsKey(messageExt.offset())) {
@@ -316,9 +316,9 @@ public class MessageStoreImpl implements MessageStore {
     }
 
     @Override
-    public CompletableFuture<PutResult> put(Message message, Map<String, String> systemProperties) {
+    public CompletableFuture<PutResult> put(FlatMessage message) {
         long streamId = metadataService.getStreamId(message.topicId(), message.queueId());
-        return streamStore.append(streamId, new SingleRecord(systemProperties, message.getByteBuffer()))
+        return streamStore.append(streamId, new SingleRecord(message.getByteBuffer()))
             .thenApply(appendResult -> new PutResult(appendResult.baseOffset()));
     }
 

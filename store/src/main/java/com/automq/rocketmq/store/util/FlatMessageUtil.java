@@ -15,16 +15,21 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.store.model.message;
+package com.automq.rocketmq.store.util;
 
 import com.automq.rocketmq.common.model.FlatMessageExt;
-import java.util.List;
+import com.automq.rocketmq.common.model.generated.FlatMessage;
+import com.automq.stream.api.RecordBatchWithContext;
 
-public record PopResult(Status status, long operationId, long deliveryTimestamp, List<FlatMessageExt> messageList) {
-    public enum Status {
-        FOUND,
-        NOT_FOUND,
-        END_OF_QUEUE,
-        ERROR
+/**
+ * An utility class to convert S3Stream Record to FlatMessage, and vice versa.
+ */
+public class FlatMessageUtil {
+    public static FlatMessageExt transferToMessageExt(RecordBatchWithContext recordBatch) {
+        FlatMessage message = FlatMessage.getRootAsFlatMessage(recordBatch.rawPayload());
+        return FlatMessageExt.Builder.builder()
+            .message(message)
+            .offset(recordBatch.baseOffset())
+            .build();
     }
 }
