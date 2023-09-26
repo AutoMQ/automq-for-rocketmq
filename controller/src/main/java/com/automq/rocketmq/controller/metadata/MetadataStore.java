@@ -61,14 +61,16 @@ public interface MetadataStore extends Closeable {
     /**
      * List queue assignments according to criteria.
      *
-     * @param topicId Optional topic-id
+     * @param topicId   Optional topic-id
      * @param srcNodeId Optional source node-id
      * @param dstNodeId Optional destination node-id
-     * @param status Optional queue assignment status
+     * @param status    Optional queue assignment status
      * @return List of the queue assignments meeting the specified criteria
      */
     List<QueueAssignment> listAssignments(Long topicId, Integer srcNodeId, Integer dstNodeId,
         QueueAssignmentStatus status);
+
+    void reassignMessageQueue(long topicId, int queueId, int dstNodeId) throws ControllerException;
 
     void markMessageQueueAssignable(long topicId, int queueId) throws ControllerException;
 

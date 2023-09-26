@@ -223,7 +223,15 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     @Override
     public void reassignMessageQueue(ReassignMessageQueueRequest request,
         StreamObserver<ReassignMessageQueueReply> responseObserver) {
-        super.reassignMessageQueue(request, responseObserver);
+        try {
+            metadataStore.reassignMessageQueue(request.getQueue().getTopicId(), request.getQueue().getQueueId(), request.getDstNodeId());
+            ReassignMessageQueueReply reply = ReassignMessageQueueReply.newBuilder()
+                .setStatus(Status.newBuilder().setCode(Code.OK).build()).build();
+            responseObserver.onNext(reply);
+            responseObserver.onCompleted();
+        } catch (ControllerException e) {
+            responseObserver.onError(e);
+        }
     }
 
     @Override
