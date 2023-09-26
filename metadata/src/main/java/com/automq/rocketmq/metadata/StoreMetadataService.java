@@ -54,6 +54,20 @@ public interface StoreMetadataService {
     CompletableFuture<StreamMetadata> retryStreamOf(long consumerGroupId, long topicId, int queueId);
 
     /**
+     * List all the streams managed by the specified queue.
+     * <p>
+     * Each queue will manage some streams:
+     * 1. data stream that stores the messages.
+     * 2. operation log stream that stores the operation logs.
+     * 3. retry streams that stores the messages that need to be retried.
+     *
+     * @param topicId topic id
+     * @param queueId the specified message queue id
+     * @return {@link CompletableFuture} of {@link StreamMetadata}
+     */
+    CompletableFuture<List<StreamMetadata>> listStreamsManagedBy(long topicId, int queueId);
+
+    /**
      * Get the configured max retry times of the specified consumer group.
      *
      * @param consumerGroupId consumer group id

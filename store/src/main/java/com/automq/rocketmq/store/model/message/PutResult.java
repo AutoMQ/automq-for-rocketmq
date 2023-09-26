@@ -17,5 +17,8 @@
 
 package com.automq.rocketmq.store.model.message;
 
-public record PutResult(long offset) {
+public record PutResult(Status status, long offset) {
+    public enum Status {
+        PUT_OK,
+    }
 }

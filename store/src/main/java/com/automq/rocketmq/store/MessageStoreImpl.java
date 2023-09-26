@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.store;
 
+import apache.rocketmq.controller.v1.StreamMetadata;
 import com.automq.rocketmq.common.config.StoreConfig;
 import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.model.generated.FlatMessage;
@@ -319,7 +320,7 @@ public class MessageStoreImpl implements MessageStore {
     public CompletableFuture<PutResult> put(FlatMessage message) {
         long streamId = metadataService.getStreamId(message.topicId(), message.queueId());
         return streamStore.append(streamId, new SingleRecord(message.getByteBuffer()))
-            .thenApply(appendResult -> new PutResult(appendResult.baseOffset()));
+            .thenApply(appendResult -> new PutResult(PutResult.Status.PUT_OK, appendResult.baseOffset()));
     }
 
     @Override
@@ -418,6 +419,17 @@ public class MessageStoreImpl implements MessageStore {
 
                 return new ChangeInvisibleDurationResult(ChangeInvisibleDurationResult.Status.SUCCESS);
             });
+    }
+
+    @Override
+    public CompletableFuture<Void> closeQueue(long topicId, int queueId) {
+        CompletableFuture<List<StreamMetadata>> streamList = metadataService.listStreamsManagedBy(topicId, queueId);
+        // Close data stream
+        return streamList.thenCompose(streamMetadataList -> {
+            // Build the stream list to close
+            List<Long> streamIds = streamMetadataList.stream().map(StreamMetadata::getStreamId).toList();
+            return streamStore.close(streamIds);
+        });
     }
 
     @Override

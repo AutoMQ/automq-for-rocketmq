@@ -45,7 +45,7 @@ public interface MessageStore {
 
 
     /**
-     * Put a message to specified topic and queue.
+     * Put a message to the specified topic and queue.
      *
      * @param flatMessage flat message to append
      * @return append result with an offset assigned to the message, see {@link PutResult}
@@ -61,14 +61,24 @@ public interface MessageStore {
     CompletableFuture<AckResult> ack(String receiptHandle);
 
     /**
-     * Change invisible duration.
+     * Change invisible duration for an inflight message.
      *
      * @param receiptHandle     unique receipt handle to identify inflight message
      * @param invisibleDuration the duration for the next time this batch of messages will be visible, in nanoseconds
      * @return change invisible duration result, see {@link ChangeInvisibleDurationResult}
      */
-    CompletableFuture<ChangeInvisibleDurationResult> changeInvisibleDuration(String receiptHandle,
-        long invisibleDuration);
+    CompletableFuture<ChangeInvisibleDurationResult> changeInvisibleDuration(String receiptHandle, long invisibleDuration);
+
+    /**
+     * Close the specified queue.
+     * <p>
+     * Once a queue is closed, no more messages can be put into it, and move operation can apply to it.
+     *
+     * @param topicId the topic id of the queue to close
+     * @param queueId queue id to close
+     * @return {@link CompletableFuture} of close operation
+     */
+    CompletableFuture<Void> closeQueue(long topicId, int queueId);
 
     int getInflightStats(long consumerGroupId, long topicId, int queueId);
 

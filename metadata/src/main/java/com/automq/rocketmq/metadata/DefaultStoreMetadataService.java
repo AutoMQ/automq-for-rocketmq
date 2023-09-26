@@ -74,6 +74,11 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
     }
 
     @Override
+    public CompletableFuture<List<StreamMetadata>> listStreamsManagedBy(long topicId, int queueId) {
+        return null;
+    }
+
+    @Override
     public CompletableFuture<Integer> maxRetryTimesOf(long consumerGroupId) {
         return null;
     }
