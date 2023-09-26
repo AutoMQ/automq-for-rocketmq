@@ -21,7 +21,7 @@ import com.automq.stream.api.RecordBatch;
 import java.nio.ByteBuffer;
 import java.util.Map;
 
-public record SingleRecord(Map<String, String> properties, ByteBuffer rawPayload) implements RecordBatch {
+public record SingleRecord(ByteBuffer rawPayload) implements RecordBatch {
     @Override
     public int count() {
         return 1;
@@ -30,5 +30,11 @@ public record SingleRecord(Map<String, String> properties, ByteBuffer rawPayload
     @Override
     public long baseTimestamp() {
         return 0;
+    }
+
+    @Override
+    public Map<String, String> properties() {
+        // We don't store any properties to S3Stream
+        return null;
     }
 }

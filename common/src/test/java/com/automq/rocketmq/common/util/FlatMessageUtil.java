@@ -15,31 +15,26 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.store.mock;
+package com.automq.rocketmq.common.util;
 
 import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.common.model.generated.FlatMessageT;
 import com.automq.rocketmq.common.model.generated.KeyValueT;
 import com.automq.rocketmq.common.model.generated.SystemPropertiesT;
 import com.google.flatbuffers.FlatBufferBuilder;
-import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
-public class MockMessageUtil {
-    public static ByteBuffer buildMessage() {
-        return buildMessage(1,1,"");
-    }
-
-    public static ByteBuffer buildMessage(long topicId, int queueId, String tag) {
+public class FlatMessageUtil {
+    public static FlatMessage mockFlatMessage() {
         FlatMessageT flatMessageT = new FlatMessageT();
-        flatMessageT.setTopicId(topicId);
-        flatMessageT.setQueueId(queueId);
+        flatMessageT.setTopicId(1);
+        flatMessageT.setQueueId(0);
         flatMessageT.setPayload("Hello, AutoMQ Message".getBytes(StandardCharsets.UTF_8));
         flatMessageT.setMessageGroup("test-group");
         flatMessageT.setKeys("keys");
-        flatMessageT.setTag(tag);
+        flatMessageT.setTag("TagA");
 
         List<KeyValueT> userProperties = new ArrayList<>();
         KeyValueT keyValueT = new KeyValueT();
@@ -59,6 +54,6 @@ public class MockMessageUtil {
         builder.forceDefaults(true);
         int root = FlatMessage.pack(builder, flatMessageT);
         builder.finish(root);
-        return builder.dataBuffer();
+        return FlatMessage.getRootAsFlatMessage(builder.dataBuffer());
     }
 }

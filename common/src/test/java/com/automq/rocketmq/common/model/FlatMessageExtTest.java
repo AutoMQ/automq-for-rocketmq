@@ -17,7 +17,8 @@
 
 package com.automq.rocketmq.common.model;
 
-import com.automq.rocketmq.common.model.generated.Message;
+import com.automq.rocketmq.common.model.generated.FlatMessage;
+import com.automq.rocketmq.common.util.FlatMessageUtil;
 import java.nio.ByteBuffer;
 import org.junit.jupiter.api.Test;
 
@@ -25,15 +26,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class MessageExtTest {
+class FlatMessageExtTest {
     @Test
     void build() {
-        assertThrowsExactly(IllegalArgumentException.class, () -> MessageExt.Builder.builder().build());
+        assertThrowsExactly(IllegalArgumentException.class, () -> FlatMessageExt.Builder.builder().build());
         assertThrowsExactly(IllegalArgumentException.class, () ->
-            MessageExt.Builder.builder().message(Message.getRootAsMessage(ByteBuffer.allocate(32))).build());
+            FlatMessageExt.Builder.builder().message(FlatMessage.getRootAsFlatMessage(ByteBuffer.allocate(32))).build());
 
-        MessageExt messageExt = MessageExt.Builder.builder()
-            .message(Message.getRootAsMessage(ByteBuffer.allocate(32)))
+        FlatMessageExt messageExt = FlatMessageExt.Builder.builder()
+            .message(FlatMessageUtil.mockFlatMessage())
             .offset(100)
             .receiptHandle("receiptHandle")
             .build();
@@ -42,7 +43,7 @@ class MessageExtTest {
         assertEquals("receiptHandle", messageExt.receiptHandle().get());
 
         assertEquals(0, messageExt.reconsumeCount());
-        messageExt.setReconsumeCount(1);
-        assertEquals(1, messageExt.reconsumeCount());
+        messageExt.setReconsumeCount(10);
+        assertEquals(10, messageExt.reconsumeCount());
     }
 }

@@ -23,8 +23,7 @@ import com.automq.rocketmq.proxy.mock.MockMessageStore;
 import com.automq.rocketmq.proxy.mock.MockProxyMetadataService;
 import com.automq.rocketmq.store.api.MessageStore;
 import com.automq.rocketmq.store.model.message.TagFilter;
-import com.automq.rocketmq.store.util.MessageUtil;
-import java.util.HashMap;
+import com.automq.rocketmq.proxy.util.FlatMessageUtil;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.rocketmq.client.consumer.AckResult;
@@ -92,8 +91,10 @@ class MessageServiceImplTest {
     void popMessage() {
         // Pop queue 0.
         PopMessageRequestHeader header = new PopMessageRequestHeader();
-        header.setConsumerGroup("group");
-        header.setTopic("topic");
+        String groupName = "group";
+        String topicName = "topic";
+        header.setConsumerGroup(groupName);
+        header.setTopic(topicName);
         header.setQueueId(0);
         header.setMaxMsgNums(32);
         PopResult result = messageService.popMessage(ProxyContext.create(), null, header, 0L).join();
@@ -101,10 +102,11 @@ class MessageServiceImplTest {
 
         header.setExpType(ExpressionType.TAG);
         header.setExp(TagFilter.SUB_ALL);
-        long consumerGroupId = metadataService.queryConsumerGroupId("group");
-        long topicId = metadataService.queryTopicId("topic");
-        messageStore.put(MessageUtil.transferToMessage(topicId, 0, "", new HashMap<>(), new byte[] {}), new HashMap<>());
-        messageStore.put(MessageUtil.transferToMessage(topicId, 0, "", new HashMap<>(), new byte[] {}), new HashMap<>());
+        long consumerGroupId = metadataService.queryConsumerGroupId(groupName);
+        long topicId = metadataService.queryTopicId(topicName);
+        messageStore.put(FlatMessageUtil.transferFrom(topicId, 0, new Message(topicName, "", new byte[] {})));
+        messageStore.put(FlatMessageUtil.transferFrom(topicId, 0, new Message(topicName, "", new byte[] {})));
+
 
         result = messageService.popMessage(ProxyContext.create(), null, header, 0L).join();
         assertEquals(PopStatus.FOUND, result.getPopStatus());
@@ -115,12 +117,13 @@ class MessageServiceImplTest {
         // Pop all queues.
         header.setQueueId(-1);
         header.setMaxMsgNums(4);
-        messageStore.put(MessageUtil.transferToMessage(topicId, 1, "", new HashMap<>(), new byte[] {}), new HashMap<>());
-        messageStore.put(MessageUtil.transferToMessage(topicId, 2, "", new HashMap<>(), new byte[] {}), new HashMap<>());
-        messageStore.put(MessageUtil.transferToMessage(topicId, 2, "", new HashMap<>(), new byte[] {}), new HashMap<>());
-        messageStore.put(MessageUtil.transferToMessage(topicId, 4, "", new HashMap<>(), new byte[] {}), new HashMap<>());
-        messageStore.put(MessageUtil.transferToMessage(topicId, 4, "", new HashMap<>(), new byte[] {}), new HashMap<>());
-        messageStore.put(MessageUtil.transferToMessage(topicId, 4, "", new HashMap<>(), new byte[] {}), new HashMap<>());
+        messageStore.put(FlatMessageUtil.transferFrom(topicId, 1, new Message(topicName, "", new byte[] {})));
+        messageStore.put(FlatMessageUtil.transferFrom(topicId, 2, new Message(topicName, "", new byte[] {})));
+        messageStore.put(FlatMessageUtil.transferFrom(topicId, 2, new Message(topicName, "", new byte[] {})));
+        messageStore.put(FlatMessageUtil.transferFrom(topicId, 4, new Message(topicName, "", new byte[] {})));
+        messageStore.put(FlatMessageUtil.transferFrom(topicId, 4, new Message(topicName, "", new byte[] {})));
+        messageStore.put(FlatMessageUtil.transferFrom(topicId, 4, new Message(topicName, "", new byte[] {})));
+
 
         result = messageService.popMessage(ProxyContext.create(), null, header, 0L).join();
         assertEquals(PopStatus.FOUND, result.getPopStatus());
@@ -165,15 +168,16 @@ class MessageServiceImplTest {
     void pop_withFifo() {
         PopMessageRequestHeader header = new PopMessageRequestHeader();
         header.setConsumerGroup("group");
-        header.setTopic("topic");
+        String topicName = "topic";
+        header.setTopic(topicName);
         header.setQueueId(0);
         header.setMaxMsgNums(1);
         header.setOrder(true);
 
-        long topicId = metadataService.queryTopicId("topic");
-        messageStore.put(MessageUtil.transferToMessage(topicId, 0, "", new HashMap<>(), new byte[] {}), new HashMap<>());
-        messageStore.put(MessageUtil.transferToMessage(topicId, 0, "", new HashMap<>(), new byte[] {}), new HashMap<>());
-        messageStore.put(MessageUtil.transferToMessage(topicId, 0, "", new HashMap<>(), new byte[] {}), new HashMap<>());
+        long topicId = metadataService.queryTopicId(topicName);
+        messageStore.put(FlatMessageUtil.transferFrom(topicId, 0, new Message(topicName, "", new byte[] {})));
+        messageStore.put(FlatMessageUtil.transferFrom(topicId, 0, new Message(topicName, "", new byte[] {})));
+        messageStore.put(FlatMessageUtil.transferFrom(topicId, 0, new Message(topicName, "", new byte[] {})));
 
         // Pop message with client id "client1".
         ProxyContext context = ProxyContext.create();
@@ -195,7 +199,7 @@ class MessageServiceImplTest {
 
         AckMessageRequestHeader ackHeader = new AckMessageRequestHeader();
         ackHeader.setExtraInfo(RECEIPT_HANDLE);
-        ackHeader.setTopic("topic");
+        ackHeader.setTopic(topicName);
         ackHeader.setQueueId(0);
         messageService.ackMessage(context, null, "", ackHeader, 0L);
         messageService.ackMessage(context, null, "", ackHeader, 0L);

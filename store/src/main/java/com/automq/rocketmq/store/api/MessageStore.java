@@ -17,13 +17,12 @@
 
 package com.automq.rocketmq.store.api;
 
-import com.automq.rocketmq.common.model.generated.Message;
+import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.store.model.message.AckResult;
 import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
 import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PopResult;
 import com.automq.rocketmq.store.model.message.PutResult;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 public interface MessageStore {
@@ -44,14 +43,14 @@ public interface MessageStore {
         int batchSize,
         boolean fifo, boolean retry, long invisibleDuration);
 
+
     /**
      * Put a message to specified topic and queue.
      *
-     * @param message message to append
-     * @param systemProperties system properties of the message
+     * @param flatMessage flat message to append
      * @return append result with an offset assigned to the message, see {@link PutResult}
      */
-    CompletableFuture<PutResult> put(Message message, Map<String, String> systemProperties);
+    CompletableFuture<PutResult> put(FlatMessage flatMessage);
 
     /**
      * Ack message.

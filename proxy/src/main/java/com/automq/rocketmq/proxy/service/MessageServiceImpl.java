@@ -18,7 +18,7 @@
 package com.automq.rocketmq.proxy.service;
 
 import com.automq.rocketmq.common.config.ProxyConfig;
-import com.automq.rocketmq.common.model.MessageExt;
+import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.util.CommonUtil;
 import com.automq.rocketmq.metadata.ProxyMetadataService;
 import com.automq.rocketmq.proxy.util.RocketMQMessageUtil;
@@ -27,11 +27,10 @@ import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PutResult;
 import com.automq.rocketmq.store.model.message.SQLFilter;
 import com.automq.rocketmq.store.model.message.TagFilter;
-import com.automq.rocketmq.store.util.MessageUtil;
+import com.automq.rocketmq.proxy.util.FlatMessageUtil;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -87,9 +86,8 @@ public class MessageServiceImpl implements MessageService {
         long topicId = metadataService.queryTopicId(requestHeader.getTopic());
 
         List<CompletableFuture<PutResult>> completableFutureList = msgList.stream()
-            .map(message -> MessageUtil.transferToMessage(topicId, requestHeader.getQueueId(), message.getTags(),
-                message.getProperties(), message.getBody()))
-            .map(message -> store.put(message, new HashMap<>()))
+            .map(message -> FlatMessageUtil.transferFrom(topicId, requestHeader.getQueueId(), message))
+            .map(store::put)
             .toList();
 
         return CompletableFuture.allOf(completableFutureList.toArray(CompletableFuture[]::new))
@@ -118,19 +116,19 @@ public class MessageServiceImpl implements MessageService {
     }
 
     private CompletableFuture<Void> popSpecifiedQueueUnsafe(long consumerGroupId, long topicId, int queueId,
-        Filter filter, int batchSize, boolean fifo, long invisibleDuration, List<MessageExt> messageList) {
+        Filter filter, int batchSize, boolean fifo, long invisibleDuration, List<FlatMessageExt> messageList) {
         long offset = metadataService.queryConsumerOffset(consumerGroupId, topicId, queueId);
 
         boolean retryPriority = !fifo && CommonUtil.applyPercentage(config.retryPriorityPercentage());
 
         // TODO: acquire lock if pop orderly.
         // Assume the variable retryPriority is false, so try to pop origin messages first.
-        CompletableFuture<List<MessageExt>> popFuture = store.pop(consumerGroupId, topicId, queueId, offset, filter, batchSize, fifo, retryPriority, invisibleDuration)
+        CompletableFuture<List<FlatMessageExt>> popFuture = store.pop(consumerGroupId, topicId, queueId, offset, filter, batchSize, fifo, retryPriority, invisibleDuration)
             .thenApply(popResult -> {
                 // Advance consumer offset for origin topic.
-                List<MessageExt> resultList = popResult.messageList();
+                List<FlatMessageExt> resultList = popResult.messageList();
                 if (!resultList.isEmpty()) {
-                    MessageExt lastMessage = resultList.get(resultList.size() - 1);
+                    FlatMessageExt lastMessage = resultList.get(resultList.size() - 1);
                     metadataService.updateConsumerOffset(consumerGroupId, topicId, queueId, lastMessage.offset() + 1, retryPriority);
                 }
                 // Add all messages popped from origin topic into result list.
@@ -150,11 +148,11 @@ public class MessageServiceImpl implements MessageService {
                 return store.pop(consumerGroupId, topicId, queueId, offset, filter, batchSize - resultMessageList.size(), false, !retryPriority, invisibleDuration)
                     .thenApply(com.automq.rocketmq.store.model.message.PopResult::messageList);
             }
-            return CompletableFuture.completedFuture(new ArrayList<MessageExt>());
+            return CompletableFuture.completedFuture(new ArrayList<FlatMessageExt>());
         }).thenAccept(resultMessageList -> {
             // Advance consumer offset for retry topic.
             if (!resultMessageList.isEmpty()) {
-                MessageExt lastMessage = resultMessageList.get(resultMessageList.size() - 1);
+                FlatMessageExt lastMessage = resultMessageList.get(resultMessageList.size() - 1);
                 metadataService.updateConsumerOffset(consumerGroupId, topicId, queueId, lastMessage.offset() + 1, !retryPriority);
             }
             // Add all messages popped from retry topic into result list.
@@ -163,7 +161,7 @@ public class MessageServiceImpl implements MessageService {
     }
 
     private CompletableFuture<Void> popSpecifiedQueue(long consumerGroupId, String clientId, long topicId, int queueId,
-        Filter filter, int batchSize, boolean fifo, long invisibleDuration, List<MessageExt> messageList) {
+        Filter filter, int batchSize, boolean fifo, long invisibleDuration, List<FlatMessageExt> messageList) {
         if (lockService.tryLock(topicId, queueId, clientId, fifo)) {
             return popSpecifiedQueueUnsafe(consumerGroupId, topicId, queueId, filter, batchSize, fifo, invisibleDuration, messageList)
                 .orTimeout(invisibleDuration, TimeUnit.NANOSECONDS)
@@ -196,7 +194,7 @@ public class MessageServiceImpl implements MessageService {
             filter = Filter.DEFAULT_FILTER;
         }
 
-        List<MessageExt> messageList = new ArrayList<>();
+        List<FlatMessageExt> messageList = new ArrayList<>();
         CompletableFuture<Void> popMessageFuture;
 
         // If the queue id in the request header is less than 0, the proxy needs to pop messages

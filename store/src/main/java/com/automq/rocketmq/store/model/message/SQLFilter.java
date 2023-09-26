@@ -17,7 +17,7 @@
 
 package com.automq.rocketmq.store.model.message;
 
-import com.automq.rocketmq.common.model.MessageExt;
+import com.automq.rocketmq.common.model.FlatMessageExt;
 import java.util.List;
 
 public record SQLFilter(String expression) implements Filter {
@@ -27,7 +27,7 @@ public record SQLFilter(String expression) implements Filter {
     }
 
     @Override
-    public List<MessageExt> doFilter(List<MessageExt> messageList) {
+    public List<FlatMessageExt> doFilter(List<FlatMessageExt> messageList) {
         return messageList;
     }
 }
