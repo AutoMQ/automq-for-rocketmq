@@ -21,6 +21,8 @@ import apache.rocketmq.controller.v1.CommitOffsetReply;
 import apache.rocketmq.controller.v1.CommitOffsetRequest;
 import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
+import apache.rocketmq.controller.v1.CreateRetryStreamReply;
+import apache.rocketmq.controller.v1.CreateRetryStreamRequest;
 import apache.rocketmq.controller.v1.CreateTopicReply;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.DeleteTopicReply;
@@ -251,7 +253,7 @@ public class GrpcControllerClient implements ControllerClient {
             .setDstNodeId(dstNodeId)
             .build();
 
-        Futures.addCallback(buildStubForTarget(target).reassignMessageQueue(request), new FutureCallback<ReassignMessageQueueReply>() {
+        Futures.addCallback(buildStubForTarget(target).reassignMessageQueue(request), new FutureCallback<>() {
             @Override
             public void onSuccess(ReassignMessageQueueReply result) {
                 if (result.getStatus().getCode() == Code.OK) {
@@ -319,6 +321,37 @@ public class GrpcControllerClient implements ControllerClient {
                 future.completeExceptionally(t);
             }
         }, MoreExecutors.directExecutor());
+        return future;
+    }
+
+    @Override
+    public CompletableFuture<Long> createRetryStream(String target, String groupName, long topicId,
+        int queueId) throws ControllerException {
+        CompletableFuture<Long> future = new CompletableFuture<>();
+
+        CreateRetryStreamRequest request = CreateRetryStreamRequest.newBuilder()
+            .setGroupName(groupName)
+            .setQueue(MessageQueue.newBuilder()
+                .setTopicId(topicId).setQueueId(queueId).build())
+            .build();
+
+        Futures.addCallback(buildStubForTarget(target).createRetryStream(request), new FutureCallback<>() {
+            @Override
+            public void onSuccess(CreateRetryStreamReply result) {
+                if (result.getStatus().getCode() == Code.OK) {
+                    future.complete(result.getStreamId());
+                } else {
+                    future.completeExceptionally(
+                        new ControllerException(result.getStatus().getCodeValue(), result.getStatus().getMessage()));
+                }
+            }
+
+            @Override
+            public void onFailure(@Nonnull Throwable t) {
+                future.completeExceptionally(t);
+            }
+        }, MoreExecutors.directExecutor());
+
         return future;
     }
 

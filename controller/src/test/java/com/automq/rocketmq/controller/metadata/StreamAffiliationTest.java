@@ -75,7 +75,7 @@ public class StreamAffiliationTest extends DatabaseTestBase {
             streamAffiliation.setStatus(AssignmentStatus.ASSIGNED);
             mapper.create(streamAffiliation);
 
-            mapper.update(1L, null, null, AssignmentStatus.DELETED);
+            mapper.update(1L, null, null, 0, 0, AssignmentStatus.DELETED);
 
             List<StreamAffiliation> streams = mapper.list(1L, null, null, null);
             for (StreamAffiliation stream : streams) {

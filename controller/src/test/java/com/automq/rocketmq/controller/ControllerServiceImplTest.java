@@ -35,15 +35,19 @@ import com.automq.rocketmq.controller.metadata.DatabaseTestBase;
 import com.automq.rocketmq.controller.metadata.GrpcControllerClient;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.DefaultMetadataStore;
+import com.automq.rocketmq.controller.metadata.database.dao.Group;
 import com.automq.rocketmq.controller.metadata.database.dao.GroupProgress;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import com.automq.rocketmq.controller.metadata.database.dao.AssignmentStatus;
+import com.automq.rocketmq.controller.metadata.database.dao.StreamAffiliation;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
 import com.automq.rocketmq.controller.metadata.database.dao.TopicStatus;
+import com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.GroupProgressMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.StreamAffiliationMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 import io.grpc.Grpc;
 import io.grpc.InsecureChannelCredentials;
@@ -364,6 +368,65 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             List<QueueAssignment> assignments = assignmentMapper.list(topicId, null, null, AssignmentStatus.YIELDING, null);
             Assertions.assertEquals(1, assignments.size());
             session.commit();
+        }
+    }
+
+    @Test
+    public void testCreateRetryStream() throws IOException, ControllerException, ExecutionException, InterruptedException {
+        ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
+        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
+        Mockito.when(controllerConfig.nodeId()).thenReturn(1);
+        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
+        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
+
+        long topicId = 1;
+        int queueId = 2;
+        int srcNodeId = 1;
+        int dstNodeId = 2;
+        String groupName = "G1";
+        long groupId;
+
+        try (SqlSession session = getSessionFactory().openSession()) {
+            QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
+            QueueAssignment assignment = new QueueAssignment();
+            assignment.setStatus(AssignmentStatus.ASSIGNED);
+            assignment.setTopicId(topicId);
+            assignment.setQueueId(queueId);
+            assignment.setSrcNodeId(srcNodeId);
+            assignment.setDstNodeId(dstNodeId);
+            assignmentMapper.create(assignment);
+
+            GroupMapper groupMapper = session.getMapper(GroupMapper.class);
+            Group group = new Group();
+            group.setName(groupName);
+            group.setGroupType(com.automq.rocketmq.controller.metadata.database.dao.GroupType.STANDARD);
+            group.setDeadLetterTopicId(1);
+            group.setMaxRetryAttempt(3);
+            groupMapper.create(group);
+            groupId = group.getId();
+
+            session.commit();
+        }
+
+        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
+            metadataStore.start();
+            Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
+                .atMost(10, TimeUnit.SECONDS)
+                .until(metadataStore::isLeader);
+
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore))) {
+                testServer.start();
+                int port = testServer.getPort();
+                ControllerClient client = new GrpcControllerClient();
+                client.createRetryStream(String.format("localhost:%d", port), groupName, topicId, queueId).get();
+            }
+        }
+
+        try (SqlSession session = getSessionFactory().openSession()) {
+            StreamAffiliationMapper streamMapper = session.getMapper(StreamAffiliationMapper.class);
+            List<StreamAffiliation> streams = streamMapper.list(topicId, queueId, groupId, null);
+            Assertions.assertEquals(1, streams.size());
         }
     }
 
