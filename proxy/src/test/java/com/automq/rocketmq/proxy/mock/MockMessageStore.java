@@ -74,7 +74,7 @@ public class MockMessageStore implements MessageStore {
         FlatMessageExt messageExt = FlatMessageExt.Builder.builder().message(message).offset(offset).build();
         List<FlatMessageExt> messageList = messageMap.computeIfAbsent(message.topicId() + message.queueId(), v -> new ArrayList<>());
         messageList.add(messageExt);
-        return CompletableFuture.completedFuture(new PutResult(offset));
+        return CompletableFuture.completedFuture(new PutResult(PutResult.Status.PUT_OK, offset));
     }
 
     @Override
@@ -99,6 +99,11 @@ public class MockMessageStore implements MessageStore {
             status = ChangeInvisibleDurationResult.Status.ERROR;
         }
         return CompletableFuture.completedFuture(new ChangeInvisibleDurationResult(status));
+    }
+
+    @Override
+    public CompletableFuture<Void> closeQueue(long topicId, int queueId) {
+        return null;
     }
 
     @Override

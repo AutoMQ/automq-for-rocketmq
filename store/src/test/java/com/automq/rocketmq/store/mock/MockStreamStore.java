@@ -23,6 +23,7 @@ import com.automq.stream.api.FetchResult;
 import com.automq.stream.api.RecordBatch;
 import com.automq.stream.api.Stream;
 import com.automq.stream.api.StreamClient;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -46,6 +47,11 @@ public class MockStreamStore implements StreamStore {
     public CompletableFuture<AppendResult> append(long streamId, RecordBatch recordBatch) {
         Stream stream = openStream(streamId);
         return stream.append(recordBatch);
+    }
+
+    @Override
+    public CompletableFuture<Void> close(List<Long> streams) {
+        return null;
     }
 
     @Override
