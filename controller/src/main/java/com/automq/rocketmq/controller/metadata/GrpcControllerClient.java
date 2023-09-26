@@ -17,6 +17,8 @@
 
 package com.automq.rocketmq.controller.metadata;
 
+import apache.rocketmq.controller.v1.CloseStreamReply;
+import apache.rocketmq.controller.v1.CloseStreamRequest;
 import apache.rocketmq.controller.v1.CommitOffsetReply;
 import apache.rocketmq.controller.v1.CommitOffsetRequest;
 import apache.rocketmq.controller.v1.CreateGroupReply;
@@ -38,6 +40,8 @@ import apache.rocketmq.controller.v1.Code;
 import apache.rocketmq.controller.v1.ControllerServiceGrpc;
 import apache.rocketmq.controller.v1.NotifyMessageQueuesAssignableReply;
 import apache.rocketmq.controller.v1.NotifyMessageQueuesAssignableRequest;
+import apache.rocketmq.controller.v1.OpenStreamReply;
+import apache.rocketmq.controller.v1.OpenStreamRequest;
 import apache.rocketmq.controller.v1.ReassignMessageQueueReply;
 import apache.rocketmq.controller.v1.ReassignMessageQueueRequest;
 import apache.rocketmq.controller.v1.Topic;
@@ -50,10 +54,12 @@ import com.google.common.util.concurrent.MoreExecutors;
 import io.grpc.Grpc;
 import io.grpc.InsecureChannelCredentials;
 import io.grpc.ManagedChannel;
+
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import javax.annotation.Nonnull;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -376,6 +382,40 @@ public class GrpcControllerClient implements ControllerClient {
                     future.completeExceptionally(
                         new ControllerException(result.getStatus().getCodeValue(), result.getStatus().getMessage()));
                 }
+            }
+
+            @Override
+            public void onFailure(@Nonnull Throwable t) {
+                future.completeExceptionally(t);
+            }
+        }, MoreExecutors.directExecutor());
+        return future;
+    }
+
+    @Override
+    public CompletableFuture<OpenStreamReply> openStream(String target, OpenStreamRequest request) throws ControllerException {
+        CompletableFuture<OpenStreamReply> future = new CompletableFuture<>();
+        Futures.addCallback(this.buildStubForTarget(target).openStream(request), new FutureCallback<>() {
+            @Override
+            public void onSuccess(OpenStreamReply result) {
+                future.complete(result);
+            }
+
+            @Override
+            public void onFailure(@Nonnull Throwable t) {
+                future.completeExceptionally(t);
+            }
+        }, MoreExecutors.directExecutor());
+        return future;
+    }
+
+    @Override
+    public CompletableFuture<CloseStreamReply> closeStream(String target, CloseStreamRequest request) throws ControllerException {
+        CompletableFuture<CloseStreamReply> future = new CompletableFuture<>();
+        Futures.addCallback(this.buildStubForTarget(target).closeStream(request), new FutureCallback<>() {
+            @Override
+            public void onSuccess(CloseStreamReply result) {
+                future.complete(result);
             }
 
             @Override

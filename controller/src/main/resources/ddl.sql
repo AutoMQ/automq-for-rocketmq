@@ -122,7 +122,7 @@ CREATE TABLE IF NOT EXISTS `range`
     broker_id    INT    NOT NULL
 );
 CREATE INDEX idx_range_stream_id_start_offset ON `range` (stream_id, start_offset);
-CREATE UNIQUE INDEX idx_range_range_id ON `range` (range_id);
+CREATE INDEX idx_range_stream_id_range_id ON `range` (stream_id, range_id);
 
 CREATE TABLE IF NOT EXISTS s3object
 (

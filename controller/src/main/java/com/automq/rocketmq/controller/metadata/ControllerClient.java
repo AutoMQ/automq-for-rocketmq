@@ -17,8 +17,12 @@
 
 package com.automq.rocketmq.controller.metadata;
 
+import apache.rocketmq.controller.v1.CloseStreamReply;
+import apache.rocketmq.controller.v1.CloseStreamRequest;
 import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
+import apache.rocketmq.controller.v1.OpenStreamReply;
+import apache.rocketmq.controller.v1.OpenStreamRequest;
 import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
@@ -53,4 +57,8 @@ public interface ControllerClient {
 
     CompletableFuture<Void> commitOffset(String target, long groupId, long topicId, int queueId,
         long offset) throws ControllerException;
+
+    CompletableFuture<OpenStreamReply> openStream(String target, OpenStreamRequest request) throws ControllerException;
+
+    CompletableFuture<CloseStreamReply> closeStream(String target, CloseStreamRequest request) throws ControllerException;
 }
