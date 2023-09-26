@@ -88,6 +88,7 @@
                         <argument>-o</argument>
                         <argument>${fbs.generated.sources}</argument>
                         <argument>store.fbs</argument>
+                        <argument>--gen-object-api</argument>
                     </arguments>
                 </configuration>
             </plugin>

@@ -17,8 +17,8 @@
 
 package com.automq.rocketmq.proxy.mock;
 
-import com.automq.rocketmq.common.model.MessageExt;
-import com.automq.rocketmq.common.model.generated.Message;
+import com.automq.rocketmq.common.model.FlatMessageExt;
+import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.store.api.MessageStore;
 import com.automq.rocketmq.store.model.message.AckResult;
 import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
@@ -38,7 +38,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public class MockMessageStore implements MessageStore {
     private final HashMap<Long, AtomicLong> offsetMap = new HashMap<>();
     private final Set<String> receiptHandleSet = new HashSet<>();
-    private final Map<Long, List<MessageExt>> messageMap = new HashMap<>();
+    private final Map<Long, List<FlatMessageExt>> messageMap = new HashMap<>();
     private final InflightService inflightService = new InflightService();
 
     public MockMessageStore() {
@@ -52,7 +52,7 @@ public class MockMessageStore implements MessageStore {
             return CompletableFuture.completedFuture(new PopResult(PopResult.Status.END_OF_QUEUE, 0L, 0L, new ArrayList<>()));
         }
 
-        List<MessageExt> messageList = messageMap.computeIfAbsent(topicId + queueId, v -> new ArrayList<>());
+        List<FlatMessageExt> messageList = messageMap.computeIfAbsent(topicId + queueId, v -> new ArrayList<>());
         int start = offset > messageList.size() ? -1 : (int) offset;
         int end = offset + batchSize >= messageList.size() ? messageList.size() : (int) offset + batchSize;
 
@@ -69,10 +69,10 @@ public class MockMessageStore implements MessageStore {
     }
 
     @Override
-    public CompletableFuture<PutResult> put(Message message, Map<String, String> systemProperties) {
+    public CompletableFuture<PutResult> put(FlatMessage message) {
         long offset = this.offsetMap.computeIfAbsent(message.topicId() + message.queueId(), queueId -> new AtomicLong()).getAndIncrement();
-        MessageExt messageExt = MessageExt.Builder.builder().message(message).offset(offset).build();
-        List<MessageExt> messageList = messageMap.computeIfAbsent(message.topicId() + message.queueId(), v -> new ArrayList<>());
+        FlatMessageExt messageExt = FlatMessageExt.Builder.builder().message(message).offset(offset).build();
+        List<FlatMessageExt> messageList = messageMap.computeIfAbsent(message.topicId() + message.queueId(), v -> new ArrayList<>());
         messageList.add(messageExt);
         return CompletableFuture.completedFuture(new PutResult(offset));
     }
@@ -108,7 +108,7 @@ public class MockMessageStore implements MessageStore {
 
     @Override
     public long startOffset(long topicId, int queueId) {
-        List<MessageExt> messageList = messageMap.computeIfAbsent(topicId + queueId, v -> new ArrayList<>());
+        List<FlatMessageExt> messageList = messageMap.computeIfAbsent(topicId + queueId, v -> new ArrayList<>());
         if (messageList.isEmpty()) {
             return 0;
         }

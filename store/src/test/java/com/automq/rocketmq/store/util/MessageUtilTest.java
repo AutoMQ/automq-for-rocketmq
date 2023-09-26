@@ -17,12 +17,11 @@
 
 package com.automq.rocketmq.store.util;
 
-import com.automq.rocketmq.common.model.MessageExt;
-import com.automq.rocketmq.common.model.generated.Message;
+import com.automq.rocketmq.common.model.FlatMessageExt;
+import com.automq.rocketmq.store.mock.MockMessageUtil;
 import com.automq.rocketmq.store.model.stream.SingleRecord;
 import com.automq.rocketmq.store.mock.MemoryStreamClient;
 import java.nio.ByteBuffer;
-import java.util.HashMap;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -33,23 +32,15 @@ class MessageUtilTest {
 
     @Test
     void transferToMessageExt() {
-        MessageExt messageExt = MessageUtil.transferToMessageExt(
+        ByteBuffer messageBuffer = MockMessageUtil.buildMessage(1, 0, "TagA");
+        FlatMessageExt messageExt = FlatMessageUtil.transferToMessageExt(
             new MemoryStreamClient.RecordBatchWithContextWrapper(
-                new SingleRecord(new HashMap<>(), ByteBuffer.allocate(10)),
+                new SingleRecord(messageBuffer),
                 100));
         assertNotNull(messageExt);
         assertNotNull(messageExt.message());
         assertEquals(100, messageExt.offset());
         assertEquals(0, messageExt.reconsumeCount());
         assertFalse(messageExt.receiptHandle().isPresent());
-    }
-
-    @Test
-    void transferToMessage() {
-        Message message = MessageUtil.transferToMessage(1, 2, "tag", new HashMap<>(), new byte[] {});
-        assertNotNull(message);
-        assertEquals(1, message.topicId());
-        assertEquals(2, message.queueId());
-        assertEquals("tag", message.tag());
     }
 }

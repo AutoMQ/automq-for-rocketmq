@@ -17,13 +17,13 @@
 
 package com.automq.rocketmq.proxy.util;
 
-import com.automq.rocketmq.common.model.MessageExt;
+import com.automq.rocketmq.common.model.FlatMessageExt;
 import java.net.InetSocketAddress;
 import java.util.List;
 
 public class RocketMQMessageUtil {
     public static List<org.apache.rocketmq.common.message.MessageExt> transformMessageExt(
-        List<MessageExt> messageList) {
+        List<FlatMessageExt> messageList) {
         return messageList.stream()
             .map(messageExt -> {
                 org.apache.rocketmq.common.message.MessageExt rocketmqMessage = new org.apache.rocketmq.common.message.MessageExt(

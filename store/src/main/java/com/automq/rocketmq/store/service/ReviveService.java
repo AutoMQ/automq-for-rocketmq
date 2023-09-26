@@ -17,7 +17,7 @@
 
 package com.automq.rocketmq.store.service;
 
-import com.automq.rocketmq.common.model.MessageExt;
+import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.metadata.StoreMetadataService;
 import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.rocketmq.store.exception.StoreException;
@@ -25,7 +25,7 @@ import com.automq.rocketmq.store.model.generated.TimerTag;
 import com.automq.rocketmq.store.model.kv.BatchDeleteRequest;
 import com.automq.rocketmq.store.model.stream.SingleRecord;
 import com.automq.rocketmq.store.service.api.KVService;
-import com.automq.rocketmq.store.util.MessageUtil;
+import com.automq.rocketmq.store.util.FlatMessageUtil;
 import com.automq.rocketmq.store.util.SerializeUtil;
 import com.automq.stream.api.FetchResult;
 import java.nio.ByteBuffer;
@@ -109,14 +109,14 @@ public class ReviveService implements Runnable {
             }
 
             // Build the retry message and append it to retry stream or dead letter stream.
-            MessageExt messageExt = MessageUtil.transferToMessageExt(result.recordBatchList().get(0));
+            FlatMessageExt messageExt = FlatMessageUtil.transferToMessageExt(result.recordBatchList().get(0));
             messageExt.setReconsumeCount(messageExt.reconsumeCount() + 1);
             if (messageExt.reconsumeCount() <= metadataService.getMaxRetryTimes(timerTag.consumerGroupId())) {
                 long retryStreamId = metadataService.getRetryStreamId(timerTag.consumerGroupId(), timerTag.originTopicId(), timerTag.originQueueId());
-                streamStore.append(retryStreamId, new SingleRecord(messageExt.systemProperties(), messageExt.message().getByteBuffer())).join();
+                streamStore.append(retryStreamId, new SingleRecord(messageExt.message().getByteBuffer())).join();
             } else {
                 long deadLetterStreamId = metadataService.getDeadLetterStreamId(timerTag.consumerGroupId(), timerTag.originTopicId(), timerTag.originQueueId());
-                streamStore.append(deadLetterStreamId, new SingleRecord(messageExt.systemProperties(), messageExt.message().getByteBuffer())).join();
+                streamStore.append(deadLetterStreamId, new SingleRecord(messageExt.message().getByteBuffer())).join();
             }
 
             // Delete checkpoint and timer tag

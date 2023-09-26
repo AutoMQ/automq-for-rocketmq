@@ -18,8 +18,8 @@
 package com.automq.rocketmq.store;
 
 import com.automq.rocketmq.common.config.StoreConfig;
-import com.automq.rocketmq.common.model.MessageExt;
-import com.automq.rocketmq.common.model.generated.Message;
+import com.automq.rocketmq.common.model.FlatMessageExt;
+import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.metadata.StoreMetadataService;
 import com.automq.rocketmq.store.api.MessageStore;
 import com.automq.rocketmq.store.api.StreamStore;
@@ -37,7 +37,6 @@ import com.automq.rocketmq.store.service.RocksDBKVService;
 import com.automq.rocketmq.store.util.SerializeUtil;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
@@ -73,15 +72,15 @@ class MessageStoreTest {
 
     @Test
     void putWithPop() {
-        Message message = Message.getRootAsMessage(buildMessage(1, 1, "TagA"));
-        messageStore.put(message, new HashMap<>());
+        FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(1, 1, "TagA"));
+        messageStore.put(message);
 
         PopResult popResult = messageStore.pop(1, 1, 1, 0, Filter.DEFAULT_FILTER, 1, false, false, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertFalse(popResult.messageList().isEmpty());
         assertEquals(popResult.messageList().size(), messageStore.getInflightStats(1, 1, 1));
 
-        MessageExt messageExt = popResult.messageList().get(0);
+        FlatMessageExt messageExt = popResult.messageList().get(0);
         assertEquals(message.topicId(), messageExt.message().topicId());
         assertEquals(message.queueId(), messageExt.message().queueId());
         assertEquals(message.payloadAsByteBuffer(), messageExt.message().payloadAsByteBuffer());
@@ -93,16 +92,16 @@ class MessageStoreTest {
 
         // Append mock message.
         long streamId = metadataService.getStreamId(1, 1);
-        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, ""))).join();
+        streamStore.append(streamId, new SingleRecord(buildMessage(1, 1, ""))).join();
         streamId = metadataService.getStreamId(1, 2);
-        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 2, ""))).join();
+        streamStore.append(streamId, new SingleRecord(buildMessage(1, 2, ""))).join();
 
         PopResult popResult = messageStore.pop(1, 1, 1, 0, Filter.DEFAULT_FILTER, 1, false, false, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertFalse(popResult.messageList().isEmpty());
         assertEquals(popResult.messageList().size(), messageStore.getInflightStats(1, 1, 1));
 
-        MessageExt messageExt = popResult.messageList().get(0);
+        FlatMessageExt messageExt = popResult.messageList().get(0);
         byte[] bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(1, 1, 0, popResult.operationId()));
         assertNotNull(bytes);
 
@@ -137,11 +136,11 @@ class MessageStoreTest {
     void popMultiple() throws StoreException {
         // Append mock message.
         long streamId = metadataService.getStreamId(1, 1);
-        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, ""))).join();
-        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, ""))).join();
-        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, ""))).join();
-        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, ""))).join();
-        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, ""))).join();
+        streamStore.append(streamId, new SingleRecord(buildMessage(1, 1, ""))).join();
+        streamStore.append(streamId, new SingleRecord(buildMessage(1, 1, ""))).join();
+        streamStore.append(streamId, new SingleRecord(buildMessage(1, 1, ""))).join();
+        streamStore.append(streamId, new SingleRecord(buildMessage(1, 1, ""))).join();
+        streamStore.append(streamId, new SingleRecord(buildMessage(1, 1, ""))).join();
 
         PopResult popResult = messageStore.pop(1, 1, 1, 0, Filter.DEFAULT_FILTER, 32, true, false, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
@@ -192,7 +191,7 @@ class MessageStoreTest {
         assertEquals(5, timerTagCount.get());
 
         // Change invisible duration and ack all messages.
-        for (MessageExt messageExt : popResult.messageList()) {
+        for (FlatMessageExt messageExt : popResult.messageList()) {
             assertTrue(messageExt.receiptHandle().isPresent());
             messageStore.changeInvisibleDuration(messageExt.receiptHandle().get(), 1000).join();
             messageStore.ack(messageExt.receiptHandle().get()).join();
@@ -217,29 +216,29 @@ class MessageStoreTest {
     void popWithFilter() throws StoreException {
         // Append mock message.
         long streamId = metadataService.getStreamId(1, 1);
-        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, "tagA"))).join();
-        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, "tagA"))).join();
-        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, "tagA"))).join();
-        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, "tagA"))).join();
+        streamStore.append(streamId, new SingleRecord(buildMessage(1, 1, "tagA"))).join();
+        streamStore.append(streamId, new SingleRecord(buildMessage(1, 1, "tagA"))).join();
+        streamStore.append(streamId, new SingleRecord(buildMessage(1, 1, "tagA"))).join();
+        streamStore.append(streamId, new SingleRecord(buildMessage(1, 1, "tagA"))).join();
 
-        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, "tagB"))).join();
-        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, "tagA"))).join();
-        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, "tagA"))).join();
-        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, "tagA"))).join();
+        streamStore.append(streamId, new SingleRecord(buildMessage(1, 1, "tagB"))).join();
+        streamStore.append(streamId, new SingleRecord(buildMessage(1, 1, "tagA"))).join();
+        streamStore.append(streamId, new SingleRecord(buildMessage(1, 1, "tagA"))).join();
+        streamStore.append(streamId, new SingleRecord(buildMessage(1, 1, "tagA"))).join();
 
-        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, "tagB"))).join();
-        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(1, 1, "tagB"))).join();
+        streamStore.append(streamId, new SingleRecord(buildMessage(1, 1, "tagB"))).join();
+        streamStore.append(streamId, new SingleRecord(buildMessage(1, 1, "tagB"))).join();
 
         PopResult popResult = messageStore.pop(1, 1, 1, 0, new TagFilter("tagB || tagC"), 2, true, false, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(2, popResult.messageList().size());
         assertEquals(2, messageStore.getInflightStats(1, 1, 1));
 
-        MessageExt firstMessageExt = popResult.messageList().get(0);
+        FlatMessageExt firstMessageExt = popResult.messageList().get(0);
         assertEquals(4, firstMessageExt.offset());
         assertEquals("tagB", firstMessageExt.message().tag());
 
-        MessageExt secondMessageExt = popResult.messageList().get(1);
+        FlatMessageExt secondMessageExt = popResult.messageList().get(1);
         assertEquals(8, secondMessageExt.offset());
         assertEquals("tagB", secondMessageExt.message().tag());
 
@@ -252,7 +251,7 @@ class MessageStoreTest {
         assertEquals(2, timerTagCount.get());
 
         // Ack all messages.
-        for (MessageExt messageExt : popResult.messageList()) {
+        for (FlatMessageExt messageExt : popResult.messageList()) {
             assertTrue(messageExt.receiptHandle().isPresent());
             messageStore.changeInvisibleDuration(messageExt.receiptHandle().get(), 1000).join();
             messageStore.ack(messageExt.receiptHandle().get()).join();
@@ -273,14 +272,14 @@ class MessageStoreTest {
     void popOrderly() throws StoreException {
         // Append mock message.
         long streamId = metadataService.getStreamId(1, 1);
-        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage())).join();
+        streamStore.append(streamId, new SingleRecord(buildMessage())).join();
 
         PopResult popResult = messageStore.pop(1, 1, 1, 0, Filter.DEFAULT_FILTER, 1, true, false, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertFalse(popResult.messageList().isEmpty());
         assertEquals(1, messageStore.getInflightStats(1, 1, 1));
 
-        MessageExt messageExt = popResult.messageList().get(0);
+        FlatMessageExt messageExt = popResult.messageList().get(0);
         byte[] bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(1, 1, messageExt.offset(), popResult.operationId()));
         assertNotNull(bytes);
 
@@ -334,14 +333,14 @@ class MessageStoreTest {
     void ack() throws StoreException {
         // Append mock message.
         long streamId = metadataService.getStreamId(1, 1);
-        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage())).join();
+        streamStore.append(streamId, new SingleRecord(buildMessage())).join();
 
         PopResult popResult = messageStore.pop(1, 1, 1, 0, Filter.DEFAULT_FILTER, 1, true, false, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertFalse(popResult.messageList().isEmpty());
         assertEquals(1, messageStore.getInflightStats(1, 1, 1));
 
-        MessageExt messageExt = popResult.messageList().get(0);
+        FlatMessageExt messageExt = popResult.messageList().get(0);
         messageStore.ack(SerializeUtil.encodeReceiptHandle(1, 1, messageExt.offset(), popResult.operationId())).join();
 
         assertEquals(0, messageStore.getInflightStats(1, 1, 1));
@@ -363,7 +362,7 @@ class MessageStoreTest {
     void changeInvisibleDuration() throws StoreException {
         // Append mock message.
         long streamId = metadataService.getStreamId(1, 1);
-        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage())).join();
+        streamStore.append(streamId, new SingleRecord(buildMessage())).join();
 
         // Pop the message to generate the check point.
         PopResult popResult = messageStore.pop(1, 1, 1, 0, Filter.DEFAULT_FILTER, 1, false, false, 100).join();
@@ -382,7 +381,7 @@ class MessageStoreTest {
         assertTrue(popEndTimestamp + 100 > checkPoint.nextVisibleTimestamp());
 
         // Change the invisible duration.
-        MessageExt messageExt = popResult.messageList().get(0);
+        FlatMessageExt messageExt = popResult.messageList().get(0);
         String receiptHandle = SerializeUtil.encodeReceiptHandle(1, 1, messageExt.offset(), popResult.operationId());
         messageStore.changeInvisibleDuration(receiptHandle, 100_000_000_000L).join();
 

@@ -1,0 +1,45 @@
+namespace com.automq.rocketmq.common.model.generated;
+
+// A guide for writing schema: https://flatbuffers.dev/flatbuffers_guide_writing_schema.html
+
+table KeyValue {
+    key: string (id: 0, required);
+    value: string (id: 1, required);
+}
+
+// The message in flatbuffer format
+table FlatMessage {
+  // The topic of the message
+  topic_id: long;
+  // The queue id of the message
+  queue_id: int;
+  // The tag of the message
+  tag: string;
+  // The keys of the message
+  keys: string;
+  // The group name of the message in the same topic
+  message_group: string;
+  // The user setted properties assiocated with the message
+  user_properties: [KeyValue];
+  // The system properties assiocated with the message
+  system_properties: SystemProperties;
+  // The carried payload of the message
+  payload: [byte];
+}
+
+table SystemProperties {
+    // The message id of the message
+    message_id: string;
+    // The message store timestamp
+    store_timestamp: long;
+    // The host that store the message
+    store_host: string;
+    // The born timestamp of the message
+    born_timestamp: long;
+    // The host that born the message
+    born_host: string;
+    // The count of the message delivery attempt
+    delivery_attempt: int;
+    // The trace context of the message
+    trace_context: string;
+}

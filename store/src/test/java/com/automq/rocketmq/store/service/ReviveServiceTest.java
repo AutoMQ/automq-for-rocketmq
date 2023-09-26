@@ -17,7 +17,7 @@
 
 package com.automq.rocketmq.store.service;
 
-import com.automq.rocketmq.common.model.MessageExt;
+import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.metadata.StoreMetadataService;
 import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.rocketmq.store.exception.StoreException;
@@ -25,10 +25,9 @@ import com.automq.rocketmq.store.mock.MockStoreMetadataService;
 import com.automq.rocketmq.store.mock.MockStreamStore;
 import com.automq.rocketmq.store.model.stream.SingleRecord;
 import com.automq.rocketmq.store.service.api.KVService;
-import com.automq.rocketmq.store.util.MessageUtil;
+import com.automq.rocketmq.store.util.FlatMessageUtil;
 import com.automq.rocketmq.store.util.SerializeUtil;
 import com.automq.stream.api.FetchResult;
-import java.util.HashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -66,7 +65,7 @@ class ReviveServiceTest {
     void tryRevive() throws StoreException {
         // Append mock message.
         long streamId = metadataService.getStreamId(32, 32);
-        streamStore.append(streamId, new SingleRecord(new HashMap<>(), buildMessage(32, 32, ""))).join();
+        streamStore.append(streamId, new SingleRecord(buildMessage(32, 32, ""))).join();
 
         // Append mock check point and timer tag.
         kvService.put(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(32, 32, 0, Long.MAX_VALUE), new byte[0]);
@@ -86,7 +85,7 @@ class ReviveServiceTest {
         FetchResult fetchResult = streamStore.fetch(retryStreamId, 0, 100).join();
         assertEquals(1, fetchResult.recordBatchList().size());
 
-        MessageExt messageExt = MessageUtil.transferToMessageExt(fetchResult.recordBatchList().get(0));
+        FlatMessageExt messageExt = FlatMessageUtil.transferToMessageExt(fetchResult.recordBatchList().get(0));
         assertEquals(1, messageExt.reconsumeCount());
         assertEquals(32, messageExt.message().topicId());
         assertEquals(32, messageExt.message().queueId());
@@ -114,7 +113,7 @@ class ReviveServiceTest {
         fetchResult = streamStore.fetch(deadLetterStreamId, 0, 100).join();
         assertEquals(1, fetchResult.recordBatchList().size());
 
-        messageExt = MessageUtil.transferToMessageExt(fetchResult.recordBatchList().get(0));
+        messageExt = FlatMessageUtil.transferToMessageExt(fetchResult.recordBatchList().get(0));
         assertEquals(2, messageExt.reconsumeCount());
         assertEquals(32, messageExt.message().topicId());
         assertEquals(32, messageExt.message().queueId());
