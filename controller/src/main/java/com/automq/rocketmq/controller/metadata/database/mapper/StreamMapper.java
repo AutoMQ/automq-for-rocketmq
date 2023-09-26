@@ -35,13 +35,13 @@ public interface StreamMapper {
 
     int updateStreamState(@Param("streamId")long streamId, @Param("state")int state);
 
-    void delete(long streamId);
+    void delete(Long streamId);
 
     List<StreamMetadata> list();
 
-    StreamMetadata get(@Param("streamId") long streamId,
-        @Param("rangeId") int rangeId,
-        @Param("state") int state
+    StreamMetadata get(@Param("streamId") Long streamId,
+        @Param("rangeId") Integer rangeId,
+        @Param("state") Integer state
     );
 
     void update(StreamMetadata streamMetadata);

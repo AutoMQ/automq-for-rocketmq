@@ -57,6 +57,11 @@
         </if>
     </update>
 
+    <update id="deleteDangerous">
+        DELETE FROM s3object
+        WHERE 1 = 1
+    </update>
+
     <update id="expired" parameterType="S3Object">
         UPDATE s3object
         SET expired_timestamp = #{expiredTimestamp}

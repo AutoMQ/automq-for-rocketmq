@@ -94,9 +94,6 @@
         <if test="null != streamId">
             AND stream_id = #{streamId}
         </if>
-        <if test="rangeId == null and streamId == null">
-            AND 1 = 0
-        </if>
     </delete>
 
     <select id="listByStreamId" resultType="Range">
