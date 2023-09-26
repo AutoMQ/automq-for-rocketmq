@@ -36,6 +36,8 @@ public interface S3ObjectMapper {
 
     int delete(S3Object s3Object);
 
+    int deleteDangerous();
+
     List<S3Object> list(@Param("state") String state,
         @Param("expiredTimestamp") Long expiredTimestamp);
 }

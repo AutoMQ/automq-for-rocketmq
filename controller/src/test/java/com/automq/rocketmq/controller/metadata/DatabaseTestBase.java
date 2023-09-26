@@ -23,12 +23,19 @@ import com.automq.rocketmq.controller.metadata.database.mapper.GroupProgressMapp
 import com.automq.rocketmq.controller.metadata.database.mapper.LeaseMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.RangeMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.S3ObjectMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.S3StreamObjectMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.S3WALObjectMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.StreamAffiliationMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Calendar;
 import java.util.Properties;
+
 import org.apache.ibatis.io.Resources;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
@@ -68,6 +75,12 @@ public class DatabaseTestBase {
             session.getMapper(StreamAffiliationMapper.class).delete(null, null);
             session.getMapper(QueueAssignmentMapper.class).delete(null);
             session.getMapper(TopicMapper.class).delete(null);
+            session.getMapper(StreamMapper.class).delete(null);
+            session.getMapper(RangeMapper.class).delete(null, null);
+            session.getMapper(S3ObjectMapper.class).deleteDangerous();
+            session.getMapper(S3StreamObjectMapper.class).delete(null, null, null);
+            session.getMapper(S3WALObjectMapper.class).delete(null, null, null);
+
 
             LeaseMapper mapper = session.getMapper(LeaseMapper.class);
             Lease lease = mapper.currentWithWriteLock();
