@@ -21,10 +21,24 @@
 
 <mapper namespace="com.automq.rocketmq.controller.metadata.database.mapper.StreamAffiliationMapper">
 
-    <insert id="create" parameterType="StreamAffiliation">
+    <insert id="create" parameterType="StreamAffiliation" useGeneratedKeys="true" keyColumn="stream_id" keyProperty="streamId">
         INSERT INTO stream_affiliation(topic_id, queue_id, stream_id, stream_role, group_id, src_node_id, dst_node_id, status)
         VALUES (#{topicId}, #{queueId}, #{streamId}, #{streamRole}, #{groupId}, #{srcNodeId}, #{dstNodeId}, #{status})
     </insert>
+
+    <update id="update">
+        UPDATE stream_affiliation SET status = #{status}
+        WHERE 1 = 1
+        <if test="null != topicId">
+            AND topic_id = #{topicId}
+        </if>
+        <if test="null != queueId">
+            AND queue_id = #{queueId}
+        </if>
+        <if test="null != groupId">
+            AND group_id = #{groupId}
+        </if>
+    </update>
 
     <delete id="delete">
         DELETE FROM stream_affiliation

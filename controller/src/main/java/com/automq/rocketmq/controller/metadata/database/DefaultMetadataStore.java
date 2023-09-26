@@ -42,6 +42,8 @@ import com.automq.rocketmq.controller.metadata.database.dao.Lease;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import com.automq.rocketmq.controller.metadata.database.dao.AssignmentStatus;
+import com.automq.rocketmq.controller.metadata.database.dao.StreamAffiliation;
+import com.automq.rocketmq.controller.metadata.database.dao.StreamRole;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
 import com.automq.rocketmq.controller.metadata.database.dao.TopicStatus;
 import com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper;
@@ -49,6 +51,7 @@ import com.automq.rocketmq.controller.metadata.database.mapper.GroupProgressMapp
 import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.LeaseMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.StreamAffiliationMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.S3StreamObjectMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.S3WALObjectMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
@@ -59,7 +62,6 @@ import com.google.common.base.Strings;
 
 import java.io.IOException;
 import java.util.ArrayList;
-
 
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -103,7 +105,7 @@ public class DefaultMetadataStore implements MetadataStore {
     /// The following fields are runtime specific
     private Lease lease;
 
-    private Gson gson;
+    private final Gson gson;
 
     public DefaultMetadataStore(ControllerClient client, SqlSessionFactory sessionFactory, ControllerConfig config) {
         this.controllerClient = client;
@@ -246,6 +248,8 @@ public class DefaultMetadataStore implements MetadataStore {
 
                     QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
 
+                    StreamAffiliationMapper streamMapper = session.getMapper(StreamAffiliationMapper.class);
+
                     long topicId = topic.getId();
                     List<Integer> aliveNodeIds =
                         this.nodes.values()
@@ -264,6 +268,14 @@ public class DefaultMetadataStore implements MetadataStore {
                             assignment.setSrcNodeId(0);
                             assignment.setDstNodeId(0);
                             assignmentMapper.create(assignment);
+                            // Create data stream
+                            long streamId = createStream(streamMapper, topicId, n, StreamRole.DATA, 0, AssignmentStatus.ASSIGNABLE);
+                            LOGGER.debug("Create assignable data stream[stream-id={}] for topic-id={}, queue-id={}",
+                                streamId, topicId, n);
+                            // Create ops stream
+                            streamId = createStream(streamMapper, topicId, n, StreamRole.OPS, 0, AssignmentStatus.ASSIGNABLE);
+                            LOGGER.debug("Create assignable ops stream[stream-id={}] for topic-id={}, queue-id={}",
+                                streamId, topicId, n);
                         });
                     } else {
                         IntStream.range(0, queueNum).forEach(n -> {
@@ -278,6 +290,14 @@ public class DefaultMetadataStore implements MetadataStore {
                             assignment.setSrcNodeId(nodeId);
                             assignment.setDstNodeId(nodeId);
                             assignmentMapper.create(assignment);
+                            // Create data stream
+                            long streamId = createStream(streamMapper, topicId, n, StreamRole.DATA, nodeId, AssignmentStatus.ASSIGNED);
+                            LOGGER.debug("Create data stream[stream-id={}] for topic-id={}, queue-id={}, assigned to node[node-id={}]",
+                                streamId, topicId, n, nodeId);
+                            // Create ops stream
+                            streamId = createStream(streamMapper, topicId, n, StreamRole.OPS, nodeId, AssignmentStatus.ASSIGNED);
+                            LOGGER.debug("Create ops stream[stream-id={}] for topic-id={}, queue-id={}, assigned to node[node-id={}]",
+                                streamId, topicId, n, nodeId);
                         });
                     }
                     // Commit transaction
@@ -299,6 +319,19 @@ public class DefaultMetadataStore implements MetadataStore {
                 }
             }
         }
+    }
+
+    private static long createStream(StreamAffiliationMapper streamMapper, long topicId, int queueId,
+        StreamRole role, int nodeId, AssignmentStatus status) {
+        StreamAffiliation dataStream = new StreamAffiliation();
+        dataStream.setStatus(status);
+        dataStream.setTopicId(topicId);
+        dataStream.setQueueId(queueId);
+        dataStream.setStreamRole(role);
+        dataStream.setSrcNodeId(nodeId);
+        dataStream.setDstNodeId(nodeId);
+        streamMapper.create(dataStream);
+        return dataStream.getStreamId();
     }
 
     @Override
@@ -331,6 +364,10 @@ public class DefaultMetadataStore implements MetadataStore {
                             assignment.setStatus(AssignmentStatus.DELETED);
                             assignmentMapper.update(assignment);
                         });
+
+                    StreamAffiliationMapper streamMapper = session.getMapper(StreamAffiliationMapper.class);
+                    streamMapper.update(topicId, null, null, AssignmentStatus.DELETED);
+
                     session.commit();
                 }
                 this.notifyOnResourceChange(toNotify);
@@ -628,7 +665,6 @@ public class DefaultMetadataStore implements MetadataStore {
 
     }
 
-
     @Override
     public StreamMetadata openStream(long streamId, long streamEpoch) {
         return null;
@@ -649,7 +685,8 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public void commitWalObject(S3WALObject walObject, List<S3StreamObject> streamObjects, List<Long> compactedObjects) {
+    public void commitWalObject(S3WALObject walObject, List<S3StreamObject> streamObjects,
+        List<Long> compactedObjects) {
 
     }
 
@@ -681,7 +718,7 @@ public class DefaultMetadataStore implements MetadataStore {
 
             return s3WALObjects.stream()
                 .map(s3WALObject -> {
-                    TypeToken<Map<Long, SubStream>> typeToken = new TypeToken<Map<Long, SubStream>>() {
+                    TypeToken<Map<Long, SubStream>> typeToken = new TypeToken<>() {
 
                     };
                     Map<Long, SubStream> subStreams = gson.fromJson(new String(s3WALObject.getSubStreams().getBytes(StandardCharsets.UTF_8)), typeToken.getType());
@@ -721,7 +758,9 @@ public class DefaultMetadataStore implements MetadataStore {
         }
     }
 
-    private S3WALObject buildS3WALObject(com.automq.rocketmq.controller.metadata.database.dao.S3WALObject originalObject, Map<Long, SubStream> subStreams) {
+    private S3WALObject buildS3WALObject(
+        com.automq.rocketmq.controller.metadata.database.dao.S3WALObject originalObject,
+        Map<Long, SubStream> subStreams) {
         return S3WALObject.newBuilder()
             .setObjectId(originalObject.getObjectId())
             .setObjectSize(originalObject.getObjectSize())
@@ -732,7 +771,6 @@ public class DefaultMetadataStore implements MetadataStore {
             .putAllSubStreams(subStreams)
             .build();
     }
-
 
     @Override
     public void close() throws IOException {

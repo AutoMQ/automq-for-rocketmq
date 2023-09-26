@@ -29,10 +29,12 @@ import com.automq.rocketmq.controller.metadata.database.dao.Lease;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import com.automq.rocketmq.controller.metadata.database.dao.AssignmentStatus;
+import com.automq.rocketmq.controller.metadata.database.dao.StreamAffiliation;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
 import com.automq.rocketmq.controller.metadata.database.dao.TopicStatus;
 import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.StreamAffiliationMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.S3StreamObjectMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.S3WALObjectMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
@@ -218,28 +220,32 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
         Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
         Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
+        long topicId;
+        int queueNum = 4;
+        String topicName = "t1";
         try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().atMost(10, TimeUnit.SECONDS)
                 .pollInterval(100, TimeUnit.MILLISECONDS)
                 .until(metadataStore::isLeader);
 
-            String topicName = "t1";
-            int queueNum = 4;
-            long topicId = metadataStore.createTopic(topicName, queueNum);
+            topicId = metadataStore.createTopic(topicName, queueNum);
+        }
 
-            try (SqlSession session = getSessionFactory().openSession()) {
-                TopicMapper mapper = session.getMapper(TopicMapper.class);
-                mapper.delete(topicId);
+        try (SqlSession session = getSessionFactory().openSession()) {
+            TopicMapper topicMapper = session.getMapper(TopicMapper.class);
+            List<Topic> topics = topicMapper.list(null, null);
+            topics.stream().filter(topic -> topic.getName().equals("t1")).forEach(topic -> {
+                Assertions.assertEquals(4, topic.getQueueNum());
+            });
 
-                NodeMapper nodeMapper = session.getMapper(NodeMapper.class);
-                nodeMapper.delete(nodeId);
+            QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
+            List<QueueAssignment> assignments = assignmentMapper.list(topicId, null, null, null, null);
+            Assertions.assertEquals(4, assignments.size());
 
-                QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
-                assignmentMapper.delete(null);
-
-                session.commit();
-            }
+            StreamAffiliationMapper streamMapper = session.getMapper(StreamAffiliationMapper.class);
+            List<StreamAffiliation> streams = streamMapper.list(topicId, null, null, null);
+            Assertions.assertEquals(queueNum * 2, streams.size());
         }
     }
 
