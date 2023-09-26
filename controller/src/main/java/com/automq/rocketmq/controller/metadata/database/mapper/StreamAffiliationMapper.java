@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.controller.metadata.database.mapper;
 
+import com.automq.rocketmq.controller.metadata.database.dao.AssignmentStatus;
 import com.automq.rocketmq.controller.metadata.database.dao.StreamAffiliation;
 import java.util.Date;
 import java.util.List;
@@ -31,4 +32,18 @@ public interface StreamAffiliationMapper {
         @Param("updateTime") Date updateTime);
 
     int delete(@Param("topicId") Long topicId, @Param("queueId") Integer queueId);
+
+    /**
+     * Update Stream status according to optional topic-id and group-id
+     *
+     * @param topicId
+     * @param queueId
+     * @param groupId
+     * @param status
+     * @return number of rows affected
+     */
+    int update(@Param("topicId") Long topicId,
+        @Param("queueId") Integer queueId,
+        @Param("groupId") Long groupId,
+        @Param("status") AssignmentStatus status);
 }

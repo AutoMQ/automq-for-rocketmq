@@ -59,4 +59,28 @@ public class StreamAffiliationTest extends DatabaseTestBase {
             Assertions.assertEquals(1, rowsAffected);
         }
     }
+
+    @Test
+    public void testUpdate() throws IOException {
+        try (SqlSession session = getSessionFactory().openSession()) {
+            StreamAffiliationMapper mapper = session.getMapper(StreamAffiliationMapper.class);
+            StreamAffiliation streamAffiliation = new StreamAffiliation();
+            streamAffiliation.setTopicId(1);
+            streamAffiliation.setQueueId(2);
+            streamAffiliation.setStreamId(3);
+            streamAffiliation.setStreamRole(StreamRole.RETRY);
+            streamAffiliation.setGroupId(4);
+            streamAffiliation.setSrcNodeId(5);
+            streamAffiliation.setDstNodeId(6);
+            streamAffiliation.setStatus(AssignmentStatus.ASSIGNED);
+            mapper.create(streamAffiliation);
+
+            mapper.update(1L, null, null, AssignmentStatus.DELETED);
+
+            List<StreamAffiliation> streams = mapper.list(1L, null, null, null);
+            for (StreamAffiliation stream : streams) {
+                Assertions.assertEquals(AssignmentStatus.DELETED, stream.getStatus());
+            }
+        }
+    }
 }
