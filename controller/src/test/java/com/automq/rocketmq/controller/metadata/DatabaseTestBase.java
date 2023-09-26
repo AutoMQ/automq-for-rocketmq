@@ -23,7 +23,7 @@ import com.automq.rocketmq.controller.metadata.database.mapper.GroupProgressMapp
 import com.automq.rocketmq.controller.metadata.database.mapper.LeaseMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper;
-import com.automq.rocketmq.controller.metadata.database.mapper.QueueMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.StreamAffiliationMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 import java.io.IOException;
 import java.io.InputStream;
@@ -65,7 +65,7 @@ public class DatabaseTestBase {
             session.getMapper(GroupMapper.class).delete(null);
             session.getMapper(GroupProgressMapper.class).delete(null, null);
             session.getMapper(NodeMapper.class).delete(null);
-            session.getMapper(QueueMapper.class).delete(null, null);
+            session.getMapper(StreamAffiliationMapper.class).delete(null, null);
             session.getMapper(QueueAssignmentMapper.class).delete(null);
             session.getMapper(TopicMapper.class).delete(null);
 

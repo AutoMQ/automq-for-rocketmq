@@ -40,7 +40,7 @@
         <typeHandler handler="org.apache.ibatis.type.EnumOrdinalTypeHandler"
                      javaType="com.automq.rocketmq.controller.metadata.database.dao.TopicStatus" />
         <typeHandler handler="org.apache.ibatis.type.EnumOrdinalTypeHandler"
-                     javaType="com.automq.rocketmq.controller.metadata.database.dao.QueueAssignmentStatus" />
+                     javaType="com.automq.rocketmq.controller.metadata.database.dao.AssignmentStatus" />
         <typeHandler handler="org.apache.ibatis.type.EnumOrdinalTypeHandler"
                      javaType="com.automq.rocketmq.controller.metadata.database.dao.StreamRole" />
         <typeHandler handler="org.apache.ibatis.type.EnumOrdinalTypeHandler"
@@ -63,7 +63,7 @@
     <mappers>
         <mapper resource="database/mapper/GroupMapper.xml" />
         <mapper resource="database/mapper/GroupProgressMapper.xml" />
-        <mapper resource="database/mapper/QueueMapper.xml" />
+        <mapper resource="database/mapper/StreamAffiliationMapper.xml" />
         <mapper resource="database/mapper/SubscriptionMapper.xml" />
         <mapper resource="database/mapper/LeaseMapper.xml" />
         <mapper resource="database/mapper/NodeMapper.xml" />

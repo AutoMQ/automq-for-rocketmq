@@ -22,7 +22,7 @@ import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
-import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignmentStatus;
+import com.automq.rocketmq.controller.metadata.database.dao.AssignmentStatus;
 import java.io.Closeable;
 import java.util.List;
 
@@ -68,7 +68,7 @@ public interface MetadataStore extends Closeable {
      * @return List of the queue assignments meeting the specified criteria
      */
     List<QueueAssignment> listAssignments(Long topicId, Integer srcNodeId, Integer dstNodeId,
-        QueueAssignmentStatus status);
+        AssignmentStatus status);
 
     void reassignMessageQueue(long topicId, int queueId, int dstNodeId) throws ControllerException;
 

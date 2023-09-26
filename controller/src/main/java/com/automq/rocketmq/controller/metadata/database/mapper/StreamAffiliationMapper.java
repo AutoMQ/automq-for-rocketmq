@@ -17,14 +17,18 @@
 
 package com.automq.rocketmq.controller.metadata.database.mapper;
 
-import com.automq.rocketmq.controller.metadata.database.dao.Queue;
+import com.automq.rocketmq.controller.metadata.database.dao.StreamAffiliation;
+import java.util.Date;
 import java.util.List;
 import org.apache.ibatis.annotations.Param;
 
-public interface QueueMapper {
-    int create(Queue queue);
+public interface StreamAffiliationMapper {
+    int create(StreamAffiliation streamAffiliation);
 
-    List<Queue> list(@Param("topicId") Long topicId, @Param("queueId") Integer queueId, @Param("groupId") Long groupId);
+    List<StreamAffiliation> list(@Param("topicId") Long topicId,
+        @Param("queueId") Integer queueId,
+        @Param("groupId") Long groupId,
+        @Param("updateTime") Date updateTime);
 
     int delete(@Param("topicId") Long topicId, @Param("queueId") Integer queueId);
 }
