@@ -24,9 +24,10 @@
 
     <insert id="create" parameterType="S3WALObject">
         INSERT INTO
-        s3walobject (object_id, broker_id, sequence_id, sub_streams, base_data_timestamp)
+        s3walobject (object_id, object_size, broker_id, sequence_id, sub_streams, base_data_timestamp)
         VALUES (
         #{objectId},
+        #{objectSize},
         #{brokerId},
         #{sequenceId},
         #{subStreams},
@@ -50,7 +51,7 @@
     </update>
 
     <select id="getByObjectId" resultType="S3WALObject">
-        SELECT object_id, broker_id, sequence_id, sub_streams, base_data_timestamp, committed_timestamp
+        SELECT object_id, object_size, broker_id, sequence_id, sub_streams, base_data_timestamp, committed_timestamp
         FROM s3walobject
         WHERE object_id = #{objectId}
     </select>
@@ -71,7 +72,7 @@
     </delete>
 
     <select id="list" resultType="S3WALObject">
-        SELECT object_id, broker_id, sequence_id, sub_streams, base_data_timestamp, committed_timestamp
+        SELECT object_id, object_size, broker_id, sequence_id, sub_streams, base_data_timestamp, committed_timestamp
         FROM s3walobject
         WHERE 1 = 1
         <if test="null != brokerId">

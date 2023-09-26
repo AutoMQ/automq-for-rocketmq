@@ -79,7 +79,7 @@ public class RangeTest extends DatabaseTestBase {
             Assertions.assertEquals(range, ranges.get(0));
 
             // test delete
-            rangeMapper.delete(range1.getRangeId());
+            rangeMapper.delete(range2.getRangeId(), null);
             List<Range> ranges2 = rangeMapper.list(null, null, null);
             Assertions.assertTrue(ranges2.isEmpty());
         }

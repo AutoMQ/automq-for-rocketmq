@@ -29,8 +29,8 @@ public interface S3WALObjectMapper {
     S3WALObject getByObjectId(long objectId);
 
     int delete(@Param("objectId") Long objectId,
-               @Param("brokerId") Integer brokerId,
-               @Param("sequenceId") Long sequenceId);
+        @Param("brokerId") Integer brokerId,
+        @Param("sequenceId") Long sequenceId);
 
     List<S3WALObject> list(@Param("brokerId") Integer brokerId,
         @Param("sequenceId") Long sequenceId);

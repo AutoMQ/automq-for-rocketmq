@@ -32,6 +32,34 @@
         )
     </insert>
 
+    <update id="update">
+        UPDATE `range`
+        <set>
+            <if test="null != streamId">
+                stream_id = #{streamId},
+            </if>
+            <if test="null != epoch">
+                epoch = #{epoch},
+            </if>
+            <if test="null != startOffset">
+                start_offset = #{startOffset},
+            </if>
+            <if test="null != endOffset">
+                end_offset = #{endOffset},
+            </if>
+            <if test="null != brokerId">
+                brokerId = #{brokerId},
+            </if>
+        </set>
+        WHERE 1 = 1
+        <if test="null != rangeId">
+             AND range_id = #{rangeId}
+        </if>
+        <if test="null != id">
+            AND id = #{id}
+        </if>
+    </update>
+
     <select id="getByRangeId" resultType="Range">
         SELECT id, range_id, stream_id, epoch, start_offset, end_offset, broker_id
         FROM `range`
@@ -57,8 +85,18 @@
         </if>
     </select>
 
-    <delete id="delete" parameterType="int">
-        DELETE FROM `range` WHERE range_id = #{rangeId}
+    <delete id="delete">
+        DELETE FROM `range`
+        WHERE 1 = 1
+        <if test="null != rangeId">
+            AND range_id = #{rangeId}
+        </if>
+        <if test="null != streamId">
+            AND stream_id = #{streamId}
+        </if>
+        <if test="rangeId == null and streamId == null">
+            AND 1 = 0
+        </if>
     </delete>
 
     <select id="listByStreamId" resultType="Range">
