@@ -40,6 +40,7 @@ public class S3WALObjectTest extends DatabaseTestBase {
             S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
             S3WALObject s3WALObject = new S3WALObject();
             s3WALObject.setObjectId(123);
+            s3WALObject.setObjectSize(22);
             s3WALObject.setBrokerId(1);
             s3WALObject.setSequenceId(999);
             s3WALObject.setSubStreams("<json><json>");
@@ -62,6 +63,7 @@ public class S3WALObjectTest extends DatabaseTestBase {
             Assertions.assertEquals(1, s3WALObjects.size());
 
             Assertions.assertEquals(123, s3WALObjects.get(0).getObjectId());
+            Assertions.assertEquals(22, s3WALObjects.get(0).getObjectSize());
             Assertions.assertEquals(1, s3WALObjects.get(0).getBrokerId());
             Assertions.assertEquals(999, s3WALObjects.get(0).getSequenceId());
             Assertions.assertEquals("<json><json>", s3WALObjects.get(0).getSubStreams());
@@ -81,6 +83,7 @@ public class S3WALObjectTest extends DatabaseTestBase {
             S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
             S3WALObject s3WALObject = new S3WALObject();
             s3WALObject.setObjectId(123);
+            s3WALObject.setObjectSize(22);
             s3WALObject.setBrokerId(1);
             s3WALObject.setSequenceId(999);
             s3WALObject.setSubStreams("<json><json>");

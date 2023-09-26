@@ -50,6 +50,25 @@
         WHERE stream_id = #{streamId}
     </update>
 
+    <update id="update">
+        UPDATE stream
+        <set>
+            <if test="null != epoch">
+                epoch = #{epoch},
+            </if>
+            <if test="null != startOffset">
+                start_offset = #{startOffset},
+            </if>
+            <if test="null != rangeId">
+                range_id = #{rangeId},
+            </if>
+            <if test="null != state">
+                state = #{state},
+            </if>
+        </set>
+        WHERE stream_id = #{streamId}
+    </update>
+
     <update id="updateStreamState">
         UPDATE stream
         SET state = #{state}

@@ -26,6 +26,8 @@ public class S3WALObject {
 
     int brokerId;
 
+    int objectSize;
+
     long sequenceId;
 
     String subStreams;
@@ -40,6 +42,14 @@ public class S3WALObject {
 
     public void setObjectId(long objectId) {
         this.objectId = objectId;
+    }
+
+    public int getObjectSize() {
+        return objectSize;
+    }
+
+    public void setObjectSize(int objectSize) {
+        this.objectSize = objectSize;
     }
 
     public int getBrokerId() {
@@ -87,11 +97,11 @@ public class S3WALObject {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         S3WALObject that = (S3WALObject) o;
-        return objectId == that.objectId && brokerId == that.brokerId && sequenceId == that.sequenceId && baseDataTimestamp == that.baseDataTimestamp && committedTimestamp == that.committedTimestamp && Objects.equals(subStreams, that.subStreams);
+        return objectId == that.objectId && brokerId == that.brokerId && objectSize == that.objectSize && sequenceId == that.sequenceId && baseDataTimestamp == that.baseDataTimestamp && committedTimestamp == that.committedTimestamp && Objects.equals(subStreams, that.subStreams);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(objectId, brokerId, sequenceId, subStreams, baseDataTimestamp, committedTimestamp);
+        return Objects.hash(objectId, brokerId, objectSize, sequenceId, subStreams, baseDataTimestamp, committedTimestamp);
     }
 }

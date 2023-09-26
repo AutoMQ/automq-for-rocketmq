@@ -79,6 +79,9 @@
         <if test="null != streamId">
             AND stream_id = #{streamId}
         </if>
+        <if test="null == id and streamId == null and objectId == null">
+            AND 1 = 0
+        </if>
     </delete>
 
     <select id="getByStreamAndObject" resultType="S3StreamObject">
@@ -97,9 +100,15 @@
         <if test="null != streamId">
             AND stream_id = #{streamId}
         </if>
-        <if test="null != offset">
-            AND start_offset &lt;= #{offset}
-            AND end_offset &gt; #{offset}
+        <if test="null != startOffset">
+            AND start_offset &lt;= #{startOffset}
+        </if>
+        <if test="null != endOffset">
+            AND end_offset &gt; #{endOffset}
+        </if>
+        ORDER BY id
+        <if test="null != limit">
+            LIMIT #{limit}
         </if>
     </select>
 

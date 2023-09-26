@@ -38,7 +38,7 @@ public interface RangeMapper {
 
     List<Range> listByStreamId(long streamId);
 
-    void delete(int rangeId);
+    void delete(@Param("rangeId") Integer rangeId, @Param("streamId") Long streamId);
 
     List<Range> listByBrokerId(int brokerId);
 
@@ -50,4 +50,5 @@ public interface RangeMapper {
         @Param("streamId") Long streamId,
         @Param("offset") Long offset);
 
+    void update(Range range);
 }
