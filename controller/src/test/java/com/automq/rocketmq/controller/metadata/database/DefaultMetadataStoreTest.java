@@ -24,7 +24,7 @@ import com.automq.rocketmq.controller.metadata.DatabaseTestBase;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
-import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignmentStatus;
+import com.automq.rocketmq.controller.metadata.database.dao.AssignmentStatus;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
 import com.automq.rocketmq.controller.metadata.database.dao.TopicStatus;
 import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
@@ -237,7 +237,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             QueueAssignmentMapper mapper = session.getMapper(QueueAssignmentMapper.class);
             QueueAssignment assignment = new QueueAssignment();
             assignment.setTopicId(1);
-            assignment.setStatus(QueueAssignmentStatus.ASSIGNED);
+            assignment.setStatus(AssignmentStatus.ASSIGNED);
             assignment.setDstNodeId(2);
             assignment.setSrcNodeId(3);
             assignment.setQueueId(4);
@@ -252,7 +252,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Assertions.assertEquals(1, assignmentList.size());
             QueueAssignment assignment = assignmentList.get(0);
             Assertions.assertEquals(1, assignment.getTopicId());
-            Assertions.assertEquals(QueueAssignmentStatus.ASSIGNED, assignment.getStatus());
+            Assertions.assertEquals(AssignmentStatus.ASSIGNED, assignment.getStatus());
             Assertions.assertEquals(2, assignment.getDstNodeId());
             Assertions.assertEquals(3, assignment.getSrcNodeId());
             Assertions.assertEquals(4, assignment.getQueueId());
@@ -328,7 +328,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
             QueueAssignment assignment = new QueueAssignment();
             assignment.setTopicId(topicId);
-            assignment.setStatus(QueueAssignmentStatus.ASSIGNED);
+            assignment.setStatus(AssignmentStatus.ASSIGNED);
             assignment.setQueueId(1);
             assignment.setDstNodeId(2);
             assignment.setSrcNodeId(3);
@@ -336,7 +336,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
             assignment = new QueueAssignment();
             assignment.setTopicId(topicId);
-            assignment.setStatus(QueueAssignmentStatus.YIELDING);
+            assignment.setStatus(AssignmentStatus.YIELDING);
             assignment.setSrcNodeId(3);
             assignment.setDstNodeId(2);
             assignment.setQueueId(2);
@@ -366,7 +366,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             QueueAssignment assignment = new QueueAssignment();
             assignment.setQueueId(1);
             assignment.setTopicId(2);
-            assignment.setStatus(QueueAssignmentStatus.YIELDING);
+            assignment.setStatus(AssignmentStatus.YIELDING);
             assignmentMapper.create(assignment);
             session.commit();
         }
@@ -384,7 +384,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             List<QueueAssignment> assignments = metadataStore.listAssignments(2L, null, null, null);
             for (QueueAssignment assignment : assignments) {
                 if (assignment.getQueueId() == 1) {
-                    Assertions.assertEquals(QueueAssignmentStatus.ASSIGNABLE, assignment.getStatus());
+                    Assertions.assertEquals(AssignmentStatus.ASSIGNABLE, assignment.getStatus());
                 }
             }
         }

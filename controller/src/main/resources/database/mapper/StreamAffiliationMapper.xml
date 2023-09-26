@@ -19,15 +19,15 @@
     PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<mapper namespace="com.automq.rocketmq.controller.metadata.database.mapper.QueueMapper">
+<mapper namespace="com.automq.rocketmq.controller.metadata.database.mapper.StreamAffiliationMapper">
 
-    <insert id="create" parameterType="Queue">
-        INSERT INTO queue(topic_id, queue_id, stream_id, stream_role, group_id)
-        VALUES (#{topicId}, #{queueId}, #{streamId}, #{streamRole}, #{groupId})
+    <insert id="create" parameterType="StreamAffiliation">
+        INSERT INTO stream_affiliation(topic_id, queue_id, stream_id, stream_role, group_id, src_node_id, dst_node_id, status)
+        VALUES (#{topicId}, #{queueId}, #{streamId}, #{streamRole}, #{groupId}, #{srcNodeId}, #{dstNodeId}, #{status})
     </insert>
 
     <delete id="delete">
-        DELETE FROM queue
+        DELETE FROM stream_affiliation
         WHERE 1 = 1
         <if test="null != topicId">
             AND topic_id = #{topicId}
@@ -37,9 +37,9 @@
         </if>
     </delete>
 
-    <select id="list" resultType="Queue">
-        SELECT topic_id, queue_id, stream_id, stream_role, group_id
-        FROM queue
+    <select id="list" resultType="StreamAffiliation">
+        SELECT topic_id, queue_id, stream_id, stream_role, group_id, src_node_id, dst_node_id, status, create_time, update_time
+        FROM stream_affiliation
         WHERE 1 = 1
         <if test="null != topicId">
             AND topic_id = #{topicId}
@@ -49,6 +49,9 @@
         </if>
         <if test="null != groupId">
             AND group_id = #{groupId}
+        </if>
+        <if test="null != updateTime">
+            AND update_time >= #{updateTime}
         </if>
     </select>
 

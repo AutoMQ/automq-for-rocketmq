@@ -17,16 +17,37 @@
 
 package com.automq.rocketmq.controller.metadata.database.dao;
 
-public class Queue {
-    private long topicId;
-    private int queueId;
+import java.util.Date;
+
+/**
+ * Manage stream/queue relationship and its assignment to node.
+ *
+ * When migrating queues among nodes on demand, the affiliated streams should be reconciled to the same node where its
+ * data/ops streams live.
+ */
+public class StreamAffiliation {
     private long streamId;
+
+    private long topicId;
+
+    private int queueId;
+
     private StreamRole streamRole;
 
     /**
      * If {@link #streamRole} is {@link StreamRole#RETRY}, this field represents owner of this retry queue.
      */
     private long groupId;
+
+    private int srcNodeId;
+
+    private int dstNodeId;
+
+    private AssignmentStatus status;
+
+    private Date createTime;
+
+    private Date updateTime;
 
     public long getTopicId() {
         return topicId;
@@ -66,5 +87,45 @@ public class Queue {
 
     public void setGroupId(long groupId) {
         this.groupId = groupId;
+    }
+
+    public int getSrcNodeId() {
+        return srcNodeId;
+    }
+
+    public void setSrcNodeId(int srcNodeId) {
+        this.srcNodeId = srcNodeId;
+    }
+
+    public int getDstNodeId() {
+        return dstNodeId;
+    }
+
+    public void setDstNodeId(int dstNodeId) {
+        this.dstNodeId = dstNodeId;
+    }
+
+    public AssignmentStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(AssignmentStatus status) {
+        this.status = status;
+    }
+
+    public Date getCreateTime() {
+        return createTime;
+    }
+
+    public void setCreateTime(Date createTime) {
+        this.createTime = createTime;
+    }
+
+    public Date getUpdateTime() {
+        return updateTime;
+    }
+
+    public void setUpdateTime(Date updateTime) {
+        this.updateTime = updateTime;
     }
 }

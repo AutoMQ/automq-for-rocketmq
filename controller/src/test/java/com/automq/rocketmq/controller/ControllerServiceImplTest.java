@@ -38,7 +38,7 @@ import com.automq.rocketmq.controller.metadata.database.DefaultMetadataStore;
 import com.automq.rocketmq.controller.metadata.database.dao.GroupProgress;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
-import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignmentStatus;
+import com.automq.rocketmq.controller.metadata.database.dao.AssignmentStatus;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
 import com.automq.rocketmq.controller.metadata.database.dao.TopicStatus;
 import com.automq.rocketmq.controller.metadata.database.mapper.GroupProgressMapper;
@@ -334,7 +334,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
         try (SqlSession session = getSessionFactory().openSession()) {
             QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
             QueueAssignment assignment = new QueueAssignment();
-            assignment.setStatus(QueueAssignmentStatus.ASSIGNED);
+            assignment.setStatus(AssignmentStatus.ASSIGNED);
             assignment.setTopicId(topicId);
             assignment.setQueueId(queueId);
             assignment.setSrcNodeId(srcNodeId);
@@ -359,7 +359,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
         try (SqlSession session = getSessionFactory().openSession()) {
             QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
-            List<QueueAssignment> assignments = assignmentMapper.list(topicId, null, null, QueueAssignmentStatus.YIELDING, null);
+            List<QueueAssignment> assignments = assignmentMapper.list(topicId, null, null, AssignmentStatus.YIELDING, null);
             Assertions.assertEquals(1, assignments.size());
             session.commit();
         }
