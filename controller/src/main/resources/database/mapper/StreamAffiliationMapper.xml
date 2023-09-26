@@ -27,7 +27,8 @@
     </insert>
 
     <update id="update">
-        UPDATE stream_affiliation SET status = #{status}
+        UPDATE stream_affiliation
+        SET status = #{status}, src_node_id = #{srcNodeId}, dst_node_id = #{dstNodeId}
         WHERE 1 = 1
         <if test="null != topicId">
             AND topic_id = #{topicId}

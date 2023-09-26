@@ -45,5 +45,7 @@ public interface StreamAffiliationMapper {
     int update(@Param("topicId") Long topicId,
         @Param("queueId") Integer queueId,
         @Param("groupId") Long groupId,
+        @Param("srcNodeId") Integer srcNodeId,
+        @Param("dstNodeId") Integer dstNodeId,
         @Param("status") AssignmentStatus status);
 }

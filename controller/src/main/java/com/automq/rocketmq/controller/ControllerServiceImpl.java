@@ -29,6 +29,8 @@ import apache.rocketmq.controller.v1.CommitWALObjectRequest;
 import apache.rocketmq.controller.v1.ControllerServiceGrpc;
 import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
+import apache.rocketmq.controller.v1.CreateRetryStreamReply;
+import apache.rocketmq.controller.v1.CreateRetryStreamRequest;
 import apache.rocketmq.controller.v1.CreateTopicReply;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.DeleteTopicReply;
@@ -282,6 +284,22 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
             CreateGroupReply reply = CreateGroupReply.newBuilder()
                 .setGroupId(groupId)
                 .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                .build();
+            responseObserver.onNext(reply);
+            responseObserver.onCompleted();
+        } catch (ControllerException e) {
+            responseObserver.onError(e);
+        }
+    }
+
+    @Override
+    public void createRetryStream(CreateRetryStreamRequest request,
+        StreamObserver<CreateRetryStreamReply> responseObserver) {
+        try {
+            long streamId = metadataStore.getOrCreateRetryStream(request.getGroupName(), request.getQueue().getTopicId(), request.getQueue().getQueueId());
+            CreateRetryStreamReply reply = CreateRetryStreamReply.newBuilder()
+                .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                .setStreamId(streamId)
                 .build();
             responseObserver.onNext(reply);
             responseObserver.onCompleted();
