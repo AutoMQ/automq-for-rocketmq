@@ -36,7 +36,7 @@ import com.automq.rocketmq.controller.metadata.database.dao.GroupProgress;
 import com.automq.rocketmq.controller.metadata.database.dao.GroupStatus;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
-import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignmentStatus;
+import com.automq.rocketmq.controller.metadata.database.dao.AssignmentStatus;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
 import com.automq.rocketmq.controller.metadata.database.dao.TopicStatus;
 import com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper;
@@ -238,7 +238,7 @@ public class DefaultMetadataStore implements MetadataStore {
                         IntStream.range(0, queueNum).forEach(n -> {
                             QueueAssignment assignment = new QueueAssignment();
                             assignment.setTopicId(topicId);
-                            assignment.setStatus(QueueAssignmentStatus.ASSIGNABLE);
+                            assignment.setStatus(AssignmentStatus.ASSIGNABLE);
                             assignment.setQueueId(n);
                             // On creation, both src and dst node_id are the same.
                             assignment.setSrcNodeId(0);
@@ -252,7 +252,7 @@ public class DefaultMetadataStore implements MetadataStore {
                             toNotify.add(nodeId);
                             QueueAssignment assignment = new QueueAssignment();
                             assignment.setTopicId(topicId);
-                            assignment.setStatus(QueueAssignmentStatus.ASSIGNED);
+                            assignment.setStatus(AssignmentStatus.ASSIGNED);
                             assignment.setQueueId(n);
                             // On creation, both src and dst node_id are the same.
                             assignment.setSrcNodeId(nodeId);
@@ -300,7 +300,7 @@ public class DefaultMetadataStore implements MetadataStore {
 
                     QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
                     List<QueueAssignment> assignments = assignmentMapper.list(topicId, null, null, null, null);
-                    assignments.stream().filter(assignment -> assignment.getStatus() != QueueAssignmentStatus.DELETED)
+                    assignments.stream().filter(assignment -> assignment.getStatus() != AssignmentStatus.DELETED)
                         .forEach(assignment -> {
                             switch (assignment.getStatus()) {
                                 case ASSIGNED -> toNotify.add(assignment.getDstNodeId());
@@ -308,7 +308,7 @@ public class DefaultMetadataStore implements MetadataStore {
                                 default -> {
                                 }
                             }
-                            assignment.setStatus(QueueAssignmentStatus.DELETED);
+                            assignment.setStatus(AssignmentStatus.DELETED);
                             assignmentMapper.update(assignment);
                         });
                     session.commit();
@@ -444,7 +444,7 @@ public class DefaultMetadataStore implements MetadataStore {
 
     @Override
     public List<QueueAssignment> listAssignments(Long topicId, Integer srcNodeId, Integer dstNodeId,
-        QueueAssignmentStatus status) {
+        AssignmentStatus status) {
         try (SqlSession session = getSessionFactory().openSession()) {
             QueueAssignmentMapper mapper = session.getMapper(QueueAssignmentMapper.class);
             return mapper.list(topicId, srcNodeId, dstNodeId, status, null);
@@ -473,7 +473,7 @@ public class DefaultMetadataStore implements MetadataStore {
                             }
                             case ASSIGNED -> {
                                 assignment.setDstNodeId(dstNodeId);
-                                assignment.setStatus(QueueAssignmentStatus.YIELDING);
+                                assignment.setStatus(AssignmentStatus.YIELDING);
                                 assignmentMapper.update(assignment);
                             }
                             case DELETED -> throw new ControllerException(Code.NOT_FOUND_VALUE, "Already deleted");
@@ -495,14 +495,14 @@ public class DefaultMetadataStore implements MetadataStore {
             if (isLeader()) {
                 try (SqlSession session = getSessionFactory().openSession()) {
                     QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
-                    List<QueueAssignment> assignments = assignmentMapper.list(topicId, null, null, QueueAssignmentStatus.YIELDING, null);
+                    List<QueueAssignment> assignments = assignmentMapper.list(topicId, null, null, AssignmentStatus.YIELDING, null);
                     for (QueueAssignment assignment : assignments) {
                         if (assignment.getQueueId() != queueId) {
                             continue;
                         }
 
                         assignment.setSrcNodeId(assignment.getDstNodeId());
-                        assignment.setStatus(QueueAssignmentStatus.ASSIGNABLE);
+                        assignment.setStatus(AssignmentStatus.ASSIGNABLE);
                         assignmentMapper.update(assignment);
                         LOGGER.info("Mark queue[topic-id={}, queue-id={}] assignable", topicId, queueId);
                         break;

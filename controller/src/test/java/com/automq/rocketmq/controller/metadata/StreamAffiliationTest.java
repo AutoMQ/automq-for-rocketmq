@@ -17,36 +17,43 @@
 
 package com.automq.rocketmq.controller.metadata;
 
-import com.automq.rocketmq.controller.metadata.database.dao.Queue;
+import com.automq.rocketmq.controller.metadata.database.dao.AssignmentStatus;
+import com.automq.rocketmq.controller.metadata.database.dao.StreamAffiliation;
 import com.automq.rocketmq.controller.metadata.database.dao.StreamRole;
-import com.automq.rocketmq.controller.metadata.database.mapper.QueueMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.StreamAffiliationMapper;
 import java.io.IOException;
 import java.util.List;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class QueueTest extends DatabaseTestBase {
+public class StreamAffiliationTest extends DatabaseTestBase {
     @Test
     public void testQueueCRUD() throws IOException {
         try (SqlSession session = getSessionFactory().openSession()) {
-            QueueMapper mapper = session.getMapper(QueueMapper.class);
-            Queue queue = new Queue();
-            queue.setTopicId(1);
-            queue.setQueueId(2);
-            queue.setStreamId(3);
-            queue.setStreamRole(StreamRole.RETRY);
-            queue.setGroupId(4);
-            int rowsAffected = mapper.create(queue);
+            StreamAffiliationMapper mapper = session.getMapper(StreamAffiliationMapper.class);
+            StreamAffiliation streamAffiliation = new StreamAffiliation();
+            streamAffiliation.setTopicId(1);
+            streamAffiliation.setQueueId(2);
+            streamAffiliation.setStreamId(3);
+            streamAffiliation.setStreamRole(StreamRole.RETRY);
+            streamAffiliation.setGroupId(4);
+            streamAffiliation.setSrcNodeId(5);
+            streamAffiliation.setDstNodeId(6);
+            streamAffiliation.setStatus(AssignmentStatus.ASSIGNED);
+            int rowsAffected = mapper.create(streamAffiliation);
             Assertions.assertEquals(1, rowsAffected);
-            List<Queue> queues = mapper.list(null, null, null);
-            Assertions.assertEquals(1, queues.size());
-            Queue got = queues.get(0);
+            List<StreamAffiliation> streamAffiliations = mapper.list(null, null, null, null);
+            Assertions.assertEquals(1, streamAffiliations.size());
+            StreamAffiliation got = streamAffiliations.get(0);
             Assertions.assertEquals(1, got.getTopicId());
             Assertions.assertEquals(2, got.getQueueId());
             Assertions.assertEquals(3, got.getStreamId());
             Assertions.assertEquals(StreamRole.RETRY, got.getStreamRole());
             Assertions.assertEquals(4, got.getGroupId());
+            Assertions.assertEquals(5, got.getSrcNodeId());
+            Assertions.assertEquals(6, got.getDstNodeId());
+            Assertions.assertEquals(AssignmentStatus.ASSIGNED, got.getStatus());
 
             rowsAffected = mapper.delete(null, null);
             Assertions.assertEquals(1, rowsAffected);

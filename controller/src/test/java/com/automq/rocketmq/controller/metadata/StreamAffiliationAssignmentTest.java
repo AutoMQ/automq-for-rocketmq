@@ -18,7 +18,7 @@
 package com.automq.rocketmq.controller.metadata;
 
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
-import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignmentStatus;
+import com.automq.rocketmq.controller.metadata.database.dao.AssignmentStatus;
 import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper;
 import java.io.IOException;
 import java.util.List;
@@ -26,7 +26,7 @@ import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class QueueAssignmentTest extends DatabaseTestBase {
+public class StreamAffiliationAssignmentTest extends DatabaseTestBase {
 
     @Test
     public void testQueueAssignmentCRUD() throws IOException {
@@ -40,7 +40,7 @@ public class QueueAssignmentTest extends DatabaseTestBase {
             int queueId = 2;
             int srcNodeId = 1;
             int dstNodeId = 2;
-            QueueAssignmentStatus status = QueueAssignmentStatus.ASSIGNABLE;
+            AssignmentStatus status = AssignmentStatus.ASSIGNABLE;
             assignment.setTopicId(topicId);
             assignment.setQueueId(queueId);
             assignment.setSrcNodeId(srcNodeId);
@@ -62,13 +62,13 @@ public class QueueAssignmentTest extends DatabaseTestBase {
             assignments = mapper.list(topicId, null, null, null, null);
             Assertions.assertEquals(1, assignments.size());
 
-            got.setStatus(QueueAssignmentStatus.ASSIGNED);
+            got.setStatus(AssignmentStatus.ASSIGNED);
             affectedRows = mapper.update(got);
             Assertions.assertEquals(1, affectedRows);
 
             assignments = mapper.list(topicId, null, null, null, null);
             got = assignments.get(0);
-            Assertions.assertEquals(got.getStatus(), QueueAssignmentStatus.ASSIGNED);
+            Assertions.assertEquals(got.getStatus(), AssignmentStatus.ASSIGNED);
 
         }
     }

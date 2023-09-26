@@ -28,7 +28,7 @@ public class QueueAssignment {
 
     private int dstNodeId;
 
-    private QueueAssignmentStatus status;
+    private AssignmentStatus status;
 
     private Date createTime;
 
@@ -66,11 +66,11 @@ public class QueueAssignment {
         this.dstNodeId = dstNodeId;
     }
 
-    public QueueAssignmentStatus getStatus() {
+    public AssignmentStatus getStatus() {
         return status;
     }
 
-    public void setStatus(QueueAssignmentStatus status) {
+    public void setStatus(AssignmentStatus status) {
         this.status = status;
     }
 

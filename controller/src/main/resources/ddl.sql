@@ -60,16 +60,21 @@ CREATE TABLE IF NOT EXISTS queue_assignment
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS queue
+CREATE TABLE IF NOT EXISTS stream_affiliation
 (
     topic_id    BIGINT  NOT NULL,
     queue_id    INT     NOT NULL,
     stream_id   BIGINT  NOT NULL,
     stream_role TINYINT NOT NULL DEFAULT 0,
-    group_id    BIGINT
+    group_id    BIGINT,
+    src_node_id INT,
+    dst_node_id INT,
+    status TINYINT,
+    create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
-CREATE UNIQUE INDEX idx_queue_stream_id ON queue (stream_id);
-CREATE UNIQUE INDEX idx_queue ON queue (topic_id, queue_id, stream_role);
+CREATE UNIQUE INDEX idx_queue_stream_id ON stream_affiliation (stream_id);
+CREATE UNIQUE INDEX idx_queue ON stream_affiliation (topic_id, queue_id, stream_role);
 
 CREATE TABLE IF NOT EXISTS consumer_group
 (

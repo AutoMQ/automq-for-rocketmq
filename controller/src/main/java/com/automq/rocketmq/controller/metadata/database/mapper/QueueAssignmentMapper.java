@@ -18,7 +18,7 @@
 package com.automq.rocketmq.controller.metadata.database.mapper;
 
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
-import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignmentStatus;
+import com.automq.rocketmq.controller.metadata.database.dao.AssignmentStatus;
 import java.util.Date;
 import java.util.List;
 import org.apache.ibatis.annotations.Param;
@@ -30,7 +30,7 @@ public interface QueueAssignmentMapper {
     List<QueueAssignment> list(@Param("topicId") Long topicId,
         @Param("srcNodeId") Integer srcNodeId,
         @Param("dstNodeId") Integer dstNodeId,
-        @Param("status") QueueAssignmentStatus status,
+        @Param("status") AssignmentStatus status,
         @Param("updateTime") Date updateTime);
 
     int update(QueueAssignment assignment);
