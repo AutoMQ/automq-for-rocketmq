@@ -83,13 +83,13 @@ public class S3StreamObjectTest extends DatabaseTestBase {
             Assertions.assertEquals(2345, s3StreamObjects1.get(0).getEndOffset());
 
             // test list
-            s3StreamObjects = s3StreamObjectMapper.list(null, s3StreamObject.getStreamId(), 2000L);
+            s3StreamObjects = s3StreamObjectMapper.list(null, s3StreamObject.getStreamId(), 2000L, 2111L, 1);
             Assertions.assertEquals(1, s3StreamObjects.size());
             Assertions.assertEquals(s3StreamObject, s3StreamObjects.get(0));
 
             // test delete
             s3StreamObjectMapper.delete(s3StreamObject1.getId(), null, null);
-            List<S3StreamObject> s3StreamObjects3 = s3StreamObjectMapper.list(null, s3StreamObject1.getStreamId(), null);
+            List<S3StreamObject> s3StreamObjects3 = s3StreamObjectMapper.list(null, s3StreamObject1.getStreamId(), null, null, null);
             Assertions.assertTrue(s3StreamObjects3.isEmpty());
         }
     }
@@ -127,7 +127,7 @@ public class S3StreamObjectTest extends DatabaseTestBase {
             Assertions.assertEquals(s3StreamObject1, s3StreamObject2);
 
             s3StreamObjectMapper.delete(null, s3StreamObject2.getStreamId(), s3StreamObject2.getObjectId());
-            List<S3StreamObject> s3StreamObjects = s3StreamObjectMapper.list(s3StreamObject.getObjectId(), null, null);
+            List<S3StreamObject> s3StreamObjects = s3StreamObjectMapper.list(s3StreamObject.getObjectId(), null, null, null, null);
             Assertions.assertTrue(s3StreamObjects.isEmpty());
         }
     }

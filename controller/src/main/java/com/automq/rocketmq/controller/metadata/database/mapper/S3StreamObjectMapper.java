@@ -28,7 +28,9 @@ public interface S3StreamObjectMapper {
 
     List<S3StreamObject> list(@Param("objectId") Long objectId,
         @Param("streamId") Long streamId,
-        @Param("offset") Long offset);
+        @Param("startOffset") Long startOffset,
+        @Param("endOffset") Long endOffset,
+        @Param("limit") Integer limit);
 
     S3StreamObject getById(long id);
 

@@ -160,12 +160,12 @@ CREATE TABLE IF NOT EXISTS s3streamobject
 CREATE INDEX idx_s3_stream_object_stream_id ON s3streamobject (stream_id, start_offset);
 CREATE UNIQUE INDEX uk_s3_stream_object_object_id ON s3streamobject (object_id);
 
-CREATE TABLE IF NOT EXISTS s3walobject
-(
-    object_id           BIGINT   NOT NULL,
-    broker_id           INT      NOT NULL,
-    sequence_id         BIGINT   NOT NULL,
-    sub_streams         LONGTEXT NOT NULL, -- immutable
+CREATE TABLE IF NOT EXISTS s3walobject (
+    object_id           BIGINT    NOT NULL,
+    object_size         BIGINT    NOT NULL,
+    broker_id           INT       NOT NULL,
+    sequence_id         BIGINT    NOT NULL,
+    sub_streams         LONGTEXT  NOT NULL, -- immutable
     base_data_timestamp BIGINT,
     committed_timestamp BIGINT
 );

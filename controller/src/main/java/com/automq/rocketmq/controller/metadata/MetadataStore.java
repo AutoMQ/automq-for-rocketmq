@@ -19,6 +19,9 @@ package com.automq.rocketmq.controller.metadata;
 
 import apache.rocketmq.controller.v1.GroupType;
 import apache.rocketmq.controller.v1.Topic;
+import apache.rocketmq.controller.v1.S3StreamObject;
+import apache.rocketmq.controller.v1.S3WALObject;
+import apache.rocketmq.controller.v1.StreamMetadata;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
@@ -77,4 +80,24 @@ public interface MetadataStore extends Closeable {
     void commitOffset(long groupId, long topicId, int queueId, long offset) throws ControllerException;
 
     long createGroup(String groupName, int maxRetry, GroupType type, long dlq) throws ControllerException;
+
+    void trimStream(long streamId, long streamEpoch, long newStartOffset) throws ControllerException;
+
+    StreamMetadata openStream(long streamId, long streamEpoch);
+
+    void closeStream(long streamId, long streamEpoch) throws ControllerException;
+
+    List<StreamMetadata> listOpenStreams();
+
+    long prepareS3Objects(int count, int ttlInMinutes);
+
+    void commitWalObject(S3WALObject walObject, List<S3StreamObject> streamObjects, List<Long> compactedObjects);
+
+    void commitStreamObject(S3StreamObject streamObject, List<Long> compactedObjects);
+
+    List<S3WALObject> listWALObjects() throws ControllerException;
+
+    List<S3WALObject> listWALObjects(long streamId, long startOffset, long endOffset, int limit);
+
+    List<S3StreamObject> listStreamObjects(long streamId, long startOffset, long endOffset, int limit);
 }

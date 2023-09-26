@@ -43,4 +43,6 @@ public interface StreamMapper {
         @Param("rangeId") int rangeId,
         @Param("state") int state
     );
+
+    void update(StreamMetadata streamMetadata);
 }
