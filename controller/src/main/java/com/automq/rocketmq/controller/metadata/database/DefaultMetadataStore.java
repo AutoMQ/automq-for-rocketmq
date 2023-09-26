@@ -59,10 +59,8 @@ import com.automq.rocketmq.controller.metadata.database.tasks.LeaseTask;
 import com.automq.rocketmq.controller.metadata.database.tasks.ScanAssignableMessageQueuesTask;
 import com.automq.rocketmq.controller.metadata.database.tasks.ScanNodeTask;
 import com.google.common.base.Strings;
-
 import java.io.IOException;
 import java.util.ArrayList;
-
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
@@ -364,10 +362,8 @@ public class DefaultMetadataStore implements MetadataStore {
                             assignment.setStatus(AssignmentStatus.DELETED);
                             assignmentMapper.update(assignment);
                         });
-
                     StreamAffiliationMapper streamMapper = session.getMapper(StreamAffiliationMapper.class);
-                    streamMapper.update(topicId, null, null, AssignmentStatus.DELETED);
-
+                    streamMapper.update(topicId, null, null, 0, 0, AssignmentStatus.DELETED);
                     session.commit();
                 }
                 this.notifyOnResourceChange(toNotify);
@@ -770,6 +766,77 @@ public class DefaultMetadataStore implements MetadataStore {
             .setCommittedTimestamp(originalObject.getCommittedTimestamp())
             .putAllSubStreams(subStreams)
             .build();
+    }
+
+    @Override
+    public long getOrCreateRetryStream(String groupName, long topicId, int queueId) throws ControllerException {
+        for (; ; ) {
+            if (isLeader()) {
+                try (SqlSession session = getSessionFactory().openSession()) {
+                    if (!maintainLeadershipWithSharedLock(session)) {
+                        continue;
+                    }
+
+                    QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
+                    List<QueueAssignment> assignments = assignmentMapper
+                        .list(topicId, null, null, null, null)
+                        .stream().filter(assignment -> assignment.getStatus() != AssignmentStatus.DELETED)
+                        .toList();
+                    if (assignments.isEmpty()) {
+                        throw new ControllerException(Code.NOT_FOUND_VALUE,
+                            String.format("No message queue found with topic-id=%d, queue-id=%d", topicId, queueId));
+                    }
+                    QueueAssignment assignment = assignments.get(0);
+
+                    GroupMapper groupMapper = session.getMapper(GroupMapper.class);
+
+                    List<Group> groups = groupMapper.list(null, groupName, GroupStatus.ACTIVE, null);
+                    if (groups.isEmpty()) {
+                        throw new ControllerException(Code.NOT_FOUND_VALUE,
+                            String.format("Group '%s' is not found", groupName));
+                    }
+
+                    long groupId = groups.get(0).getId();
+                    StreamAffiliationMapper streamMapper = session.getMapper(StreamAffiliationMapper.class);
+                    List<StreamAffiliation> streams = streamMapper.list(topicId, queueId, groupId, null)
+                        .stream().filter(stream -> stream.getStreamRole() == StreamRole.RETRY).toList();
+                    if (streams.isEmpty()) {
+                        StreamAffiliation stream = new StreamAffiliation();
+                        stream.setTopicId(topicId);
+                        stream.setQueueId(queueId);
+                        stream.setGroupId(groupId);
+                        stream.setStreamRole(StreamRole.RETRY);
+                        stream.setStatus(assignment.getStatus());
+                        stream.setSrcNodeId(assignment.getSrcNodeId());
+                        stream.setDstNodeId(assignment.getDstNodeId());
+                        streamMapper.create(stream);
+                        session.commit();
+                        return stream.getStreamId();
+                    } else {
+                        StreamAffiliation stream = streams.get(0);
+                        if (stream.getStatus() == AssignmentStatus.DELETED) {
+                            streamMapper.update(topicId, queueId, groupId, assignment.getSrcNodeId(),
+                                assignment.getDstNodeId(),
+                                AssignmentStatus.ASSIGNED);
+                            session.commit();
+                        }
+                        return streams.get(0).getStreamId();
+                    }
+                }
+            } else {
+                try {
+                    this.controllerClient.createRetryStream(leaderAddress(), groupName, topicId, queueId).get();
+                } catch (InterruptedException e) {
+                    throw new ControllerException(Code.INTERRUPTED_VALUE, e);
+                } catch (ExecutionException e) {
+                    if (e.getCause() instanceof ControllerException) {
+                        throw (ControllerException) e.getCause();
+                    } else {
+                        throw new ControllerException(Code.INTERNAL_VALUE, e);
+                    }
+                }
+            }
+        }
     }
 
     @Override

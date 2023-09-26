@@ -48,6 +48,9 @@ public interface ControllerClient {
     CompletableFuture<CreateGroupReply> createGroup(String target, CreateGroupRequest request)
         throws ControllerException;
 
+    CompletableFuture<Long> createRetryStream(String target, String groupName, long topicId, int queueId)
+        throws ControllerException;
+
     CompletableFuture<Void> commitOffset(String target, long groupId, long topicId, int queueId,
         long offset) throws ControllerException;
 }

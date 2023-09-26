@@ -100,4 +100,6 @@ public interface MetadataStore extends Closeable {
     List<S3WALObject> listWALObjects(long streamId, long startOffset, long endOffset, int limit);
 
     List<S3StreamObject> listStreamObjects(long streamId, long startOffset, long endOffset, int limit);
+
+    long getOrCreateRetryStream(String groupName, long topicId, int queueId) throws ControllerException;
 }
