@@ -40,14 +40,14 @@ import com.automq.rocketmq.controller.metadata.database.dao.GroupProgress;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import com.automq.rocketmq.controller.metadata.database.dao.AssignmentStatus;
-import com.automq.rocketmq.controller.metadata.database.dao.StreamAffiliation;
+import com.automq.rocketmq.controller.metadata.database.dao.Stream;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
 import com.automq.rocketmq.controller.metadata.database.dao.TopicStatus;
 import com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.GroupProgressMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper;
-import com.automq.rocketmq.controller.metadata.database.mapper.StreamAffiliationMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 import io.grpc.Grpc;
 import io.grpc.InsecureChannelCredentials;
@@ -424,8 +424,8 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
-            StreamAffiliationMapper streamMapper = session.getMapper(StreamAffiliationMapper.class);
-            List<StreamAffiliation> streams = streamMapper.list(topicId, queueId, groupId, null);
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+            List<Stream> streams = streamMapper.list(topicId, queueId, groupId);
             Assertions.assertEquals(1, streams.size());
         }
     }

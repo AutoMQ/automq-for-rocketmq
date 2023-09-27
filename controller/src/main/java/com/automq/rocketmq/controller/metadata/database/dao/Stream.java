@@ -15,18 +15,21 @@
  * limitations under the License.
  */
 
+
 package com.automq.rocketmq.controller.metadata.database.dao;
 
+import apache.rocketmq.controller.v1.StreamState;
 import java.util.Date;
 
-/**
- * Manage stream/queue relationship and its assignment to node.
- *
- * When migrating queues among nodes on demand, the affiliated streams should be reconciled to the same node where its
- * data/ops streams live.
- */
-public class StreamAffiliation {
-    private long streamId;
+public class Stream {
+
+    private long id;
+
+    private long epoch;
+
+    private Integer rangeId;
+
+    private long startOffset;
 
     private long topicId;
 
@@ -37,17 +40,49 @@ public class StreamAffiliation {
     /**
      * If {@link #streamRole} is {@link StreamRole#RETRY}, this field represents owner of this retry queue.
      */
-    private long groupId;
+    private Long groupId;
 
-    private int srcNodeId;
+    private Integer srcNodeId;
 
-    private int dstNodeId;
+    private Integer dstNodeId;
 
-    private AssignmentStatus status;
+    private StreamState state;
 
     private Date createTime;
 
     private Date updateTime;
+
+    public long getId() {
+        return id;
+    }
+
+    public void setId(long id) {
+        this.id = id;
+    }
+
+    public long getEpoch() {
+        return epoch;
+    }
+
+    public void setEpoch(long epoch) {
+        this.epoch = epoch;
+    }
+
+    public Integer getRangeId() {
+        return rangeId;
+    }
+
+    public void setRangeId(Integer rangeId) {
+        this.rangeId = rangeId;
+    }
+
+    public long getStartOffset() {
+        return startOffset;
+    }
+
+    public void setStartOffset(long startOffset) {
+        this.startOffset = startOffset;
+    }
 
     public long getTopicId() {
         return topicId;
@@ -65,14 +100,6 @@ public class StreamAffiliation {
         this.queueId = queueId;
     }
 
-    public long getStreamId() {
-        return streamId;
-    }
-
-    public void setStreamId(long streamId) {
-        this.streamId = streamId;
-    }
-
     public StreamRole getStreamRole() {
         return streamRole;
     }
@@ -81,36 +108,36 @@ public class StreamAffiliation {
         this.streamRole = streamRole;
     }
 
-    public long getGroupId() {
+    public Long getGroupId() {
         return groupId;
     }
 
-    public void setGroupId(long groupId) {
+    public void setGroupId(Long groupId) {
         this.groupId = groupId;
     }
 
-    public int getSrcNodeId() {
+    public Integer getSrcNodeId() {
         return srcNodeId;
     }
 
-    public void setSrcNodeId(int srcNodeId) {
+    public void setSrcNodeId(Integer srcNodeId) {
         this.srcNodeId = srcNodeId;
     }
 
-    public int getDstNodeId() {
+    public Integer getDstNodeId() {
         return dstNodeId;
     }
 
-    public void setDstNodeId(int dstNodeId) {
+    public void setDstNodeId(Integer dstNodeId) {
         this.dstNodeId = dstNodeId;
     }
 
-    public AssignmentStatus getStatus() {
-        return status;
+    public StreamState getState() {
+        return state;
     }
 
-    public void setStatus(AssignmentStatus status) {
-        this.status = status;
+    public void setState(StreamState state) {
+        this.state = state;
     }
 
     public Date getCreateTime() {

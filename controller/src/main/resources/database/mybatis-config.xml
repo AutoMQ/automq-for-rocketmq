@@ -21,13 +21,14 @@
 <configuration>
     <properties resource="database/config.properties">
     </properties>
-    
+
     <settings>
         <setting name="useGeneratedKeys" value="true" />
         <setting name="logImpl" value="SLF4J" />
         <setting name="mapUnderscoreToCamelCase" value="true" />
+        <setting name="jdbcTypeForNull" value="NULL" />
     </settings>
-    
+
     <typeAliases>
         <package name="com.automq.rocketmq.controller.metadata.database.dao"/>
     </typeAliases>
@@ -47,6 +48,8 @@
                      javaType="apache.rocketmq.controller.v1.StreamState" />
         <typeHandler handler="org.apache.ibatis.type.EnumOrdinalTypeHandler"
                      javaType="apache.rocketmq.controller.v1.S3ObjectState" />
+        <typeHandler handler="com.automq.rocketmq.controller.metadata.database.handler.LongTypeHandler"
+                     javaType="java.lang.Long" />
     </typeHandlers>
 
     <environments default="development">
@@ -63,7 +66,6 @@
     <mappers>
         <mapper resource="database/mapper/GroupMapper.xml" />
         <mapper resource="database/mapper/GroupProgressMapper.xml" />
-        <mapper resource="database/mapper/StreamAffiliationMapper.xml" />
         <mapper resource="database/mapper/SubscriptionMapper.xml" />
         <mapper resource="database/mapper/LeaseMapper.xml" />
         <mapper resource="database/mapper/NodeMapper.xml" />

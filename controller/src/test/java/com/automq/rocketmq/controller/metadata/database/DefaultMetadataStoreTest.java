@@ -29,14 +29,14 @@ import com.automq.rocketmq.controller.metadata.database.dao.Lease;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import com.automq.rocketmq.controller.metadata.database.dao.AssignmentStatus;
-import com.automq.rocketmq.controller.metadata.database.dao.StreamAffiliation;
+import com.automq.rocketmq.controller.metadata.database.dao.Stream;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
 import com.automq.rocketmq.controller.metadata.database.dao.TopicStatus;
 import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper;
-import com.automq.rocketmq.controller.metadata.database.mapper.StreamAffiliationMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.S3StreamObjectMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.S3WALObjectMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 
 import java.io.IOException;
@@ -243,8 +243,8 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             List<QueueAssignment> assignments = assignmentMapper.list(topicId, null, null, null, null);
             Assertions.assertEquals(4, assignments.size());
 
-            StreamAffiliationMapper streamMapper = session.getMapper(StreamAffiliationMapper.class);
-            List<StreamAffiliation> streams = streamMapper.list(topicId, null, null, null);
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+            List<Stream> streams = streamMapper.list(topicId, null, null);
             Assertions.assertEquals(queueNum * 2, streams.size());
         }
     }
