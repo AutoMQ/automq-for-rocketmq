@@ -39,8 +39,8 @@ public class S3ObjectTest extends DatabaseTestBase {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
             S3Object s3Object = new S3Object();
-            s3Object.setObjectId(987);
-            s3Object.setObjectSize(555);
+            s3Object.setObjectId(987L);
+            s3Object.setObjectSize(555L);
             s3Object.setState(S3ObjectState.BOS_PREPARED);
 
             Calendar calendar = Calendar.getInstance();
@@ -52,6 +52,7 @@ public class S3ObjectTest extends DatabaseTestBase {
             int affectedRows = s3ObjectMapper.create(s3Object);
             Assertions.assertEquals(1, affectedRows);
             Assertions.assertTrue(s3Object.getId() > 0);
+            s3ObjectMapper.prepare(s3Object);
 
             // test getById
             S3Object s3Object1 = s3ObjectMapper.getById(s3Object.getId());
@@ -84,8 +85,8 @@ public class S3ObjectTest extends DatabaseTestBase {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
             S3Object s3Object = new S3Object();
-            s3Object.setObjectId(987);
-            s3Object.setObjectSize(555);
+            s3Object.setObjectId(987L);
+            s3Object.setObjectSize(555L);
             s3Object.setState(S3ObjectState.BOS_PREPARED);
 
             Calendar calendar = Calendar.getInstance();
@@ -118,8 +119,8 @@ public class S3ObjectTest extends DatabaseTestBase {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
             S3Object s3Object = new S3Object();
-            s3Object.setObjectId(987);
-            s3Object.setObjectSize(555);
+            s3Object.setObjectId(987L);
+            s3Object.setObjectSize(555L);
             s3Object.setState(S3ObjectState.BOS_PREPARED);
 
             Calendar calendar = Calendar.getInstance();

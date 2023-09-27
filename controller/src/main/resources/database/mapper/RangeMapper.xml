@@ -48,7 +48,7 @@
                 end_offset = #{endOffset},
             </if>
             <if test="null != brokerId">
-                brokerId = #{brokerId},
+                broker_id = #{brokerId},
             </if>
         </set>
         WHERE 1 = 1

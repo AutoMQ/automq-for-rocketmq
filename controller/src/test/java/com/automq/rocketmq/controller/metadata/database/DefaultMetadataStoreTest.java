@@ -685,9 +685,9 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Range range = new Range();
             range.setRangeId(0);
             range.setStreamId(streamId);
-            range.setEpoch(1);
-            range.setStartOffset(1234);
-            range.setEndOffset(2345);
+            range.setEpoch(1L);
+            range.setStartOffset(1234L);
+            range.setEndOffset(2345L);
             range.setBrokerId(1);
             rangeMapper.create(range);
             session.commit();
@@ -737,6 +737,72 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
             streamMapper.delete(streamId);
             session.commit();
+        }
+
+    }
+
+
+    @Test
+    public void testTrimStream() throws IOException {
+        long streamId,streamEpoch = 1, newStartOffset = 2000;
+        int nodeId = 1, rangId = 0;
+        try (SqlSession session = this.getSessionFactory().openSession()) {
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+            RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
+
+            com.automq.rocketmq.controller.metadata.database.dao.Stream stream = new com.automq.rocketmq.controller.metadata.database.dao.Stream();
+            stream.setSrcNodeId(nodeId);
+            stream.setDstNodeId(nodeId);
+            stream.setStartOffset(1234);
+            stream.setEpoch(0);
+            stream.setRangeId(rangId);
+            stream.setState(StreamState.OPEN);
+            stream.setStreamRole(StreamRole.DATA);
+            streamMapper.create(stream);
+            streamId = stream.getId();
+
+            Range range = new Range();
+            range.setRangeId(rangId);
+            range.setStreamId(streamId);
+            range.setEpoch(0L);
+            range.setStartOffset(1234L);
+            range.setEndOffset(2345L);
+            range.setBrokerId(nodeId);
+            rangeMapper.create(range);
+
+            session.commit();
+        }
+
+
+        ControllerConfig config = Mockito.mock(ControllerConfig.class);
+        Mockito.when(config.nodeId()).thenReturn(nodeId);
+        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
+        Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
+        try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            metadataStore.start();
+            Awaitility.await().with().atMost(10, TimeUnit.SECONDS).pollInterval(100, TimeUnit.MILLISECONDS)
+                .until(metadataStore::isLeader);
+
+            metadataStore.trimStream(streamId, streamEpoch, newStartOffset);
+        } catch (ControllerException e) {
+            Assertions.fail(e);
+        }
+
+        try (SqlSession session = this.getSessionFactory().openSession()) {
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+            Stream stream = streamMapper.getByStreamId(streamId);
+            Assertions.assertEquals(newStartOffset, stream.getStartOffset());
+            Assertions.assertEquals(nodeId, stream.getSrcNodeId());
+            Assertions.assertEquals(nodeId, stream.getDstNodeId());
+            Assertions.assertEquals(0, stream.getRangeId());
+
+            RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
+            Range range = rangeMapper.getByRangeId(rangId);
+            Assertions.assertEquals(newStartOffset, range.getStartOffset());
+            Assertions.assertEquals(2345, range.getEndOffset());
+            Assertions.assertEquals(nodeId, range.getBrokerId());
+            Assertions.assertEquals(streamId, range.getStreamId());
         }
 
     }

@@ -21,12 +21,10 @@
 <mapper namespace="com.automq.rocketmq.controller.metadata.database.mapper.S3ObjectMapper">
 
     <insert id="create" parameterType="S3Object" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
-        INSERT INTO s3object (object_id, object_size, prepared_timestamp, expired_timestamp, state)
+        INSERT INTO s3object (object_id, object_size, state)
         VALUES (
             #{objectId},
             #{objectSize},
-            #{preparedTimestamp},
-            #{expiredTimestamp},
             #{state}
         )
     </insert>
@@ -60,6 +58,18 @@
     <update id="deleteDangerous">
         DELETE FROM s3object
         WHERE 1 = 1
+    </update>
+
+    <update id="prepare" parameterType="S3Object">
+        UPDATE s3object
+        SET prepared_timestamp = #{preparedTimestamp}, expired_timestamp = #{expiredTimestamp}
+        WHERE 1 = 1
+        <if test="null != id">
+            AND id = #{id}
+        </if>
+        <if test="null != objectId">
+            AND object_id = #{objectId}
+        </if>
     </update>
 
     <update id="expired" parameterType="S3Object">

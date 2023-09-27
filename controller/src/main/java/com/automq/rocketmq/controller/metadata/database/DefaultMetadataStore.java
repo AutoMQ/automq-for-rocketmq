@@ -27,11 +27,9 @@ import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.OngoingMessageQueueReassignment;
 import apache.rocketmq.controller.v1.OpenStreamReply;
 import apache.rocketmq.controller.v1.OpenStreamRequest;
-import apache.rocketmq.controller.v1.S3StreamObject;
-import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamState;
-import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.SubStream;
+import apache.rocketmq.controller.v1.TrimStreamRequest;
 import com.automq.rocketmq.common.PrefixThreadFactory;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.BrokerNode;
@@ -47,6 +45,7 @@ import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import com.automq.rocketmq.controller.metadata.database.dao.AssignmentStatus;
 import com.automq.rocketmq.controller.metadata.database.dao.Stream;
+import com.automq.rocketmq.controller.metadata.database.dao.S3Object;
 import com.automq.rocketmq.controller.metadata.database.dao.StreamRole;
 import com.automq.rocketmq.controller.metadata.database.dao.Range;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
@@ -56,6 +55,7 @@ import com.automq.rocketmq.controller.metadata.database.mapper.GroupProgressMapp
 import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.LeaseMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.S3ObjectMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.S3StreamObjectMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.S3WALObjectMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.RangeMapper;
@@ -664,11 +664,134 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     public void trimStream(long streamId, long streamEpoch, long newStartOffset) throws ControllerException {
+        for (; ; ) {
+            if (this.isLeader()) {
+                try (SqlSession session = this.sessionFactory.openSession(false)) {
+                    if (!maintainLeadershipWithSharedLock(session)) {
+                        continue;
+                    }
+                    StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+                    RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
+                    S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
+                    S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
+                    S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
 
+                    Stream stream = streamMapper.getByStreamId(streamId);
+                    if (null == stream) {
+                        throw new ControllerException(Code.NOT_FOUND_VALUE,
+                            String.format("Stream[stream-id=%d] is not found", streamId)
+                        );
+                    }
+                    if (stream.getState() == StreamState.CLOSED) {
+                        LOGGER.warn("Stream[{}]‘s state is CLOSED, can't trim", streamId);
+                        return;
+                    }
+                    if (stream.getStartOffset() > newStartOffset) {
+                        LOGGER.warn("Stream[{}]‘s start offset {} is larger than request new start offset {}",
+                            streamId, stream.getStartOffset(), newStartOffset);
+                        return;
+                    }
+                    if (stream.getStartOffset() == newStartOffset) {
+                        // regard it as redundant trim operation, just return success
+                        return;
+                    }
+
+                    // now the request is valid
+                    // update the stream metadata start offset
+                    stream.setEpoch(streamEpoch);
+                    stream.setStartOffset(newStartOffset);
+                    streamMapper.update(stream);
+
+                    // remove range or update range's start offset
+                    rangeMapper.listByStreamId(streamId).stream().forEach(range -> {
+                        if (newStartOffset <= range.getStartOffset()) {
+                            return;
+                        }
+                        if (stream.getRangeId() == range.getRangeId()) {
+                            // current range, update start offset
+                            // if current range is [50, 100)
+                            // 1. try to trim to 40, then current range will be [50, 100)
+                            // 2. try to trim to 60, then current range will be [60, 100)
+                            // 3. try to trim to 100, then current range will be [100, 100)
+                            // 4. try to trim to 110, then current range will be [100, 100)
+                            long newRangeStartOffset = newStartOffset < range.getEndOffset() ? newStartOffset : range.getEndOffset();
+                            range.setStartOffset(newRangeStartOffset);
+                            rangeMapper.update(range);
+                            return;
+                        }
+                        if (newStartOffset >= range.getEndOffset()) {
+                            // remove range
+                            rangeMapper.delete(range.getRangeId(), streamId);
+                            return;
+                        }
+                        // update range's start offset
+                        range.setStartOffset(newStartOffset);
+                        rangeMapper.update(range);
+                    });
+                    // remove stream object
+                    s3StreamObjectMapper.listByStreamId(streamId).stream().forEach(streamObject -> {
+                        long streamStartOffset = streamObject.getStartOffset();
+                        long streamEndOffset = streamObject.getEndOffset();
+                        if (newStartOffset <= streamStartOffset) {
+                            return;
+                        }
+                        if (newStartOffset >= streamEndOffset) {
+                            // stream object
+                            s3StreamObjectMapper.delete(null, streamId, streamObject.getObjectId());
+                            // markDestroyObjects
+                            S3Object s3Object = s3ObjectMapper.getByObjectId(streamObject.getObjectId());
+                            s3Object.setMarkedForDeletionTimestamp(System.currentTimeMillis());
+                            s3ObjectMapper.delete(s3Object);
+                        }
+                    });
+
+                    // remove wal object or remove sub-stream range in wal object
+                    s3WALObjectMapper.list(stream.getDstNodeId(),null).stream()
+                        .map(s3WALObject -> {
+                            Map<Long, SubStream> subStreams = gson.fromJson(new String(s3WALObject.getSubStreams().getBytes(StandardCharsets.UTF_8)), new TypeToken<Map<Long, SubStream>>() {
+                            }.getType());
+                            return buildS3WALObject(s3WALObject, subStreams);
+                        })
+                        .filter(s3WALObject -> s3WALObject.getSubStreamsMap().containsKey(streamId))
+                        .filter(s3WALObject -> s3WALObject.getSubStreamsMap().get(streamId).getEndOffset() <= newStartOffset)
+                        .forEach(s3WALObject -> {
+                            if (s3WALObject.getSubStreamsMap().size() == 1) {
+                                // only this range, but we will remove this range, so now we can remove this wal object
+                                S3Object s3Object = s3ObjectMapper.getByObjectId(s3WALObject.getObjectId());
+                                s3Object.setMarkedForDeletionTimestamp(System.currentTimeMillis());
+                                s3ObjectMapper.delete(s3Object);
+                            }
+
+                            // remove offset range about substream ...
+                        });
+                    session.commit();
+                    LOGGER.info("Node[node-id={}] trim stream [stream-id={}] with epoch={} and newStartOffset={}",
+                        this.lease.getNodeId(), streamId, streamEpoch, newStartOffset);
+                }
+            } else {
+                TrimStreamRequest request = TrimStreamRequest.newBuilder()
+                    .setStreamId(streamId)
+                    .setStreamEpoch(streamEpoch)
+                    .setNewStartOffset(newStartOffset)
+                    .build();
+                try {
+                    this.controllerClient.trimStream(this.leaderAddress(), request).get();
+                } catch (InterruptedException e) {
+                    throw new ControllerException(Code.INTERRUPTED_VALUE, e);
+                } catch (ExecutionException e) {
+                    if (e.getCause() instanceof ControllerException) {
+                        throw (ControllerException) e.getCause();
+                    }
+                    throw new ControllerException(Code.INTERNAL_VALUE, e);
+                }
+            }
+            break;
+        }
     }
 
+
     @Override
-    public StreamMetadata openStream(long streamId, long streamEpoch) throws ControllerException {
+    public apache.rocketmq.controller.v1.StreamMetadata openStream(long streamId, long streamEpoch) throws ControllerException {
         for (; ; ) {
             if (isLeader()) {
                 try (SqlSession session = getSessionFactory().openSession()) {
@@ -721,8 +844,7 @@ public class DefaultMetadataStore implements MetadataStore {
                             metadata.setStartOffset(stream.getStartOffset());
                             metadata.setState(StreamState.OPEN);
                             streamMapper.create(metadata);
-
-                            return StreamMetadata.newBuilder()
+                            return apache.rocketmq.controller.v1.StreamMetadata.newBuilder()
                                 .setStreamId(streamId)
                                 .setEpoch(streamEpoch)
                                 .setRangeId(stream.getRangeId())
@@ -735,7 +857,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     // Make open reentrant
                     if (stream.getState() == StreamState.OPEN) {
                         LOGGER.warn("Stream[stream-id={}] is already OPEN with epoch={}", streamId, stream.getEpoch());
-                        return StreamMetadata.newBuilder()
+                        return apache.rocketmq.controller.v1.StreamMetadata.newBuilder()
                             .setStreamId(streamId)
                             .setEpoch(streamEpoch)
                             .setRangeId(stream.getRangeId())
@@ -774,7 +896,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     // Commit transaction
                     session.commit();
 
-                    return StreamMetadata.newBuilder()
+                    return apache.rocketmq.controller.v1.StreamMetadata.newBuilder()
                         .setStreamId(streamId)
                         .setEpoch(streamEpoch)
                         .setRangeId(rangeId)
@@ -854,9 +976,8 @@ public class DefaultMetadataStore implements MetadataStore {
             break;
         }
     }
-
     @Override
-    public List<StreamMetadata> listOpenStreams() {
+    public List<apache.rocketmq.controller.v1.StreamMetadata> listOpenStreams() {
         return null;
     }
 
@@ -866,19 +987,17 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public void commitWalObject(S3WALObject walObject, List<S3StreamObject> streamObjects,
-        List<Long> compactedObjects) {
+    public void commitWalObject(apache.rocketmq.controller.v1.S3WALObject walObject, List<apache.rocketmq.controller.v1.S3StreamObject> streamObjects, List<Long> compactedObjects) {
 
     }
 
     @Override
-    public void commitStreamObject(S3StreamObject streamObject,
-        List<Long> compactedObjects) {
+    public void commitStreamObject(apache.rocketmq.controller.v1.S3StreamObject streamObject, List<Long> compactedObjects) {
 
     }
 
     @Override
-    public List<S3WALObject> listWALObjects() {
+    public List<apache.rocketmq.controller.v1.S3WALObject> listWALObjects() {
         try (SqlSession session = this.sessionFactory.openSession()) {
             S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
             return s3WALObjectMapper.list(this.lease.getNodeId(), null).stream()
@@ -893,8 +1012,7 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public List<S3WALObject> listWALObjects(long streamId, long startOffset,
-        long endOffset, int limit) {
+    public List<apache.rocketmq.controller.v1.S3WALObject> listWALObjects(long streamId, long startOffset, long endOffset, int limit) {
         try (SqlSession session = this.sessionFactory.openSession()) {
             S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
             List<com.automq.rocketmq.controller.metadata.database.dao.S3WALObject> s3WALObjects = s3WALObjectMapper.list(this.lease.getNodeId(), null);
@@ -924,12 +1042,12 @@ public class DefaultMetadataStore implements MetadataStore {
         }
     }
 
-    public List<S3StreamObject> listStreamObjects(long streamId, long startOffset,
+    public List<apache.rocketmq.controller.v1.S3StreamObject> listStreamObjects(long streamId, long startOffset,
         long endOffset, int limit) {
         try (SqlSession session = this.sessionFactory.openSession()) {
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
             return s3StreamObjectMapper.list(null, streamId, startOffset, endOffset, limit).stream()
-                .map(streamObject -> S3StreamObject.newBuilder()
+                .map(streamObject -> apache.rocketmq.controller.v1.S3StreamObject.newBuilder()
                     .setStreamId(streamObject.getStreamId())
                     .setObjectSize(streamObject.getObjectSize())
                     .setObjectId(streamObject.getObjectId())
@@ -942,10 +1060,9 @@ public class DefaultMetadataStore implements MetadataStore {
         }
     }
 
-    private S3WALObject buildS3WALObject(
-        com.automq.rocketmq.controller.metadata.database.dao.S3WALObject originalObject,
-        Map<Long, SubStream> subStreams) {
-        return S3WALObject.newBuilder()
+
+    private apache.rocketmq.controller.v1.S3WALObject buildS3WALObject(com.automq.rocketmq.controller.metadata.database.dao.S3WALObject originalObject, Map<Long, SubStream> subStreams) {
+        return apache.rocketmq.controller.v1.S3WALObject.newBuilder()
             .setObjectId(originalObject.getObjectId())
             .setObjectSize(originalObject.getObjectSize())
             .setBrokerId(originalObject.getBrokerId())

@@ -37,10 +37,10 @@ public class RangeTest extends DatabaseTestBase {
             RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
             Range range = new Range();
             range.setRangeId(22);
-            range.setStreamId(11);
-            range.setEpoch(1);
-            range.setStartOffset(1234);
-            range.setEndOffset(2345);
+            range.setStreamId(11L);
+            range.setEpoch(1L);
+            range.setStartOffset(1234L);
+            range.setEndOffset(2345L);
             range.setBrokerId(33);
 
             int affectedRows = rangeMapper.create(range);

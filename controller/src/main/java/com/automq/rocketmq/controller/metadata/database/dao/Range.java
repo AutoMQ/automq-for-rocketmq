@@ -21,73 +21,73 @@ import java.util.Objects;
 
 public class Range {
 
-    long id;
+    Long id;
 
-    int rangeId;
+    Integer rangeId;
 
-    long streamId;
+    Long streamId;
 
-    long epoch;
+    Long epoch;
 
-    long startOffset;
+    Long startOffset;
 
-    long endOffset;
+    Long endOffset;
 
-    int brokerId;
+    Integer brokerId;
 
-    public long getId() {
+    public Long getId() {
         return id;
     }
 
-    public void setId(long id) {
+    public void setId(Long id) {
         this.id = id;
     }
 
-    public int getRangeId() {
+    public Integer getRangeId() {
         return rangeId;
     }
 
-    public void setRangeId(int rangeId) {
+    public void setRangeId(Integer rangeId) {
         this.rangeId = rangeId;
     }
 
-    public long getStreamId() {
+    public Long getStreamId() {
         return streamId;
     }
 
-    public void setStreamId(long streamId) {
+    public void setStreamId(Long streamId) {
         this.streamId = streamId;
     }
 
-    public long getEpoch() {
+    public Long getEpoch() {
         return epoch;
     }
 
-    public void setEpoch(long epoch) {
+    public void setEpoch(Long epoch) {
         this.epoch = epoch;
     }
 
-    public long getStartOffset() {
+    public Long getStartOffset() {
         return startOffset;
     }
 
-    public void setStartOffset(long startOffset) {
+    public void setStartOffset(Long startOffset) {
         this.startOffset = startOffset;
     }
 
-    public long getEndOffset() {
+    public Long getEndOffset() {
         return endOffset;
     }
 
-    public void setEndOffset(long endOffset) {
+    public void setEndOffset(Long endOffset) {
         this.endOffset = endOffset;
     }
 
-    public int getBrokerId() {
+    public Integer getBrokerId() {
         return brokerId;
     }
 
-    public void setBrokerId(int brokerId) {
+    public void setBrokerId(Integer brokerId) {
         this.brokerId = brokerId;
     }
 
@@ -96,7 +96,7 @@ public class Range {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Range range = (Range) o;
-        return id == range.id && rangeId == range.rangeId && streamId == range.streamId && epoch == range.epoch && startOffset == range.startOffset && endOffset == range.endOffset && brokerId == range.brokerId;
+        return Objects.equals(id, range.id) && Objects.equals(rangeId, range.rangeId) && Objects.equals(streamId, range.streamId) && Objects.equals(epoch, range.epoch) && Objects.equals(startOffset, range.startOffset) && Objects.equals(endOffset, range.endOffset) && Objects.equals(brokerId, range.brokerId);
     }
 
     @Override
