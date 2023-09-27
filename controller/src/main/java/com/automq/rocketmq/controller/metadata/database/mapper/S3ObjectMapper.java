@@ -40,4 +40,6 @@ public interface S3ObjectMapper {
 
     List<S3Object> list(@Param("state") String state,
         @Param("expiredTimestamp") Long expiredTimestamp);
+
+    int prepare(S3Object s3Object);
 }

@@ -69,7 +69,9 @@ import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.google.protobuf.TextFormat;
 import io.grpc.stub.StreamObserver;
+
 import java.util.List;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -356,7 +358,24 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
 
     @Override
     public void trimStream(TrimStreamRequest request, StreamObserver<TrimStreamReply> responseObserver) {
-        super.trimStream(request, responseObserver);
+        try {
+            metadataStore.trimStream(request.getStreamId(), request.getStreamEpoch(), request.getNewStartOffset());
+            TrimStreamReply reply = TrimStreamReply.newBuilder()
+                .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                .build();
+            responseObserver.onNext(reply);
+            responseObserver.onCompleted();
+        } catch (ControllerException e) {
+            TrimStreamReply reply = TrimStreamReply.newBuilder()
+                .setStatus(Status.newBuilder()
+                    .setCode(Code.forNumber(e.getErrorCode()))
+                    .setMessage(e.getMessage()).build())
+                .build();
+            responseObserver.onNext(reply);
+            responseObserver.onCompleted();
+        } catch (Throwable e) {
+            responseObserver.onError(e);
+        }
     }
 
     @Override

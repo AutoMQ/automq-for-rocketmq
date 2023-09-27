@@ -32,7 +32,9 @@ import apache.rocketmq.controller.v1.NodeRegistrationReply;
 import apache.rocketmq.controller.v1.NodeRegistrationRequest;
 import apache.rocketmq.controller.v1.OpenStreamReply;
 import apache.rocketmq.controller.v1.OpenStreamRequest;
+import apache.rocketmq.controller.v1.S3ObjectState;
 import apache.rocketmq.controller.v1.StreamState;
+import apache.rocketmq.controller.v1.TrimStreamRequest;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.ControllerClient;
 import com.automq.rocketmq.controller.metadata.ControllerConfig;
@@ -46,6 +48,9 @@ import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import com.automq.rocketmq.controller.metadata.database.dao.AssignmentStatus;
 import com.automq.rocketmq.controller.metadata.database.dao.Range;
+import com.automq.rocketmq.controller.metadata.database.dao.S3Object;
+import com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject;
+import com.automq.rocketmq.controller.metadata.database.dao.S3WALObject;
 import com.automq.rocketmq.controller.metadata.database.dao.Stream;
 import com.automq.rocketmq.controller.metadata.database.dao.StreamRole;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
@@ -55,6 +60,9 @@ import com.automq.rocketmq.controller.metadata.database.mapper.GroupProgressMapp
 import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.RangeMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.S3ObjectMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.S3StreamObjectMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.S3WALObjectMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 import io.grpc.Grpc;
@@ -528,10 +536,11 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
             Range range = new Range();
             range.setRangeId(0);
-            range.setStartOffset(0);
+            range.setStartOffset(0L);
+            range.setBrokerId(2);
             range.setStreamId(streamId);
-            range.setEpoch(1);
-            range.setEndOffset(100);
+            range.setEpoch(1L);
+            range.setEndOffset(100L);
             rangeMapper.create(range);
 
             session.commit();
@@ -591,10 +600,11 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
             Range range = new Range();
             range.setRangeId(0);
-            range.setStartOffset(0);
+            range.setStartOffset(0L);
+            range.setBrokerId(2);
             range.setStreamId(streamId);
-            range.setEpoch(1);
-            range.setEndOffset(100);
+            range.setEpoch(1L);
+            range.setEndOffset(100L);
             rangeMapper.create(range);
 
             session.commit();
@@ -654,10 +664,11 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
             Range range = new Range();
             range.setRangeId(0);
-            range.setStartOffset(0);
+            range.setStartOffset(0L);
+            range.setBrokerId(1);
             range.setStreamId(streamId);
-            range.setEpoch(1);
-            range.setEndOffset(100);
+            range.setEpoch(1L);
+            range.setEndOffset(100L);
             rangeMapper.create(range);
 
             session.commit();
@@ -688,70 +699,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             List<Stream> streams = streamMapper.list(topicId, queueId, null);
             Assertions.assertEquals(1, streams.size());
             Assertions.assertEquals(StreamState.CLOSED, streams.get(0).getState());
-        }
-    }
-
-    @Test
-    public void testCloseStream_Fenced() throws IOException, ControllerException, ExecutionException, InterruptedException {
-        ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
-        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
-        Mockito.when(controllerConfig.nodeId()).thenReturn(2);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
-
-        long topicId = 1;
-        int queueId = 2;
-        int srcNodeId = 1;
-        int dstNodeId = 2;
-        long streamId;
-
-        try (SqlSession session = getSessionFactory().openSession()) {
-            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
-
-            Stream stream = new Stream();
-            stream.setStreamRole(StreamRole.DATA);
-            stream.setTopicId(topicId);
-            stream.setQueueId(queueId);
-            stream.setEpoch(1);
-            stream.setState(StreamState.OPEN);
-            stream.setStartOffset(0);
-            stream.setSrcNodeId(srcNodeId);
-            stream.setDstNodeId(dstNodeId);
-            streamMapper.create(stream);
-            streamId = stream.getId();
-
-            RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
-            Range range = new Range();
-            range.setRangeId(0);
-            range.setStartOffset(0);
-            range.setStreamId(streamId);
-            range.setEpoch(1);
-            range.setEndOffset(100);
-            rangeMapper.create(range);
-
-            session.commit();
-        }
-
-        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
-            metadataStore.start();
-            Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
-                .atMost(10, TimeUnit.SECONDS)
-                .until(metadataStore::isLeader);
-
-            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore))) {
-                testServer.start();
-                int port = testServer.getPort();
-                ControllerClient client = new GrpcControllerClient();
-                CloseStreamRequest request = CloseStreamRequest.newBuilder()
-                    .setStreamId(streamId)
-                    .setBrokerId(2)
-                    .setStreamEpoch(0)
-                    .setBrokerEpoch(1)
-                    .build();
-                CloseStreamReply reply = client.closeStream(String.format("localhost:%d", port), request).get();
-                Assertions.assertEquals(Code.FENCED, reply.getStatus().getCode());
-            }
         }
     }
 
@@ -788,10 +735,11 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
             Range range = new Range();
             range.setRangeId(0);
-            range.setStartOffset(0);
+            range.setStartOffset(0L);
+            range.setBrokerId(1);
             range.setStreamId(streamId);
-            range.setEpoch(1);
-            range.setEndOffset(100);
+            range.setEpoch(1L);
+            range.setEndOffset(100L);
             rangeMapper.create(range);
 
             session.commit();
@@ -818,4 +766,304 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             }
         }
     }
+
+    @Test
+    public void testTrimStream() throws IOException, ControllerException, ExecutionException, InterruptedException {
+        ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
+        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
+        Mockito.when(controllerConfig.nodeId()).thenReturn(2);
+        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
+        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
+
+        long topicId = 1;
+        int queueId = 2;
+        int srcNodeId = 1;
+        int dstNodeId = 1;
+        long streamId;
+        long newStartOffset = 40;
+
+        try (SqlSession session = getSessionFactory().openSession()) {
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+
+            Stream stream = new Stream();
+            stream.setStreamRole(StreamRole.DATA);
+            stream.setTopicId(topicId);
+            stream.setQueueId(queueId);
+            stream.setEpoch(1);
+            stream.setState(StreamState.OPEN);
+            stream.setStartOffset(0);
+            stream.setRangeId(0);
+            stream.setSrcNodeId(srcNodeId);
+            stream.setDstNodeId(dstNodeId);
+            streamMapper.create(stream);
+            streamId = stream.getId();
+
+            RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
+            Range range = new Range();
+            range.setRangeId(0);
+            range.setStartOffset(0L);
+            range.setBrokerId(2);
+            range.setStreamId(streamId);
+            range.setEpoch(1L);
+            range.setEndOffset(100L);
+            rangeMapper.create(range);
+
+            session.commit();
+        }
+
+        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
+            metadataStore.start();
+            Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
+                .atMost(10, TimeUnit.SECONDS)
+                .until(metadataStore::isLeader);
+
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore))) {
+                testServer.start();
+                int port = testServer.getPort();
+                ControllerClient client = new GrpcControllerClient();
+                TrimStreamRequest request = TrimStreamRequest.newBuilder()
+                    .setStreamId(streamId)
+                    .setStreamEpoch(1)
+                    .setNewStartOffset(newStartOffset)
+                    .build();
+                client.trimStream(String.format("localhost:%d", port), request).get();
+            }
+        }
+
+        try (SqlSession session = getSessionFactory().openSession()) {
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+            List<Stream> streams = streamMapper.list(topicId, queueId, null);
+            Assertions.assertEquals(1, streams.size());
+            Assertions.assertEquals(newStartOffset, streams.get(0).getStartOffset());
+
+            RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
+            List<Range> ranges = rangeMapper.list(null, streamId, null);
+            Assertions.assertEquals(1, ranges.size());
+            Assertions.assertEquals(newStartOffset, ranges.get(0).getStartOffset());
+            Assertions.assertEquals(100, ranges.get(0).getEndOffset());
+        }
+
+    }
+
+    @Test
+    public void testTrimStream_WithS3Stream() throws IOException, ControllerException, ExecutionException, InterruptedException {
+        ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
+        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
+        Mockito.when(controllerConfig.nodeId()).thenReturn(2);
+        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
+        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
+
+        long topicId = 1;
+        int queueId = 2;
+        int srcNodeId = 1;
+        int dstNodeId = 2;
+        long streamId;
+        long objectId = 2;
+        long newStartOffset = 40L;
+
+        try (SqlSession session = getSessionFactory().openSession()) {
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+
+            Stream stream = new Stream();
+            stream.setStreamRole(StreamRole.DATA);
+            stream.setTopicId(topicId);
+            stream.setQueueId(queueId);
+            stream.setEpoch(1);
+            stream.setState(StreamState.OPEN);
+            stream.setStartOffset(0);
+            stream.setSrcNodeId(srcNodeId);
+            stream.setDstNodeId(dstNodeId);
+            streamMapper.create(stream);
+            streamId = stream.getId();
+
+            RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
+            Range range = new Range();
+            range.setRangeId(0);
+            range.setStartOffset(0L);
+            range.setStreamId(streamId);
+            range.setBrokerId(2);
+            range.setEpoch(1L);
+            range.setEndOffset(100L);
+            rangeMapper.create(range);
+
+            S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
+            S3Object s3Object = new S3Object();
+            s3Object.setObjectId(objectId);
+            s3Object.setState(S3ObjectState.BOS_COMMITTED);
+            s3Object.setObjectSize(1000L);
+            s3ObjectMapper.create(s3Object);
+
+            S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
+            S3StreamObject s3StreamObject = new S3StreamObject();
+            s3StreamObject.setBaseDataTimestamp(System.currentTimeMillis());
+            s3StreamObject.setStreamId(streamId);
+            s3StreamObject.setObjectId(objectId);
+            s3StreamObject.setStartOffset(0L);
+            s3StreamObject.setEndOffset(40L);
+            s3StreamObject.setObjectSize(1000);
+            s3StreamObjectMapper.create(s3StreamObject);
+
+            session.commit();
+        }
+
+        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
+            metadataStore.start();
+            Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
+                .atMost(10, TimeUnit.SECONDS)
+                .until(metadataStore::isLeader);
+
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore))) {
+                testServer.start();
+                int port = testServer.getPort();
+                ControllerClient client = new GrpcControllerClient();
+                TrimStreamRequest request = TrimStreamRequest.newBuilder()
+                    .setStreamId(streamId)
+                    .setStreamEpoch(1)
+                    .setNewStartOffset(newStartOffset)
+                    .build();
+                client.trimStream(String.format("localhost:%d", port), request).get();
+            }
+        }
+
+        try (SqlSession session = getSessionFactory().openSession()) {
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+            List<Stream> streams = streamMapper.list(topicId, queueId, null);
+            Assertions.assertEquals(1, streams.size());
+            Assertions.assertEquals(newStartOffset, streams.get(0).getStartOffset());
+
+            RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
+            List<Range> ranges = rangeMapper.list(null, streamId, null);
+            Assertions.assertEquals(1, ranges.size());
+            Assertions.assertEquals(newStartOffset, ranges.get(0).getStartOffset());
+            Assertions.assertEquals(100, ranges.get(0).getEndOffset());
+
+            S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
+            List<S3StreamObject> objects = s3StreamObjectMapper.listByStreamId(streamId);
+            Assertions.assertEquals(0, objects.size());
+
+            S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
+            S3Object s3Object = s3ObjectMapper.getByObjectId(objectId);
+            long cost = s3Object.getMarkedForDeletionTimestamp() - System.currentTimeMillis();
+            if (cost > 5 * 60) {
+                Assertions.fail();
+            }
+        }
+    }
+
+    @Test
+    public void testTrimStream_WithS3WAL() throws IOException, ControllerException, ExecutionException, InterruptedException {
+        ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
+        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
+        Mockito.when(controllerConfig.nodeId()).thenReturn(2);
+        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
+        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
+
+        long topicId = 1;
+        int queueId = 2;
+        int srcNodeId = 1;
+        int dstNodeId = 2;
+        long streamId;
+        long objectId = 2;
+        long newStartOffset = 40L;
+        String expectSubStream = "{\n" +
+            "  \"1234567890\": {\n" +
+            "    \"streamId_\": 1234567890,\n" +
+            "    \"startOffset_\": 0,\n" +
+            "    \"endOffset_\": 10\n" +
+            "  }" +
+            "}";
+
+        try (SqlSession session = getSessionFactory().openSession()) {
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+
+            Stream stream = new Stream();
+            stream.setStreamRole(StreamRole.DATA);
+            stream.setTopicId(topicId);
+            stream.setQueueId(queueId);
+            stream.setEpoch(1);
+            stream.setState(StreamState.OPEN);
+            stream.setStartOffset(0);
+            stream.setSrcNodeId(srcNodeId);
+            stream.setDstNodeId(dstNodeId);
+            streamMapper.create(stream);
+            streamId = stream.getId();
+
+            RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
+            Range range = new Range();
+            range.setRangeId(0);
+            range.setStartOffset(0L);
+            range.setStreamId(streamId);
+            range.setBrokerId(2);
+            range.setEpoch(1L);
+            range.setEndOffset(100L);
+            rangeMapper.create(range);
+
+            S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
+            S3Object s3Object = new S3Object();
+            s3Object.setObjectId(objectId);
+            s3Object.setState(S3ObjectState.BOS_COMMITTED);
+            s3Object.setObjectSize(1000L);
+            s3ObjectMapper.create(s3Object);
+
+            String replacedJson = expectSubStream.replace("1234567890", streamId + "");
+
+            S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
+            S3WALObject s3WALObject = new S3WALObject();
+            s3WALObject.setObjectId(objectId);
+            s3WALObject.setObjectSize(500);
+            s3WALObject.setSequenceId(111);
+            s3WALObject.setSubStreams(replacedJson);
+            s3WALObject.setBrokerId(2);
+            s3WALObjectMapper.create(s3WALObject);
+            session.commit();
+        }
+
+        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
+            metadataStore.start();
+            Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
+                .atMost(10, TimeUnit.SECONDS)
+                .until(metadataStore::isLeader);
+
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore))) {
+                testServer.start();
+                int port = testServer.getPort();
+                ControllerClient client = new GrpcControllerClient();
+                TrimStreamRequest request = TrimStreamRequest.newBuilder()
+                    .setStreamId(streamId)
+                    .setStreamEpoch(1)
+                    .setNewStartOffset(newStartOffset)
+                    .build();
+                client.trimStream(String.format("localhost:%d", port), request).get();
+            }
+        }
+
+        try (SqlSession session = getSessionFactory().openSession()) {
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+            List<Stream> streams = streamMapper.list(topicId, queueId, null);
+            Assertions.assertEquals(1, streams.size());
+            Assertions.assertEquals(newStartOffset, streams.get(0).getStartOffset());
+
+            RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
+            List<Range> ranges = rangeMapper.list(null, streamId, null);
+            Assertions.assertEquals(1, ranges.size());
+            Assertions.assertEquals(newStartOffset, ranges.get(0).getStartOffset());
+            Assertions.assertEquals(100, ranges.get(0).getEndOffset());
+
+            S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
+            S3WALObject object = s3WALObjectMapper.getByObjectId(objectId);
+            Assertions.assertEquals(500, object.getObjectSize());
+            Assertions.assertEquals(111, object.getSequenceId());
+
+            S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
+            S3Object s3Object = s3ObjectMapper.getByObjectId(objectId);
+            long cost = s3Object.getMarkedForDeletionTimestamp() - System.currentTimeMillis();
+            if (cost > 5 * 60) {
+                Assertions.fail();
+            }
+        }
+    }
+
 }

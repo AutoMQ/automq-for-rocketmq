@@ -45,6 +45,8 @@ import apache.rocketmq.controller.v1.OpenStreamRequest;
 import apache.rocketmq.controller.v1.ReassignMessageQueueReply;
 import apache.rocketmq.controller.v1.ReassignMessageQueueRequest;
 import apache.rocketmq.controller.v1.Topic;
+import apache.rocketmq.controller.v1.TrimStreamReply;
+import apache.rocketmq.controller.v1.TrimStreamRequest;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.google.common.base.Strings;
@@ -415,6 +417,23 @@ public class GrpcControllerClient implements ControllerClient {
         Futures.addCallback(this.buildStubForTarget(target).closeStream(request), new FutureCallback<>() {
             @Override
             public void onSuccess(CloseStreamReply result) {
+                future.complete(result);
+            }
+
+            @Override
+            public void onFailure(@Nonnull Throwable t) {
+                future.completeExceptionally(t);
+            }
+        }, MoreExecutors.directExecutor());
+        return future;
+    }
+
+    @Override
+    public CompletableFuture<TrimStreamReply> trimStream(String target, TrimStreamRequest request) throws ControllerException {
+        CompletableFuture<TrimStreamReply> future = new CompletableFuture<>();
+        Futures.addCallback(this.buildStubForTarget(target).trimStream(request), new FutureCallback<>() {
+            @Override
+            public void onSuccess(TrimStreamReply result) {
                 future.complete(result);
             }
 

@@ -24,75 +24,75 @@ import java.util.Objects;
 
 public class S3Object {
 
-    long id;
+    Long id;
 
-    long objectId;
+    Long objectId;
 
-    long objectSize;
+    Long objectSize;
     
-    long preparedTimestamp;
+    Long preparedTimestamp;
 
-    long committedTimestamp;
+    Long committedTimestamp;
 
-    long expiredTimestamp;
+    Long expiredTimestamp;
 
-    long markedForDeletionTimestamp;
+    Long markedForDeletionTimestamp;
 
     S3ObjectState state;
 
-    public long getId() {
+    public Long getId() {
         return id;
     }
 
-    public void setId(long id) {
+    public void setId(Long id) {
         this.id = id;
     }
 
-    public long getObjectId() {
+    public Long getObjectId() {
         return objectId;
     }
 
-    public void setObjectId(long objectId) {
+    public void setObjectId(Long objectId) {
         this.objectId = objectId;
     }
 
-    public long getObjectSize() {
+    public Long getObjectSize() {
         return objectSize;
     }
 
-    public void setObjectSize(long objectSize) {
+    public void setObjectSize(Long objectSize) {
         this.objectSize = objectSize;
     }
 
-    public long getPreparedTimestamp() {
+    public Long getPreparedTimestamp() {
         return preparedTimestamp;
     }
 
-    public void setPreparedTimestamp(long preparedTimestamp) {
+    public void setPreparedTimestamp(Long preparedTimestamp) {
         this.preparedTimestamp = preparedTimestamp;
     }
 
-    public long getCommittedTimestamp() {
+    public Long getCommittedTimestamp() {
         return committedTimestamp;
     }
 
-    public void setCommittedTimestamp(long committedTimestamp) {
+    public void setCommittedTimestamp(Long committedTimestamp) {
         this.committedTimestamp = committedTimestamp;
     }
 
-    public long getExpiredTimestamp() {
+    public Long getExpiredTimestamp() {
         return expiredTimestamp;
     }
 
-    public void setExpiredTimestamp(long expiredTimestamp) {
+    public void setExpiredTimestamp(Long expiredTimestamp) {
         this.expiredTimestamp = expiredTimestamp;
     }
 
-    public long getMarkedForDeletionTimestamp() {
+    public Long getMarkedForDeletionTimestamp() {
         return markedForDeletionTimestamp;
     }
 
-    public void setMarkedForDeletionTimestamp(long markedForDeletionTimestamp) {
+    public void setMarkedForDeletionTimestamp(Long markedForDeletionTimestamp) {
         this.markedForDeletionTimestamp = markedForDeletionTimestamp;
     }
 
@@ -109,7 +109,7 @@ public class S3Object {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         S3Object s3Object = (S3Object) o;
-        return id == s3Object.id && objectId == s3Object.objectId && objectSize == s3Object.objectSize && preparedTimestamp == s3Object.preparedTimestamp && committedTimestamp == s3Object.committedTimestamp && expiredTimestamp == s3Object.expiredTimestamp && markedForDeletionTimestamp == s3Object.markedForDeletionTimestamp && state == s3Object.state;
+        return Objects.equals(id, s3Object.id) && Objects.equals(objectId, s3Object.objectId) && Objects.equals(objectSize, s3Object.objectSize) && Objects.equals(preparedTimestamp, s3Object.preparedTimestamp) && Objects.equals(committedTimestamp, s3Object.committedTimestamp) && Objects.equals(expiredTimestamp, s3Object.expiredTimestamp) && Objects.equals(markedForDeletionTimestamp, s3Object.markedForDeletionTimestamp) && state == s3Object.state;
     }
 
     @Override

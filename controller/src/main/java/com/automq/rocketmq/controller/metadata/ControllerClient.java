@@ -24,6 +24,8 @@ import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.OpenStreamReply;
 import apache.rocketmq.controller.v1.OpenStreamRequest;
 import apache.rocketmq.controller.v1.Topic;
+import apache.rocketmq.controller.v1.TrimStreamReply;
+import apache.rocketmq.controller.v1.TrimStreamRequest;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 
@@ -61,4 +63,6 @@ public interface ControllerClient {
     CompletableFuture<OpenStreamReply> openStream(String target, OpenStreamRequest request) throws ControllerException;
 
     CompletableFuture<CloseStreamReply> closeStream(String target, CloseStreamRequest request) throws ControllerException;
+
+    CompletableFuture<TrimStreamReply> trimStream(String target, TrimStreamRequest request) throws ControllerException;
 }
