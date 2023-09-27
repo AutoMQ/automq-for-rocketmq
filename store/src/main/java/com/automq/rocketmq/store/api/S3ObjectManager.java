@@ -26,9 +26,11 @@ import java.util.concurrent.CompletableFuture;
 public interface S3ObjectManager {
     /**
      * Delete a list of S3 objects by object id.
+     * <p>
+     * Regard non-exist object as success delete.
      *
      * @param objectIds the objects to delete.
-     * @return the future of delete result, contains the deleted object name.
+     * @return the future of delete result, contains the deleted object id.
      */
-    CompletableFuture<List<String>> delete(List<Long> objectIds);
+    CompletableFuture<List<Long>> delete(List<Long> objectIds);
 }
