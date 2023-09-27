@@ -107,9 +107,9 @@ CREATE TABLE IF NOT EXISTS group_progress
     group_id     BIGINT NOT NULL,
     topic_id     BIGINT NOT NULL,
     queue_id     INT    NOT NULL,
-    queue_offset BIGINT NOT NULL
+    queue_offset BIGINT NOT NULL,
+    UNIQUE INDEX idx_group_progress(group_id, topic_id, queue_id)
 );
-CREATE UNIQUE INDEX idx_group_progress ON group_progress (group_id, topic_id, queue_id);
 
 CREATE TABLE IF NOT EXISTS `range`
 (
@@ -119,10 +119,10 @@ CREATE TABLE IF NOT EXISTS `range`
     epoch        BIGINT NOT NULL,
     start_offset BIGINT NOT NULL,
     end_offset   BIGINT NOT NULL,
-    broker_id    INT    NOT NULL
+    broker_id    INT    NOT NULL,
+    UNIQUE INDEX idx_stream_range(stream_id, range_id),
+    UNIQUE INDEX idx_stream_start_offset(stream_id, start_offset)
 );
-CREATE INDEX idx_range_stream_id_start_offset ON `range` (stream_id, start_offset);
-CREATE INDEX idx_range_stream_id_range_id ON `range` (stream_id, range_id);
 
 CREATE TABLE IF NOT EXISTS s3object
 (

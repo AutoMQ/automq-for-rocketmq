@@ -811,19 +811,28 @@ public class DefaultMetadataStore implements MetadataStore {
                         continue;
                     }
                     StreamMapper streamMapper = session.getMapper(StreamMapper.class);
-                    // verify epoch match
-                    Stream streamMetadata = streamMapper.getByStreamId(streamId);
-                    if (streamMetadata.getState() == StreamState.CLOSED) {
-                        break;
+
+                    Stream stream = streamMapper.getByStreamId(streamId);
+
+                    // Verify resource existence
+                    if (null == stream) {
+                        throw new ControllerException(Code.NOT_FOUND_VALUE, String.format("Stream[stream-id=%d] is not found", streamId));
                     }
 
-                    Stream metadata = new Stream();
-                    metadata.setId(streamId);
-                    metadata.setEpoch(streamEpoch);
-                    metadata.setRangeId(streamMetadata.getRangeId());
-                    metadata.setStartOffset(streamMetadata.getStartOffset());
-                    metadata.setState(StreamState.CLOSED);
-                    streamMapper.update(metadata);
+                    // Verify epoch
+                    if (streamEpoch < stream.getEpoch()) {
+                        throw new ControllerException(Code.FENCED_VALUE, "Stream epoch is deprecated");
+                    }
+
+                    // Make closeStream reentrant
+                    if (stream.getState() == StreamState.CLOSED) {
+                        return;
+                    }
+
+                    // Flag state as closed
+                    stream.setState(StreamState.CLOSED);
+                    streamMapper.update(stream);
+
                     session.commit();
                 }
             } else {

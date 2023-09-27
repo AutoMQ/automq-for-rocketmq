@@ -320,14 +320,38 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
             responseObserver.onNext(reply);
             responseObserver.onCompleted();
         } catch (ControllerException e) {
+            OpenStreamReply reply = OpenStreamReply.newBuilder()
+                .setStatus(Status.newBuilder()
+                    .setCode(Code.forNumber(e.getErrorCode()))
+                    .setMessage(e.getMessage()).build())
+                .build();
+            responseObserver.onNext(reply);
+            responseObserver.onCompleted();
+        } catch (Throwable e) {
             responseObserver.onError(e);
         }
-        super.openStream(request, responseObserver);
     }
 
     @Override
     public void closeStream(CloseStreamRequest request, StreamObserver<CloseStreamReply> responseObserver) {
-        super.closeStream(request, responseObserver);
+        try {
+            metadataStore.closeStream(request.getStreamId(), request.getStreamEpoch());
+            CloseStreamReply reply = CloseStreamReply.newBuilder()
+                .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                .build();
+            responseObserver.onNext(reply);
+            responseObserver.onCompleted();
+        } catch (ControllerException e) {
+            CloseStreamReply reply = CloseStreamReply.newBuilder()
+                .setStatus(Status.newBuilder()
+                    .setCode(Code.forNumber(e.getErrorCode()))
+                    .setMessage(e.getMessage()).build())
+                .build();
+            responseObserver.onNext(reply);
+            responseObserver.onCompleted();
+        } catch (Throwable e) {
+            responseObserver.onError(e);
+        }
     }
 
     @Override
