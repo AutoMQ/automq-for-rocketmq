@@ -18,31 +18,28 @@
 
 package com.automq.rocketmq.controller.metadata.database.mapper;
 
-import com.automq.rocketmq.controller.metadata.database.dao.StreamMetadata;
+import apache.rocketmq.controller.v1.StreamState;
+import com.automq.rocketmq.controller.metadata.database.dao.Stream;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
 public interface StreamMapper {
 
-    int create(StreamMetadata stream);
+    int create(Stream stream);
 
-    StreamMetadata getByStreamId(long streamId);
+    Stream getByStreamId(long id);
 
     int increaseEpoch(long id);
 
-    int updateLastRange(@Param("streamId") long streamId, @Param("lastRangeId") int lastRangeId);
+    int updateLastRange(@Param("id") long id, @Param("lastRangeId") int lastRangeId);
 
-    int updateStreamState(@Param("streamId")long streamId, @Param("state")int state);
+    int updateStreamState(@Param("id") Long id, @Param("topicId") Long topicId, @Param("queueId") Integer queueId,
+        @Param("state") StreamState state);
 
-    void delete(Long streamId);
+    int delete(@Param("id") Long id);
 
-    List<StreamMetadata> list();
+    List<Stream> list(@Param("topicId") Long topicId, @Param("queueId") Integer queueId, @Param("groupId") Long groupId);
 
-    StreamMetadata get(@Param("streamId") Long streamId,
-        @Param("rangeId") Integer rangeId,
-        @Param("state") Integer state
-    );
-
-    void update(StreamMetadata streamMetadata);
+    void update(Stream stream);
 }

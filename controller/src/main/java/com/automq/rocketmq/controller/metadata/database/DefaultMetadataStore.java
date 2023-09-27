@@ -27,6 +27,7 @@ import apache.rocketmq.controller.v1.OngoingMessageQueueReassignment;
 import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
+import apache.rocketmq.controller.v1.StreamState;
 import apache.rocketmq.controller.v1.SubStream;
 import com.automq.rocketmq.common.PrefixThreadFactory;
 import com.automq.rocketmq.controller.exception.ControllerException;
@@ -42,7 +43,7 @@ import com.automq.rocketmq.controller.metadata.database.dao.Lease;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import com.automq.rocketmq.controller.metadata.database.dao.AssignmentStatus;
-import com.automq.rocketmq.controller.metadata.database.dao.StreamAffiliation;
+import com.automq.rocketmq.controller.metadata.database.dao.Stream;
 import com.automq.rocketmq.controller.metadata.database.dao.StreamRole;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
 import com.automq.rocketmq.controller.metadata.database.dao.TopicStatus;
@@ -51,9 +52,9 @@ import com.automq.rocketmq.controller.metadata.database.mapper.GroupProgressMapp
 import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.LeaseMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper;
-import com.automq.rocketmq.controller.metadata.database.mapper.StreamAffiliationMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.S3StreamObjectMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.S3WALObjectMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 import com.automq.rocketmq.controller.metadata.database.tasks.LeaseTask;
 import com.automq.rocketmq.controller.metadata.database.tasks.ScanAssignableMessageQueuesTask;
@@ -246,7 +247,7 @@ public class DefaultMetadataStore implements MetadataStore {
 
                     QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
 
-                    StreamAffiliationMapper streamMapper = session.getMapper(StreamAffiliationMapper.class);
+                    StreamMapper streamMapper = session.getMapper(StreamMapper.class);
 
                     long topicId = topic.getId();
                     List<Integer> aliveNodeIds =
@@ -267,11 +268,11 @@ public class DefaultMetadataStore implements MetadataStore {
                             assignment.setDstNodeId(0);
                             assignmentMapper.create(assignment);
                             // Create data stream
-                            long streamId = createStream(streamMapper, topicId, n, StreamRole.DATA, 0, AssignmentStatus.ASSIGNABLE);
+                            long streamId = createStream(streamMapper, topicId, n, StreamRole.DATA, 0);
                             LOGGER.debug("Create assignable data stream[stream-id={}] for topic-id={}, queue-id={}",
                                 streamId, topicId, n);
                             // Create ops stream
-                            streamId = createStream(streamMapper, topicId, n, StreamRole.OPS, 0, AssignmentStatus.ASSIGNABLE);
+                            streamId = createStream(streamMapper, topicId, n, StreamRole.OPS, 0);
                             LOGGER.debug("Create assignable ops stream[stream-id={}] for topic-id={}, queue-id={}",
                                 streamId, topicId, n);
                         });
@@ -289,11 +290,11 @@ public class DefaultMetadataStore implements MetadataStore {
                             assignment.setDstNodeId(nodeId);
                             assignmentMapper.create(assignment);
                             // Create data stream
-                            long streamId = createStream(streamMapper, topicId, n, StreamRole.DATA, nodeId, AssignmentStatus.ASSIGNED);
+                            long streamId = createStream(streamMapper, topicId, n, StreamRole.DATA, nodeId);
                             LOGGER.debug("Create data stream[stream-id={}] for topic-id={}, queue-id={}, assigned to node[node-id={}]",
                                 streamId, topicId, n, nodeId);
                             // Create ops stream
-                            streamId = createStream(streamMapper, topicId, n, StreamRole.OPS, nodeId, AssignmentStatus.ASSIGNED);
+                            streamId = createStream(streamMapper, topicId, n, StreamRole.OPS, nodeId);
                             LOGGER.debug("Create ops stream[stream-id={}] for topic-id={}, queue-id={}, assigned to node[node-id={}]",
                                 streamId, topicId, n, nodeId);
                         });
@@ -319,17 +320,17 @@ public class DefaultMetadataStore implements MetadataStore {
         }
     }
 
-    private static long createStream(StreamAffiliationMapper streamMapper, long topicId, int queueId,
-        StreamRole role, int nodeId, AssignmentStatus status) {
-        StreamAffiliation dataStream = new StreamAffiliation();
-        dataStream.setStatus(status);
+    private static long createStream(StreamMapper streamMapper, long topicId, int queueId,
+        StreamRole role, int nodeId) {
+        Stream dataStream = new Stream();
+        dataStream.setState(StreamState.UNINITIALIZED);
         dataStream.setTopicId(topicId);
         dataStream.setQueueId(queueId);
         dataStream.setStreamRole(role);
         dataStream.setSrcNodeId(nodeId);
         dataStream.setDstNodeId(nodeId);
         streamMapper.create(dataStream);
-        return dataStream.getStreamId();
+        return dataStream.getId();
     }
 
     @Override
@@ -362,8 +363,8 @@ public class DefaultMetadataStore implements MetadataStore {
                             assignment.setStatus(AssignmentStatus.DELETED);
                             assignmentMapper.update(assignment);
                         });
-                    StreamAffiliationMapper streamMapper = session.getMapper(StreamAffiliationMapper.class);
-                    streamMapper.update(topicId, null, null, 0, 0, AssignmentStatus.DELETED);
+                    StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+                    streamMapper.updateStreamState(null, topicId, null, StreamState.DELETED);
                     session.commit();
                 }
                 this.notifyOnResourceChange(toNotify);
@@ -797,30 +798,23 @@ public class DefaultMetadataStore implements MetadataStore {
                     }
 
                     long groupId = groups.get(0).getId();
-                    StreamAffiliationMapper streamMapper = session.getMapper(StreamAffiliationMapper.class);
-                    List<StreamAffiliation> streams = streamMapper.list(topicId, queueId, groupId, null)
+                    StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+                    List<Stream> streams = streamMapper.list(topicId, queueId, groupId)
                         .stream().filter(stream -> stream.getStreamRole() == StreamRole.RETRY).toList();
                     if (streams.isEmpty()) {
-                        StreamAffiliation stream = new StreamAffiliation();
+                        Stream stream = new Stream();
                         stream.setTopicId(topicId);
                         stream.setQueueId(queueId);
                         stream.setGroupId(groupId);
                         stream.setStreamRole(StreamRole.RETRY);
-                        stream.setStatus(assignment.getStatus());
+                        stream.setState(StreamState.UNINITIALIZED);
                         stream.setSrcNodeId(assignment.getSrcNodeId());
                         stream.setDstNodeId(assignment.getDstNodeId());
                         streamMapper.create(stream);
                         session.commit();
-                        return stream.getStreamId();
+                        return stream.getId();
                     } else {
-                        StreamAffiliation stream = streams.get(0);
-                        if (stream.getStatus() == AssignmentStatus.DELETED) {
-                            streamMapper.update(topicId, queueId, groupId, assignment.getSrcNodeId(),
-                                assignment.getDstNodeId(),
-                                AssignmentStatus.ASSIGNED);
-                            session.commit();
-                        }
-                        return streams.get(0).getStreamId();
+                        return streams.get(0).getId();
                     }
                 }
             } else {
