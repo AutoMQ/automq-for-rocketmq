@@ -48,8 +48,6 @@
                      javaType="apache.rocketmq.controller.v1.StreamState" />
         <typeHandler handler="org.apache.ibatis.type.EnumOrdinalTypeHandler"
                      javaType="apache.rocketmq.controller.v1.S3ObjectState" />
-        <typeHandler handler="com.automq.rocketmq.controller.metadata.database.handler.LongTypeHandler"
-                     javaType="java.lang.Long" />
     </typeHandlers>
 
     <environments default="development">
