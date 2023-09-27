@@ -27,7 +27,7 @@ public class Stream {
 
     private long epoch;
 
-    private Integer rangeId;
+    private int rangeId;
 
     private long startOffset;
 
@@ -52,6 +52,13 @@ public class Stream {
 
     private Date updateTime;
 
+    public Stream() {
+        epoch = -1L;
+        rangeId = -1;
+        state = StreamState.UNINITIALIZED;
+        startOffset = 0L;
+    }
+
     public long getId() {
         return id;
     }
@@ -68,11 +75,11 @@ public class Stream {
         this.epoch = epoch;
     }
 
-    public Integer getRangeId() {
+    public int getRangeId() {
         return rangeId;
     }
 
-    public void setRangeId(Integer rangeId) {
+    public void setRangeId(int rangeId) {
         this.rangeId = rangeId;
     }
 

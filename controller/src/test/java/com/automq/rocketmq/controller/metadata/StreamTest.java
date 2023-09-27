@@ -43,8 +43,8 @@ public class StreamTest extends DatabaseTestBase {
             stream.setTopicId(1);
             stream.setQueueId(2);
             stream.setStreamRole(StreamRole.OPS);
-            stream.setStartOffset(1234);
-            stream.setEpoch(1);
+            stream.setStartOffset(1234L);
+            stream.setEpoch(1L);
             stream.setRangeId(2);
             stream.setState(StreamState.OPEN);
 
@@ -75,8 +75,8 @@ public class StreamTest extends DatabaseTestBase {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
             Stream stream = new Stream();
             stream.setId(123);
-            stream.setStartOffset(1234);
-            stream.setEpoch(1);
+            stream.setStartOffset(1234L);
+            stream.setEpoch(1L);
             stream.setRangeId(2);
             stream.setState(StreamState.OPEN);
             stream.setStreamRole(StreamRole.DATA);
@@ -102,8 +102,8 @@ public class StreamTest extends DatabaseTestBase {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
             Stream stream = new Stream();
             stream.setId(123);
-            stream.setStartOffset(1234);
-            stream.setEpoch(1);
+            stream.setStartOffset(1234L);
+            stream.setEpoch(1L);
             stream.setRangeId(2);
             stream.setState(StreamState.OPEN);
             stream.setStreamRole(StreamRole.DATA);
@@ -128,8 +128,8 @@ public class StreamTest extends DatabaseTestBase {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
             Stream stream = new Stream();
             stream.setId(123);
-            stream.setStartOffset(1234);
-            stream.setEpoch(1);
+            stream.setStartOffset(1234L);
+            stream.setEpoch(1L);
             stream.setRangeId(2);
             stream.setState(StreamState.OPEN);
             stream.setStreamRole(StreamRole.DATA);
