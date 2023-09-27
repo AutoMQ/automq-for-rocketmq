@@ -678,7 +678,8 @@ public class DefaultMetadataStore implements MetadataStore {
                     // verify epoch match
                     Stream stream = streamMapper.getByStreamId(streamId);
                     if (stream.getEpoch() > streamEpoch) {
-                        LOGGER.warn("stream {}'s epoch {} is larger than request epoch {}", streamId, stream.getEpoch(), streamEpoch);
+                        LOGGER.warn("stream {}'s epoch {} is larger than request epoch {}",
+                            streamId, stream.getEpoch(), streamEpoch);
                         break;
                     }
                     if (stream.getEpoch() == streamEpoch) {
@@ -687,12 +688,14 @@ public class DefaultMetadataStore implements MetadataStore {
                         Range range = rangeMapper.getByRangeId(stream.getRangeId());
 
                         if (Objects.isNull(range)) {
-                            LOGGER.warn("stream {}'s current range {} not exist when open stream with epoch: {}", streamId, stream.getEpoch(), streamEpoch);
+                            LOGGER.warn("stream {}'s current range {} not exist when open stream with epoch: {}",
+                                streamId, stream.getEpoch(), streamEpoch);
                             break;
                         }
-
-                        if (range.getBrokerId() != this.lease.getNodeId()) {
-                            LOGGER.warn("stream {}'s current range {} broker {} is not equal to request broker {}", streamId, stream.getEpoch(), range.getBrokerId(), this.lease.getNodeId());
+                        // ensure that the broker corresponding to the range is alive
+                        if (!this.nodes.containsKey(range.getBrokerId()) || !this.nodes.get(range.getBrokerId()).isAlive(config)) {
+                            LOGGER.warn("stream {}'s current range {} broker {} does not exist or is inactive",
+                                streamId, stream.getEpoch(), range.getBrokerId());
                             break;
                         }
                         // epoch equals, broker equals, regard it as redundant open operation, just return success
@@ -831,12 +834,14 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public void commitWalObject(apache.rocketmq.controller.v1.S3WALObject walObject, List<apache.rocketmq.controller.v1.S3StreamObject> streamObjects, List<Long> compactedObjects) {
+    public void commitWalObject(apache.rocketmq.controller.v1.S3WALObject walObject,
+        List<apache.rocketmq.controller.v1.S3StreamObject> streamObjects, List<Long> compactedObjects) {
 
     }
 
     @Override
-    public void commitStreamObject(apache.rocketmq.controller.v1.S3StreamObject streamObject, List<Long> compactedObjects) {
+    public void commitStreamObject(apache.rocketmq.controller.v1.S3StreamObject streamObject,
+        List<Long> compactedObjects) {
 
     }
 
@@ -856,7 +861,8 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public List<apache.rocketmq.controller.v1.S3WALObject> listWALObjects(long streamId, long startOffset, long endOffset, int limit) {
+    public List<apache.rocketmq.controller.v1.S3WALObject> listWALObjects(long streamId, long startOffset,
+        long endOffset, int limit) {
         try (SqlSession session = this.sessionFactory.openSession()) {
             S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
             List<com.automq.rocketmq.controller.metadata.database.dao.S3WALObject> s3WALObjects = s3WALObjectMapper.list(this.lease.getNodeId(), null);
@@ -886,7 +892,8 @@ public class DefaultMetadataStore implements MetadataStore {
         }
     }
 
-    public List<apache.rocketmq.controller.v1.S3StreamObject> listStreamObjects(long streamId, long startOffset, long endOffset, int limit) {
+    public List<apache.rocketmq.controller.v1.S3StreamObject> listStreamObjects(long streamId, long startOffset,
+        long endOffset, int limit) {
         try (SqlSession session = this.sessionFactory.openSession()) {
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
             return s3StreamObjectMapper.list(null, streamId, startOffset, endOffset, limit).stream()
@@ -903,8 +910,9 @@ public class DefaultMetadataStore implements MetadataStore {
         }
     }
 
-
-    private apache.rocketmq.controller.v1.S3WALObject buildS3WALObject(com.automq.rocketmq.controller.metadata.database.dao.S3WALObject originalObject, Map<Long, SubStream> subStreams) {
+    private apache.rocketmq.controller.v1.S3WALObject buildS3WALObject(
+        com.automq.rocketmq.controller.metadata.database.dao.S3WALObject originalObject,
+        Map<Long, SubStream> subStreams) {
         return apache.rocketmq.controller.v1.S3WALObject.newBuilder()
             .setObjectId(originalObject.getObjectId())
             .setObjectSize(originalObject.getObjectSize())
