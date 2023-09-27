@@ -891,6 +891,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
             S3Object s3Object = new S3Object();
             s3Object.setObjectId(objectId);
+            s3Object.setStreamId(streamId);
             s3Object.setState(S3ObjectState.BOS_COMMITTED);
             s3Object.setObjectSize(1000L);
             s3ObjectMapper.create(s3Object);
@@ -1004,6 +1005,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
             S3Object s3Object = new S3Object();
             s3Object.setObjectId(objectId);
+            s3Object.setStreamId(streamId);
             s3Object.setState(S3ObjectState.BOS_COMMITTED);
             s3Object.setObjectSize(1000L);
             s3ObjectMapper.create(s3Object);
@@ -1056,6 +1058,122 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             S3WALObject object = s3WALObjectMapper.getByObjectId(objectId);
             Assertions.assertEquals(500, object.getObjectSize());
             Assertions.assertEquals(111, object.getSequenceId());
+
+            S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
+            S3Object s3Object = s3ObjectMapper.getByObjectId(objectId);
+            long cost = s3Object.getMarkedForDeletionTimestamp() - System.currentTimeMillis();
+            if (cost > 5 * 60) {
+                Assertions.fail();
+            }
+        }
+    }
+
+    @Test
+    public void testTrimStream_WithRange() throws IOException, ControllerException, ExecutionException, InterruptedException {
+        ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
+        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
+        Mockito.when(controllerConfig.nodeId()).thenReturn(2);
+        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
+        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
+
+        long topicId = 1;
+        int queueId = 2;
+        int srcNodeId = 1;
+        int dstNodeId = 2;
+        long streamId;
+        long objectId = 2;
+        long newStartOffset = 60;
+
+        try (SqlSession session = getSessionFactory().openSession()) {
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+
+            Stream stream = new Stream();
+            stream.setStreamRole(StreamRole.DATA);
+            stream.setTopicId(topicId);
+            stream.setQueueId(queueId);
+            stream.setEpoch(1);
+            stream.setState(StreamState.OPEN);
+            stream.setStartOffset(0);
+            stream.setSrcNodeId(srcNodeId);
+            stream.setDstNodeId(dstNodeId);
+            streamMapper.create(stream);
+            streamId = stream.getId();
+
+            RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
+            Range range = new Range();
+            range.setRangeId(0);
+            range.setStartOffset(0L);
+            range.setStreamId(streamId);
+            range.setBrokerId(2);
+            range.setEpoch(1L);
+            range.setEndOffset(30L);
+            rangeMapper.create(range);
+
+            Range range1 = new Range();
+            range1.setRangeId(1);
+            range1.setStartOffset(50L);
+            range1.setStreamId(streamId);
+            range1.setBrokerId(2);
+            range1.setEpoch(1L);
+            range1.setEndOffset(100L);
+            rangeMapper.create(range1);
+
+            S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
+            S3Object s3Object = new S3Object();
+            s3Object.setObjectId(objectId);
+            s3Object.setStreamId(streamId);
+            s3Object.setState(S3ObjectState.BOS_COMMITTED);
+            s3Object.setObjectSize(1000L);
+            s3ObjectMapper.create(s3Object);
+
+            S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
+            S3StreamObject s3StreamObject = new S3StreamObject();
+            s3StreamObject.setBaseDataTimestamp(System.currentTimeMillis());
+            s3StreamObject.setStreamId(streamId);
+            s3StreamObject.setObjectId(objectId);
+            s3StreamObject.setStartOffset(0L);
+            s3StreamObject.setEndOffset(40L);
+            s3StreamObject.setObjectSize(1000);
+            s3StreamObjectMapper.create(s3StreamObject);
+
+            session.commit();
+        }
+
+        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
+            metadataStore.start();
+            Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
+                .atMost(10, TimeUnit.SECONDS)
+                .until(metadataStore::isLeader);
+
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore))) {
+                testServer.start();
+                int port = testServer.getPort();
+                ControllerClient client = new GrpcControllerClient();
+                TrimStreamRequest request = TrimStreamRequest.newBuilder()
+                    .setStreamId(streamId)
+                    .setStreamEpoch(1)
+                    .setNewStartOffset(newStartOffset)
+                    .build();
+                client.trimStream(String.format("localhost:%d", port), request).get();
+            }
+        }
+
+        try (SqlSession session = getSessionFactory().openSession()) {
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+            List<Stream> streams = streamMapper.list(topicId, queueId, null);
+            Assertions.assertEquals(1, streams.size());
+            Assertions.assertEquals(newStartOffset, streams.get(0).getStartOffset());
+
+            RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
+            List<Range> ranges = rangeMapper.list(null, streamId, null);
+            Assertions.assertEquals(1, ranges.size());
+            Assertions.assertEquals(newStartOffset, ranges.get(0).getStartOffset());
+            Assertions.assertEquals(100, ranges.get(0).getEndOffset());
+
+            S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
+            List<S3StreamObject> objects = s3StreamObjectMapper.listByStreamId(streamId);
+            Assertions.assertEquals(0, objects.size());
 
             S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
             S3Object s3Object = s3ObjectMapper.getByObjectId(objectId);

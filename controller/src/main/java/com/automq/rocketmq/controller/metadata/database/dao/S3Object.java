@@ -29,6 +29,8 @@ public class S3Object {
     Long objectId;
 
     Long objectSize;
+
+    Long streamId;
     
     Long preparedTimestamp;
 
@@ -62,6 +64,14 @@ public class S3Object {
 
     public void setObjectSize(Long objectSize) {
         this.objectSize = objectSize;
+    }
+
+    public Long getStreamId() {
+        return streamId;
+    }
+
+    public void setStreamId(Long streamId) {
+        this.streamId = streamId;
     }
 
     public Long getPreparedTimestamp() {
@@ -109,11 +119,11 @@ public class S3Object {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         S3Object s3Object = (S3Object) o;
-        return Objects.equals(id, s3Object.id) && Objects.equals(objectId, s3Object.objectId) && Objects.equals(objectSize, s3Object.objectSize) && Objects.equals(preparedTimestamp, s3Object.preparedTimestamp) && Objects.equals(committedTimestamp, s3Object.committedTimestamp) && Objects.equals(expiredTimestamp, s3Object.expiredTimestamp) && Objects.equals(markedForDeletionTimestamp, s3Object.markedForDeletionTimestamp) && state == s3Object.state;
+        return Objects.equals(id, s3Object.id) && Objects.equals(objectId, s3Object.objectId) && Objects.equals(objectSize, s3Object.objectSize) && Objects.equals(streamId, s3Object.streamId) && Objects.equals(preparedTimestamp, s3Object.preparedTimestamp) && Objects.equals(committedTimestamp, s3Object.committedTimestamp) && Objects.equals(expiredTimestamp, s3Object.expiredTimestamp) && Objects.equals(markedForDeletionTimestamp, s3Object.markedForDeletionTimestamp) && state == s3Object.state;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, objectId, objectSize, preparedTimestamp, committedTimestamp, expiredTimestamp, markedForDeletionTimestamp, state);
+        return Objects.hash(id, objectId, objectSize, streamId, preparedTimestamp, committedTimestamp, expiredTimestamp, markedForDeletionTimestamp, state);
     }
 }

@@ -703,7 +703,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     streamMapper.update(stream);
 
                     // remove range or update range's start offset
-                    rangeMapper.listByStreamId(streamId).stream().forEach(range -> {
+                    rangeMapper.listByStreamId(streamId).forEach(range -> {
                         if (newStartOffset <= range.getStartOffset()) {
                             return;
                         }
@@ -729,7 +729,7 @@ public class DefaultMetadataStore implements MetadataStore {
                         rangeMapper.update(range);
                     });
                     // remove stream object
-                    s3StreamObjectMapper.listByStreamId(streamId).stream().forEach(streamObject -> {
+                    s3StreamObjectMapper.listByStreamId(streamId).forEach(streamObject -> {
                         long streamStartOffset = streamObject.getStartOffset();
                         long streamEndOffset = streamObject.getEndOffset();
                         if (newStartOffset <= streamStartOffset) {

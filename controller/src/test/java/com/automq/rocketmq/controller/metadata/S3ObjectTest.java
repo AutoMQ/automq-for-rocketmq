@@ -40,6 +40,7 @@ public class S3ObjectTest extends DatabaseTestBase {
             S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
             S3Object s3Object = new S3Object();
             s3Object.setObjectId(987L);
+            s3Object.setStreamId(1L);
             s3Object.setObjectSize(555L);
             s3Object.setState(S3ObjectState.BOS_PREPARED);
 
@@ -86,6 +87,7 @@ public class S3ObjectTest extends DatabaseTestBase {
             S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
             S3Object s3Object = new S3Object();
             s3Object.setObjectId(987L);
+            s3Object.setStreamId(1L);
             s3Object.setObjectSize(555L);
             s3Object.setState(S3ObjectState.BOS_PREPARED);
 
@@ -120,6 +122,7 @@ public class S3ObjectTest extends DatabaseTestBase {
             S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
             S3Object s3Object = new S3Object();
             s3Object.setObjectId(987L);
+            s3Object.setStreamId(1L);
             s3Object.setObjectSize(555L);
             s3Object.setState(S3ObjectState.BOS_PREPARED);
 
