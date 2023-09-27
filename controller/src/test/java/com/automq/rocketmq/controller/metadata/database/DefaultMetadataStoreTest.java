@@ -19,21 +19,27 @@ package com.automq.rocketmq.controller.metadata.database;
 
 import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
+import apache.rocketmq.controller.v1.StreamMetadata;
+import apache.rocketmq.controller.v1.StreamState;
 import apache.rocketmq.controller.v1.SubStream;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.ControllerClient;
 import com.automq.rocketmq.controller.metadata.ControllerConfig;
 import com.automq.rocketmq.controller.metadata.DatabaseTestBase;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
+import com.automq.rocketmq.controller.metadata.Role;
 import com.automq.rocketmq.controller.metadata.database.dao.Lease;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import com.automq.rocketmq.controller.metadata.database.dao.AssignmentStatus;
 import com.automq.rocketmq.controller.metadata.database.dao.Stream;
+import com.automq.rocketmq.controller.metadata.database.dao.Range;
+import com.automq.rocketmq.controller.metadata.database.dao.StreamRole;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
 import com.automq.rocketmq.controller.metadata.database.dao.TopicStatus;
 import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.RangeMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.S3StreamObjectMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.S3WALObjectMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
@@ -596,5 +602,142 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             s3WALObjectMapper.delete(123L, 1, null);
             session.commit();
         }
+    }
+
+    @Test
+    public void testOpenStream_WithCloseStream_AtStart() throws IOException, ControllerException {
+        long streamEpoch = 0;
+        long streamId;
+        try (SqlSession session = this.getSessionFactory().openSession()) {
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+            Stream stream = new Stream();
+            stream.setRangeId(-1);
+            stream.setState(StreamState.UNINITIALIZED);
+            stream.setStreamRole(StreamRole.DATA);
+            streamMapper.create(stream);
+            streamId = stream.getId();
+            session.commit();
+        }
+
+
+        ControllerConfig config = Mockito.mock(ControllerConfig.class);
+        Mockito.when(config.nodeId()).thenReturn(1);
+        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
+
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            Assertions.assertNull(metadataStore.getLease());
+            Lease lease = new Lease();
+            lease.setNodeId(config.nodeId());
+            metadataStore.setLease(lease);
+            metadataStore.setRole(Role.Leader);
+
+            StreamMetadata metadata = metadataStore.openStream(streamId, streamEpoch);
+            Assertions.assertNotNull(metadata);
+            Assertions.assertEquals(streamId, metadata.getStreamId());
+            Assertions.assertEquals(0, metadata.getStartOffset());
+            Assertions.assertEquals(streamEpoch, metadata.getEpoch());
+            Assertions.assertEquals(0, metadata.getRangeId());
+            Assertions.assertEquals(StreamState.OPEN, metadata.getState());
+
+            metadataStore.closeStream(streamId, streamEpoch);
+        }
+
+        try (SqlSession session = getSessionFactory().openSession()) {
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+            RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
+
+            Stream stream = streamMapper.getByStreamId(streamId);
+            Assertions.assertEquals(streamId, stream.getId());
+            Assertions.assertEquals(0, stream.getStartOffset());
+            Assertions.assertEquals(streamEpoch, stream.getEpoch());
+            Assertions.assertEquals(0, stream.getRangeId());
+            Assertions.assertEquals(StreamState.CLOSED, stream.getState());
+
+            Range range = rangeMapper.get(stream.getRangeId(), streamId, null);
+            Assertions.assertEquals(0, range.getRangeId());
+            Assertions.assertEquals(streamId, range.getStreamId());
+            Assertions.assertEquals(streamEpoch, range.getEpoch());
+            Assertions.assertEquals(0, range.getStartOffset());
+            Assertions.assertEquals(0, range.getEndOffset());
+
+            streamMapper.delete(streamId);
+            session.commit();
+        }
+
+    }
+
+    @Test
+    public void testOpenStream_WithClosedStream() throws IOException, ControllerException {
+        long streamId, streamEpoch = 1;
+        try (SqlSession session = this.getSessionFactory().openSession()) {
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+            RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
+
+            Stream stream = new Stream();
+            stream.setRangeId(0);
+            stream.setState(StreamState.CLOSED);
+            stream.setStreamRole(StreamRole.DATA);
+            stream.setStartOffset(1234);
+            streamMapper.create(stream);
+            streamId = stream.getId();
+
+            Range range = new Range();
+            range.setRangeId(0);
+            range.setStreamId(streamId);
+            range.setEpoch(1);
+            range.setStartOffset(1234);
+            range.setEndOffset(2345);
+            range.setBrokerId(1);
+            rangeMapper.create(range);
+            session.commit();
+        }
+
+
+        ControllerConfig config = Mockito.mock(ControllerConfig.class);
+        Mockito.when(config.nodeId()).thenReturn(1);
+        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
+
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            Assertions.assertNull(metadataStore.getLease());
+            Lease lease = new Lease();
+            lease.setNodeId(config.nodeId());
+            metadataStore.setLease(lease);
+            metadataStore.setRole(Role.Leader);
+
+            StreamMetadata metadata = metadataStore.openStream(streamId, streamEpoch);
+            Assertions.assertNotNull(metadata);
+            Assertions.assertEquals(streamId, metadata.getStreamId());
+            Assertions.assertEquals(1234, metadata.getStartOffset());
+            Assertions.assertEquals(streamEpoch, metadata.getEpoch());
+            Assertions.assertEquals(1, metadata.getRangeId());
+            Assertions.assertEquals(StreamState.OPEN, metadata.getState());
+
+            metadataStore.closeStream(streamId, streamEpoch);
+        }
+
+        try (SqlSession session = getSessionFactory().openSession()) {
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+            RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
+
+            Stream stream = streamMapper.getByStreamId(streamId);
+            Assertions.assertEquals(streamId, stream.getId());
+            Assertions.assertEquals(1234, stream.getStartOffset());
+            Assertions.assertEquals(streamEpoch, stream.getEpoch());
+            Assertions.assertEquals(1, stream.getRangeId());
+            Assertions.assertEquals(StreamState.CLOSED, stream.getState());
+
+            Range range = rangeMapper.get(stream.getRangeId(), streamId, null);
+            Assertions.assertEquals(1, range.getRangeId());
+            Assertions.assertEquals(streamId, range.getStreamId());
+            Assertions.assertEquals(streamEpoch, range.getEpoch());
+            Assertions.assertEquals(2345, range.getStartOffset());
+            Assertions.assertEquals(2345, range.getEndOffset());
+
+            streamMapper.delete(streamId);
+            session.commit();
+        }
+
     }
 }

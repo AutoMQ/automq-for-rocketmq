@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.controller.metadata.database;
 
+import apache.rocketmq.controller.v1.CloseStreamRequest;
 import apache.rocketmq.controller.v1.Code;
 import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
@@ -24,10 +25,12 @@ import apache.rocketmq.controller.v1.GroupType;
 import apache.rocketmq.controller.v1.MessageQueue;
 import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.OngoingMessageQueueReassignment;
+import apache.rocketmq.controller.v1.OpenStreamReply;
+import apache.rocketmq.controller.v1.OpenStreamRequest;
 import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
-import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.StreamState;
+import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.SubStream;
 import com.automq.rocketmq.common.PrefixThreadFactory;
 import com.automq.rocketmq.controller.exception.ControllerException;
@@ -45,6 +48,7 @@ import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import com.automq.rocketmq.controller.metadata.database.dao.AssignmentStatus;
 import com.automq.rocketmq.controller.metadata.database.dao.Stream;
 import com.automq.rocketmq.controller.metadata.database.dao.StreamRole;
+import com.automq.rocketmq.controller.metadata.database.dao.Range;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
 import com.automq.rocketmq.controller.metadata.database.dao.TopicStatus;
 import com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper;
@@ -54,6 +58,7 @@ import com.automq.rocketmq.controller.metadata.database.mapper.LeaseMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.S3StreamObjectMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.S3WALObjectMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.RangeMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 import com.automq.rocketmq.controller.metadata.database.tasks.LeaseTask;
@@ -663,12 +668,191 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public StreamMetadata openStream(long streamId, long streamEpoch) {
-        return null;
+    public StreamMetadata openStream(long streamId, long streamEpoch) throws ControllerException {
+        for (; ; ) {
+            if (isLeader()) {
+                try (SqlSession session = getSessionFactory().openSession()) {
+                    if (!maintainLeadershipWithSharedLock(session)) {
+                        continue;
+                    }
+                    StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+                    RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
+
+                    // verify epoch match
+                    Stream stream = streamMapper.getByStreamId(streamId);
+                    if (null == stream) {
+                        throw new ControllerException(Code.NOT_FOUND_VALUE,
+                            String.format("Stream[stream-id=%d] is not found", streamId)
+                        );
+                    }
+
+                    if (stream.getEpoch() > streamEpoch) {
+                        LOGGER.warn("stream {}'s epoch {} is larger than request epoch {}",
+                            streamId, stream.getEpoch(), streamEpoch);
+                        throw new ControllerException(Code.FENCED_VALUE, "Epoch of stream is deprecated");
+                    }
+
+                    if (stream.getEpoch() == streamEpoch) {
+                        // broker may use the same epoch to open -> close -> open stream.
+                        // verify broker
+                        Range range = rangeMapper.getByRangeId(stream.getRangeId());
+
+                        if (Objects.isNull(range)) {
+                            LOGGER.warn("stream {}'s current range {} not exist when open stream with epoch: {}",
+                                streamId, stream.getEpoch(), streamEpoch);
+                            throw new ControllerException(Code.ILLEGAL_STATE_VALUE, "Expected range is missing");
+                        }
+
+                        // ensure that the broker corresponding to the range is alive
+                        if (!this.nodes.containsKey(range.getBrokerId())
+                            || !this.nodes.get(range.getBrokerId()).isAlive(config)) {
+                            LOGGER.warn("Node[node-id={}] that backs up Stream[stream-id={}, epoch={}] does not exist or is inactive",
+                                range.getBrokerId(), streamId, stream.getEpoch());
+                            throw new ControllerException(Code.ILLEGAL_STATE_VALUE,
+                                String.format("Node[node-id=%d] backing up the stream is inactive", range.getBrokerId()));
+                        }
+
+                        // epoch equals, broker equals, regard it as redundant open operation, just return success
+                        if (stream.getState() == StreamState.CLOSED) {
+                            Stream metadata = new Stream();
+                            metadata.setId(streamId);
+                            metadata.setEpoch(streamEpoch);
+                            metadata.setRangeId(stream.getRangeId());
+                            metadata.setStartOffset(stream.getStartOffset());
+                            metadata.setState(StreamState.OPEN);
+                            streamMapper.create(metadata);
+
+                            return StreamMetadata.newBuilder()
+                                .setStreamId(streamId)
+                                .setEpoch(streamEpoch)
+                                .setRangeId(stream.getRangeId())
+                                .setStartOffset(stream.getStartOffset())
+                                .setState(StreamState.OPEN)
+                                .build();
+                        }
+                    }
+
+                    // Make open reentrant
+                    if (stream.getState() == StreamState.OPEN) {
+                        LOGGER.warn("Stream[stream-id={}] is already OPEN with epoch={}", streamId, stream.getEpoch());
+                        return StreamMetadata.newBuilder()
+                            .setStreamId(streamId)
+                            .setEpoch(streamEpoch)
+                            .setRangeId(stream.getRangeId())
+                            .setStartOffset(stream.getStartOffset())
+                            .setState(StreamState.OPEN)
+                            .build();
+                    }
+
+                    // now the request in valid, update the stream's epoch and create a new range for this broker
+                    int rangeId = stream.getRangeId() + 1;
+                    // stream update record
+                    stream.setEpoch(streamEpoch);
+                    stream.setRangeId(rangeId);
+                    stream.setStartOffset(stream.getStartOffset());
+                    stream.setState(StreamState.OPEN);
+                    streamMapper.update(stream);
+                    // get new range's start offset
+                    // default regard this range is the first range in stream, use 0 as start offset
+                    long startOffset = 0;
+                    if (rangeId > 0) {
+                        Range prevRange = rangeMapper.getByRangeId(rangeId - 1);
+                        startOffset = prevRange.getEndOffset();
+                    }
+                    // range create record
+                    Range range = new Range();
+                    range.setStreamId(streamId);
+                    range.setBrokerId(this.lease.getNodeId());
+                    range.setStartOffset(startOffset);
+                    range.setEndOffset(startOffset);
+                    range.setEpoch(streamEpoch);
+                    range.setRangeId(rangeId);
+                    rangeMapper.create(range);
+                    LOGGER.info("Node[node-id={}] opens stream [stream-id={}] with epoch={}",
+                        this.lease.getNodeId(), streamId, streamEpoch);
+
+                    // Commit transaction
+                    session.commit();
+
+                    return StreamMetadata.newBuilder()
+                        .setStreamId(streamId)
+                        .setEpoch(streamEpoch)
+                        .setRangeId(rangeId)
+                        .setStartOffset(stream.getStartOffset())
+                        .setState(StreamState.OPEN)
+                        .build();
+                }
+            } else {
+                OpenStreamRequest request = OpenStreamRequest.newBuilder()
+                    .setStreamId(streamId)
+                    .setStreamEpoch(streamEpoch)
+                    .build();
+                try {
+                    OpenStreamReply reply = this.controllerClient.openStream(this.leaderAddress(), request).get();
+                    return reply.getStreamMetadata();
+                } catch (InterruptedException e) {
+                    throw new ControllerException(Code.INTERRUPTED_VALUE, e);
+                } catch (ExecutionException e) {
+                    if (e.getCause() instanceof ControllerException) {
+                        throw (ControllerException) e.getCause();
+                    }
+                    throw new ControllerException(Code.INTERNAL_VALUE, e);
+                }
+            }
+        }
     }
 
     @Override
     public void closeStream(long streamId, long streamEpoch) throws ControllerException {
+        for (; ; ) {
+            if (isLeader()) {
+                try (SqlSession session = getSessionFactory().openSession()) {
+                    if (!maintainLeadershipWithSharedLock(session)) {
+                        continue;
+                    }
+                    StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+
+                    Stream stream = streamMapper.getByStreamId(streamId);
+
+                    // Verify resource existence
+                    if (null == stream) {
+                        throw new ControllerException(Code.NOT_FOUND_VALUE, String.format("Stream[stream-id=%d] is not found", streamId));
+                    }
+
+                    // Verify epoch
+                    if (streamEpoch < stream.getEpoch()) {
+                        throw new ControllerException(Code.FENCED_VALUE, "Stream epoch is deprecated");
+                    }
+
+                    // Make closeStream reentrant
+                    if (stream.getState() == StreamState.CLOSED) {
+                        return;
+                    }
+
+                    // Flag state as closed
+                    stream.setState(StreamState.CLOSED);
+                    streamMapper.update(stream);
+
+                    session.commit();
+                }
+            } else {
+                CloseStreamRequest request = CloseStreamRequest.newBuilder()
+                    .setStreamId(streamId)
+                    .setStreamEpoch(streamEpoch)
+                    .build();
+                try {
+                    this.controllerClient.closeStream(this.leaderAddress(), request).get();
+                } catch (InterruptedException e) {
+                    throw new ControllerException(Code.INTERNAL_VALUE, e);
+                } catch (ExecutionException e) {
+                    if (e.getCause() instanceof ControllerException) {
+                        throw (ControllerException) e.getCause();
+                    }
+                    throw new ControllerException(Code.INTERNAL_VALUE, e);
+                }
+            }
+            break;
+        }
     }
 
     @Override
@@ -688,7 +872,8 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public void commitStreamObject(S3StreamObject streamObject, List<Long> compactedObjects) {
+    public void commitStreamObject(S3StreamObject streamObject,
+        List<Long> compactedObjects) {
 
     }
 
@@ -708,7 +893,8 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public List<S3WALObject> listWALObjects(long streamId, long startOffset, long endOffset, int limit) {
+    public List<S3WALObject> listWALObjects(long streamId, long startOffset,
+        long endOffset, int limit) {
         try (SqlSession session = this.sessionFactory.openSession()) {
             S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
             List<com.automq.rocketmq.controller.metadata.database.dao.S3WALObject> s3WALObjects = s3WALObjectMapper.list(this.lease.getNodeId(), null);
@@ -738,7 +924,8 @@ public class DefaultMetadataStore implements MetadataStore {
         }
     }
 
-    public List<S3StreamObject> listStreamObjects(long streamId, long startOffset, long endOffset, int limit) {
+    public List<S3StreamObject> listStreamObjects(long streamId, long startOffset,
+        long endOffset, int limit) {
         try (SqlSession session = this.sessionFactory.openSession()) {
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
             return s3StreamObjectMapper.list(null, streamId, startOffset, endOffset, limit).stream()
