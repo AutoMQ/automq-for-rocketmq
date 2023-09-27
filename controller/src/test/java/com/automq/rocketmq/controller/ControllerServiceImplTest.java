@@ -28,6 +28,8 @@ import apache.rocketmq.controller.v1.ListTopicsReply;
 import apache.rocketmq.controller.v1.ListTopicsRequest;
 import apache.rocketmq.controller.v1.NodeRegistrationReply;
 import apache.rocketmq.controller.v1.NodeRegistrationRequest;
+import apache.rocketmq.controller.v1.OpenStreamRequest;
+import apache.rocketmq.controller.v1.StreamState;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.ControllerClient;
 import com.automq.rocketmq.controller.metadata.ControllerConfig;
@@ -41,6 +43,7 @@ import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import com.automq.rocketmq.controller.metadata.database.dao.AssignmentStatus;
 import com.automq.rocketmq.controller.metadata.database.dao.Stream;
+import com.automq.rocketmq.controller.metadata.database.dao.StreamRole;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
 import com.automq.rocketmq.controller.metadata.database.dao.TopicStatus;
 import com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper;
@@ -430,4 +433,62 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
         }
     }
 
+
+    @Test
+    public void testOpenStream() throws IOException, ControllerException, ExecutionException, InterruptedException {
+        ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
+        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
+        Mockito.when(controllerConfig.nodeId()).thenReturn(1);
+        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
+        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
+
+        long topicId = 1;
+        int queueId = 2;
+        int srcNodeId = 1;
+        int dstNodeId = 2;
+        long streamId;
+
+
+        try (SqlSession session = getSessionFactory().openSession()) {
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+
+            Stream stream = new Stream();
+            stream.setStreamRole(StreamRole.DATA);
+            stream.setTopicId(topicId);
+            stream.setQueueId(queueId);
+            stream.setState(StreamState.UNINITIALIZED);
+            stream.setSrcNodeId(srcNodeId);
+            stream.setDstNodeId(dstNodeId);
+            streamMapper.create(stream);
+            streamId = stream.getId();
+            session.commit();
+        }
+
+        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
+            metadataStore.start();
+            Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
+                .atMost(10, TimeUnit.SECONDS)
+                .until(metadataStore::isLeader);
+
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore))) {
+                testServer.start();
+                int port = testServer.getPort();
+                ControllerClient client = new GrpcControllerClient();
+                OpenStreamRequest request = OpenStreamRequest.newBuilder()
+                    .setStreamId(streamId)
+                    .setStreamEpoch(0)
+                    .setBrokerEpoch(1)
+                    .build();
+                client.openStream(String.format("localhost:%d", port), request).get();
+            }
+        }
+
+        try (SqlSession session = getSessionFactory().openSession()) {
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+            List<Stream> streams = streamMapper.list(topicId, queueId, null);
+            Assertions.assertEquals(1, streams.size());
+            Assertions.assertEquals(StreamState.OPEN, streams.get(0).getState());
+        }
+    }
 }

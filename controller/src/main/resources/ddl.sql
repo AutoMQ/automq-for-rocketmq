@@ -69,10 +69,10 @@ CREATE TABLE IF NOT EXISTS stream
     group_id     BIGINT NULL,
     src_node_id  INT,
     dst_node_id  INT,
-    epoch        BIGINT    NOT NULL DEFAULT 0,
-    range_id     INT,
+    epoch        BIGINT    NOT NULL DEFAULT -1,
+    range_id     INT NOT NULL DEFAULT -1,
     start_offset BIGINT    NOT NULL DEFAULT 0,
-    state        INT       NOT NULL,
+    state        INT       NOT NULL DEFAULT 1,
     create_time  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     update_time  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE INDEX idx_queue (topic_id, queue_id, group_id, stream_role)

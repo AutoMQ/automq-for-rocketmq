@@ -59,6 +59,7 @@ import apache.rocketmq.controller.v1.PrepareS3ObjectsRequest;
 import apache.rocketmq.controller.v1.ReassignMessageQueueReply;
 import apache.rocketmq.controller.v1.ReassignMessageQueueRequest;
 import apache.rocketmq.controller.v1.Status;
+import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.Topic;
 import apache.rocketmq.controller.v1.TrimStreamReply;
 import apache.rocketmq.controller.v1.TrimStreamRequest;
@@ -310,6 +311,17 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
 
     @Override
     public void openStream(OpenStreamRequest request, StreamObserver<OpenStreamReply> responseObserver) {
+        try {
+            StreamMetadata metadata = metadataStore.openStream(request.getStreamId(), request.getStreamEpoch());
+            OpenStreamReply reply = OpenStreamReply.newBuilder()
+                .setStreamMetadata(metadata)
+                .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                .build();
+            responseObserver.onNext(reply);
+            responseObserver.onCompleted();
+        } catch (ControllerException e) {
+            responseObserver.onError(e);
+        }
         super.openStream(request, responseObserver);
     }
 

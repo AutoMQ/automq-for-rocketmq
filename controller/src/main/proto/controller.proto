@@ -25,6 +25,12 @@ enum Code {
   BAD_REQUEST = 1001;
   MOCK_FAILURE = 1002;
   DUPLICATED = 1003;
+
+  // Illegal state for the operation
+  ILLEGAL_STATE = 1004;
+
+  // Operation is fenced out as provided epoch is deprecated.
+  FENCED = 1005;
 }
 
 message Status {

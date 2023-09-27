@@ -610,10 +610,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         long streamId;
         try (SqlSession session = this.getSessionFactory().openSession()) {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
-
             Stream stream = new Stream();
-            stream.setStartOffset(0);
-            stream.setEpoch(-1);
             stream.setRangeId(-1);
             stream.setState(StreamState.UNINITIALIZED);
             stream.setStreamRole(StreamRole.DATA);
@@ -678,11 +675,10 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
 
             Stream stream = new Stream();
-            stream.setStartOffset(1234);
-            stream.setEpoch(0);
             stream.setRangeId(0);
-            stream.setState(StreamState.UNINITIALIZED);
+            stream.setState(StreamState.CLOSED);
             stream.setStreamRole(StreamRole.DATA);
+            stream.setStartOffset(1234);
             streamMapper.create(stream);
             streamId = stream.getId();
 
