@@ -21,33 +21,41 @@
 
 <mapper namespace="com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper">
 
-    <insert id="create" parameterType="StreamMetadata">
-        INSERT INTO stream (stream_id, epoch, range_id, start_offset, state)
+    <insert id="create" parameterType="Stream" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO stream (
+            topic_id, queue_id, stream_role, group_id, src_node_id, dst_node_id, epoch, range_id, start_offset, state
+        )
         VALUES (
-        #{streamId},
-        #{epoch},
-        #{rangeId},
-        #{startOffset},
-        #{state}
+            #{topicId},
+            #{queueId},
+            #{streamRole},
+            #{groupId},
+            #{srcNodeId},
+            #{dstNodeId},
+            #{epoch},
+            #{rangeId},
+            #{startOffset},
+            #{state}
         )
     </insert>
 
     <update id="increaseEpoch" parameterType="long">
         UPDATE stream
         SET epoch = epoch + 1
-        WHERE stream_id = #{id}
+        WHERE id = #{id}
     </update>
 
-    <select id="getByStreamId" resultType="StreamMetadata" parameterType="long">
-        SELECT stream_id, epoch, range_id, start_offset, state
+    <select id="getByStreamId" resultType="Stream" parameterType="long">
+        SELECT id, topic_id, queue_id, stream_role, group_id, src_node_id, dst_node_id, epoch, range_id, start_offset,
+               state
         FROM stream
-        WHERE stream_id = #{streamId, jdbcType=BIGINT}
+        WHERE id = #{id}
     </select>
 
     <update id="updateLastRange">
         UPDATE stream
         SET range_id = #{lastRangeId}
-        WHERE stream_id = #{streamId}
+        WHERE id = #{id}
     </update>
 
     <update id="update">
@@ -66,41 +74,46 @@
                 state = #{state},
             </if>
         </set>
-        WHERE stream_id = #{streamId}
+        WHERE id = #{id}
     </update>
 
     <update id="updateStreamState">
         UPDATE stream
         SET state = #{state}
-        WHERE stream_id = #{streamId}
+        WHERE 1 = 1
+        <if test="null != id">
+            AND id = #{id}
+        </if>
+        <if test="null != topicId">
+            AND topic_id = #{topicId}
+        </if>
+        <if test="null != queueId">
+            AND queue_id = #{queueId}
+        </if>
     </update>
 
-    <delete id="delete" parameterType="long">
+    <delete id="delete">
         DELETE FROM stream
         WHERE 1 = 1
-        <if test="null != streamId">
-            AND stream_id = #{streamId}
+        <if test="null != id">
+            AND id = #{id}
         </if>
     </delete>
 
-    <select id="get" resultType="StreamMetadata">
-        SELECT stream_id, epoch, range_id, start_offset, state
+    <select id="list" resultType="Stream">
+        SELECT id, topic_id, queue_id, stream_role, group_id, src_node_id, dst_node_id, epoch, range_id, start_offset,
+               state
         FROM stream
         WHERE 1 = 1
-        <if test="null != streamId">
-            AND stream_id = #{streamId}
+        <if test="null != topicId">
+            AND topic_id = #{topicId}
         </if>
-        <if test="null != rangeId">
-            AND range_id = #{rangeId}
+        <if test="null != queueId">
+            AND queue_id = #{queueId}
         </if>
-        <if test="null != state">
-            AND state = #{state}
+        <if test="null != groupId">
+            AND group_id = #{groupId}
         </if>
-    </select>
-
-    <select id="list" resultType="StreamMetadata">
-        SELECT stream_id, epoch, range_id, start_offset, state
-        FROM stream
     </select>
 
 </mapper>

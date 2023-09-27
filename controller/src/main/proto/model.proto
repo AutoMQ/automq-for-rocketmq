@@ -78,15 +78,20 @@ message ConsumerGroup {
 message StreamMetadata {
   // The stream ID of the stream.
   int64 stream_id = 1;
+
   // The epoch of the stream.
   int64 epoch = 2;
+
   // The last range that belongs to the stream.
   int32 range_id = 3;
+
   // The start offset of the stream, inclusive.
   int64 start_offset = 4;
+
   // End offset of this stream, exclusive.
-  // This filed is equal to the end offset of the last range of the stream.
+  // This field is equal to the end offset of the last range of the stream.
   int64 end_offset = 5;
+
   // The stream state.
   StreamState state = 6;
 }
@@ -94,14 +99,24 @@ message StreamMetadata {
 enum StreamState {
   // The stream state is unspecified.
   UNSPECIFIED = 0;
+
   // The stream is in the un initial state.
   UNINITIALIZED = 1;
+
   // The stream is in the open state.
   OPEN = 2;
+
+  // Once the leader controller has decided to migrate the stream to another node, it would flag its state as closing
+  // and update src_node_id and dst_node_id accordingly.
+  // Once the src node received this event, it would close the stream and update this field to closed.
+  // When dst node gets to know that the src node has closed the steam, it would open the stream again for read/write.
+  CLOSING = 3;
+
   // The stream is in the closed state.
-  CLOSED = 3;
+  CLOSED = 4;
+
   // The stream is in the deleted state.
-  DELETED = 4;
+  DELETED = 5;
 }
 
 
