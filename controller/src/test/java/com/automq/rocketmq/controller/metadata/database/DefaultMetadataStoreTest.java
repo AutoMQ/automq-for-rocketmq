@@ -34,6 +34,7 @@ import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import com.automq.rocketmq.controller.metadata.database.dao.AssignmentStatus;
 import com.automq.rocketmq.controller.metadata.database.dao.Stream;
 import com.automq.rocketmq.controller.metadata.database.dao.Range;
+import com.automq.rocketmq.controller.metadata.database.dao.StreamRole;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
 import com.automq.rocketmq.controller.metadata.database.dao.TopicStatus;
 import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
@@ -605,18 +606,19 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
     @Test
     public void testOpenStream_WithCloseStream_AtStart() throws IOException, ControllerException {
-        long streamId = 123, streamEpoch = 0;
+        long streamEpoch = 0;
+        long streamId;
         try (SqlSession session = this.getSessionFactory().openSession()) {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
 
             Stream stream = new Stream();
-            stream.setId(streamId);
             stream.setStartOffset(0);
             stream.setEpoch(-1);
             stream.setRangeId(-1);
             stream.setState(StreamState.UNINITIALIZED);
+            stream.setStreamRole(StreamRole.DATA);
             streamMapper.create(stream);
-
+            streamId = stream.getId();
             session.commit();
         }
 
@@ -669,19 +671,20 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testOpenStream_WithCloseStream() throws IOException, ControllerException {
-        long streamId = 123, streamEpoch = 1;
+    public void testOpenStream_WithClosedStream() throws IOException, ControllerException {
+        long streamId, streamEpoch = 1;
         try (SqlSession session = this.getSessionFactory().openSession()) {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
             RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
 
             Stream stream = new Stream();
-            stream.setId(streamId);
             stream.setStartOffset(1234);
             stream.setEpoch(0);
             stream.setRangeId(0);
             stream.setState(StreamState.UNINITIALIZED);
+            stream.setStreamRole(StreamRole.DATA);
             streamMapper.create(stream);
+            streamId = stream.getId();
 
             Range range = new Range();
             range.setRangeId(0);
