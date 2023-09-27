@@ -21,23 +21,24 @@
 <mapper namespace="com.automq.rocketmq.controller.metadata.database.mapper.S3ObjectMapper">
 
     <insert id="create" parameterType="S3Object" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
-        INSERT INTO s3object (object_id, object_size, state)
+        INSERT INTO s3object (object_id, object_size, stream_id, state)
         VALUES (
             #{objectId},
             #{objectSize},
+            #{streamId},
             #{state}
         )
     </insert>
 
     <select id="getById" resultType="S3Object">
-        SELECT id, object_id, object_size, prepared_timestamp, committed_timestamp, expired_timestamp,
+        SELECT id, object_id, stream_id, object_size, prepared_timestamp, committed_timestamp, expired_timestamp,
         marked_for_deletion_timestamp, state
         FROM s3object
         WHERE id = #{id}
     </select>
 
     <select id="getByObjectId" resultType="S3Object">
-        SELECT id, object_id, object_size, prepared_timestamp, committed_timestamp, expired_timestamp,
+        SELECT id, object_id, stream_id, object_size, prepared_timestamp, committed_timestamp, expired_timestamp,
         marked_for_deletion_timestamp, state
         FROM s3object
         WHERE object_id = #{objectId}
@@ -97,7 +98,7 @@
     </update>
 
     <select id="list" resultType="S3Object">
-        SELECT id, object_id, object_size, prepared_timestamp, committed_timestamp, expired_timestamp,
+        SELECT id, object_id, stream_id, object_size, prepared_timestamp, committed_timestamp, expired_timestamp,
         marked_for_deletion_timestamp, state
         FROM s3object
         WHERE 1 = 1
