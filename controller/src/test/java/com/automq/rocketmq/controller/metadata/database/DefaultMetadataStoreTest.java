@@ -115,7 +115,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
     /**
      * Dummy test, should be removed later
-     *
      */
     @Test
     void testGetLease() throws IOException {
@@ -820,6 +819,39 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Assertions.assertEquals(GroupType.GROUP_TYPE_STANDARD, got.getGroupType());
             Assertions.assertEquals(1L, got.getDeadLetterTopicId());
             Assertions.assertEquals("G1", got.getName());
+        }
+    }
+
+    @Test
+    public void testListOpenStreams() throws IOException, ExecutionException, InterruptedException {
+        try (SqlSession session = getSessionFactory().openSession()) {
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+
+            Stream stream = new Stream();
+            stream.setEpoch(1);
+            stream.setTopicId(2L);
+            stream.setQueueId(3);
+            stream.setDstNodeId(4);
+            stream.setSrcNodeId(5);
+            stream.setState(StreamState.OPEN);
+            stream.setStartOffset(6);
+            stream.setRangeId(7);
+            stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
+            streamMapper.create(stream);
+            session.commit();
+        }
+
+        ControllerConfig config = Mockito.mock(ControllerConfig.class);
+        Mockito.when(config.nodeId()).thenReturn(4);
+        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
+        Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(null, getSessionFactory(), config)) {
+            metadataStore.start();
+            Awaitility.await().with().atMost(3, TimeUnit.SECONDS).pollInterval(100, TimeUnit.MILLISECONDS)
+                .until(metadataStore::isLeader);
+            List<StreamMetadata> metadataList = metadataStore.listOpenStreams(4, 1L).get();
+            Assertions.assertEquals(1, metadataList.size());
         }
     }
 

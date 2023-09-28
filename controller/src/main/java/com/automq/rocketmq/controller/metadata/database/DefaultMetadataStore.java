@@ -32,6 +32,8 @@ import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.OngoingMessageQueueReassignment;
 import apache.rocketmq.controller.v1.OpenStreamReply;
 import apache.rocketmq.controller.v1.OpenStreamRequest;
+import apache.rocketmq.controller.v1.S3StreamObject;
+import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.StreamState;
@@ -1061,7 +1063,7 @@ public class DefaultMetadataStore implements MetadataStore {
                             return StreamMetadata.newBuilder()
                                 .setStreamId(stream.getId())
                                 .setStartOffset(stream.getStartOffset())
-                                .setEndOffset(range.getEndOffset())
+                                .setEndOffset(null == range ? 0 : range.getEndOffset())
                                 .setEpoch(stream.getEpoch())
                                 .setState(stream.getState())
                                 .setRangeId(stream.getRangeId())
@@ -1094,19 +1096,19 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public void commitWalObject(apache.rocketmq.controller.v1.S3WALObject walObject,
-        List<apache.rocketmq.controller.v1.S3StreamObject> streamObjects, List<Long> compactedObjects) {
+    public void commitWalObject(S3WALObject walObject,
+        List<S3StreamObject> streamObjects, List<Long> compactedObjects) {
 
     }
 
     @Override
-    public void commitStreamObject(apache.rocketmq.controller.v1.S3StreamObject streamObject,
+    public void commitStreamObject(S3StreamObject streamObject,
         List<Long> compactedObjects) {
 
     }
 
     @Override
-    public List<apache.rocketmq.controller.v1.S3WALObject> listWALObjects() {
+    public List<S3WALObject> listWALObjects() {
         try (SqlSession session = this.sessionFactory.openSession()) {
             S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
             return s3WALObjectMapper.list(this.lease.getNodeId(), null).stream()
@@ -1121,7 +1123,7 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public List<apache.rocketmq.controller.v1.S3WALObject> listWALObjects(long streamId, long startOffset,
+    public List<S3WALObject> listWALObjects(long streamId, long startOffset,
         long endOffset, int limit) {
         try (SqlSession session = this.sessionFactory.openSession()) {
             S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
@@ -1152,12 +1154,12 @@ public class DefaultMetadataStore implements MetadataStore {
         }
     }
 
-    public List<apache.rocketmq.controller.v1.S3StreamObject> listStreamObjects(long streamId, long startOffset,
+    public List<S3StreamObject> listStreamObjects(long streamId, long startOffset,
         long endOffset, int limit) {
         try (SqlSession session = this.sessionFactory.openSession()) {
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
             return s3StreamObjectMapper.list(null, streamId, startOffset, endOffset, limit).stream()
-                .map(streamObject -> apache.rocketmq.controller.v1.S3StreamObject.newBuilder()
+                .map(streamObject -> S3StreamObject.newBuilder()
                     .setStreamId(streamObject.getStreamId())
                     .setObjectSize(streamObject.getObjectSize())
                     .setObjectId(streamObject.getObjectId())
@@ -1170,10 +1172,10 @@ public class DefaultMetadataStore implements MetadataStore {
         }
     }
 
-    private apache.rocketmq.controller.v1.S3WALObject buildS3WALObject(
+    private S3WALObject buildS3WALObject(
         com.automq.rocketmq.controller.metadata.database.dao.S3WALObject originalObject,
         Map<Long, SubStream> subStreams) {
-        return apache.rocketmq.controller.v1.S3WALObject.newBuilder()
+        return S3WALObject.newBuilder()
             .setObjectId(originalObject.getObjectId())
             .setObjectSize(originalObject.getObjectSize())
             .setBrokerId(originalObject.getBrokerId())
