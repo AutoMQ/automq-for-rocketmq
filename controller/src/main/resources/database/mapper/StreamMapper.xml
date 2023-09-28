@@ -116,4 +116,17 @@
         </if>
     </select>
 
+    <select id="listByNode" resultType="Stream">
+        SELECT id, topic_id, queue_id, stream_role, group_id, src_node_id, dst_node_id, epoch, range_id, start_offset,
+        state
+        FROM stream
+        WHERE 1 = 1
+        <if test="null != nodeId">
+            AND dst_node_id = #{nodeId}
+        </if>
+        <if test="null != state">
+            AND state = #{state}
+        </if>
+    </select>
+
 </mapper>

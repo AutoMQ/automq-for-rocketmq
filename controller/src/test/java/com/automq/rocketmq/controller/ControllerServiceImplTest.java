@@ -27,6 +27,7 @@ import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.GroupType;
 import apache.rocketmq.controller.v1.HeartbeatReply;
 import apache.rocketmq.controller.v1.HeartbeatRequest;
+import apache.rocketmq.controller.v1.ListOpenStreamsRequest;
 import apache.rocketmq.controller.v1.ListTopicsReply;
 import apache.rocketmq.controller.v1.ListTopicsRequest;
 import apache.rocketmq.controller.v1.NodeRegistrationReply;
@@ -1197,4 +1198,51 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
         }
     }
 
+
+    @Test
+    public void testListOpenStreams() throws IOException, ExecutionException, InterruptedException {
+        ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
+        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
+        Mockito.when(controllerConfig.nodeId()).thenReturn(2);
+        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
+        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
+
+        try (SqlSession session = getSessionFactory().openSession()) {
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+
+            Stream stream = new Stream();
+            stream.setEpoch(1);
+            stream.setTopicId(2L);
+            stream.setQueueId(3);
+            stream.setDstNodeId(4);
+            stream.setSrcNodeId(5);
+            stream.setState(StreamState.OPEN);
+            stream.setStartOffset(6);
+            stream.setRangeId(7);
+            stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
+            streamMapper.create(stream);
+            session.commit();
+        }
+
+        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
+            metadataStore.start();
+            Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
+                .atMost(10, TimeUnit.SECONDS)
+                .until(metadataStore::isLeader);
+
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
+                 ControllerClient client = new GrpcControllerClient()
+            ) {
+                testServer.start();
+                int port = testServer.getPort();
+
+                ListOpenStreamsRequest request = ListOpenStreamsRequest.newBuilder()
+                    .setBrokerId(1)
+                    .setBrokerEpoch(2)
+                    .build();
+                client.listOpenStreams(String.format("localhost:%d", port), request).get();
+            }
+        }
+    }
 }

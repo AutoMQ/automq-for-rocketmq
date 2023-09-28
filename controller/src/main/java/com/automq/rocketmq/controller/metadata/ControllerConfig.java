@@ -20,6 +20,8 @@ package com.automq.rocketmq.controller.metadata;
 public interface ControllerConfig {
     int nodeId();
 
+    long epoch();
+
     int scanIntervalInSecs();
 
     int leaseLifeSpanInSecs();
