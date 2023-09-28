@@ -400,37 +400,46 @@ public class GrpcControllerClient implements ControllerClient {
 
     @Override
     public CompletableFuture<OpenStreamReply> openStream(String target,
-        OpenStreamRequest request) throws ControllerException {
+        OpenStreamRequest request) {
         CompletableFuture<OpenStreamReply> future = new CompletableFuture<>();
-        Futures.addCallback(this.buildStubForTarget(target).openStream(request), new FutureCallback<>() {
-            @Override
-            public void onSuccess(OpenStreamReply result) {
-                future.complete(result);
-            }
+        try {
+            Futures.addCallback(this.buildStubForTarget(target).openStream(request), new FutureCallback<>() {
+                @Override
+                public void onSuccess(OpenStreamReply result) {
+                    future.complete(result);
+                }
 
-            @Override
-            public void onFailure(@Nonnull Throwable t) {
-                future.completeExceptionally(t);
-            }
-        }, MoreExecutors.directExecutor());
+                @Override
+                public void onFailure(@Nonnull Throwable t) {
+                    future.completeExceptionally(t);
+                }
+            }, MoreExecutors.directExecutor());
+        } catch (ControllerException e) {
+            future.completeExceptionally(e);
+        }
+
         return future;
     }
 
     @Override
     public CompletableFuture<CloseStreamReply> closeStream(String target,
-        CloseStreamRequest request) throws ControllerException {
+        CloseStreamRequest request) {
         CompletableFuture<CloseStreamReply> future = new CompletableFuture<>();
-        Futures.addCallback(this.buildStubForTarget(target).closeStream(request), new FutureCallback<>() {
-            @Override
-            public void onSuccess(CloseStreamReply result) {
-                future.complete(result);
-            }
+        try {
+            Futures.addCallback(this.buildStubForTarget(target).closeStream(request), new FutureCallback<>() {
+                @Override
+                public void onSuccess(CloseStreamReply result) {
+                    future.complete(result);
+                }
 
-            @Override
-            public void onFailure(@Nonnull Throwable t) {
-                future.completeExceptionally(t);
-            }
-        }, MoreExecutors.directExecutor());
+                @Override
+                public void onFailure(@Nonnull Throwable t) {
+                    future.completeExceptionally(t);
+                }
+            }, MoreExecutors.directExecutor());
+        } catch (ControllerException e) {
+            future.completeExceptionally(e);
+        }
         return future;
     }
 

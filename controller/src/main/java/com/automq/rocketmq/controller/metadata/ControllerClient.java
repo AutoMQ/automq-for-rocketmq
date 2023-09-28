@@ -61,9 +61,9 @@ public interface ControllerClient extends Closeable {
     CompletableFuture<Void> commitOffset(String target, long groupId, long topicId, int queueId,
         long offset) throws ControllerException;
 
-    CompletableFuture<OpenStreamReply> openStream(String target, OpenStreamRequest request) throws ControllerException;
+    CompletableFuture<OpenStreamReply> openStream(String target, OpenStreamRequest request);
 
-    CompletableFuture<CloseStreamReply> closeStream(String target, CloseStreamRequest request) throws ControllerException;
+    CompletableFuture<CloseStreamReply> closeStream(String target, CloseStreamRequest request);
 
     CompletableFuture<TrimStreamReply> trimStream(String target, TrimStreamRequest request) throws ControllerException;
 }
