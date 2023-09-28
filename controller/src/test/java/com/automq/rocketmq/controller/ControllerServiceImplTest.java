@@ -419,9 +419,9 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             GroupMapper groupMapper = session.getMapper(GroupMapper.class);
             Group group = new Group();
             group.setName(groupName);
-            group.setGroupType(com.automq.rocketmq.controller.metadata.database.dao.GroupType.STANDARD);
+            group.setGroupType(GroupType.GROUP_TYPE_STANDARD);
             group.setDeadLetterTopicId(1);
-            group.setMaxRetryAttempt(3);
+            group.setMaxDeliveryAttempt(3);
             groupMapper.create(group);
             groupId = group.getId();
 

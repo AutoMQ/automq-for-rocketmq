@@ -17,16 +17,17 @@
 
 package com.automq.rocketmq.metadata;
 
+import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
 import com.automq.rocketmq.common.util.Pair;
-import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.DefaultMetadataStore;
 import com.automq.rocketmq.controller.metadata.database.dao.StreamRole;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,8 +44,10 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
     @Override
     public long getStreamId(long topicId, int queueId) {
         try {
-            return metadataStore.streamIdOf(topicId, queueId, null, StreamRole.DATA);
-        } catch (ControllerException e) {
+            return metadataStore.getStream(topicId, queueId, null, StreamRole.DATA)
+                .get()
+                .getStreamId();
+        } catch (ExecutionException | InterruptedException e) {
             LOGGER.error("Failed to acquire data stream-id for topic-id={}, queue-id={}", topicId, queueId);
             return -1L;
         }
@@ -53,8 +56,9 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
     @Override
     public long getOperationLogStreamId(long topicId, int queueId) {
         try {
-            return metadataStore.streamIdOf(topicId, queueId, null, StreamRole.OPS);
-        } catch (ControllerException e) {
+            return metadataStore.getStream(topicId, queueId, null, StreamRole.OPS).get()
+                .getStreamId();
+        } catch (ExecutionException | InterruptedException e) {
             LOGGER.error("Failed to acquire data stream-id for topic-id={}, queue-id={}", topicId, queueId);
             return -1L;
         }
@@ -63,8 +67,9 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
     @Override
     public long getRetryStreamId(long consumerGroupId, long topicId, int queueId) {
         try {
-            return metadataStore.streamIdOf(topicId, queueId, consumerGroupId, StreamRole.RETRY);
-        } catch (ControllerException e) {
+            return metadataStore.getStream(topicId, queueId, consumerGroupId, StreamRole.RETRY).get()
+                .getStreamId();
+        } catch (ExecutionException | InterruptedException e) {
             LOGGER.error("Failed to acquire data stream-id for topic-id={}, queue-id={}", topicId, queueId);
             return -1L;
         }
@@ -76,23 +81,29 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
     }
 
     @Override
-    public int getMaxRetryTimes(long consumerGroupId) {
-        return 0;
+    public int getMaxDeliveryAttempts(long consumerGroupId) {
+        try {
+            ConsumerGroup group = metadataStore.getGroup(consumerGroupId).get();
+            return group.getMaxDeliveryAttempt();
+        } catch (ExecutionException | InterruptedException e) {
+            LOGGER.error("Exception raised while retrieving group for {}", consumerGroupId, e);
+            return -1;
+        }
     }
 
     @Override
     public CompletableFuture<StreamMetadata> dataStreamOf(long topicId, int queueId) {
-        return null;
+        return metadataStore.getStream(topicId, queueId, null, StreamRole.DATA);
     }
 
     @Override
     public CompletableFuture<StreamMetadata> operationStreamOf(long topicId, int queueId) {
-        return null;
+        return metadataStore.getStream(topicId, queueId, null, StreamRole.OPS);
     }
 
     @Override
     public CompletableFuture<StreamMetadata> retryStreamOf(long consumerGroupId, long topicId, int queueId) {
-        return null;
+        return metadataStore.getStream(topicId, queueId, consumerGroupId, StreamRole.RETRY);
     }
 
     @Override
@@ -101,8 +112,8 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
     }
 
     @Override
-    public CompletableFuture<Integer> maxRetryTimesOf(long consumerGroupId) {
-        return null;
+    public CompletableFuture<Integer> maxDeliveryAttemptsOf(long consumerGroupId) {
+        return metadataStore.getGroup(consumerGroupId).thenApply((ConsumerGroup::getMaxDeliveryAttempt));
     }
 
     @Override

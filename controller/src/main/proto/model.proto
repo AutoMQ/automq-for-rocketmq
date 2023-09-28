@@ -70,6 +70,9 @@ message OngoingMessageQueueReassignment {
 message ConsumerGroup {
   string name = 1;
   int64 group_id = 2;
+  GroupType group_type = 3;
+  int32 max_delivery_attempt = 4;
+  int64 dead_letter_topic_id = 5;
 }
 
 // Bellow messages are used to represent the `Stream` resource.

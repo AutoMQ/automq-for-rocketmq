@@ -19,6 +19,7 @@ package com.automq.rocketmq.controller.metadata.database;
 
 import apache.rocketmq.controller.v1.CloseStreamRequest;
 import apache.rocketmq.controller.v1.Code;
+import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.GroupType;
@@ -27,6 +28,7 @@ import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.OngoingMessageQueueReassignment;
 import apache.rocketmq.controller.v1.OpenStreamReply;
 import apache.rocketmq.controller.v1.OpenStreamRequest;
+import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.StreamState;
 import apache.rocketmq.controller.v1.SubStream;
 import apache.rocketmq.controller.v1.TrimStreamRequest;
@@ -74,6 +76,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
@@ -625,15 +628,10 @@ public class DefaultMetadataStore implements MetadataStore {
 
                     Group group = new Group();
                     group.setName(groupName);
-                    group.setMaxRetryAttempt(maxRetry);
+                    group.setMaxDeliveryAttempt(maxRetry);
                     group.setDeadLetterTopicId(deadLetterTopicId);
                     group.setStatus(GroupStatus.ACTIVE);
-                    switch (type) {
-                        case GROUP_TYPE_STANDARD ->
-                            group.setGroupType(com.automq.rocketmq.controller.metadata.database.dao.GroupType.STANDARD);
-                        case GROUP_TYPE_FIFO ->
-                            group.setGroupType(com.automq.rocketmq.controller.metadata.database.dao.GroupType.FIFO);
-                    }
+                    group.setGroupType(type);
                     groupMapper.create(group);
                     session.commit();
                     return group.getId();
@@ -664,17 +662,55 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public long streamIdOf(long topicId, int queueId, Long groupId, StreamRole streamRole) throws ControllerException {
+    public CompletableFuture<StreamMetadata> getStream(long topicId, int queueId, Long groupId, StreamRole streamRole) {
+        CompletableFuture<StreamMetadata> future = new CompletableFuture<>();
         try (SqlSession session = getSessionFactory().openSession()) {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
             List<Stream> streams = streamMapper.list(topicId, queueId, groupId).stream()
                 .filter(stream -> stream.getStreamRole() == streamRole).toList();
             if (streams.isEmpty()) {
-                throw new ControllerException(Code.NOT_FOUND_VALUE,
+                ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE,
                     String.format("Stream for topic-id=%d, queue-id=%d, stream-role=%s is not found", topicId, queueId, streamRole.name()));
+                future.completeExceptionally(e);
+            } else {
+                Stream stream = streams.get(0);
+                StreamMetadata metadata = StreamMetadata.newBuilder()
+                    .setEpoch(stream.getEpoch())
+                    .setStreamId(stream.getId())
+                    .setRangeId(stream.getRangeId())
+                    .setState(stream.getState())
+                    .setStartOffset(stream.getStartOffset())
+                    .build();
+                future.complete(metadata);
             }
-            return streams.get(0).getId();
         }
+
+        return future;
+    }
+
+    @Override
+    public CompletableFuture<ConsumerGroup> getGroup(long groupId) {
+        CompletableFuture<ConsumerGroup> future = new CompletableFuture<>();
+        try (SqlSession session = getSessionFactory().openSession()) {
+            GroupMapper groupMapper = session.getMapper(GroupMapper.class);
+            List<Group> groups = groupMapper.list(groupId, null, null, null);
+            if (groups.isEmpty()) {
+                ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE,
+                    String.format("Group with group-id=%d is not found", groupId));
+                future.completeExceptionally(e);
+            } else {
+                Group group = groups.get(0);
+                ConsumerGroup cg = ConsumerGroup.newBuilder()
+                    .setGroupId(group.getId())
+                    .setName(group.getName())
+                    .setGroupType(group.getGroupType())
+                    .setMaxDeliveryAttempt(group.getMaxDeliveryAttempt())
+                    .setDeadLetterTopicId(group.getDeadLetterTopicId())
+                    .build();
+                future.complete(cg);
+            }
+        }
+        return future;
     }
 
     public void trimStream(long streamId, long streamEpoch, long newStartOffset) throws ControllerException {
@@ -760,7 +796,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     });
 
                     // remove wal object or remove sub-stream range in wal object
-                    s3WALObjectMapper.list(stream.getDstNodeId(),null).stream()
+                    s3WALObjectMapper.list(stream.getDstNodeId(), null).stream()
                         .map(s3WALObject -> {
                             Map<Long, SubStream> subStreams = gson.fromJson(new String(s3WALObject.getSubStreams().getBytes(StandardCharsets.UTF_8)), new TypeToken<Map<Long, SubStream>>() {
                             }.getType());
@@ -803,9 +839,9 @@ public class DefaultMetadataStore implements MetadataStore {
         }
     }
 
-
     @Override
-    public apache.rocketmq.controller.v1.StreamMetadata openStream(long streamId, long streamEpoch) throws ControllerException {
+    public apache.rocketmq.controller.v1.StreamMetadata openStream(long streamId,
+        long streamEpoch) throws ControllerException {
         for (; ; ) {
             if (isLeader()) {
                 try (SqlSession session = getSessionFactory().openSession()) {
@@ -990,6 +1026,7 @@ public class DefaultMetadataStore implements MetadataStore {
             break;
         }
     }
+
     @Override
     public List<apache.rocketmq.controller.v1.StreamMetadata> listOpenStreams() {
         return null;
@@ -1001,12 +1038,14 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public void commitWalObject(apache.rocketmq.controller.v1.S3WALObject walObject, List<apache.rocketmq.controller.v1.S3StreamObject> streamObjects, List<Long> compactedObjects) {
+    public void commitWalObject(apache.rocketmq.controller.v1.S3WALObject walObject,
+        List<apache.rocketmq.controller.v1.S3StreamObject> streamObjects, List<Long> compactedObjects) {
 
     }
 
     @Override
-    public void commitStreamObject(apache.rocketmq.controller.v1.S3StreamObject streamObject, List<Long> compactedObjects) {
+    public void commitStreamObject(apache.rocketmq.controller.v1.S3StreamObject streamObject,
+        List<Long> compactedObjects) {
 
     }
 
@@ -1026,7 +1065,8 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public List<apache.rocketmq.controller.v1.S3WALObject> listWALObjects(long streamId, long startOffset, long endOffset, int limit) {
+    public List<apache.rocketmq.controller.v1.S3WALObject> listWALObjects(long streamId, long startOffset,
+        long endOffset, int limit) {
         try (SqlSession session = this.sessionFactory.openSession()) {
             S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
             List<com.automq.rocketmq.controller.metadata.database.dao.S3WALObject> s3WALObjects = s3WALObjectMapper.list(this.lease.getNodeId(), null);
@@ -1074,8 +1114,9 @@ public class DefaultMetadataStore implements MetadataStore {
         }
     }
 
-
-    private apache.rocketmq.controller.v1.S3WALObject buildS3WALObject(com.automq.rocketmq.controller.metadata.database.dao.S3WALObject originalObject, Map<Long, SubStream> subStreams) {
+    private apache.rocketmq.controller.v1.S3WALObject buildS3WALObject(
+        com.automq.rocketmq.controller.metadata.database.dao.S3WALObject originalObject,
+        Map<Long, SubStream> subStreams) {
         return apache.rocketmq.controller.v1.S3WALObject.newBuilder()
             .setObjectId(originalObject.getObjectId())
             .setObjectSize(originalObject.getObjectSize())
