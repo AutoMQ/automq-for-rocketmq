@@ -70,7 +70,7 @@ public class MockStoreMetadataService implements StoreMetadataService {
     }
 
     @Override
-    public int getMaxRetryTimes(long consumerGroupId) {
+    public int getMaxDeliveryAttempts(long consumerGroupId) {
         return 1;
     }
 
@@ -95,7 +95,7 @@ public class MockStoreMetadataService implements StoreMetadataService {
     }
 
     @Override
-    public CompletableFuture<Integer> maxRetryTimesOf(long consumerGroupId) {
+    public CompletableFuture<Integer> maxDeliveryAttemptsOf(long consumerGroupId) {
         return null;
     }
 

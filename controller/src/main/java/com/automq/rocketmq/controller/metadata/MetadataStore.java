@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.controller.metadata;
 
+import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.GroupType;
 import apache.rocketmq.controller.v1.Topic;
 import apache.rocketmq.controller.v1.S3StreamObject;
@@ -29,6 +30,7 @@ import com.automq.rocketmq.controller.metadata.database.dao.AssignmentStatus;
 import com.automq.rocketmq.controller.metadata.database.dao.StreamRole;
 import java.io.Closeable;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 public interface MetadataStore extends Closeable {
 
@@ -82,7 +84,9 @@ public interface MetadataStore extends Closeable {
 
     long createGroup(String groupName, int maxRetry, GroupType type, long dlq) throws ControllerException;
 
-    long streamIdOf(long topicId, int queueId, Long groupId, StreamRole streamRole) throws ControllerException;
+    CompletableFuture<StreamMetadata> getStream(long topicId, int queueId, Long groupId, StreamRole streamRole);
+
+    CompletableFuture<ConsumerGroup> getGroup(long groupId);
 
     void trimStream(long streamId, long streamEpoch, long newStartOffset) throws ControllerException;
 

@@ -68,12 +68,12 @@ public interface StoreMetadataService {
     CompletableFuture<List<StreamMetadata>> listStreamsManagedBy(long topicId, int queueId);
 
     /**
-     * Get the configured max retry times of the specified consumer group.
+     * Get the configured max delivery attempt times of the specified consumer group.
      *
      * @param consumerGroupId consumer group id
      * @return {@link CompletableFuture} of {@link Integer}
      */
-    CompletableFuture<Integer> maxRetryTimesOf(long consumerGroupId);
+    CompletableFuture<Integer> maxDeliveryAttemptsOf(long consumerGroupId);
 
     /**
      * Trim stream to new start offset. The old data will be deleted or marked as deleted.
@@ -195,5 +195,5 @@ public interface StoreMetadataService {
     @Deprecated
     long getDeadLetterStreamId(long consumerGroupId, long topicId, int queueId);
     @Deprecated
-    int getMaxRetryTimes(long consumerGroupId);
+    int getMaxDeliveryAttempts(long consumerGroupId);
 }

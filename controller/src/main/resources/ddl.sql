@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS consumer_group
     name                 VARCHAR(255) NOT NULL,
     status               TINYINT      NOT NULL DEFAULT 0,
     dead_letter_topic_id BIGINT,
-    max_retry_attempt    INT          NOT NULL DEFAULT 16,
+    max_delivery_attempt    INT          NOT NULL DEFAULT 16,
     group_type           TINYINT      NOT NULL,
     create_time          DATETIME              DEFAULT CURRENT_TIMESTAMP,
     update_time          DATETIME              DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

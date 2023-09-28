@@ -17,6 +17,8 @@
 
 package com.automq.rocketmq.controller.metadata.database;
 
+import apache.rocketmq.controller.v1.ConsumerGroup;
+import apache.rocketmq.controller.v1.GroupType;
 import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
@@ -28,6 +30,8 @@ import com.automq.rocketmq.controller.metadata.ControllerConfig;
 import com.automq.rocketmq.controller.metadata.DatabaseTestBase;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.Role;
+import com.automq.rocketmq.controller.metadata.database.dao.Group;
+import com.automq.rocketmq.controller.metadata.database.dao.GroupStatus;
 import com.automq.rocketmq.controller.metadata.database.dao.Lease;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
@@ -37,6 +41,7 @@ import com.automq.rocketmq.controller.metadata.database.dao.Range;
 import com.automq.rocketmq.controller.metadata.database.dao.StreamRole;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
 import com.automq.rocketmq.controller.metadata.database.dao.TopicStatus;
+import com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.RangeMapper;
@@ -49,6 +54,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import com.google.gson.Gson;
@@ -739,7 +745,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testStreamIdOf() throws IOException, ControllerException {
+    public void testGetStream() throws IOException, ControllerException, ExecutionException, InterruptedException {
         long dataStreamId;
         long opsStreamId;
         long retryStreamId;
@@ -776,20 +782,51 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            long streamId = metadataStore.streamIdOf(1, 2, null, StreamRole.DATA);
+            long streamId = metadataStore.getStream(1, 2, null, StreamRole.DATA)
+                .get().getStreamId();
             Assertions.assertEquals(streamId, dataStreamId);
-            streamId = metadataStore.streamIdOf(1, 2, null, StreamRole.OPS);
+            streamId = metadataStore.getStream(1, 2, null, StreamRole.OPS).get().getStreamId();
             Assertions.assertEquals(streamId, opsStreamId);
 
-            streamId = metadataStore.streamIdOf(1, 2, 3L, StreamRole.RETRY);
+            streamId = metadataStore.getStream(1, 2, 3L, StreamRole.RETRY).get().getStreamId();
             Assertions.assertEquals(streamId, retryStreamId);
         }
     }
 
+    @Test
+    public void testGetGroup() throws IOException, ExecutionException, InterruptedException {
+        long groupId;
+        try (SqlSession session = this.getSessionFactory().openSession()) {
+            GroupMapper groupMapper = session.getMapper(GroupMapper.class);
+            Group group = new Group();
+            group.setGroupType(GroupType.GROUP_TYPE_STANDARD);
+            group.setMaxDeliveryAttempt(5);
+            group.setDeadLetterTopicId(1L);
+            group.setStatus(GroupStatus.ACTIVE);
+            group.setName("G1");
+            groupMapper.create(group);
+            groupId = group.getId();
+            session.commit();
+        }
+
+        ControllerConfig config = Mockito.mock(ControllerConfig.class);
+        Mockito.when(config.nodeId()).thenReturn(1);
+        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
+        Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
+        try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            ConsumerGroup got = metadataStore.getGroup(groupId).get();
+//            Assertions.assertEquals(5, got.getMaxRetryAttempt());
+//            Assertions.assertEquals(GroupType.STANDARD, got.getGroupType());
+//            Assertions.assertEquals(1L, got.getDeadLetterTopicId());
+//            Assertions.assertEquals(GroupStatus.ACTIVE, got.getStatus());
+            Assertions.assertEquals("G1", got.getName());
+        }
+    }
 
     @Test
     public void testTrimStream() throws IOException {
-        long streamId,streamEpoch = 1, newStartOffset = 2000;
+        long streamId, streamEpoch = 1, newStartOffset = 2000;
         int nodeId = 1, rangId = 0;
         try (SqlSession session = this.getSessionFactory().openSession()) {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
@@ -817,7 +854,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
             session.commit();
         }
-
 
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.nodeId()).thenReturn(nodeId);

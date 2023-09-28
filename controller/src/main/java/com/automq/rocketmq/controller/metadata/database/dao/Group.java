@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.controller.metadata.database.dao;
 
+import apache.rocketmq.controller.v1.GroupType;
 import java.util.Date;
 
 public class Group {
@@ -27,9 +28,9 @@ public class Group {
 
     private long deadLetterTopicId;
 
-    private int maxRetryAttempt;
+    private int maxDeliveryAttempt;
 
-    private GroupType groupType = GroupType.STANDARD;
+    private GroupType groupType = GroupType.GROUP_TYPE_STANDARD;
 
     private Date createTime;
     private Date updateTime;
@@ -82,12 +83,12 @@ public class Group {
         this.deadLetterTopicId = deadLetterTopicId;
     }
 
-    public int getMaxRetryAttempt() {
-        return maxRetryAttempt;
+    public int getMaxDeliveryAttempt() {
+        return maxDeliveryAttempt;
     }
 
-    public void setMaxRetryAttempt(int maxRetryAttempt) {
-        this.maxRetryAttempt = maxRetryAttempt;
+    public void setMaxDeliveryAttempt(int maxDeliveryAttempt) {
+        this.maxDeliveryAttempt = maxDeliveryAttempt;
     }
 
     public GroupType getGroupType() {

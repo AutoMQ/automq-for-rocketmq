@@ -18,9 +18,11 @@
 package com.automq.rocketmq.metadata;
 
 import apache.rocketmq.controller.v1.Code;
+import apache.rocketmq.controller.v1.StreamMetadata;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.dao.StreamRole;
+import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
@@ -29,61 +31,80 @@ import org.mockito.Mockito;
 class DefaultStoreMetadataServiceTest {
 
     @Test
-    public void testGetStreamId() throws ControllerException {
+    public void testGetStreamId() {
+        CompletableFuture<StreamMetadata> future = new CompletableFuture<>();
+        StreamMetadata metadata = StreamMetadata.newBuilder()
+            .setStreamId(1L).build();
+        future.complete(metadata);
         MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
-        Mockito.when(metadataStore.streamIdOf(ArgumentMatchers.anyLong(), ArgumentMatchers.anyInt(),
+        Mockito.when(metadataStore.getStream(ArgumentMatchers.anyLong(), ArgumentMatchers.anyInt(),
                 ArgumentMatchers.nullable(Long.class), ArgumentMatchers.eq(StreamRole.DATA)))
-            .thenReturn(1L);
+            .thenReturn(future);
+
         DefaultStoreMetadataService service = new DefaultStoreMetadataService(metadataStore);
         Assertions.assertEquals(1L, service.getStreamId(1L, 2));
     }
 
     @Test
-    public void testGetStreamId_throws() throws ControllerException {
+    public void testGetStreamId_throws() {
         MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
-        Mockito.when(metadataStore.streamIdOf(ArgumentMatchers.anyLong(), ArgumentMatchers.anyInt(),
+        CompletableFuture<StreamMetadata> future = new CompletableFuture<>();
+        future.completeExceptionally(new ControllerException(Code.NOT_FOUND_VALUE, "not found"));
+        Mockito.when(metadataStore.getStream(ArgumentMatchers.anyLong(), ArgumentMatchers.anyInt(),
                 ArgumentMatchers.nullable(Long.class), ArgumentMatchers.eq(StreamRole.DATA)))
-            .thenThrow(new ControllerException(Code.NOT_FOUND_VALUE, "not found"));
+            .thenReturn(future);
         DefaultStoreMetadataService service = new DefaultStoreMetadataService(metadataStore);
         Assertions.assertEquals(-1L, service.getStreamId(1L, 2));
     }
 
     @Test
-    public void testGetOperationLogStreamId() throws ControllerException {
+    public void testGetOperationLogStreamId() {
         MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
-        Mockito.when(metadataStore.streamIdOf(ArgumentMatchers.anyLong(), ArgumentMatchers.anyInt(),
+        CompletableFuture<StreamMetadata> future = new CompletableFuture<>();
+        StreamMetadata metadata = StreamMetadata.newBuilder()
+            .setStreamId(1L).build();
+        future.complete(metadata);
+        Mockito.when(metadataStore.getStream(ArgumentMatchers.anyLong(), ArgumentMatchers.anyInt(),
                 ArgumentMatchers.nullable(Long.class), ArgumentMatchers.eq(StreamRole.OPS)))
-            .thenReturn(1L);
+            .thenReturn(future);
         DefaultStoreMetadataService service = new DefaultStoreMetadataService(metadataStore);
         Assertions.assertEquals(1L, service.getOperationLogStreamId(1L, 2));
     }
 
     @Test
-    public void testGetOperationLogStreamId_throws() throws ControllerException {
+    public void testGetOperationLogStreamId_throws() {
         MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
-        Mockito.when(metadataStore.streamIdOf(ArgumentMatchers.anyLong(), ArgumentMatchers.anyInt(),
+        CompletableFuture<StreamMetadata> future = new CompletableFuture<>();
+        future.completeExceptionally(new ControllerException(Code.NOT_FOUND_VALUE, "not found"));
+        Mockito.when(metadataStore.getStream(ArgumentMatchers.anyLong(), ArgumentMatchers.anyInt(),
                 ArgumentMatchers.nullable(Long.class), ArgumentMatchers.eq(StreamRole.OPS)))
-            .thenThrow(new ControllerException(Code.NOT_FOUND_VALUE, "not found"));
+            .thenReturn(future);
         DefaultStoreMetadataService service = new DefaultStoreMetadataService(metadataStore);
         Assertions.assertEquals(-1L, service.getOperationLogStreamId(1L, 2));
     }
 
     @Test
-    public void testGetRetryStreamId() throws ControllerException {
+    public void testGetRetryStreamId() {
         MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
-        Mockito.when(metadataStore.streamIdOf(ArgumentMatchers.anyLong(), ArgumentMatchers.anyInt(),
+        CompletableFuture<StreamMetadata> future = new CompletableFuture<>();
+        StreamMetadata metadata = StreamMetadata.newBuilder()
+            .setStreamId(1L).build();
+        future.complete(metadata);
+        Mockito.when(metadataStore.getStream(ArgumentMatchers.anyLong(), ArgumentMatchers.anyInt(),
                 ArgumentMatchers.nullable(Long.class), ArgumentMatchers.eq(StreamRole.RETRY)))
-            .thenReturn(1L);
+            .thenReturn(future);
         DefaultStoreMetadataService service = new DefaultStoreMetadataService(metadataStore);
         Assertions.assertEquals(1L, service.getRetryStreamId(3L, 1L, 2));
     }
 
     @Test
-    public void testGetRetryStreamId_throws() throws ControllerException {
+    public void testGetRetryStreamId_throws() {
         MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
-        Mockito.when(metadataStore.streamIdOf(ArgumentMatchers.anyLong(), ArgumentMatchers.anyInt(),
+        CompletableFuture<StreamMetadata> future = new CompletableFuture<>();
+        future.completeExceptionally(new ControllerException(Code.NOT_FOUND_VALUE, "not found"));
+        Mockito.when(metadataStore.getStream(ArgumentMatchers.anyLong(), ArgumentMatchers.anyInt(),
                 ArgumentMatchers.nullable(Long.class), ArgumentMatchers.eq(StreamRole.RETRY)))
-            .thenThrow(new ControllerException(Code.NOT_FOUND_VALUE, "not found"));
+            .thenReturn(future);
         DefaultStoreMetadataService service = new DefaultStoreMetadataService(metadataStore);
         Assertions.assertEquals(-1L, service.getRetryStreamId(0L, 1L, 2));
     }
