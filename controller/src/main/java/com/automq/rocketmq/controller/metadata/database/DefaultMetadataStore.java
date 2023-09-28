@@ -21,6 +21,8 @@ import apache.rocketmq.controller.v1.AssignmentStatus;
 import apache.rocketmq.controller.v1.CloseStreamRequest;
 import apache.rocketmq.controller.v1.Code;
 import apache.rocketmq.controller.v1.ConsumerGroup;
+import apache.rocketmq.controller.v1.CommitStreamObjectRequest;
+import apache.rocketmq.controller.v1.CommitWALObjectRequest;
 import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.GroupStatus;
@@ -35,6 +37,9 @@ import apache.rocketmq.controller.v1.OpenStreamRequest;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.StreamRole;
+import apache.rocketmq.controller.v1.PrepareS3ObjectsReply;
+import apache.rocketmq.controller.v1.PrepareS3ObjectsRequest;
+import apache.rocketmq.controller.v1.S3ObjectState;
 import apache.rocketmq.controller.v1.StreamState;
 import apache.rocketmq.controller.v1.SubStream;
 import apache.rocketmq.controller.v1.TopicStatus;
@@ -52,6 +57,7 @@ import com.automq.rocketmq.controller.metadata.database.dao.Lease;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject;
+import com.automq.rocketmq.controller.metadata.database.dao.S3WALObject;
 import com.automq.rocketmq.controller.metadata.database.dao.Stream;
 import com.automq.rocketmq.controller.metadata.database.dao.S3Object;
 import com.automq.rocketmq.controller.metadata.database.dao.Range;
@@ -1091,80 +1097,227 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public long prepareS3Objects(int count, int ttlInMinutes) {
+    public long prepareS3Objects(int count, int ttlInMinutes) throws ControllerException {
         for (; ; ) {
             if (isLeader()) {
                 try (SqlSession session = getSessionFactory().openSession()) {
+                    if (!maintainLeadershipWithSharedLock(session)) {
+                        continue;
+                    }
+                    S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
+                    long prepareTs = System.currentTimeMillis(), expiredTs = prepareTs + (long) ttlInMinutes * 60 * 1000;
+                    List<Long> objectIds = IntStream.range(0, count)
+                        .mapToObj(i -> {
+                            S3Object object = new S3Object();
+                            object.setState(S3ObjectState.BOS_PREPARED);
+                            object.setPreparedTimestamp(prepareTs);
+                            object.setCommittedTimestamp(expiredTs);
+                            s3ObjectMapper.prepare(object);
+                            return object.getId();
+                        })
+                        .toList();
 
+                    session.commit();
+                    return objectIds.get(0);
                 }
             } else {
-
+                PrepareS3ObjectsRequest request = PrepareS3ObjectsRequest.newBuilder()
+                    .setPreparedCount(count)
+                    .setTimeToLiveMinutes(ttlInMinutes)
+                    .build();
+                try {
+                    PrepareS3ObjectsReply reply = this.controllerClient.prepareS3Objects(leaderAddress(), request).get();
+                    return reply.getFirstObjectId();
+                } catch (InterruptedException e) {
+                    throw new ControllerException(Code.INTERNAL_VALUE, e);
+                } catch (ExecutionException e) {
+                    if (e.getCause() instanceof ControllerException) {
+                        throw (ControllerException) e.getCause();
+                    }
+                    throw new ControllerException(Code.INTERNAL_VALUE, e);
+                }
             }
-            break;
         }
-        return 0;
     }
 
     @Override
-    public void commitWalObject(apache.rocketmq.controller.v1.S3WALObject walObject, List<apache.rocketmq.controller.v1.S3StreamObject> streamObjects, List<Long> compactedObjects) {
+    public void commitWalObject(apache.rocketmq.controller.v1.S3WALObject walObject, List<apache.rocketmq.controller.v1.S3StreamObject> streamObjects, List<Long> compactedObjects) throws ControllerException {
         for (; ; ) {
             if (isLeader()) {
                 try (SqlSession session = getSessionFactory().openSession()) {
+                    if (!maintainLeadershipWithSharedLock(session)) {
+                        continue;
+                    }
+
+                    S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
+                    S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
+                    S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
                     long committedTs = System.currentTimeMillis();
+                    int brokerId = walObject.getBrokerId();
+                    long objectId = walObject.getObjectId();
 
                     if (Objects.isNull(compactedObjects) || compactedObjects.isEmpty()) {
                         // verify stream continuity
-
-
+                        List<long[]> offsets = java.util.stream.Stream.concat(
+                            streamObjects.stream()
+                                .map(s3StreamObject -> new long[]{s3StreamObject.getStreamId(), s3StreamObject.getStartOffset(), s3StreamObject.getEndOffset()}),
+                            walObject.getSubStreamsMap().entrySet()
+                                .stream()
+                                .map(obj -> new long[]{obj.getKey(), obj.getValue().getStartOffset(), obj.getValue().getEndOffset()})
+                        ).toList();
+                        if (!checkStreamAdvance(session, offsets)) {
+                            return;
+                        }
+                    }
+                    // commit object
+                    if (!commitObject(walObject.getObjectId(), session, committedTs)) {
+                        return;
                     }
 
-                    // commit object
+                    long dataTs = committedTs;
+                    if (!Objects.isNull(compactedObjects) && !compactedObjects.isEmpty()) {
+                        // update dataTs to the min compacted object's dataTs
+                        dataTs = compactedObjects.stream()
+                            .map(id -> {
+                                // mark destroy compacted object
+                                S3Object object = s3ObjectMapper.getById(id);
+                                object.setMarkedForDeletionTimestamp(System.currentTimeMillis());
+                                s3ObjectMapper.delete(object);
 
-                    // mark destroy compacted object
+                                S3WALObject s3WALObject = s3WALObjectMapper.getByObjectId(id);
+                                return s3WALObject.getBaseDataTimestamp();
+                            })
+                            .min(Long::compareTo).get();
+                    }
 
+                    List<long[]> subStreamIdxs = walObject.getSubStreamsMap().entrySet()
+                        .stream()
+                        .map(obj -> new long[]{obj.getKey(), obj.getValue().getStartOffset(), obj.getValue().getEndOffset()})
+                        .toList();
                     // update broker's wal object
 
+                    if (objectId != -1) {
+                        // generate broker's wal object record
+                        walObject.getSubStreamsMap();
+                        S3WALObject s3WALObject = new S3WALObject();
+                        s3WALObject.setObjectId(objectId);
+                        s3WALObject.setBaseDataTimestamp(dataTs);
+                        s3WALObject.setBrokerId(brokerId);
+                        s3WALObject.setSequenceId(walObject.getSequenceId());
+                        s3WALObject.setSubStreams(gson.toJson(walObject.getSubStreamsMap()));
+                        s3WALObjectMapper.create(s3WALObject);
+                    }
+                    // commit stream objects;
+                    if (!Objects.isNull(streamObjects) && !streamObjects.isEmpty()) {
+                        for (apache.rocketmq.controller.v1.S3StreamObject s3StreamObject : streamObjects) {
+                            long oId = s3StreamObject.getObjectId();
+                            if (!commitObject(oId, session, committedTs)) {
+                                return;
+                            }
+                        }
+                        // create stream object records
+                        streamObjects.forEach(s3StreamObject -> {
+                            S3StreamObject object = new S3StreamObject();
+                            object.setStreamId(s3StreamObject.getStreamId());
+                            object.setObjectSize(s3StreamObject.getObjectSize());
+                            object.setStartOffset(s3StreamObject.getStartOffset());
+                            object.setEndOffset(s3StreamObject.getEndOffset());
+                            object.setBaseDataTimestamp(s3StreamObject.getBaseDataTimestamp());
+                            object.setCommittedTimestamp(committedTs);
+                            s3StreamObjectMapper.create(object);
+                        });
+                    }
 
+                    // generate compacted objects' remove record ...
+
+                    LOGGER.info("broker: {} commit wal object: {} success, compacted objects: {}, stream objects: {}", brokerId, walObject.getObjectId(),
+                        compactedObjects, streamObjects);
+                    session.commit();
                 }
             } else {
-
+                CommitWALObjectRequest request = CommitWALObjectRequest.newBuilder()
+                    .setS3WalObject(walObject)
+                    .addAllS3StreamObjects(streamObjects)
+                    .addAllCompactedObjectIds(compactedObjects)
+                    .build();
+                try {
+                    this.controllerClient.commitWALObject(leaderAddress(), request).get();
+                } catch (InterruptedException e) {
+                    throw new ControllerException(Code.INTERNAL_VALUE, e);
+                } catch (ExecutionException e) {
+                    if (e.getCause() instanceof ControllerException) {
+                        throw (ControllerException) e.getCause();
+                    }
+                    throw new ControllerException(Code.INTERNAL_VALUE, e);
+                }
             }
             break;
         }
     }
 
     @Override
-    public void commitStreamObject(apache.rocketmq.controller.v1.S3StreamObject streamObject, List<Long> compactedObjects) {
+    public void commitStreamObject(apache.rocketmq.controller.v1.S3StreamObject streamObject, List<Long> compactedObjects) throws ControllerException {
         for (; ; ) {
             if (isLeader()) {
                 try (SqlSession session = getSessionFactory().openSession()) {
+                    if (!maintainLeadershipWithSharedLock(session)) {
+                        continue;
+                    }
                     long committedTs = System.currentTimeMillis();
+                    S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
                     S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
 
-                    // commit object --> store
+                    // commit object
+                    if (!commitObject(streamObject.getObjectId(), session, committedTs)) {
+                        return;
+                    }
                     long dataTs = committedTs;
+                    if (!Objects.isNull(compactedObjects) && !compactedObjects.isEmpty()) {
+                        // update dataTs to the min compacted object's dataTs
+                        dataTs = compactedObjects.stream()
+                            .map(id -> {
+                                // mark destroy compacted object
+                                S3Object object = s3ObjectMapper.getById(id);
+                                object.setMarkedForDeletionTimestamp(System.currentTimeMillis());
+                                s3ObjectMapper.delete(object);
+
+                                S3StreamObject s3StreamObject = s3StreamObjectMapper.getByObjectId(id);
+                                return s3StreamObject.getBaseDataTimestamp();
+                            })
+                            .min(Long::compareTo).get();
+                    }
+                    S3StreamObject newS3StreamObj = new S3StreamObject();
+                    newS3StreamObj.setStreamId(streamObject.getStreamId());
+                    newS3StreamObj.setObjectId(streamObject.getStreamId());
+                    newS3StreamObj.setStartOffset(streamObject.getStartOffset());
+                    newS3StreamObj.setEndOffset(streamObject.getEndOffset());
+                    newS3StreamObj.setBaseDataTimestamp(dataTs);
+                    newS3StreamObj.setCommittedTimestamp(committedTs);
+                    s3StreamObjectMapper.create(newS3StreamObj);
 
                     if (!Objects.isNull(compactedObjects) && !compactedObjects.isEmpty()) {
-                        // mark destroy compacted object
-                        S3StreamObject s3StreamObject = new S3StreamObject();
-                        s3StreamObject.setObjectId(streamObject.getObjectId());
-                        s3StreamObject.setStreamId(streamObject.getStreamId());
-                        s3StreamObject.setCommittedTimestamp(committedTs);
-                        s3StreamObjectMapper.commit(s3StreamObject);
-
-                        // update dataTs to the min compacted object's dataTs
+                        compactedObjects.stream().forEach(id -> {
+                            s3StreamObjectMapper.delete(null, null, id);
+                        });
                     }
-
-
-
-                    // mark destroy compacted object
-
-                    // update broker's wal object
-
-
+                    LOGGER.info("stream object: {} commit success, compacted objects: {}", streamObject.getObjectId(), compactedObjects);
+                    session.commit();
                 }
             } else {
-
+                CommitStreamObjectRequest request = CommitStreamObjectRequest.newBuilder()
+                    .setS3StreamObject(streamObject)
+                    .addAllCompactedObjectIds(compactedObjects)
+                    .build();
+                try {
+                    this.controllerClient.commitStreamObject(leaderAddress(), request).get();
+                } catch (InterruptedException e) {
+                    throw new ControllerException(Code.INTERNAL_VALUE, e);
+                } catch (ExecutionException e) {
+                    if (e.getCause() instanceof ControllerException) {
+                        throw (ControllerException) e.getCause();
+                    }
+                    throw new ControllerException(Code.INTERNAL_VALUE, e);
+                }
             }
             break;
         }
@@ -1247,6 +1400,56 @@ public class DefaultMetadataStore implements MetadataStore {
             .setCommittedTimestamp(originalObject.getCommittedTimestamp())
             .putAllSubStreams(subStreams)
             .build();
+    }
+
+    private boolean commitObject(Long objectId, SqlSession session, long committedTs) {
+        S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
+        S3Object s3Object = s3ObjectMapper.getById(objectId);
+        // verify the state
+        if (s3Object.getState() == S3ObjectState.BOS_COMMITTED) {
+            LOGGER.warn("object {} already committed", objectId);
+            return false;
+        }
+        if (s3Object.getState() != S3ObjectState.BOS_PREPARED) {
+            LOGGER.error("object {} is not prepared but try to commit", objectId);
+            return false;
+        }
+        s3Object.setCommittedTimestamp(committedTs);
+        s3Object.setState(S3ObjectState.BOS_COMMITTED);
+        s3ObjectMapper.commit(s3Object);
+        return true;
+    }
+
+    private boolean checkStreamAdvance(SqlSession session, List<long[]> offsets) {
+        if (offsets == null || offsets.isEmpty()) {
+            return true;
+        }
+        StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+        RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
+        for(long[] offset: offsets) {
+            long streamId = offset[0], startOffset = offset[1], endStart = offset[2];
+            // verify stream exist and open
+            Stream stream = streamMapper.getByStreamId(streamId);
+            if (stream.getState() != StreamState.OPEN) {
+                LOGGER.warn("stream {} not opened", streamId);
+                return false;
+            }
+
+            Range range = rangeMapper.getByRangeId(stream.getRangeId());
+            if (Objects.isNull(range)) {
+                LOGGER.error("stream {}'s current range {} not exist when stream has been ",
+                    streamId, stream.getRangeId());
+                return false;
+            }
+
+            if (range.getEndOffset() != startOffset) {
+                LOGGER.warn("stream {}'s current range {}'s end offset {} is not equal to request start offset {}",
+                    streamId, range.getRangeId(),
+                    range.getEndOffset(), startOffset);
+                return false;
+            }
+        }
+        return true;
     }
 
     @Override

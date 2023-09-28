@@ -316,6 +316,9 @@ message CommitStreamObjectRequest {
   int64 broker_epoch = 3;
 
   S3StreamObject s3_stream_object = 4;
+
+  // The compacted object ids.
+  repeated int64 compacted_object_ids = 5;
 }
 
 message CommitStreamObjectReply {

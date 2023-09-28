@@ -127,8 +127,8 @@ CREATE TABLE IF NOT EXISTS `range`
 CREATE TABLE IF NOT EXISTS s3object
 (
     id                            BIGINT  NOT NULL PRIMARY KEY AUTO_INCREMENT,
-    object_size                   BIGINT  NOT NULL,
-    stream_id                     BIGINT  NOT NULL,
+    object_size                   BIGINT  NOT NULL DEFAULT -1,
+    stream_id                     BIGINT  NOT NULL DEFAULT -1,
     prepared_timestamp            BIGINT,
     committed_timestamp           BIGINT,
     expired_timestamp             BIGINT,

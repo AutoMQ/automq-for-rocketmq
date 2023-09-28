@@ -19,12 +19,18 @@ package com.automq.rocketmq.controller.metadata;
 
 import apache.rocketmq.controller.v1.CloseStreamReply;
 import apache.rocketmq.controller.v1.CloseStreamRequest;
+import apache.rocketmq.controller.v1.CommitStreamObjectReply;
+import apache.rocketmq.controller.v1.CommitStreamObjectRequest;
+import apache.rocketmq.controller.v1.CommitWALObjectReply;
+import apache.rocketmq.controller.v1.CommitWALObjectRequest;
 import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.ListOpenStreamsReply;
 import apache.rocketmq.controller.v1.ListOpenStreamsRequest;
 import apache.rocketmq.controller.v1.OpenStreamReply;
 import apache.rocketmq.controller.v1.OpenStreamRequest;
+import apache.rocketmq.controller.v1.PrepareS3ObjectsReply;
+import apache.rocketmq.controller.v1.PrepareS3ObjectsRequest;
 import apache.rocketmq.controller.v1.Topic;
 import apache.rocketmq.controller.v1.TrimStreamReply;
 import apache.rocketmq.controller.v1.TrimStreamRequest;
@@ -70,4 +76,10 @@ public interface ControllerClient extends Closeable {
     CompletableFuture<ListOpenStreamsReply> listOpenStreams(String target, ListOpenStreamsRequest request);
 
     CompletableFuture<TrimStreamReply> trimStream(String target, TrimStreamRequest request) throws ControllerException;
+
+    CompletableFuture<PrepareS3ObjectsReply> prepareS3Objects(String target, PrepareS3ObjectsRequest request) throws ControllerException;
+
+    CompletableFuture<CommitStreamObjectReply> commitStreamObject(String target, CommitStreamObjectRequest request) throws ControllerException;
+
+    CompletableFuture<CommitWALObjectReply> commitWALObject(String target, CommitWALObjectRequest request) throws ControllerException;
 }
