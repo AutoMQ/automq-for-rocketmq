@@ -50,7 +50,7 @@ public interface MetadataStore extends Closeable {
 
     void deleteTopic(long topicId) throws ControllerException;
 
-    Topic describeTopic(Long topicId, String topicName) throws ControllerException;
+    CompletableFuture<Topic> describeTopic(Long topicId, String topicName);
 
     List<Topic> listTopics() throws ControllerException;
 

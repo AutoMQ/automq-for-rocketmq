@@ -384,16 +384,19 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public apache.rocketmq.controller.v1.Topic describeTopic(Long topicId,
-        String topicName) throws ControllerException {
+    public CompletableFuture<apache.rocketmq.controller.v1.Topic> describeTopic(Long topicId,
+        String topicName) {
+        CompletableFuture<apache.rocketmq.controller.v1.Topic> future = new CompletableFuture<>();
         if (isLeader()) {
             try (SqlSession session = getSessionFactory().openSession()) {
                 TopicMapper topicMapper = session.getMapper(TopicMapper.class);
                 Topic topic = topicMapper.get(topicId, topicName);
 
                 if (null == topic) {
-                    throw new ControllerException(Code.NOT_FOUND_VALUE,
+                    ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE,
                         String.format("Topic not found for topic-id=%d, topic-name=%s", topicId, topicName));
+                    future.completeExceptionally(e);
+                    return future;
                 }
 
                 QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
@@ -411,7 +414,7 @@ public class DefaultMetadataStore implements MetadataStore {
                             case ASSIGNMENT_STATUS_DELETED -> {
                             }
 
-                            case ASSIGNMENT_STATUS_ASSIGNED ->  {
+                            case ASSIGNMENT_STATUS_ASSIGNED -> {
                                 MessageQueueAssignment queueAssignment = MessageQueueAssignment.newBuilder()
                                     .setQueue(MessageQueue.newBuilder()
                                         .setTopicId(assignment.getTopicId())
@@ -435,19 +438,15 @@ public class DefaultMetadataStore implements MetadataStore {
                         }
                     }
                 }
-                return topicBuilder.build();
+                future.complete(topicBuilder.build());
+                return future;
             }
         } else {
             try {
-                return this.controllerClient.describeTopic(leaderAddress(), topicId, topicName).get();
-            } catch (InterruptedException e) {
-                throw new ControllerException(Code.INTERRUPTED_VALUE, e);
-            } catch (ExecutionException e) {
-                if (e.getCause() instanceof ControllerException) {
-                    throw (ControllerException) e.getCause();
-                } else {
-                    throw new ControllerException(Code.INTERNAL_VALUE, e);
-                }
+                return this.controllerClient.describeTopic(leaderAddress(), topicId, topicName);
+            } catch (ControllerException e) {
+                future.completeExceptionally(e);
+                return future;
             }
         }
     }
@@ -538,7 +537,8 @@ public class DefaultMetadataStore implements MetadataStore {
                                 assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_YIELDING);
                                 assignmentMapper.update(assignment);
                             }
-                            case ASSIGNMENT_STATUS_DELETED -> throw new ControllerException(Code.NOT_FOUND_VALUE, "Already deleted");
+                            case ASSIGNMENT_STATUS_DELETED ->
+                                throw new ControllerException(Code.NOT_FOUND_VALUE, "Already deleted");
                         }
                         break;
                     }

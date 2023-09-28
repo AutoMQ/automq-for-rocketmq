@@ -24,6 +24,7 @@ import com.automq.rocketmq.controller.ControllerTestServer;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import java.io.IOException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -44,10 +45,11 @@ class GrpcControllerClientTest {
         Mockito.when(metadataStore.registerBrokerNode(ArgumentMatchers.anyString(), ArgumentMatchers.anyString(),
             ArgumentMatchers.anyString())).thenReturn(node);
         ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
-        try (ControllerTestServer testServer = new ControllerTestServer(0, svc)) {
+        try (ControllerTestServer testServer = new ControllerTestServer(0, svc);
+             ControllerClient client = new GrpcControllerClient()
+        ) {
             testServer.start();
             int port = testServer.getPort();
-            ControllerClient client = new GrpcControllerClient();
             Node result = client.registerBroker(String.format("localhost:%d", port), name, address, instanceId).get();
             Assertions.assertEquals(1, result.getId());
             Assertions.assertEquals(1, result.getEpoch());
@@ -68,9 +70,10 @@ class GrpcControllerClientTest {
         node.setEpoch(1);
         Mockito.when(metadataStore.registerBrokerNode(ArgumentMatchers.anyString(), ArgumentMatchers.anyString(),
             ArgumentMatchers.anyString())).thenReturn(node);
-        ControllerClient client = new GrpcControllerClient();
-        Assertions.assertThrows(ControllerException.class,
-            () -> client.registerBroker(null, name, address, instanceId));
+        try (ControllerClient client = new GrpcControllerClient()) {
+            Assertions.assertThrows(ControllerException.class,
+                () -> client.registerBroker(null, name, address, instanceId));
+        }
     }
 
     @Test
@@ -85,10 +88,11 @@ class GrpcControllerClientTest {
         Mockito.when(metadataStore.registerBrokerNode(ArgumentMatchers.anyString(), ArgumentMatchers.anyString(),
             ArgumentMatchers.anyString())).thenThrow(new ControllerException(Code.MOCK_FAILURE_VALUE));
         ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
-        try (ControllerTestServer testServer = new ControllerTestServer(0, svc)) {
+        try (ControllerTestServer testServer = new ControllerTestServer(0, svc);
+             ControllerClient client = new GrpcControllerClient()
+        ) {
             testServer.start();
             int port = testServer.getPort();
-            ControllerClient client = new GrpcControllerClient();
             Assertions.assertThrows(ExecutionException.class,
                 () -> client.registerBroker(String.format("localhost:%d", port), name, address, instanceId).get());
 
@@ -99,10 +103,11 @@ class GrpcControllerClientTest {
     public void testHeartbeat() throws IOException {
         MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
         ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
-        try (ControllerTestServer testServer = new ControllerTestServer(0, svc)) {
+        try (ControllerTestServer testServer = new ControllerTestServer(0, svc);
+             ControllerClient client = new GrpcControllerClient()
+        ) {
             testServer.start();
             int port = testServer.getPort();
-            ControllerClient client = new GrpcControllerClient();
             Assertions.assertDoesNotThrow(() -> client.heartbeat(String.format("localhost:%d", port), 1, 1, false).get());
         }
     }
@@ -114,10 +119,11 @@ class GrpcControllerClientTest {
         MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
         Mockito.when(metadataStore.createTopic(ArgumentMatchers.anyString(), ArgumentMatchers.anyInt())).thenReturn(1L);
         ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
-        try (ControllerTestServer testServer = new ControllerTestServer(0, svc)) {
+        try (ControllerTestServer testServer = new ControllerTestServer(0, svc);
+             ControllerClient client = new GrpcControllerClient()
+        ) {
             testServer.start();
             int port = testServer.getPort();
-            ControllerClient client = new GrpcControllerClient();
             long topicId = client.createTopic(String.format("localhost:%d", port), topicName, queueNum).get();
             Assertions.assertEquals(1, topicId);
         }
@@ -131,10 +137,11 @@ class GrpcControllerClientTest {
         Mockito.when(metadataStore.createTopic(ArgumentMatchers.anyString(), ArgumentMatchers.anyInt()))
             .thenThrow(new ControllerException(Code.DUPLICATED_VALUE, "Topic name is taken"));
         ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
-        try (ControllerTestServer testServer = new ControllerTestServer(0, svc)) {
+        try (ControllerTestServer testServer = new ControllerTestServer(0, svc);
+             ControllerClient client = new GrpcControllerClient()
+        ) {
             testServer.start();
             int port = testServer.getPort();
-            ControllerClient client = new GrpcControllerClient();
             Assertions.assertThrows(ExecutionException.class,
                 () -> client.createTopic(String.format("localhost:%d", port), topicName, queueNum).get());
         }
@@ -146,24 +153,26 @@ class GrpcControllerClientTest {
         MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
         Mockito.doNothing().when(metadataStore).deleteTopic(ArgumentMatchers.anyLong());
         ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
-        try (ControllerTestServer testServer = new ControllerTestServer(0, svc)) {
+        try (ControllerTestServer testServer = new ControllerTestServer(0, svc);
+             ControllerClient client = new GrpcControllerClient()
+        ) {
             testServer.start();
             int port = testServer.getPort();
-            ControllerClient client = new GrpcControllerClient();
             client.deleteTopic(String.format("localhost:%d", port), topicId).get();
         }
     }
 
     @Test
-    public void testDeleteTopic_NotFound() throws ControllerException, IOException, ExecutionException, InterruptedException {
+    public void testDeleteTopic_NotFound() throws ControllerException, IOException {
         long topicId = 1;
         MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
         Mockito.doThrow(new ControllerException(Code.NOT_FOUND_VALUE, "Not found")).when(metadataStore).deleteTopic(ArgumentMatchers.anyLong());
         ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
-        try (ControllerTestServer testServer = new ControllerTestServer(0, svc)) {
+        try (ControllerTestServer testServer = new ControllerTestServer(0, svc);
+             ControllerClient client = new GrpcControllerClient()
+        ) {
             testServer.start();
             int port = testServer.getPort();
-            ControllerClient client = new GrpcControllerClient();
             Assertions.assertThrows(ExecutionException.class, () -> client.deleteTopic(String.format("localhost:%d", port), topicId).get());
         }
     }
@@ -178,13 +187,16 @@ class GrpcControllerClientTest {
             .setTopicId(topicId)
             .setCount(1)
             .build();
+        CompletableFuture<Topic> future = new CompletableFuture<>();
+        future.complete(topic);
         Mockito.when(metadataStore.describeTopic(ArgumentMatchers.anyLong(), ArgumentMatchers.anyString()))
-            .thenReturn(topic);
+            .thenReturn(future);
         ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
-        try (ControllerTestServer testServer = new ControllerTestServer(0, svc)) {
+        try (ControllerTestServer testServer = new ControllerTestServer(0, svc);
+             ControllerClient client = new GrpcControllerClient()
+        ) {
             testServer.start();
             int port = testServer.getPort();
-            ControllerClient client = new GrpcControllerClient();
             Topic got = client.describeTopic(String.format("localhost:%d", port), topicId, topicName).get();
             Assertions.assertEquals(topicId, got.getTopicId());
             Assertions.assertEquals(topicName, got.getName());
@@ -192,35 +204,38 @@ class GrpcControllerClientTest {
     }
 
     @Test
-    public void testDescribeTopic_NotFound() throws IOException, ControllerException, ExecutionException, InterruptedException {
+    public void testDescribeTopic_NotFound() throws IOException {
         long topicId = 1L;
         String topicName = "T-abc";
         MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
+        CompletableFuture<Topic> future = new CompletableFuture<>();
+        future.completeExceptionally(new ControllerException(Code.NOT_FOUND_VALUE, "Not found"));
         Mockito.when(metadataStore.describeTopic(ArgumentMatchers.anyLong(), ArgumentMatchers.anyString()))
-            .thenThrow(new ControllerException(Code.NOT_FOUND_VALUE, "Not found"));
+            .thenReturn(future);
         ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
-        try (ControllerTestServer testServer = new ControllerTestServer(0, svc)) {
+        try (ControllerTestServer testServer = new ControllerTestServer(0, svc);
+             ControllerClient client = new GrpcControllerClient()
+        ) {
             testServer.start();
             int port = testServer.getPort();
-            ControllerClient client = new GrpcControllerClient();
-            Assertions.assertThrows(ExecutionException.class, () -> {
-                client.describeTopic(String.format("localhost:%d", port), topicId, topicName).get();
-            });
+            Assertions.assertThrows(ExecutionException.class,
+                () -> client.describeTopic(String.format("localhost:%d", port), topicId, topicName).get());
         }
     }
 
     @Test
-    public void testNotifyMessageQueueAssignable() throws IOException, ControllerException, ExecutionException, InterruptedException {
+    public void testNotifyMessageQueueAssignable() throws IOException, ControllerException {
         long topicId = 1L;
         int queueId = 2;
         MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
         Mockito.doNothing().when(metadataStore)
             .markMessageQueueAssignable(ArgumentMatchers.anyLong(), ArgumentMatchers.anyInt());
         ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
-        try (ControllerTestServer testServer = new ControllerTestServer(0, svc)) {
+        try (ControllerTestServer testServer = new ControllerTestServer(0, svc);
+             ControllerClient client = new GrpcControllerClient()
+        ) {
             testServer.start();
             int port = testServer.getPort();
-            ControllerClient client = new GrpcControllerClient();
             Assertions.assertDoesNotThrow(() -> {
                 client.notifyMessageQueueAssignable(String.format("localhost:%d", port), topicId, queueId).get();
             });
