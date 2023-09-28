@@ -55,7 +55,7 @@ class DefaultStoreMetadataServiceTest {
                 ArgumentMatchers.nullable(Long.class), ArgumentMatchers.eq(StreamRole.OPS)))
             .thenReturn(1L);
         DefaultStoreMetadataService service = new DefaultStoreMetadataService(metadataStore);
-        Assertions.assertEquals(1L, service.getStreamId(1L, 2));
+        Assertions.assertEquals(1L, service.getOperationLogStreamId(1L, 2));
     }
 
     @Test
@@ -65,7 +65,7 @@ class DefaultStoreMetadataServiceTest {
                 ArgumentMatchers.nullable(Long.class), ArgumentMatchers.eq(StreamRole.OPS)))
             .thenThrow(new ControllerException(Code.NOT_FOUND_VALUE, "not found"));
         DefaultStoreMetadataService service = new DefaultStoreMetadataService(metadataStore);
-        Assertions.assertEquals(-1L, service.getStreamId(1L, 2));
+        Assertions.assertEquals(-1L, service.getOperationLogStreamId(1L, 2));
     }
 
     @Test
@@ -75,7 +75,7 @@ class DefaultStoreMetadataServiceTest {
                 ArgumentMatchers.nullable(Long.class), ArgumentMatchers.eq(StreamRole.RETRY)))
             .thenReturn(1L);
         DefaultStoreMetadataService service = new DefaultStoreMetadataService(metadataStore);
-        Assertions.assertEquals(1L, service.getStreamId(1L, 2));
+        Assertions.assertEquals(1L, service.getRetryStreamId(3L, 1L, 2));
     }
 
     @Test
@@ -85,7 +85,7 @@ class DefaultStoreMetadataServiceTest {
                 ArgumentMatchers.nullable(Long.class), ArgumentMatchers.eq(StreamRole.RETRY)))
             .thenThrow(new ControllerException(Code.NOT_FOUND_VALUE, "not found"));
         DefaultStoreMetadataService service = new DefaultStoreMetadataService(metadataStore);
-        Assertions.assertEquals(-1L, service.getStreamId(1L, 2));
+        Assertions.assertEquals(-1L, service.getRetryStreamId(0L, 1L, 2));
     }
 
 }

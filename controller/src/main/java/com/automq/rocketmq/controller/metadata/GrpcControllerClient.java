@@ -53,13 +53,17 @@ import com.google.common.base.Strings;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.MoreExecutors;
+import io.grpc.Channel;
 import io.grpc.Grpc;
 import io.grpc.InsecureChannelCredentials;
 import io.grpc.ManagedChannel;
 
+import java.io.IOException;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 
 import org.slf4j.Logger;
@@ -395,7 +399,8 @@ public class GrpcControllerClient implements ControllerClient {
     }
 
     @Override
-    public CompletableFuture<OpenStreamReply> openStream(String target, OpenStreamRequest request) throws ControllerException {
+    public CompletableFuture<OpenStreamReply> openStream(String target,
+        OpenStreamRequest request) throws ControllerException {
         CompletableFuture<OpenStreamReply> future = new CompletableFuture<>();
         Futures.addCallback(this.buildStubForTarget(target).openStream(request), new FutureCallback<>() {
             @Override
@@ -412,7 +417,8 @@ public class GrpcControllerClient implements ControllerClient {
     }
 
     @Override
-    public CompletableFuture<CloseStreamReply> closeStream(String target, CloseStreamRequest request) throws ControllerException {
+    public CompletableFuture<CloseStreamReply> closeStream(String target,
+        CloseStreamRequest request) throws ControllerException {
         CompletableFuture<CloseStreamReply> future = new CompletableFuture<>();
         Futures.addCallback(this.buildStubForTarget(target).closeStream(request), new FutureCallback<>() {
             @Override
@@ -429,7 +435,8 @@ public class GrpcControllerClient implements ControllerClient {
     }
 
     @Override
-    public CompletableFuture<TrimStreamReply> trimStream(String target, TrimStreamRequest request) throws ControllerException {
+    public CompletableFuture<TrimStreamReply> trimStream(String target,
+        TrimStreamRequest request) throws ControllerException {
         CompletableFuture<TrimStreamReply> future = new CompletableFuture<>();
         Futures.addCallback(this.buildStubForTarget(target).trimStream(request), new FutureCallback<>() {
             @Override
@@ -443,5 +450,26 @@ public class GrpcControllerClient implements ControllerClient {
             }
         }, MoreExecutors.directExecutor());
         return future;
+    }
+
+    @Override
+    public void close() throws IOException {
+        for (Map.Entry<String, ControllerServiceGrpc.ControllerServiceFutureStub> entry : stubs.entrySet()) {
+            Channel channel = entry.getValue().getChannel();
+            if (channel instanceof ManagedChannel managedChannel) {
+                managedChannel.shutdownNow();
+            }
+        }
+
+        for (Map.Entry<String, ControllerServiceGrpc.ControllerServiceFutureStub> entry : stubs.entrySet()) {
+            Channel channel = entry.getValue().getChannel();
+            if (channel instanceof ManagedChannel managedChannel) {
+                try {
+                    managedChannel.awaitTermination(3, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }
     }
 }
