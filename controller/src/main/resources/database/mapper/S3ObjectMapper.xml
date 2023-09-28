@@ -40,6 +40,9 @@
     <update id="delete" parameterType="S3Object">
         UPDATE s3object
         SET marked_for_deletion_timestamp = #{markedForDeletionTimestamp}
+        <if test="state != null">
+            , state = #{state}
+        </if>
         WHERE 1 = 1
         <if test="null != id">
             AND id = #{id}
@@ -51,27 +54,39 @@
         WHERE 1 = 1
     </update>
 
-    <update id="prepare" parameterType="S3Object">
+    <update id="expired" parameterType="S3Object">
         UPDATE s3object
-        SET prepared_timestamp = #{preparedTimestamp}, expired_timestamp = #{expiredTimestamp}
+        SET expired_timestamp = #{expiredTimestamp}
+        <if test="state != null">
+            , state = #{state}
+        </if>
         WHERE 1 = 1
         <if test="null != id">
             AND id = #{id}
         </if>
     </update>
 
-    <update id="expired" parameterType="S3Object">
-        UPDATE s3object
-        SET expired_timestamp = #{expiredTimestamp}
-        WHERE 1 = 1
-        <if test="null != id">
-            AND id = #{id}
+    <insert id="prepare" parameterType="S3Object" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO s3object (prepared_timestamp, expired_timestamp, state, object_size, stream_id)
+        VALUES (
+        #{preparedTimestamp},
+        #{expiredTimestamp},
+        #{state},
+        <if test="objectSize != null">
+            #{objectSize},
         </if>
-    </update>
+        <if test="streamId != null">
+            #{streamId}
+        </if>
+        )
+    </insert>
 
     <update id="commit" parameterType="S3Object">
         UPDATE s3object
         SET committed_timestamp = #{committedTimestamp}
+        <if test="state != null">
+            , state = #{state}
+        </if>
         WHERE 1 = 1
         <if test="null != id">
             AND id = #{id}

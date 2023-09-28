@@ -51,6 +51,12 @@
         WHERE object_id = #{objectId}
     </select>
 
+    <select id="getByObjectId" resultType="S3StreamObject">
+        SELECT id, object_id, object_size, stream_id, start_offset, end_offset, base_data_timestamp, committed_timestamp
+        FROM s3streamobject
+        WHERE object_id = #{objectId}
+    </select>
+
     <update id="commit" parameterType="S3StreamObject">
         UPDATE s3streamobject
         SET committed_timestamp = #{committedTimestamp}

@@ -21,6 +21,10 @@ import apache.rocketmq.controller.v1.CloseStreamReply;
 import apache.rocketmq.controller.v1.CloseStreamRequest;
 import apache.rocketmq.controller.v1.CommitOffsetReply;
 import apache.rocketmq.controller.v1.CommitOffsetRequest;
+import apache.rocketmq.controller.v1.CommitStreamObjectReply;
+import apache.rocketmq.controller.v1.CommitStreamObjectRequest;
+import apache.rocketmq.controller.v1.CommitWALObjectReply;
+import apache.rocketmq.controller.v1.CommitWALObjectRequest;
 import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.CreateRetryStreamReply;
@@ -44,6 +48,8 @@ import apache.rocketmq.controller.v1.NotifyMessageQueuesAssignableReply;
 import apache.rocketmq.controller.v1.NotifyMessageQueuesAssignableRequest;
 import apache.rocketmq.controller.v1.OpenStreamReply;
 import apache.rocketmq.controller.v1.OpenStreamRequest;
+import apache.rocketmq.controller.v1.PrepareS3ObjectsReply;
+import apache.rocketmq.controller.v1.PrepareS3ObjectsRequest;
 import apache.rocketmq.controller.v1.ReassignMessageQueueReply;
 import apache.rocketmq.controller.v1.ReassignMessageQueueRequest;
 import apache.rocketmq.controller.v1.Topic;
@@ -473,6 +479,58 @@ public class GrpcControllerClient implements ControllerClient {
         Futures.addCallback(this.buildStubForTarget(target).trimStream(request), new FutureCallback<>() {
             @Override
             public void onSuccess(TrimStreamReply result) {
+                future.complete(result);
+            }
+
+            @Override
+            public void onFailure(@Nonnull Throwable t) {
+                future.completeExceptionally(t);
+            }
+        }, MoreExecutors.directExecutor());
+        return future;
+    }
+
+    @Override
+    public CompletableFuture<PrepareS3ObjectsReply> prepareS3Objects(String target,
+        PrepareS3ObjectsRequest request) throws ControllerException {
+        CompletableFuture<PrepareS3ObjectsReply> future = new CompletableFuture<>();
+        Futures.addCallback(this.buildStubForTarget(target).prepareS3Objects(request), new FutureCallback<>() {
+            @Override
+            public void onSuccess(PrepareS3ObjectsReply result) {
+                future.complete(result);
+            }
+
+            @Override
+            public void onFailure(@Nonnull Throwable t) {
+                future.completeExceptionally(t);
+            }
+        }, MoreExecutors.directExecutor());
+        return future;
+    }
+
+    @Override
+    public CompletableFuture<CommitStreamObjectReply> commitStreamObject(String target, CommitStreamObjectRequest request) throws ControllerException {
+        CompletableFuture<CommitStreamObjectReply> future = new CompletableFuture<>();
+        Futures.addCallback(this.buildStubForTarget(target).commitStreamObject(request), new FutureCallback<>() {
+            @Override
+            public void onSuccess(CommitStreamObjectReply result) {
+                future.complete(result);
+            }
+
+            @Override
+            public void onFailure(@Nonnull Throwable t) {
+                future.completeExceptionally(t);
+            }
+        }, MoreExecutors.directExecutor());
+        return future;
+    }
+
+    @Override
+    public CompletableFuture<CommitWALObjectReply> commitWALObject(String target, CommitWALObjectRequest request) throws ControllerException {
+        CompletableFuture<CommitWALObjectReply> future = new CompletableFuture<>();
+        Futures.addCallback(this.buildStubForTarget(target).commitWALObject(request), new FutureCallback<>() {
+            @Override
+            public void onSuccess(CommitWALObjectReply result) {
                 future.complete(result);
             }
 

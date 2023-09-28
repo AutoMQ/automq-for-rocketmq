@@ -49,10 +49,9 @@ public class S3ObjectTest extends DatabaseTestBase {
             s3Object.setPreparedTimestamp(time);
             s3Object.setExpiredTimestamp(time + 5 * 1000);
 
-            int affectedRows = s3ObjectMapper.create(s3Object);
+            int affectedRows = s3ObjectMapper.prepare(s3Object);
             Assertions.assertEquals(1, affectedRows);
             Assertions.assertTrue(s3Object.getId() > 0);
-            s3ObjectMapper.prepare(s3Object);
 
             // test getById
             S3Object s3Object1 = s3ObjectMapper.getById(s3Object.getId());
