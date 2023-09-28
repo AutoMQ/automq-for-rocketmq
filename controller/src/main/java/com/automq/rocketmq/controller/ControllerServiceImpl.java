@@ -59,7 +59,6 @@ import apache.rocketmq.controller.v1.PrepareS3ObjectsRequest;
 import apache.rocketmq.controller.v1.ReassignMessageQueueReply;
 import apache.rocketmq.controller.v1.ReassignMessageQueueRequest;
 import apache.rocketmq.controller.v1.Status;
-import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.Topic;
 import apache.rocketmq.controller.v1.TrimStreamReply;
 import apache.rocketmq.controller.v1.TrimStreamRequest;
@@ -316,47 +315,52 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
 
     @Override
     public void openStream(OpenStreamRequest request, StreamObserver<OpenStreamReply> responseObserver) {
-        try {
-            StreamMetadata metadata = metadataStore.openStream(request.getStreamId(), request.getStreamEpoch());
+        metadataStore.openStream(request.getStreamId(), request.getStreamEpoch()).whenComplete((metadata, e) -> {
+            if (null != e) {
+                if (e instanceof ControllerException ex) {
+                    OpenStreamReply reply = OpenStreamReply.newBuilder()
+                        .setStatus(Status.newBuilder()
+                            .setCode(Code.forNumber(ex.getErrorCode()))
+                            .setMessage(e.getMessage()).build())
+                        .build();
+                    responseObserver.onNext(reply);
+                    responseObserver.onCompleted();
+                    return;
+                }
+                responseObserver.onError(e);
+            }
             OpenStreamReply reply = OpenStreamReply.newBuilder()
                 .setStreamMetadata(metadata)
                 .setStatus(Status.newBuilder().setCode(Code.OK).build())
                 .build();
             responseObserver.onNext(reply);
             responseObserver.onCompleted();
-        } catch (ControllerException e) {
-            OpenStreamReply reply = OpenStreamReply.newBuilder()
-                .setStatus(Status.newBuilder()
-                    .setCode(Code.forNumber(e.getErrorCode()))
-                    .setMessage(e.getMessage()).build())
-                .build();
-            responseObserver.onNext(reply);
-            responseObserver.onCompleted();
-        } catch (Throwable e) {
-            responseObserver.onError(e);
-        }
+        });
     }
 
     @Override
     public void closeStream(CloseStreamRequest request, StreamObserver<CloseStreamReply> responseObserver) {
-        try {
-            metadataStore.closeStream(request.getStreamId(), request.getStreamEpoch());
-            CloseStreamReply reply = CloseStreamReply.newBuilder()
-                .setStatus(Status.newBuilder().setCode(Code.OK).build())
-                .build();
-            responseObserver.onNext(reply);
-            responseObserver.onCompleted();
-        } catch (ControllerException e) {
-            CloseStreamReply reply = CloseStreamReply.newBuilder()
-                .setStatus(Status.newBuilder()
-                    .setCode(Code.forNumber(e.getErrorCode()))
-                    .setMessage(e.getMessage()).build())
-                .build();
-            responseObserver.onNext(reply);
-            responseObserver.onCompleted();
-        } catch (Throwable e) {
-            responseObserver.onError(e);
-        }
+        metadataStore.closeStream(request.getStreamId(), request.getStreamEpoch()).whenComplete((res, e) -> {
+            if (null != e) {
+                if (e instanceof ControllerException ex) {
+                    CloseStreamReply reply = CloseStreamReply.newBuilder()
+                        .setStatus(Status.newBuilder()
+                            .setCode(Code.forNumber(ex.getErrorCode()))
+                            .setMessage(e.getMessage()).build())
+                        .build();
+                    responseObserver.onNext(reply);
+                    responseObserver.onCompleted();
+                } else {
+                    responseObserver.onError(e);
+                }
+            } else {
+                CloseStreamReply reply = CloseStreamReply.newBuilder()
+                    .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                    .build();
+                responseObserver.onNext(reply);
+                responseObserver.onCompleted();
+            }
+        });
     }
 
     @Override

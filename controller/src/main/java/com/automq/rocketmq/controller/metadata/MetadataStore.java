@@ -90,9 +90,9 @@ public interface MetadataStore extends Closeable {
 
     void trimStream(long streamId, long streamEpoch, long newStartOffset) throws ControllerException;
 
-    StreamMetadata openStream(long streamId, long streamEpoch) throws ControllerException;
+    CompletableFuture<StreamMetadata> openStream(long streamId, long streamEpoch);
 
-    void closeStream(long streamId, long streamEpoch) throws ControllerException;
+    CompletableFuture<Void> closeStream(long streamId, long streamEpoch);
 
     List<StreamMetadata> listOpenStreams();
 

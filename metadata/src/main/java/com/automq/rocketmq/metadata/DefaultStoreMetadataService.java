@@ -124,12 +124,12 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
 
     @Override
     public CompletableFuture<StreamMetadata> openStream(long streamId, long streamEpoch) {
-        return null;
+        return metadataStore.openStream(streamId, streamEpoch);
     }
 
     @Override
     public CompletableFuture<Void> closeStream(long streamId, long streamEpoch) {
-        return null;
+        return metadataStore.closeStream(streamId, streamEpoch);
     }
 
     @Override

@@ -451,7 +451,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testOpenStream() throws IOException, ControllerException, ExecutionException, InterruptedException {
+    public void testOpenStream() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
         ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
         Mockito.when(controllerConfig.nodeId()).thenReturn(1);
@@ -509,7 +509,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testOpenStream_NotFound() throws IOException, ControllerException, ExecutionException, InterruptedException {
+    public void testOpenStream_NotFound() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
         ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
         Mockito.when(controllerConfig.nodeId()).thenReturn(1);
@@ -574,7 +574,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testOpenStream_Fenced() throws IOException, ControllerException, ExecutionException, InterruptedException {
+    public void testOpenStream_Fenced() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
         ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
         Mockito.when(controllerConfig.nodeId()).thenReturn(1);
@@ -639,7 +639,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testCloseStream() throws IOException, ControllerException, ExecutionException, InterruptedException {
+    public void testCloseStream() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
         ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
         Mockito.when(controllerConfig.nodeId()).thenReturn(2);
@@ -684,7 +684,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
         try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
             metadataStore.start();
             Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
-                .atMost(10, TimeUnit.SECONDS)
+                .atMost(3, TimeUnit.SECONDS)
                 .until(metadataStore::isLeader);
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
@@ -711,7 +711,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testCloseStream_NotFound() throws IOException, ControllerException, ExecutionException, InterruptedException {
+    public void testCloseStream_NotFound() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
         ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
         Mockito.when(controllerConfig.nodeId()).thenReturn(2);

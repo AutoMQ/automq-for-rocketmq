@@ -609,7 +609,8 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testOpenStream_WithCloseStream_AtStart() throws IOException, ControllerException {
+    public void testOpenStream_WithCloseStream_AtStart() throws IOException, ExecutionException,
+        InterruptedException {
         long streamEpoch = 0;
         long streamId;
         try (SqlSession session = this.getSessionFactory().openSession()) {
@@ -635,7 +636,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             metadataStore.setLease(lease);
             metadataStore.setRole(Role.Leader);
 
-            StreamMetadata metadata = metadataStore.openStream(streamId, streamEpoch);
+            StreamMetadata metadata = metadataStore.openStream(streamId, streamEpoch).get();
             Assertions.assertNotNull(metadata);
             Assertions.assertEquals(streamId, metadata.getStreamId());
             Assertions.assertEquals(0, metadata.getStartOffset());
@@ -671,7 +672,8 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testOpenStream_WithClosedStream() throws IOException, ControllerException {
+    public void testOpenStream_WithClosedStream() throws IOException, ExecutionException,
+        InterruptedException {
         long streamId, streamEpoch = 1;
         try (SqlSession session = this.getSessionFactory().openSession()) {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
@@ -708,7 +710,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             metadataStore.setLease(lease);
             metadataStore.setRole(Role.Leader);
 
-            StreamMetadata metadata = metadataStore.openStream(streamId, streamEpoch);
+            StreamMetadata metadata = metadataStore.openStream(streamId, streamEpoch).get();
             Assertions.assertNotNull(metadata);
             Assertions.assertEquals(streamId, metadata.getStreamId());
             Assertions.assertEquals(1234, metadata.getStartOffset());

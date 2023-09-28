@@ -840,8 +840,8 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public apache.rocketmq.controller.v1.StreamMetadata openStream(long streamId,
-        long streamEpoch) throws ControllerException {
+    public CompletableFuture<StreamMetadata> openStream(long streamId, long streamEpoch) {
+        CompletableFuture<StreamMetadata> future = new CompletableFuture<>();
         for (; ; ) {
             if (isLeader()) {
                 try (SqlSession session = getSessionFactory().openSession()) {
@@ -854,15 +854,19 @@ public class DefaultMetadataStore implements MetadataStore {
                     // verify epoch match
                     Stream stream = streamMapper.getByStreamId(streamId);
                     if (null == stream) {
-                        throw new ControllerException(Code.NOT_FOUND_VALUE,
+                        ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE,
                             String.format("Stream[stream-id=%d] is not found", streamId)
                         );
+                        future.completeExceptionally(e);
+                        return future;
                     }
 
                     if (stream.getEpoch() > streamEpoch) {
                         LOGGER.warn("stream {}'s epoch {} is larger than request epoch {}",
                             streamId, stream.getEpoch(), streamEpoch);
-                        throw new ControllerException(Code.FENCED_VALUE, "Epoch of stream is deprecated");
+                        ControllerException e = new ControllerException(Code.FENCED_VALUE, "Epoch of stream is deprecated");
+                        future.completeExceptionally(e);
+                        return future;
                     }
 
                     if (stream.getEpoch() == streamEpoch) {
@@ -873,7 +877,9 @@ public class DefaultMetadataStore implements MetadataStore {
                         if (Objects.isNull(range)) {
                             LOGGER.warn("stream {}'s current range {} not exist when open stream with epoch: {}",
                                 streamId, stream.getEpoch(), streamEpoch);
-                            throw new ControllerException(Code.ILLEGAL_STATE_VALUE, "Expected range is missing");
+                            ControllerException e = new ControllerException(Code.ILLEGAL_STATE_VALUE, "Expected range is missing");
+                            future.completeExceptionally(e);
+                            return future;
                         }
 
                         // ensure that the broker corresponding to the range is alive
@@ -881,39 +887,40 @@ public class DefaultMetadataStore implements MetadataStore {
                             || !this.nodes.get(range.getBrokerId()).isAlive(config)) {
                             LOGGER.warn("Node[node-id={}] that backs up Stream[stream-id={}, epoch={}] does not exist or is inactive",
                                 range.getBrokerId(), streamId, stream.getEpoch());
-                            throw new ControllerException(Code.ILLEGAL_STATE_VALUE,
+                            ControllerException e = new ControllerException(Code.ILLEGAL_STATE_VALUE,
                                 String.format("Node[node-id=%d] backing up the stream is inactive", range.getBrokerId()));
+                            future.completeExceptionally(e);
+                            return future;
                         }
 
-                        // epoch equals, broker equals, regard it as redundant open operation, just return success
+                        // epoch equals, node equals, regard it as redundant open operation, just return success
                         if (stream.getState() == StreamState.CLOSED) {
-                            Stream metadata = new Stream();
-                            metadata.setId(streamId);
-                            metadata.setEpoch(streamEpoch);
-                            metadata.setRangeId(stream.getRangeId());
-                            metadata.setStartOffset(stream.getStartOffset());
-                            metadata.setState(StreamState.OPEN);
-                            streamMapper.create(metadata);
-                            return apache.rocketmq.controller.v1.StreamMetadata.newBuilder()
+                            streamMapper.updateStreamState(streamId, stream.getTopicId(), stream.getQueueId(),
+                                StreamState.OPEN);
+                            StreamMetadata metadata = StreamMetadata.newBuilder()
                                 .setStreamId(streamId)
                                 .setEpoch(streamEpoch)
                                 .setRangeId(stream.getRangeId())
                                 .setStartOffset(stream.getStartOffset())
                                 .setState(StreamState.OPEN)
                                 .build();
+                            future.complete(metadata);
+                            return future;
                         }
                     }
 
                     // Make open reentrant
                     if (stream.getState() == StreamState.OPEN) {
                         LOGGER.warn("Stream[stream-id={}] is already OPEN with epoch={}", streamId, stream.getEpoch());
-                        return apache.rocketmq.controller.v1.StreamMetadata.newBuilder()
+                        StreamMetadata metadata = StreamMetadata.newBuilder()
                             .setStreamId(streamId)
                             .setEpoch(streamEpoch)
                             .setRangeId(stream.getRangeId())
                             .setStartOffset(stream.getStartOffset())
                             .setState(StreamState.OPEN)
                             .build();
+                        future.complete(metadata);
+                        return future;
                     }
 
                     // now the request in valid, update the stream's epoch and create a new range for this broker
@@ -946,13 +953,15 @@ public class DefaultMetadataStore implements MetadataStore {
                     // Commit transaction
                     session.commit();
 
-                    return apache.rocketmq.controller.v1.StreamMetadata.newBuilder()
+                    StreamMetadata metadata = StreamMetadata.newBuilder()
                         .setStreamId(streamId)
                         .setEpoch(streamEpoch)
                         .setRangeId(rangeId)
                         .setStartOffset(stream.getStartOffset())
                         .setState(StreamState.OPEN)
                         .build();
+                    future.complete(metadata);
+                    return future;
                 }
             } else {
                 OpenStreamRequest request = OpenStreamRequest.newBuilder()
@@ -960,22 +969,17 @@ public class DefaultMetadataStore implements MetadataStore {
                     .setStreamEpoch(streamEpoch)
                     .build();
                 try {
-                    OpenStreamReply reply = this.controllerClient.openStream(this.leaderAddress(), request).get();
-                    return reply.getStreamMetadata();
-                } catch (InterruptedException e) {
-                    throw new ControllerException(Code.INTERRUPTED_VALUE, e);
-                } catch (ExecutionException e) {
-                    if (e.getCause() instanceof ControllerException) {
-                        throw (ControllerException) e.getCause();
-                    }
-                    throw new ControllerException(Code.INTERNAL_VALUE, e);
+                    return this.controllerClient.openStream(this.leaderAddress(), request).thenApply(OpenStreamReply::getStreamMetadata);
+                } catch (ControllerException e) {
+                    future.completeExceptionally(e);
                 }
             }
         }
     }
 
     @Override
-    public void closeStream(long streamId, long streamEpoch) throws ControllerException {
+    public CompletableFuture<Void> closeStream(long streamId, long streamEpoch) {
+        CompletableFuture<Void> future = new CompletableFuture<>();
         for (; ; ) {
             if (isLeader()) {
                 try (SqlSession session = getSessionFactory().openSession()) {
@@ -988,24 +992,30 @@ public class DefaultMetadataStore implements MetadataStore {
 
                     // Verify resource existence
                     if (null == stream) {
-                        throw new ControllerException(Code.NOT_FOUND_VALUE, String.format("Stream[stream-id=%d] is not found", streamId));
+                        ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE, String.format("Stream[stream-id=%d] is not found", streamId));
+                        future.completeExceptionally(e);
+                        break;
                     }
 
                     // Verify epoch
                     if (streamEpoch < stream.getEpoch()) {
-                        throw new ControllerException(Code.FENCED_VALUE, "Stream epoch is deprecated");
+                        ControllerException e = new ControllerException(Code.FENCED_VALUE, "Stream epoch is deprecated");
+                        future.completeExceptionally(e);
+                        break;
                     }
 
                     // Make closeStream reentrant
                     if (stream.getState() == StreamState.CLOSED) {
-                        return;
+                        future.complete(null);
+                        break;
                     }
 
                     // Flag state as closed
                     stream.setState(StreamState.CLOSED);
                     streamMapper.update(stream);
-
                     session.commit();
+                    future.complete(null);
+                    break;
                 }
             } else {
                 CloseStreamRequest request = CloseStreamRequest.newBuilder()
@@ -1013,22 +1023,24 @@ public class DefaultMetadataStore implements MetadataStore {
                     .setStreamEpoch(streamEpoch)
                     .build();
                 try {
-                    this.controllerClient.closeStream(this.leaderAddress(), request).get();
-                } catch (InterruptedException e) {
-                    throw new ControllerException(Code.INTERNAL_VALUE, e);
-                } catch (ExecutionException e) {
-                    if (e.getCause() instanceof ControllerException) {
-                        throw (ControllerException) e.getCause();
-                    }
-                    throw new ControllerException(Code.INTERNAL_VALUE, e);
+                    this.controllerClient.closeStream(this.leaderAddress(), request).whenComplete(((reply, e) -> {
+                        if (null != e) {
+                            future.completeExceptionally(e);
+                        } else {
+                            future.complete(null);
+                        }
+                    }));
+                } catch (ControllerException e) {
+                    future.completeExceptionally(e);
                 }
+                break;
             }
-            break;
         }
+        return future;
     }
 
     @Override
-    public List<apache.rocketmq.controller.v1.StreamMetadata> listOpenStreams() {
+    public List<StreamMetadata> listOpenStreams() {
         return null;
     }
 
