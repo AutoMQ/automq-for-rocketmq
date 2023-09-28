@@ -21,10 +21,10 @@ import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
+import apache.rocketmq.controller.v1.StreamRole;
 import com.automq.rocketmq.common.util.Pair;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.DefaultMetadataStore;
-import com.automq.rocketmq.controller.metadata.database.dao.StreamRole;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -44,7 +44,7 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
     @Override
     public long getStreamId(long topicId, int queueId) {
         try {
-            return metadataStore.getStream(topicId, queueId, null, StreamRole.DATA)
+            return metadataStore.getStream(topicId, queueId, null, StreamRole.STREAM_ROLE_DATA)
                 .get()
                 .getStreamId();
         } catch (ExecutionException | InterruptedException e) {
@@ -56,7 +56,7 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
     @Override
     public long getOperationLogStreamId(long topicId, int queueId) {
         try {
-            return metadataStore.getStream(topicId, queueId, null, StreamRole.OPS).get()
+            return metadataStore.getStream(topicId, queueId, null, StreamRole.STREAM_ROLE_OPS).get()
                 .getStreamId();
         } catch (ExecutionException | InterruptedException e) {
             LOGGER.error("Failed to acquire data stream-id for topic-id={}, queue-id={}", topicId, queueId);
@@ -67,7 +67,7 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
     @Override
     public long getRetryStreamId(long consumerGroupId, long topicId, int queueId) {
         try {
-            return metadataStore.getStream(topicId, queueId, consumerGroupId, StreamRole.RETRY).get()
+            return metadataStore.getStream(topicId, queueId, consumerGroupId, StreamRole.STREAM_ROLE_RETRY).get()
                 .getStreamId();
         } catch (ExecutionException | InterruptedException e) {
             LOGGER.error("Failed to acquire data stream-id for topic-id={}, queue-id={}", topicId, queueId);
@@ -93,17 +93,17 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
 
     @Override
     public CompletableFuture<StreamMetadata> dataStreamOf(long topicId, int queueId) {
-        return metadataStore.getStream(topicId, queueId, null, StreamRole.DATA);
+        return metadataStore.getStream(topicId, queueId, null, StreamRole.STREAM_ROLE_DATA);
     }
 
     @Override
     public CompletableFuture<StreamMetadata> operationStreamOf(long topicId, int queueId) {
-        return metadataStore.getStream(topicId, queueId, null, StreamRole.OPS);
+        return metadataStore.getStream(topicId, queueId, null, StreamRole.STREAM_ROLE_OPS);
     }
 
     @Override
     public CompletableFuture<StreamMetadata> retryStreamOf(long consumerGroupId, long topicId, int queueId) {
-        return metadataStore.getStream(topicId, queueId, consumerGroupId, StreamRole.RETRY);
+        return metadataStore.getStream(topicId, queueId, consumerGroupId, StreamRole.STREAM_ROLE_RETRY);
     }
 
     @Override

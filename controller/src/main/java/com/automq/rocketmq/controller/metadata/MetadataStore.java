@@ -17,8 +17,10 @@
 
 package com.automq.rocketmq.controller.metadata;
 
+import apache.rocketmq.controller.v1.AssignmentStatus;
 import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.GroupType;
+import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.Topic;
 import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
@@ -26,8 +28,6 @@ import apache.rocketmq.controller.v1.StreamMetadata;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
-import com.automq.rocketmq.controller.metadata.database.dao.AssignmentStatus;
-import com.automq.rocketmq.controller.metadata.database.dao.StreamRole;
 import java.io.Closeable;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;

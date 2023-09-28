@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.controller.metadata.database.dao;
 
+import apache.rocketmq.controller.v1.TopicStatus;
 import java.util.Date;
 import java.util.Objects;
 
@@ -24,7 +25,7 @@ public class Topic {
     private long id;
     private String name;
     private int queueNum;
-    private TopicStatus status = TopicStatus.ACTIVE;
+    private TopicStatus status = TopicStatus.TOPIC_STATUS_ACTIVE;
     private Date createTime;
     private Date updateTime;
 

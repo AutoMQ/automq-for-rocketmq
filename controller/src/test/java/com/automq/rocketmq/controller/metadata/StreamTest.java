@@ -17,9 +17,9 @@
 
 package com.automq.rocketmq.controller.metadata;
 
+import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.StreamState;
 import com.automq.rocketmq.controller.metadata.database.dao.Stream;
-import com.automq.rocketmq.controller.metadata.database.dao.StreamRole;
 import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
@@ -42,7 +42,7 @@ public class StreamTest extends DatabaseTestBase {
             Stream stream = new Stream();
             stream.setTopicId(1);
             stream.setQueueId(2);
-            stream.setStreamRole(StreamRole.OPS);
+            stream.setStreamRole(StreamRole.STREAM_ROLE_OPS);
             stream.setStartOffset(1234L);
             stream.setEpoch(1L);
             stream.setRangeId(2);
@@ -58,7 +58,7 @@ public class StreamTest extends DatabaseTestBase {
             Assertions.assertEquals(StreamState.OPEN, createdStream.getState());
             Assertions.assertEquals(1, createdStream.getTopicId());
             Assertions.assertEquals(2, createdStream.getQueueId());
-            Assertions.assertEquals(StreamRole.OPS, createdStream.getStreamRole());
+            Assertions.assertEquals(StreamRole.STREAM_ROLE_OPS, createdStream.getStreamRole());
 
 
             streamMapper.delete(createdStream.getId());
@@ -79,7 +79,7 @@ public class StreamTest extends DatabaseTestBase {
             stream.setEpoch(1L);
             stream.setRangeId(2);
             stream.setState(StreamState.OPEN);
-            stream.setStreamRole(StreamRole.DATA);
+            stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
 
             int affectedRows = streamMapper.create(stream);
             Assertions.assertEquals(1, affectedRows);
@@ -106,7 +106,7 @@ public class StreamTest extends DatabaseTestBase {
             stream.setEpoch(1L);
             stream.setRangeId(2);
             stream.setState(StreamState.OPEN);
-            stream.setStreamRole(StreamRole.DATA);
+            stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
             int affectedRows = streamMapper.create(stream);
             Assertions.assertEquals(1, affectedRows);
 
@@ -132,7 +132,7 @@ public class StreamTest extends DatabaseTestBase {
             stream.setEpoch(1L);
             stream.setRangeId(2);
             stream.setState(StreamState.OPEN);
-            stream.setStreamRole(StreamRole.DATA);
+            stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
             int affectedRows = streamMapper.create(stream);
             Assertions.assertEquals(1, affectedRows);
 

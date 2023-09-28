@@ -8,6 +8,20 @@ option java_generate_equals_and_hash = true;
 option java_string_check_utf8 = true;
 option java_outer_classname = "ControllerDomains";
 
+enum AssignmentStatus {
+  ASSIGNMENT_STATUS_UNSPECIFIED = 0;
+  ASSIGNMENT_STATUS_YIELDING = 1;
+  ASSIGNMENT_STATUS_ASSIGNABLE = 2;
+  ASSIGNMENT_STATUS_ASSIGNED = 3;
+  ASSIGNMENT_STATUS_DELETED = 4;
+}
+
+enum TopicStatus {
+  TOPIC_STATUS_UNSPECIFIED = 0;
+  TOPIC_STATUS_ACTIVE = 1;
+  TOPIC_STATUS_DELETED = 2;
+}
+
 message Topic {
   string name = 1;
   int64 topic_id = 2;
@@ -47,6 +61,12 @@ enum MessageType {
   // Messages that are transactional. Only committed messages are delivered to
   // subscribers.
   TRANSACTION = 4;
+}
+
+enum GroupStatus {
+  GROUP_STATUS_UNSPECIFIED = 0;
+  GROUP_STATUS_ACTIVE = 1;
+  GROUP_STATUS_DELETED = 2;
 }
 
 enum GroupType {
@@ -97,6 +117,13 @@ message StreamMetadata {
 
   // The stream state.
   StreamState state = 6;
+}
+
+enum StreamRole {
+  STREAM_ROLE_UNSPECIFIED = 0;
+  STREAM_ROLE_DATA = 1;
+  STREAM_ROLE_OPS = 2;
+  STREAM_ROLE_RETRY = 3;
 }
 
 enum StreamState {

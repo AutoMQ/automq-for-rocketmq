@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.controller;
 
+import apache.rocketmq.controller.v1.AssignmentStatus;
 import apache.rocketmq.controller.v1.CloseStreamReply;
 import apache.rocketmq.controller.v1.CloseStreamRequest;
 import apache.rocketmq.controller.v1.Code;
@@ -33,7 +34,9 @@ import apache.rocketmq.controller.v1.NodeRegistrationRequest;
 import apache.rocketmq.controller.v1.OpenStreamReply;
 import apache.rocketmq.controller.v1.OpenStreamRequest;
 import apache.rocketmq.controller.v1.S3ObjectState;
+import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.StreamState;
+import apache.rocketmq.controller.v1.TopicStatus;
 import apache.rocketmq.controller.v1.TrimStreamRequest;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.ControllerClient;
@@ -46,15 +49,12 @@ import com.automq.rocketmq.controller.metadata.database.dao.Group;
 import com.automq.rocketmq.controller.metadata.database.dao.GroupProgress;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
-import com.automq.rocketmq.controller.metadata.database.dao.AssignmentStatus;
 import com.automq.rocketmq.controller.metadata.database.dao.Range;
 import com.automq.rocketmq.controller.metadata.database.dao.S3Object;
 import com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject;
 import com.automq.rocketmq.controller.metadata.database.dao.S3WALObject;
 import com.automq.rocketmq.controller.metadata.database.dao.Stream;
-import com.automq.rocketmq.controller.metadata.database.dao.StreamRole;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
-import com.automq.rocketmq.controller.metadata.database.dao.TopicStatus;
 import com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.GroupProgressMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
@@ -227,7 +227,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             TopicMapper topicMapper = session.getMapper(TopicMapper.class);
             for (int i = 0; i < 3; i++) {
                 Topic topic = new Topic();
-                topic.setStatus(TopicStatus.ACTIVE);
+                topic.setStatus(TopicStatus.TOPIC_STATUS_ACTIVE);
                 topic.setName("T" + i);
                 topicMapper.create(topic);
             }
@@ -358,7 +358,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
         try (SqlSession session = getSessionFactory().openSession()) {
             QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
             QueueAssignment assignment = new QueueAssignment();
-            assignment.setStatus(AssignmentStatus.ASSIGNED);
+            assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNED);
             assignment.setTopicId(topicId);
             assignment.setQueueId(queueId);
             assignment.setSrcNodeId(srcNodeId);
@@ -384,7 +384,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
         try (SqlSession session = getSessionFactory().openSession()) {
             QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
-            List<QueueAssignment> assignments = assignmentMapper.list(topicId, null, null, AssignmentStatus.YIELDING, null);
+            List<QueueAssignment> assignments = assignmentMapper.list(topicId, null, null, AssignmentStatus.ASSIGNMENT_STATUS_YIELDING, null);
             Assertions.assertEquals(1, assignments.size());
             session.commit();
         }
@@ -409,7 +409,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
         try (SqlSession session = getSessionFactory().openSession()) {
             QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
             QueueAssignment assignment = new QueueAssignment();
-            assignment.setStatus(AssignmentStatus.ASSIGNED);
+            assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNED);
             assignment.setTopicId(topicId);
             assignment.setQueueId(queueId);
             assignment.setSrcNodeId(srcNodeId);
@@ -469,7 +469,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
 
             Stream stream = new Stream();
-            stream.setStreamRole(StreamRole.DATA);
+            stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
             stream.setTopicId(topicId);
             stream.setQueueId(queueId);
             stream.setState(StreamState.UNINITIALIZED);
@@ -527,7 +527,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
 
             Stream stream = new Stream();
-            stream.setStreamRole(StreamRole.DATA);
+            stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
             stream.setTopicId(topicId);
             stream.setQueueId(queueId);
             stream.setState(StreamState.CLOSED);
@@ -592,7 +592,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
 
             Stream stream = new Stream();
-            stream.setStreamRole(StreamRole.DATA);
+            stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
             stream.setTopicId(topicId);
             stream.setQueueId(queueId);
             stream.setState(StreamState.CLOSED);
@@ -657,7 +657,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
 
             Stream stream = new Stream();
-            stream.setStreamRole(StreamRole.DATA);
+            stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
             stream.setTopicId(topicId);
             stream.setQueueId(queueId);
             stream.setEpoch(1);
@@ -729,7 +729,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
 
             Stream stream = new Stream();
-            stream.setStreamRole(StreamRole.DATA);
+            stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
             stream.setTopicId(topicId);
             stream.setQueueId(queueId);
             stream.setEpoch(1);
@@ -796,7 +796,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
 
             Stream stream = new Stream();
-            stream.setStreamRole(StreamRole.DATA);
+            stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
             stream.setTopicId(topicId);
             stream.setQueueId(queueId);
             stream.setEpoch(1);
@@ -877,7 +877,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
 
             Stream stream = new Stream();
-            stream.setStreamRole(StreamRole.DATA);
+            stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
             stream.setTopicId(topicId);
             stream.setQueueId(queueId);
             stream.setEpoch(1);
@@ -992,7 +992,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
 
             Stream stream = new Stream();
-            stream.setStreamRole(StreamRole.DATA);
+            stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
             stream.setTopicId(topicId);
             stream.setQueueId(queueId);
             stream.setEpoch(1);
@@ -1101,7 +1101,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
 
             Stream stream = new Stream();
-            stream.setStreamRole(StreamRole.DATA);
+            stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
             stream.setTopicId(topicId);
             stream.setQueueId(queueId);
             stream.setEpoch(1);

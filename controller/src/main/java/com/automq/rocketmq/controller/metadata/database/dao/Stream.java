@@ -18,6 +18,7 @@
 
 package com.automq.rocketmq.controller.metadata.database.dao;
 
+import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.StreamState;
 import java.util.Date;
 
@@ -38,7 +39,7 @@ public class Stream {
     private StreamRole streamRole;
 
     /**
-     * If {@link #streamRole} is {@link StreamRole#RETRY}, this field represents owner of this retry queue.
+     * If {@link #streamRole} is {@link StreamRole#STREAM_ROLE_RETRY}, this field represents owner of this retry queue.
      */
     private Long groupId;
 

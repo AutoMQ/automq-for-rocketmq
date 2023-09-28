@@ -17,11 +17,13 @@
 
 package com.automq.rocketmq.controller.metadata.database;
 
+import apache.rocketmq.controller.v1.AssignmentStatus;
 import apache.rocketmq.controller.v1.CloseStreamRequest;
 import apache.rocketmq.controller.v1.Code;
 import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
+import apache.rocketmq.controller.v1.GroupStatus;
 import apache.rocketmq.controller.v1.GroupType;
 import apache.rocketmq.controller.v1.MessageQueue;
 import apache.rocketmq.controller.v1.MessageQueueAssignment;
@@ -29,8 +31,10 @@ import apache.rocketmq.controller.v1.OngoingMessageQueueReassignment;
 import apache.rocketmq.controller.v1.OpenStreamReply;
 import apache.rocketmq.controller.v1.OpenStreamRequest;
 import apache.rocketmq.controller.v1.StreamMetadata;
+import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.StreamState;
 import apache.rocketmq.controller.v1.SubStream;
+import apache.rocketmq.controller.v1.TopicStatus;
 import apache.rocketmq.controller.v1.TrimStreamRequest;
 import com.automq.rocketmq.common.PrefixThreadFactory;
 import com.automq.rocketmq.controller.exception.ControllerException;
@@ -41,17 +45,13 @@ import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.Role;
 import com.automq.rocketmq.controller.metadata.database.dao.Group;
 import com.automq.rocketmq.controller.metadata.database.dao.GroupProgress;
-import com.automq.rocketmq.controller.metadata.database.dao.GroupStatus;
 import com.automq.rocketmq.controller.metadata.database.dao.Lease;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
-import com.automq.rocketmq.controller.metadata.database.dao.AssignmentStatus;
 import com.automq.rocketmq.controller.metadata.database.dao.Stream;
 import com.automq.rocketmq.controller.metadata.database.dao.S3Object;
-import com.automq.rocketmq.controller.metadata.database.dao.StreamRole;
 import com.automq.rocketmq.controller.metadata.database.dao.Range;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
-import com.automq.rocketmq.controller.metadata.database.dao.TopicStatus;
 import com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.GroupProgressMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
@@ -250,7 +250,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     Topic topic = new Topic();
                     topic.setName(topicName);
                     topic.setQueueNum(queueNum);
-                    topic.setStatus(TopicStatus.ACTIVE);
+                    topic.setStatus(TopicStatus.TOPIC_STATUS_ACTIVE);
                     topicMapper.create(topic);
 
                     QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
@@ -269,18 +269,18 @@ public class DefaultMetadataStore implements MetadataStore {
                         IntStream.range(0, queueNum).forEach(n -> {
                             QueueAssignment assignment = new QueueAssignment();
                             assignment.setTopicId(topicId);
-                            assignment.setStatus(AssignmentStatus.ASSIGNABLE);
+                            assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNABLE);
                             assignment.setQueueId(n);
                             // On creation, both src and dst node_id are the same.
                             assignment.setSrcNodeId(0);
                             assignment.setDstNodeId(0);
                             assignmentMapper.create(assignment);
                             // Create data stream
-                            long streamId = createStream(streamMapper, topicId, n, StreamRole.DATA, 0);
+                            long streamId = createStream(streamMapper, topicId, n, StreamRole.STREAM_ROLE_DATA, 0);
                             LOGGER.debug("Create assignable data stream[stream-id={}] for topic-id={}, queue-id={}",
                                 streamId, topicId, n);
                             // Create ops stream
-                            streamId = createStream(streamMapper, topicId, n, StreamRole.OPS, 0);
+                            streamId = createStream(streamMapper, topicId, n, StreamRole.STREAM_ROLE_OPS, 0);
                             LOGGER.debug("Create assignable ops stream[stream-id={}] for topic-id={}, queue-id={}",
                                 streamId, topicId, n);
                         });
@@ -291,18 +291,18 @@ public class DefaultMetadataStore implements MetadataStore {
                             toNotify.add(nodeId);
                             QueueAssignment assignment = new QueueAssignment();
                             assignment.setTopicId(topicId);
-                            assignment.setStatus(AssignmentStatus.ASSIGNED);
+                            assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNED);
                             assignment.setQueueId(n);
                             // On creation, both src and dst node_id are the same.
                             assignment.setSrcNodeId(nodeId);
                             assignment.setDstNodeId(nodeId);
                             assignmentMapper.create(assignment);
                             // Create data stream
-                            long streamId = createStream(streamMapper, topicId, n, StreamRole.DATA, nodeId);
+                            long streamId = createStream(streamMapper, topicId, n, StreamRole.STREAM_ROLE_DATA, nodeId);
                             LOGGER.debug("Create data stream[stream-id={}] for topic-id={}, queue-id={}, assigned to node[node-id={}]",
                                 streamId, topicId, n, nodeId);
                             // Create ops stream
-                            streamId = createStream(streamMapper, topicId, n, StreamRole.OPS, nodeId);
+                            streamId = createStream(streamMapper, topicId, n, StreamRole.STREAM_ROLE_OPS, nodeId);
                             LOGGER.debug("Create ops stream[stream-id={}] for topic-id={}, queue-id={}, assigned to node[node-id={}]",
                                 streamId, topicId, n, nodeId);
                         });
@@ -356,19 +356,19 @@ public class DefaultMetadataStore implements MetadataStore {
                     if (null == topic) {
                         throw new ControllerException(Code.NOT_FOUND_VALUE, String.format("This is no topic with topic-id %d", topicId));
                     }
-                    topicMapper.updateStatusById(topicId, TopicStatus.DELETED);
+                    topicMapper.updateStatusById(topicId, TopicStatus.TOPIC_STATUS_DELETED);
 
                     QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
                     List<QueueAssignment> assignments = assignmentMapper.list(topicId, null, null, null, null);
-                    assignments.stream().filter(assignment -> assignment.getStatus() != AssignmentStatus.DELETED)
+                    assignments.stream().filter(assignment -> assignment.getStatus() != AssignmentStatus.ASSIGNMENT_STATUS_DELETED)
                         .forEach(assignment -> {
                             switch (assignment.getStatus()) {
-                                case ASSIGNED -> toNotify.add(assignment.getDstNodeId());
-                                case YIELDING -> toNotify.add(assignment.getSrcNodeId());
+                                case ASSIGNMENT_STATUS_ASSIGNED -> toNotify.add(assignment.getDstNodeId());
+                                case ASSIGNMENT_STATUS_YIELDING -> toNotify.add(assignment.getSrcNodeId());
                                 default -> {
                                 }
                             }
-                            assignment.setStatus(AssignmentStatus.DELETED);
+                            assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_DELETED);
                             assignmentMapper.update(assignment);
                         });
                     StreamMapper streamMapper = session.getMapper(StreamMapper.class);
@@ -408,10 +408,10 @@ public class DefaultMetadataStore implements MetadataStore {
                 if (null != assignments) {
                     for (QueueAssignment assignment : assignments) {
                         switch (assignment.getStatus()) {
-                            case DELETED -> {
+                            case ASSIGNMENT_STATUS_DELETED -> {
                             }
 
-                            case ASSIGNED -> {
+                            case ASSIGNMENT_STATUS_ASSIGNED ->  {
                                 MessageQueueAssignment queueAssignment = MessageQueueAssignment.newBuilder()
                                     .setQueue(MessageQueue.newBuilder()
                                         .setTopicId(assignment.getTopicId())
@@ -421,7 +421,7 @@ public class DefaultMetadataStore implements MetadataStore {
                                 topicBuilder.addAssignments(queueAssignment);
                             }
 
-                            case YIELDING, ASSIGNABLE -> {
+                            case ASSIGNMENT_STATUS_YIELDING, ASSIGNMENT_STATUS_ASSIGNABLE -> {
                                 OngoingMessageQueueReassignment reassignment = OngoingMessageQueueReassignment.newBuilder()
                                     .setQueue(MessageQueue.newBuilder()
                                         .setTopicId(assignment.getTopicId())
@@ -459,7 +459,7 @@ public class DefaultMetadataStore implements MetadataStore {
             TopicMapper topicMapper = session.getMapper(TopicMapper.class);
             List<Topic> topics = topicMapper.list(null, null);
             for (Topic topic : topics) {
-                if (TopicStatus.DELETED == topic.getStatus()) {
+                if (TopicStatus.TOPIC_STATUS_DELETED == topic.getStatus()) {
                     continue;
                 }
                 apache.rocketmq.controller.v1.Topic t = apache.rocketmq.controller.v1.Topic.newBuilder()
@@ -529,16 +529,16 @@ public class DefaultMetadataStore implements MetadataStore {
                         }
 
                         switch (assignment.getStatus()) {
-                            case ASSIGNABLE, YIELDING -> {
+                            case ASSIGNMENT_STATUS_ASSIGNABLE, ASSIGNMENT_STATUS_YIELDING -> {
                                 assignment.setDstNodeId(dstNodeId);
                                 assignmentMapper.update(assignment);
                             }
-                            case ASSIGNED -> {
+                            case ASSIGNMENT_STATUS_ASSIGNED -> {
                                 assignment.setDstNodeId(dstNodeId);
-                                assignment.setStatus(AssignmentStatus.YIELDING);
+                                assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_YIELDING);
                                 assignmentMapper.update(assignment);
                             }
-                            case DELETED -> throw new ControllerException(Code.NOT_FOUND_VALUE, "Already deleted");
+                            case ASSIGNMENT_STATUS_DELETED -> throw new ControllerException(Code.NOT_FOUND_VALUE, "Already deleted");
                         }
                         break;
                     }
@@ -557,14 +557,14 @@ public class DefaultMetadataStore implements MetadataStore {
             if (isLeader()) {
                 try (SqlSession session = getSessionFactory().openSession()) {
                     QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
-                    List<QueueAssignment> assignments = assignmentMapper.list(topicId, null, null, AssignmentStatus.YIELDING, null);
+                    List<QueueAssignment> assignments = assignmentMapper.list(topicId, null, null, AssignmentStatus.ASSIGNMENT_STATUS_YIELDING, null);
                     for (QueueAssignment assignment : assignments) {
                         if (assignment.getQueueId() != queueId) {
                             continue;
                         }
 
                         assignment.setSrcNodeId(assignment.getDstNodeId());
-                        assignment.setStatus(AssignmentStatus.ASSIGNABLE);
+                        assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNABLE);
                         assignmentMapper.update(assignment);
                         LOGGER.info("Mark queue[topic-id={}, queue-id={}] assignable", topicId, queueId);
                         break;
@@ -630,7 +630,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     group.setName(groupName);
                     group.setMaxDeliveryAttempt(maxRetry);
                     group.setDeadLetterTopicId(deadLetterTopicId);
-                    group.setStatus(GroupStatus.ACTIVE);
+                    group.setStatus(GroupStatus.GROUP_STATUS_ACTIVE);
                     group.setGroupType(type);
                     groupMapper.create(group);
                     session.commit();
@@ -1140,7 +1140,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
                     List<QueueAssignment> assignments = assignmentMapper
                         .list(topicId, null, null, null, null)
-                        .stream().filter(assignment -> assignment.getStatus() != AssignmentStatus.DELETED)
+                        .stream().filter(assignment -> assignment.getStatus() != AssignmentStatus.ASSIGNMENT_STATUS_DELETED)
                         .toList();
                     if (assignments.isEmpty()) {
                         throw new ControllerException(Code.NOT_FOUND_VALUE,
@@ -1150,7 +1150,7 @@ public class DefaultMetadataStore implements MetadataStore {
 
                     GroupMapper groupMapper = session.getMapper(GroupMapper.class);
 
-                    List<Group> groups = groupMapper.list(null, groupName, GroupStatus.ACTIVE, null);
+                    List<Group> groups = groupMapper.list(null, groupName, GroupStatus.GROUP_STATUS_ACTIVE, null);
                     if (groups.isEmpty()) {
                         throw new ControllerException(Code.NOT_FOUND_VALUE,
                             String.format("Group '%s' is not found", groupName));
@@ -1159,13 +1159,13 @@ public class DefaultMetadataStore implements MetadataStore {
                     long groupId = groups.get(0).getId();
                     StreamMapper streamMapper = session.getMapper(StreamMapper.class);
                     List<Stream> streams = streamMapper.list(topicId, queueId, groupId)
-                        .stream().filter(stream -> stream.getStreamRole() == StreamRole.RETRY).toList();
+                        .stream().filter(stream -> stream.getStreamRole() == StreamRole.STREAM_ROLE_RETRY).toList();
                     if (streams.isEmpty()) {
                         Stream stream = new Stream();
                         stream.setTopicId(topicId);
                         stream.setQueueId(queueId);
                         stream.setGroupId(groupId);
-                        stream.setStreamRole(StreamRole.RETRY);
+                        stream.setStreamRole(StreamRole.STREAM_ROLE_RETRY);
                         stream.setState(StreamState.UNINITIALIZED);
                         stream.setSrcNodeId(assignment.getSrcNodeId());
                         stream.setDstNodeId(assignment.getDstNodeId());
