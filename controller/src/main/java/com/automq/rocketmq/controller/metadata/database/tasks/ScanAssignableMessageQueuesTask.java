@@ -17,9 +17,9 @@
 
 package com.automq.rocketmq.controller.metadata.database.tasks;
 
+import apache.rocketmq.controller.v1.AssignmentStatus;
 import com.automq.rocketmq.controller.metadata.database.DefaultMetadataStore;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
-import com.automq.rocketmq.controller.metadata.database.dao.AssignmentStatus;
 import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper;
 import java.util.List;
 import org.apache.ibatis.session.SqlSession;
@@ -43,7 +43,7 @@ public class ScanAssignableMessageQueuesTask extends ScanTask {
             try (SqlSession session = metadataStore.getSessionFactory().openSession()) {
                 QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
                 List<QueueAssignment> assignments = assignmentMapper.list(null, null, null,
-                    AssignmentStatus.ASSIGNABLE, this.lastScanTime);
+                    AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNABLE, this.lastScanTime);
                 if (doAssign(assignments, session)) {
                     session.commit();
                 }

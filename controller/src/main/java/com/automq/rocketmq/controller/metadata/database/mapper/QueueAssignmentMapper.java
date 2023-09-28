@@ -17,8 +17,8 @@
 
 package com.automq.rocketmq.controller.metadata.database.mapper;
 
+import apache.rocketmq.controller.v1.AssignmentStatus;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
-import com.automq.rocketmq.controller.metadata.database.dao.AssignmentStatus;
 import java.util.Date;
 import java.util.List;
 import org.apache.ibatis.annotations.Param;

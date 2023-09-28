@@ -17,8 +17,8 @@
 
 package com.automq.rocketmq.controller.metadata.database.mapper;
 
+import apache.rocketmq.controller.v1.GroupStatus;
 import com.automq.rocketmq.controller.metadata.database.dao.Group;
-import com.automq.rocketmq.controller.metadata.database.dao.GroupStatus;
 import java.util.Date;
 import java.util.List;
 import org.apache.ibatis.annotations.Param;

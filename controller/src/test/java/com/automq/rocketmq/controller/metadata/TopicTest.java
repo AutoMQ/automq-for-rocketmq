@@ -17,8 +17,8 @@
 
 package com.automq.rocketmq.controller.metadata;
 
+import apache.rocketmq.controller.v1.TopicStatus;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
-import com.automq.rocketmq.controller.metadata.database.dao.TopicStatus;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 import java.io.IOException;
 import java.util.List;
@@ -35,7 +35,7 @@ public class TopicTest extends DatabaseTestBase {
             Topic topic = new Topic();
             String name = "T1";
             int queueNum = 16;
-            TopicStatus status = TopicStatus.DELETED;
+            TopicStatus status = TopicStatus.TOPIC_STATUS_DELETED;
 
             topic.setName(name);
             topic.setQueueNum(queueNum);
@@ -48,19 +48,19 @@ public class TopicTest extends DatabaseTestBase {
             Topic got = topicMapper.get(topic.getId(), null);
             Assertions.assertEquals(topic, got);
 
-            affectedRows = topicMapper.updateStatusById(topic.getId(), TopicStatus.ACTIVE);
+            affectedRows = topicMapper.updateStatusById(topic.getId(), TopicStatus.TOPIC_STATUS_ACTIVE);
             Assertions.assertEquals(1, affectedRows);
 
             got = topicMapper.get(topic.getId(),null);
-            Assertions.assertEquals(TopicStatus.ACTIVE, got.getStatus());
+            Assertions.assertEquals(TopicStatus.TOPIC_STATUS_ACTIVE, got.getStatus());
 
             List<Topic> topics = topicMapper.list(null, null);
             Assertions.assertEquals(1, topics.size());
 
-            topics = topicMapper.list(TopicStatus.ACTIVE, null);
+            topics = topicMapper.list(TopicStatus.TOPIC_STATUS_ACTIVE, null);
             Assertions.assertEquals(1, topics.size());
 
-            topics = topicMapper.list(TopicStatus.DELETED, null);
+            topics = topicMapper.list(TopicStatus.TOPIC_STATUS_DELETED, null);
             Assertions.assertEquals(0, topics.size());
         }
     }

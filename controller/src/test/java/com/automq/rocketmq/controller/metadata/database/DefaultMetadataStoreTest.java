@@ -17,13 +17,17 @@
 
 package com.automq.rocketmq.controller.metadata.database;
 
+import apache.rocketmq.controller.v1.AssignmentStatus;
 import apache.rocketmq.controller.v1.ConsumerGroup;
+import apache.rocketmq.controller.v1.GroupStatus;
 import apache.rocketmq.controller.v1.GroupType;
 import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
+import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.StreamState;
 import apache.rocketmq.controller.v1.SubStream;
+import apache.rocketmq.controller.v1.TopicStatus;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.ControllerClient;
 import com.automq.rocketmq.controller.metadata.ControllerConfig;
@@ -31,16 +35,12 @@ import com.automq.rocketmq.controller.metadata.DatabaseTestBase;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.Role;
 import com.automq.rocketmq.controller.metadata.database.dao.Group;
-import com.automq.rocketmq.controller.metadata.database.dao.GroupStatus;
 import com.automq.rocketmq.controller.metadata.database.dao.Lease;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
-import com.automq.rocketmq.controller.metadata.database.dao.AssignmentStatus;
 import com.automq.rocketmq.controller.metadata.database.dao.Stream;
 import com.automq.rocketmq.controller.metadata.database.dao.Range;
-import com.automq.rocketmq.controller.metadata.database.dao.StreamRole;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
-import com.automq.rocketmq.controller.metadata.database.dao.TopicStatus;
 import com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper;
@@ -116,7 +116,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     /**
      * Dummy test, should be removed later
      *
-     * @throws IOException
      */
     @Test
     void testGetLease() throws IOException {
@@ -267,7 +266,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             QueueAssignmentMapper mapper = session.getMapper(QueueAssignmentMapper.class);
             QueueAssignment assignment = new QueueAssignment();
             assignment.setTopicId(1);
-            assignment.setStatus(AssignmentStatus.ASSIGNED);
+            assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNED);
             assignment.setDstNodeId(2);
             assignment.setSrcNodeId(3);
             assignment.setQueueId(4);
@@ -282,7 +281,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Assertions.assertEquals(1, assignmentList.size());
             QueueAssignment assignment = assignmentList.get(0);
             Assertions.assertEquals(1, assignment.getTopicId());
-            Assertions.assertEquals(AssignmentStatus.ASSIGNED, assignment.getStatus());
+            Assertions.assertEquals(AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNED, assignment.getStatus());
             Assertions.assertEquals(2, assignment.getDstNodeId());
             Assertions.assertEquals(3, assignment.getSrcNodeId());
             Assertions.assertEquals(4, assignment.getQueueId());
@@ -305,7 +304,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
             TopicMapper topicMapper = session.getMapper(TopicMapper.class);
             Topic topic = new Topic();
-            topic.setStatus(TopicStatus.ACTIVE);
+            topic.setStatus(TopicStatus.TOPIC_STATUS_ACTIVE);
             topic.setName("T");
             topic.setQueueNum(1);
             topicMapper.create(topic);
@@ -351,14 +350,14 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             TopicMapper topicMapper = session.getMapper(TopicMapper.class);
             Topic topic = new Topic();
             topic.setName("T1");
-            topic.setStatus(TopicStatus.ACTIVE);
+            topic.setStatus(TopicStatus.TOPIC_STATUS_ACTIVE);
             topicMapper.create(topic);
             topicId = topic.getId();
 
             QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
             QueueAssignment assignment = new QueueAssignment();
             assignment.setTopicId(topicId);
-            assignment.setStatus(AssignmentStatus.ASSIGNED);
+            assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNED);
             assignment.setQueueId(1);
             assignment.setDstNodeId(2);
             assignment.setSrcNodeId(3);
@@ -366,7 +365,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
             assignment = new QueueAssignment();
             assignment.setTopicId(topicId);
-            assignment.setStatus(AssignmentStatus.YIELDING);
+            assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_YIELDING);
             assignment.setSrcNodeId(3);
             assignment.setDstNodeId(2);
             assignment.setQueueId(2);
@@ -396,7 +395,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             QueueAssignment assignment = new QueueAssignment();
             assignment.setQueueId(1);
             assignment.setTopicId(2);
-            assignment.setStatus(AssignmentStatus.YIELDING);
+            assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_YIELDING);
             assignmentMapper.create(assignment);
             session.commit();
         }
@@ -414,7 +413,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             List<QueueAssignment> assignments = metadataStore.listAssignments(2L, null, null, null);
             for (QueueAssignment assignment : assignments) {
                 if (assignment.getQueueId() == 1) {
-                    Assertions.assertEquals(AssignmentStatus.ASSIGNABLE, assignment.getStatus());
+                    Assertions.assertEquals(AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNABLE, assignment.getStatus());
                 }
             }
         }
@@ -467,28 +466,29 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         endOffset = 9L;
         int limit = 1;
         Gson gson = new Gson();
-        String subStreamsJson = "{\n" +
-            "  \"1234567890\": {\n" +
-            "    \"streamId_\": 1234567890,\n" +
-            "    \"startOffset_\": 0,\n" +
-            "    \"endOffset_\": 10\n" +
-            "  },\n" +
-            "  \"9876543210\": {\n" +
-            "    \"streamId_\": 9876543210,\n" +
-            "    \"startOffset_\": 5,\n" +
-            "    \"endOffset_\": 15\n" +
-            "  },\n" +
-            "  \"5678901234\": {\n" +
-            "    \"streamId_\": 5678901234,\n" +
-            "    \"startOffset_\": 2,\n" +
-            "    \"endOffset_\": 8\n" +
-            "  },\n" +
-            "  \"4321098765\": {\n" +
-            "    \"streamId_\": 4321098765,\n" +
-            "    \"startOffset_\": 7,\n" +
-            "    \"endOffset_\": 12\n" +
-            "  }\n" +
-            "}";
+        String subStreamsJson = """
+            {
+              "1234567890": {
+                "streamId_": 1234567890,
+                "startOffset_": 0,
+                "endOffset_": 10
+              },
+              "9876543210": {
+                "streamId_": 9876543210,
+                "startOffset_": 5,
+                "endOffset_": 15
+              },
+              "5678901234": {
+                "streamId_": 5678901234,
+                "startOffset_": 2,
+                "endOffset_": 8
+              },
+              "4321098765": {
+                "streamId_": 4321098765,
+                "startOffset_": 7,
+                "endOffset_": 12
+              }
+            }""";
         try (SqlSession session = getSessionFactory().openSession()) {
             S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
             com.automq.rocketmq.controller.metadata.database.dao.S3WALObject s3WALObject = new com.automq.rocketmq.controller.metadata.database.dao.S3WALObject();
@@ -503,13 +503,13 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             s3WALObjectMapper.create(s3WALObject);
             session.commit();
         }
-        String expectSubStream = "{\n" +
-            "  \"1234567890\": {\n" +
-            "    \"streamId_\": 1234567890,\n" +
-            "    \"startOffset_\": 0,\n" +
-            "    \"endOffset_\": 10\n" +
-            "  }" +
-            "}";
+        String expectSubStream = """
+            {
+              "1234567890": {
+                "streamId_": 1234567890,
+                "startOffset_": 0,
+                "endOffset_": 10
+              }}""";
         Map<Long, SubStream> subStreams = gson.fromJson(new String(expectSubStream.getBytes(StandardCharsets.UTF_8)), new TypeToken<Map<Long, SubStream>>() {
         }.getType());
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
@@ -543,28 +543,29 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     @Test
     public void testListWALObjects_NotParms() throws IOException {
         Gson gson = new Gson();
-        String subStreamsJson = "{\n" +
-            "  \"1234567890\": {\n" +
-            "    \"streamId_\": 1234567890,\n" +
-            "    \"startOffset_\": 0,\n" +
-            "    \"endOffset_\": 10\n" +
-            "  },\n" +
-            "  \"9876543210\": {\n" +
-            "    \"streamId_\": 9876543210,\n" +
-            "    \"startOffset_\": 5,\n" +
-            "    \"endOffset_\": 15\n" +
-            "  },\n" +
-            "  \"5678901234\": {\n" +
-            "    \"streamId_\": 5678901234,\n" +
-            "    \"startOffset_\": 2,\n" +
-            "    \"endOffset_\": 8\n" +
-            "  },\n" +
-            "  \"4321098765\": {\n" +
-            "    \"streamId_\": 4321098765,\n" +
-            "    \"startOffset_\": 7,\n" +
-            "    \"endOffset_\": 12\n" +
-            "  }\n" +
-            "}";
+        String subStreamsJson = """
+            {
+              "1234567890": {
+                "streamId_": 1234567890,
+                "startOffset_": 0,
+                "endOffset_": 10
+              },
+              "9876543210": {
+                "streamId_": 9876543210,
+                "startOffset_": 5,
+                "endOffset_": 15
+              },
+              "5678901234": {
+                "streamId_": 5678901234,
+                "startOffset_": 2,
+                "endOffset_": 8
+              },
+              "4321098765": {
+                "streamId_": 4321098765,
+                "startOffset_": 7,
+                "endOffset_": 12
+              }
+            }""";
         try (SqlSession session = getSessionFactory().openSession()) {
             S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
             com.automq.rocketmq.controller.metadata.database.dao.S3WALObject s3WALObject = new com.automq.rocketmq.controller.metadata.database.dao.S3WALObject();
@@ -579,8 +580,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             s3WALObjectMapper.create(s3WALObject);
             session.commit();
         }
-        String expectSubStream = subStreamsJson;
-        Map<Long, SubStream> subStreams = gson.fromJson(new String(expectSubStream.getBytes(StandardCharsets.UTF_8)), new TypeToken<Map<Long, SubStream>>() {
+        Map<Long, SubStream> subStreams = gson.fromJson(new String(subStreamsJson.getBytes(StandardCharsets.UTF_8)), new TypeToken<Map<Long, SubStream>>() {
         }.getType());
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.nodeId()).thenReturn(1);
@@ -619,7 +619,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Stream stream = new Stream();
             stream.setRangeId(-1);
             stream.setState(StreamState.UNINITIALIZED);
-            stream.setStreamRole(StreamRole.DATA);
+            stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
             streamMapper.create(stream);
             streamId = stream.getId();
             session.commit();
@@ -682,7 +682,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Stream stream = new Stream();
             stream.setRangeId(0);
             stream.setState(StreamState.CLOSED);
-            stream.setStreamRole(StreamRole.DATA);
+            stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
             stream.setStartOffset(1234);
             streamMapper.create(stream);
             streamId = stream.getId();
@@ -756,19 +756,19 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             stream.setQueueId(2);
             stream.setRangeId(0);
             stream.setState(StreamState.CLOSED);
-            stream.setStreamRole(StreamRole.DATA);
+            stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
             stream.setStartOffset(1234);
             streamMapper.create(stream);
             dataStreamId = stream.getId();
 
             stream.setState(StreamState.CLOSED);
-            stream.setStreamRole(StreamRole.OPS);
+            stream.setStreamRole(StreamRole.STREAM_ROLE_OPS);
             stream.setStartOffset(1234);
             streamMapper.create(stream);
             opsStreamId = stream.getId();
 
             stream.setState(StreamState.CLOSED);
-            stream.setStreamRole(StreamRole.RETRY);
+            stream.setStreamRole(StreamRole.STREAM_ROLE_RETRY);
             stream.setGroupId(3L);
             stream.setStartOffset(1234);
             streamMapper.create(stream);
@@ -782,13 +782,13 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            long streamId = metadataStore.getStream(1, 2, null, StreamRole.DATA)
+            long streamId = metadataStore.getStream(1, 2, null, StreamRole.STREAM_ROLE_DATA)
                 .get().getStreamId();
             Assertions.assertEquals(streamId, dataStreamId);
-            streamId = metadataStore.getStream(1, 2, null, StreamRole.OPS).get().getStreamId();
+            streamId = metadataStore.getStream(1, 2, null, StreamRole.STREAM_ROLE_OPS).get().getStreamId();
             Assertions.assertEquals(streamId, opsStreamId);
 
-            streamId = metadataStore.getStream(1, 2, 3L, StreamRole.RETRY).get().getStreamId();
+            streamId = metadataStore.getStream(1, 2, 3L, StreamRole.STREAM_ROLE_RETRY).get().getStreamId();
             Assertions.assertEquals(streamId, retryStreamId);
         }
     }
@@ -802,7 +802,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             group.setGroupType(GroupType.GROUP_TYPE_STANDARD);
             group.setMaxDeliveryAttempt(5);
             group.setDeadLetterTopicId(1L);
-            group.setStatus(GroupStatus.ACTIVE);
+            group.setStatus(GroupStatus.GROUP_STATUS_ACTIVE);
             group.setName("G1");
             groupMapper.create(group);
             groupId = group.getId();
@@ -816,10 +816,9 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
         try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             ConsumerGroup got = metadataStore.getGroup(groupId).get();
-//            Assertions.assertEquals(5, got.getMaxRetryAttempt());
-//            Assertions.assertEquals(GroupType.STANDARD, got.getGroupType());
-//            Assertions.assertEquals(1L, got.getDeadLetterTopicId());
-//            Assertions.assertEquals(GroupStatus.ACTIVE, got.getStatus());
+            Assertions.assertEquals(5, got.getMaxDeliveryAttempt());
+            Assertions.assertEquals(GroupType.GROUP_TYPE_STANDARD, got.getGroupType());
+            Assertions.assertEquals(1L, got.getDeadLetterTopicId());
             Assertions.assertEquals("G1", got.getName());
         }
     }
@@ -839,7 +838,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             stream.setEpoch(0);
             stream.setRangeId(rangId);
             stream.setState(StreamState.OPEN);
-            stream.setStreamRole(StreamRole.DATA);
+            stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
             streamMapper.create(stream);
             streamId = stream.getId();
 

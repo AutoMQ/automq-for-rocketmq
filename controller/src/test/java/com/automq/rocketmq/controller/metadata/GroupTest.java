@@ -17,8 +17,8 @@
 
 package com.automq.rocketmq.controller.metadata;
 
+import apache.rocketmq.controller.v1.GroupStatus;
 import com.automq.rocketmq.controller.metadata.database.dao.Group;
-import com.automq.rocketmq.controller.metadata.database.dao.GroupStatus;
 import com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper;
 import java.io.IOException;
 import java.util.List;
@@ -33,12 +33,12 @@ public class GroupTest extends DatabaseTestBase {
             GroupMapper mapper = session.getMapper(GroupMapper.class);
             Group group = new Group();
             group.setName("G1");
-            group.setStatus(GroupStatus.ACTIVE);
+            group.setStatus(GroupStatus.GROUP_STATUS_ACTIVE);
             group.setDeadLetterTopicId(1);
             int rowsAffected = mapper.create(group);
             Assertions.assertEquals(1, rowsAffected);
 
-            group.setStatus(GroupStatus.DELETED);
+            group.setStatus(GroupStatus.GROUP_STATUS_DELETED);
             group.setDeadLetterTopicId(2);
             mapper.update(group);
 
@@ -46,10 +46,10 @@ public class GroupTest extends DatabaseTestBase {
             Assertions.assertEquals(1, groups.size());
             Group got = groups.get(0);
             Assertions.assertEquals("G1", got.getName());
-            Assertions.assertEquals(GroupStatus.DELETED, got.getStatus());
+            Assertions.assertEquals(GroupStatus.GROUP_STATUS_DELETED, got.getStatus());
             Assertions.assertEquals(2, got.getDeadLetterTopicId());
 
-            groups = mapper.list(null, null, GroupStatus.ACTIVE, null);
+            groups = mapper.list(null, null, GroupStatus.GROUP_STATUS_ACTIVE, null);
             Assertions.assertTrue(groups.isEmpty());
 
             rowsAffected = mapper.delete(group.getId());

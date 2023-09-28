@@ -35,15 +35,15 @@
 
     <typeHandlers>
         <typeHandler handler="org.apache.ibatis.type.EnumOrdinalTypeHandler"
-                     javaType="com.automq.rocketmq.controller.metadata.database.dao.GroupStatus" />
+                     javaType="apache.rocketmq.controller.v1.GroupStatus" />
         <typeHandler handler="org.apache.ibatis.type.EnumOrdinalTypeHandler"
                      javaType="apache.rocketmq.controller.v1.GroupType" />
         <typeHandler handler="org.apache.ibatis.type.EnumOrdinalTypeHandler"
-                     javaType="com.automq.rocketmq.controller.metadata.database.dao.TopicStatus" />
+                     javaType="apache.rocketmq.controller.v1.TopicStatus" />
         <typeHandler handler="org.apache.ibatis.type.EnumOrdinalTypeHandler"
-                     javaType="com.automq.rocketmq.controller.metadata.database.dao.AssignmentStatus" />
+                     javaType="apache.rocketmq.controller.v1.AssignmentStatus" />
         <typeHandler handler="org.apache.ibatis.type.EnumOrdinalTypeHandler"
-                     javaType="com.automq.rocketmq.controller.metadata.database.dao.StreamRole" />
+                     javaType="apache.rocketmq.controller.v1.StreamRole" />
         <typeHandler handler="org.apache.ibatis.type.EnumOrdinalTypeHandler"
                      javaType="apache.rocketmq.controller.v1.StreamState" />
         <typeHandler handler="org.apache.ibatis.type.EnumOrdinalTypeHandler"

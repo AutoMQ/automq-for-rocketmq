@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.controller.metadata.database.dao;
 
+import apache.rocketmq.controller.v1.AssignmentStatus;
 import java.util.Date;
 
 public class QueueAssignment {

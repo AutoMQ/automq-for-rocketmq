@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.controller.metadata.database.dao;
 
+import apache.rocketmq.controller.v1.GroupStatus;
 import apache.rocketmq.controller.v1.GroupType;
 import java.util.Date;
 
@@ -24,7 +25,7 @@ public class Group {
     private long id;
     private String name;
 
-    private GroupStatus status = GroupStatus.ACTIVE;
+    private GroupStatus status = GroupStatus.GROUP_STATUS_ACTIVE;
 
     private long deadLetterTopicId;
 
