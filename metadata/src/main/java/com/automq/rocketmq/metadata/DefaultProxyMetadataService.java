@@ -19,13 +19,20 @@ package com.automq.rocketmq.metadata;
 
 import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.Topic;
+import com.automq.rocketmq.controller.metadata.MetadataStore;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 public class DefaultProxyMetadataService implements ProxyMetadataService {
+    private final MetadataStore metadataStore;
+
+    public DefaultProxyMetadataService(MetadataStore metadataStore) {
+        this.metadataStore = metadataStore;
+    }
+
     @Override
     public CompletableFuture<Topic> topicOf(String topicName) {
-        return null;
+        return metadataStore.describeTopic(null, topicName);
     }
 
     @Override

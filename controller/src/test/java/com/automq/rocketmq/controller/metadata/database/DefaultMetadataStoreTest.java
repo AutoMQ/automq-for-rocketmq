@@ -246,9 +246,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         try (SqlSession session = getSessionFactory().openSession()) {
             TopicMapper topicMapper = session.getMapper(TopicMapper.class);
             List<Topic> topics = topicMapper.list(null, null);
-            topics.stream().filter(topic -> topic.getName().equals("t1")).forEach(topic -> {
-                Assertions.assertEquals(4, topic.getQueueNum());
-            });
+            topics.stream().filter(topic -> topic.getName().equals("t1")).forEach(topic -> Assertions.assertEquals(4, topic.getQueueNum()));
 
             QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
             List<QueueAssignment> assignments = assignmentMapper.list(topicId, null, null, null, null);
@@ -343,7 +341,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testDescribeTopic() throws IOException, ControllerException {
+    public void testDescribeTopic() throws IOException, ExecutionException, InterruptedException {
         long topicId;
         try (SqlSession session = getSessionFactory().openSession()) {
 
@@ -381,7 +379,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             metadataStore.start();
             Awaitility.await().with().atMost(10, TimeUnit.SECONDS).pollInterval(100, TimeUnit.MILLISECONDS)
                 .until(metadataStore::isLeader);
-            apache.rocketmq.controller.v1.Topic topic = metadataStore.describeTopic(topicId, null);
+            apache.rocketmq.controller.v1.Topic topic = metadataStore.describeTopic(topicId, null).get();
             Assertions.assertEquals("T1", topic.getName());
             Assertions.assertEquals(1, topic.getAssignmentsCount());
             Assertions.assertEquals(1, topic.getReassignmentsCount());
@@ -541,7 +539,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testListWALObjects_NotParms() throws IOException {
+    public void testListWALObjects_NotParams() throws IOException {
         Gson gson = new Gson();
         String subStreamsJson = """
             {
@@ -745,7 +743,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testGetStream() throws IOException, ControllerException, ExecutionException, InterruptedException {
+    public void testGetStream() throws IOException, ExecutionException, InterruptedException {
         long dataStreamId;
         long opsStreamId;
         long retryStreamId;
