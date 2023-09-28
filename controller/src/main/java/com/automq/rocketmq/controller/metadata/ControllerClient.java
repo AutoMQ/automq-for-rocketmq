@@ -29,9 +29,10 @@ import apache.rocketmq.controller.v1.TrimStreamRequest;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 
+import java.io.Closeable;
 import java.util.concurrent.CompletableFuture;
 
-public interface ControllerClient {
+public interface ControllerClient extends Closeable {
 
     CompletableFuture<Node> registerBroker(String target, String name, String address, String instanceId)
         throws ControllerException;

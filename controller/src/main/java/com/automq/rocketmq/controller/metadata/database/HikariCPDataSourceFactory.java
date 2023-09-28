@@ -28,12 +28,13 @@ public class HikariCPDataSourceFactory extends PooledDataSourceFactory {
 
     @Override
     public void setProperties(Properties properties) {
-        synchronized (HikariDataSource.class) {
+        synchronized (HikariCPDataSourceFactory.class) {
             if (null == dataSource) {
                 HikariConfig config = new HikariConfig(properties);
                 config.setMaximumPoolSize(10);
                 config.setIdleTimeout(100);
-                config.setLeakDetectionThreshold(3);
+                config.setLeakDetectionThreshold(2100);
+                config.setMaxLifetime(30000);
                 dataSource = new HikariDataSource(config);
             }
         }

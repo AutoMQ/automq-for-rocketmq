@@ -663,6 +663,20 @@ public class DefaultMetadataStore implements MetadataStore {
         }
     }
 
+    @Override
+    public long streamIdOf(long topicId, int queueId, Long groupId, StreamRole streamRole) throws ControllerException {
+        try (SqlSession session = getSessionFactory().openSession()) {
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+            List<Stream> streams = streamMapper.list(topicId, queueId, groupId).stream()
+                .filter(stream -> stream.getStreamRole() == streamRole).toList();
+            if (streams.isEmpty()) {
+                throw new ControllerException(Code.NOT_FOUND_VALUE,
+                    String.format("Stream for topic-id=%d, queue-id=%d, stream-role=%s is not found", topicId, queueId, streamRole.name()));
+            }
+            return streams.get(0).getId();
+        }
+    }
+
     public void trimStream(long streamId, long streamEpoch, long newStartOffset) throws ControllerException {
         for (; ; ) {
             if (this.isLeader()) {

@@ -278,10 +278,11 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .atMost(10, TimeUnit.SECONDS)
                 .until(metadataStore::isLeader);
 
-            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore))) {
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
+                 ControllerClient client = new GrpcControllerClient()
+            ) {
                 testServer.start();
                 int port = testServer.getPort();
-                ControllerClient client = new GrpcControllerClient();
                 Assertions.assertDoesNotThrow(() -> {
                     client.commitOffset(String.format("localhost:%d", port), 1, 1, 1, 1).get();
                 });
@@ -315,10 +316,11 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .atMost(10, TimeUnit.SECONDS)
                 .until(metadataStore::isLeader);
 
-            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore))) {
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
+                 ControllerClient client = new GrpcControllerClient()
+            ) {
                 testServer.start();
                 int port = testServer.getPort();
-                ControllerClient client = new GrpcControllerClient();
 
                 CreateGroupRequest request = CreateGroupRequest.newBuilder()
                     .setGroupType(GroupType.GROUP_TYPE_STANDARD)
@@ -371,10 +373,11 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .atMost(10, TimeUnit.SECONDS)
                 .until(metadataStore::isLeader);
 
-            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore))) {
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
+                 ControllerClient client = new GrpcControllerClient()
+            ) {
                 testServer.start();
                 int port = testServer.getPort();
-                ControllerClient client = new GrpcControllerClient();
                 client.reassignMessageQueue(String.format("localhost:%d", port), topicId, queueId, srcNodeId).get();
             }
         }
@@ -431,10 +434,11 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .atMost(10, TimeUnit.SECONDS)
                 .until(metadataStore::isLeader);
 
-            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore))) {
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
+                 ControllerClient client = new GrpcControllerClient()
+            ) {
                 testServer.start();
                 int port = testServer.getPort();
-                ControllerClient client = new GrpcControllerClient();
                 client.createRetryStream(String.format("localhost:%d", port), groupName, topicId, queueId).get();
             }
         }
@@ -482,10 +486,11 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .atMost(10, TimeUnit.SECONDS)
                 .until(metadataStore::isLeader);
 
-            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore))) {
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
+                 ControllerClient client = new GrpcControllerClient()
+            ) {
                 testServer.start();
                 int port = testServer.getPort();
-                ControllerClient client = new GrpcControllerClient();
                 OpenStreamRequest request = OpenStreamRequest.newBuilder()
                     .setStreamId(streamId)
                     .setStreamEpoch(0)
@@ -552,10 +557,11 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .atMost(10, TimeUnit.SECONDS)
                 .until(metadataStore::isLeader);
 
-            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore))) {
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
+                 ControllerClient client = new GrpcControllerClient()
+            ) {
                 testServer.start();
                 int port = testServer.getPort();
-                ControllerClient client = new GrpcControllerClient();
                 OpenStreamRequest request = OpenStreamRequest.newBuilder()
                     .setStreamId(streamId + 100)
                     .setStreamEpoch(1)
@@ -616,10 +622,11 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .atMost(10, TimeUnit.SECONDS)
                 .until(metadataStore::isLeader);
 
-            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore))) {
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
+                 ControllerClient client = new GrpcControllerClient()
+            ) {
                 testServer.start();
                 int port = testServer.getPort();
-                ControllerClient client = new GrpcControllerClient();
                 OpenStreamRequest request = OpenStreamRequest.newBuilder()
                     .setStreamId(streamId)
                     .setStreamEpoch(0)
@@ -680,10 +687,11 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .atMost(10, TimeUnit.SECONDS)
                 .until(metadataStore::isLeader);
 
-            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore))) {
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
+                 ControllerClient client = new GrpcControllerClient()
+            ) {
                 testServer.start();
                 int port = testServer.getPort();
-                ControllerClient client = new GrpcControllerClient();
                 CloseStreamRequest request = CloseStreamRequest.newBuilder()
                     .setStreamId(streamId)
                     .setBrokerId(2)
@@ -751,10 +759,11 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .atMost(10, TimeUnit.SECONDS)
                 .until(metadataStore::isLeader);
 
-            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore))) {
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
+                 ControllerClient client = new GrpcControllerClient()
+            ) {
                 testServer.start();
                 int port = testServer.getPort();
-                ControllerClient client = new GrpcControllerClient();
                 CloseStreamRequest request = CloseStreamRequest.newBuilder()
                     .setStreamId(streamId + 100) // Not found
                     .setBrokerId(2)
@@ -818,10 +827,11 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .atMost(10, TimeUnit.SECONDS)
                 .until(metadataStore::isLeader);
 
-            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore))) {
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
+                 ControllerClient client = new GrpcControllerClient()
+            ) {
                 testServer.start();
                 int port = testServer.getPort();
-                ControllerClient client = new GrpcControllerClient();
                 TrimStreamRequest request = TrimStreamRequest.newBuilder()
                     .setStreamId(streamId)
                     .setStreamEpoch(1)
@@ -915,10 +925,11 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .atMost(10, TimeUnit.SECONDS)
                 .until(metadataStore::isLeader);
 
-            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore))) {
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
+                 ControllerClient client = new GrpcControllerClient()
+            ) {
                 testServer.start();
                 int port = testServer.getPort();
-                ControllerClient client = new GrpcControllerClient();
                 TrimStreamRequest request = TrimStreamRequest.newBuilder()
                     .setStreamId(streamId)
                     .setStreamEpoch(1)
@@ -969,13 +980,13 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
         long streamId;
         long objectId = 2;
         long newStartOffset = 40L;
-        String expectSubStream = "{\n" +
-            "  \"1234567890\": {\n" +
-            "    \"streamId_\": 1234567890,\n" +
-            "    \"startOffset_\": 0,\n" +
-            "    \"endOffset_\": 10\n" +
-            "  }" +
-            "}";
+        String expectSubStream = """
+            {
+              "1234567890": {
+                "streamId_": 1234567890,
+                "startOffset_": 0,
+                "endOffset_": 10
+              }}""";
 
         try (SqlSession session = getSessionFactory().openSession()) {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
@@ -1029,10 +1040,11 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .atMost(10, TimeUnit.SECONDS)
                 .until(metadataStore::isLeader);
 
-            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore))) {
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
+                 ControllerClient client = new GrpcControllerClient()
+            ) {
                 testServer.start();
                 int port = testServer.getPort();
-                ControllerClient client = new GrpcControllerClient();
                 TrimStreamRequest request = TrimStreamRequest.newBuilder()
                     .setStreamId(streamId)
                     .setStreamEpoch(1)
@@ -1146,10 +1158,11 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .atMost(10, TimeUnit.SECONDS)
                 .until(metadataStore::isLeader);
 
-            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore))) {
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
+                 ControllerClient client = new GrpcControllerClient()
+            ) {
                 testServer.start();
                 int port = testServer.getPort();
-                ControllerClient client = new GrpcControllerClient();
                 TrimStreamRequest request = TrimStreamRequest.newBuilder()
                     .setStreamId(streamId)
                     .setStreamEpoch(1)

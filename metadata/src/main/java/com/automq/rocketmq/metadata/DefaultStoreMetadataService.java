@@ -21,11 +21,18 @@ import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
 import com.automq.rocketmq.common.util.Pair;
+import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
+import com.automq.rocketmq.controller.metadata.database.DefaultMetadataStore;
+import com.automq.rocketmq.controller.metadata.database.dao.StreamRole;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class DefaultStoreMetadataService implements StoreMetadataService {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(DefaultMetadataStore.class);
 
     private final MetadataStore metadataStore;
 
@@ -35,22 +42,37 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
 
     @Override
     public long getStreamId(long topicId, int queueId) {
-        return 0;
+        try {
+            return metadataStore.streamIdOf(topicId, queueId, null, StreamRole.DATA);
+        } catch (ControllerException e) {
+            LOGGER.error("Failed to acquire data stream-id for topic-id={}, queue-id={}", topicId, queueId);
+            return -1L;
+        }
     }
 
     @Override
     public long getOperationLogStreamId(long topicId, int queueId) {
-        return 0;
+        try {
+            return metadataStore.streamIdOf(topicId, queueId, null, StreamRole.OPS);
+        } catch (ControllerException e) {
+            LOGGER.error("Failed to acquire data stream-id for topic-id={}, queue-id={}", topicId, queueId);
+            return -1L;
+        }
     }
 
     @Override
     public long getRetryStreamId(long consumerGroupId, long topicId, int queueId) {
-        return 0;
+        try {
+            return metadataStore.streamIdOf(topicId, queueId, consumerGroupId, StreamRole.RETRY);
+        } catch (ControllerException e) {
+            LOGGER.error("Failed to acquire data stream-id for topic-id={}, queue-id={}", topicId, queueId);
+            return -1L;
+        }
     }
 
     @Override
     public long getDeadLetterStreamId(long consumerGroupId, long topicId, int queueId) {
-        return 0;
+        throw new RuntimeException("Unsupported operation");
     }
 
     @Override
