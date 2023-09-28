@@ -918,4 +918,130 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         }
 
     }
+
+    @Test
+    public void testListOpenStream() throws IOException {
+        long streamId;
+        int nodeId = 1, rangId = 0;
+        try (SqlSession session = this.getSessionFactory().openSession()) {
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+            RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
+
+            com.automq.rocketmq.controller.metadata.database.dao.Stream stream = new com.automq.rocketmq.controller.metadata.database.dao.Stream();
+            stream.setSrcNodeId(nodeId);
+            stream.setDstNodeId(nodeId);
+            stream.setStartOffset(1234);
+            stream.setEpoch(0);
+            stream.setRangeId(rangId);
+            stream.setState(StreamState.OPEN);
+            stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
+            streamMapper.create(stream);
+            streamId = stream.getId();
+
+            Range range = new Range();
+            range.setRangeId(rangId);
+            range.setStreamId(streamId);
+            range.setEpoch(0L);
+            range.setStartOffset(1234L);
+            range.setEndOffset(2345L);
+            range.setBrokerId(nodeId);
+            rangeMapper.create(range);
+
+            session.commit();
+        }
+
+
+        ControllerConfig config = Mockito.mock(ControllerConfig.class);
+        Mockito.when(config.nodeId()).thenReturn(nodeId);
+        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
+        Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
+
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            Assertions.assertNull(metadataStore.getLease());
+            Lease lease = new Lease();
+            lease.setNodeId(config.nodeId());
+            metadataStore.setLease(lease);
+            metadataStore.setRole(Role.Leader);
+            List<StreamMetadata> streams = metadataStore.listOpenStreams(nodeId, 0).get();
+
+            Assertions.assertFalse(streams.isEmpty());
+            StreamMetadata streamMetadata = streams.get(0);
+            Assertions.assertEquals(streamId, streamMetadata.getStreamId());
+            Assertions.assertEquals(StreamState.OPEN, streamMetadata.getState());
+            Assertions.assertEquals(1234, streamMetadata.getStartOffset());
+            Assertions.assertEquals(2345, streamMetadata.getEndOffset());
+        } catch (ExecutionException e) {
+            throw new RuntimeException(e);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+        try (SqlSession session = getSessionFactory().openSession()) {
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+            streamMapper.delete(streamId);
+            session.commit();
+        }
+
+    }
+
+    @Test
+    public void testListOpenStream_NotFound() throws IOException {
+        long streamId;
+        int nodeId = 1, rangId = 0;
+        try (SqlSession session = this.getSessionFactory().openSession()) {
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+            RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
+
+            com.automq.rocketmq.controller.metadata.database.dao.Stream stream = new com.automq.rocketmq.controller.metadata.database.dao.Stream();
+            stream.setSrcNodeId(nodeId);
+            stream.setDstNodeId(nodeId);
+            stream.setStartOffset(1234);
+            stream.setEpoch(0);
+            stream.setRangeId(rangId);
+            stream.setState(StreamState.CLOSED);
+            stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
+            streamMapper.create(stream);
+            streamId = stream.getId();
+
+            Range range = new Range();
+            range.setRangeId(rangId);
+            range.setStreamId(streamId);
+            range.setEpoch(0L);
+            range.setStartOffset(1234L);
+            range.setEndOffset(2345L);
+            range.setBrokerId(nodeId);
+            rangeMapper.create(range);
+
+            session.commit();
+        }
+
+
+        ControllerConfig config = Mockito.mock(ControllerConfig.class);
+        Mockito.when(config.nodeId()).thenReturn(nodeId);
+        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
+        Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
+
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            Assertions.assertNull(metadataStore.getLease());
+            Lease lease = new Lease();
+            lease.setNodeId(config.nodeId());
+            metadataStore.setLease(lease);
+            metadataStore.setRole(Role.Leader);
+            List<StreamMetadata> streams = metadataStore.listOpenStreams(nodeId, 0).get();
+
+            Assertions.assertTrue(streams.isEmpty());
+        } catch (ExecutionException e) {
+            throw new RuntimeException(e);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+        try (SqlSession session = getSessionFactory().openSession()) {
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+            streamMapper.delete(streamId);
+            session.commit();
+        }
+    }
 }
