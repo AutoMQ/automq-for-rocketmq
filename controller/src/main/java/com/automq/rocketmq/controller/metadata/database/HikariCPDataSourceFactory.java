@@ -24,23 +24,24 @@ import javax.sql.DataSource;
 import org.apache.ibatis.datasource.pooled.PooledDataSourceFactory;
 
 public class HikariCPDataSourceFactory extends PooledDataSourceFactory {
-    private static HikariDataSource dataSource;
+    private static HikariDataSource DATA_SOURCE;
 
     @Override
     public void setProperties(Properties properties) {
-        synchronized (HikariDataSource.class) {
-            if (null == dataSource) {
+        synchronized (HikariCPDataSourceFactory.class) {
+            if (null == DATA_SOURCE) {
                 HikariConfig config = new HikariConfig(properties);
                 config.setMaximumPoolSize(10);
                 config.setIdleTimeout(100);
-                config.setLeakDetectionThreshold(3);
-                dataSource = new HikariDataSource(config);
+                config.setLeakDetectionThreshold(2100);
+                config.setMaxLifetime(30000);
+                DATA_SOURCE = new HikariDataSource(config);
             }
         }
     }
 
     @Override
     public DataSource getDataSource() {
-        return dataSource;
+        return DATA_SOURCE;
     }
 }

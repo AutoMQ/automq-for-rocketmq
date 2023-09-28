@@ -26,6 +26,7 @@ import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import com.automq.rocketmq.controller.metadata.database.dao.AssignmentStatus;
+import com.automq.rocketmq.controller.metadata.database.dao.StreamRole;
 import java.io.Closeable;
 import java.util.List;
 
@@ -80,6 +81,8 @@ public interface MetadataStore extends Closeable {
     void commitOffset(long groupId, long topicId, int queueId, long offset) throws ControllerException;
 
     long createGroup(String groupName, int maxRetry, GroupType type, long dlq) throws ControllerException;
+
+    long streamIdOf(long topicId, int queueId, Long groupId, StreamRole streamRole) throws ControllerException;
 
     void trimStream(long streamId, long streamEpoch, long newStartOffset) throws ControllerException;
 

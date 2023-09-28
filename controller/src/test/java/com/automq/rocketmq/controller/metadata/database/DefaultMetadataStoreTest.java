@@ -619,7 +619,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             session.commit();
         }
 
-
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.nodeId()).thenReturn(1);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
@@ -693,7 +692,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             session.commit();
         }
 
-
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.nodeId()).thenReturn(1);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
@@ -738,7 +736,54 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             streamMapper.delete(streamId);
             session.commit();
         }
+    }
 
+    @Test
+    public void testStreamIdOf() throws IOException, ControllerException {
+        long dataStreamId;
+        long opsStreamId;
+        long retryStreamId;
+        try (SqlSession session = this.getSessionFactory().openSession()) {
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+            Stream stream = new Stream();
+            stream.setTopicId(1L);
+            stream.setQueueId(2);
+            stream.setRangeId(0);
+            stream.setState(StreamState.CLOSED);
+            stream.setStreamRole(StreamRole.DATA);
+            stream.setStartOffset(1234);
+            streamMapper.create(stream);
+            dataStreamId = stream.getId();
+
+            stream.setState(StreamState.CLOSED);
+            stream.setStreamRole(StreamRole.OPS);
+            stream.setStartOffset(1234);
+            streamMapper.create(stream);
+            opsStreamId = stream.getId();
+
+            stream.setState(StreamState.CLOSED);
+            stream.setStreamRole(StreamRole.RETRY);
+            stream.setGroupId(3L);
+            stream.setStartOffset(1234);
+            streamMapper.create(stream);
+            retryStreamId = stream.getId();
+            session.commit();
+        }
+
+        ControllerConfig config = Mockito.mock(ControllerConfig.class);
+        Mockito.when(config.nodeId()).thenReturn(1);
+        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
+
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            long streamId = metadataStore.streamIdOf(1, 2, null, StreamRole.DATA);
+            Assertions.assertEquals(streamId, dataStreamId);
+            streamId = metadataStore.streamIdOf(1, 2, null, StreamRole.OPS);
+            Assertions.assertEquals(streamId, opsStreamId);
+
+            streamId = metadataStore.streamIdOf(1, 2, 3L, StreamRole.RETRY);
+            Assertions.assertEquals(streamId, retryStreamId);
+        }
     }
 
 
