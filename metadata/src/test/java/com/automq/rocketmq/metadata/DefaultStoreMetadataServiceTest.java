@@ -21,6 +21,7 @@ import apache.rocketmq.controller.v1.Code;
 import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.StreamRole;
 import com.automq.rocketmq.controller.exception.ControllerException;
+import com.automq.rocketmq.controller.metadata.ControllerConfig;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Assertions;
@@ -29,6 +30,12 @@ import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
 
 class DefaultStoreMetadataServiceTest {
+
+    private final ControllerConfig config;
+
+    public DefaultStoreMetadataServiceTest() {
+        this.config = Mockito.mock(ControllerConfig.class);
+    }
 
     @Test
     public void testGetStreamId() {
@@ -41,7 +48,9 @@ class DefaultStoreMetadataServiceTest {
                 ArgumentMatchers.nullable(Long.class), ArgumentMatchers.eq(StreamRole.STREAM_ROLE_DATA)))
             .thenReturn(future);
 
-        DefaultStoreMetadataService service = new DefaultStoreMetadataService(metadataStore);
+        ControllerConfig config = Mockito.mock(ControllerConfig.class);
+
+        DefaultStoreMetadataService service = new DefaultStoreMetadataService(metadataStore, config);
         Assertions.assertEquals(1L, service.getStreamId(1L, 2));
     }
 
@@ -53,7 +62,7 @@ class DefaultStoreMetadataServiceTest {
         Mockito.when(metadataStore.getStream(ArgumentMatchers.anyLong(), ArgumentMatchers.anyInt(),
                 ArgumentMatchers.nullable(Long.class), ArgumentMatchers.eq(StreamRole.STREAM_ROLE_DATA)))
             .thenReturn(future);
-        DefaultStoreMetadataService service = new DefaultStoreMetadataService(metadataStore);
+        DefaultStoreMetadataService service = new DefaultStoreMetadataService(metadataStore, config);
         Assertions.assertEquals(-1L, service.getStreamId(1L, 2));
     }
 
@@ -67,7 +76,7 @@ class DefaultStoreMetadataServiceTest {
         Mockito.when(metadataStore.getStream(ArgumentMatchers.anyLong(), ArgumentMatchers.anyInt(),
                 ArgumentMatchers.nullable(Long.class), ArgumentMatchers.eq(StreamRole.STREAM_ROLE_OPS)))
             .thenReturn(future);
-        DefaultStoreMetadataService service = new DefaultStoreMetadataService(metadataStore);
+        DefaultStoreMetadataService service = new DefaultStoreMetadataService(metadataStore, config);
         Assertions.assertEquals(1L, service.getOperationLogStreamId(1L, 2));
     }
 
@@ -79,7 +88,7 @@ class DefaultStoreMetadataServiceTest {
         Mockito.when(metadataStore.getStream(ArgumentMatchers.anyLong(), ArgumentMatchers.anyInt(),
                 ArgumentMatchers.nullable(Long.class), ArgumentMatchers.eq(StreamRole.STREAM_ROLE_OPS)))
             .thenReturn(future);
-        DefaultStoreMetadataService service = new DefaultStoreMetadataService(metadataStore);
+        DefaultStoreMetadataService service = new DefaultStoreMetadataService(metadataStore, config);
         Assertions.assertEquals(-1L, service.getOperationLogStreamId(1L, 2));
     }
 
@@ -93,7 +102,7 @@ class DefaultStoreMetadataServiceTest {
         Mockito.when(metadataStore.getStream(ArgumentMatchers.anyLong(), ArgumentMatchers.anyInt(),
                 ArgumentMatchers.nullable(Long.class), ArgumentMatchers.eq(StreamRole.STREAM_ROLE_RETRY)))
             .thenReturn(future);
-        DefaultStoreMetadataService service = new DefaultStoreMetadataService(metadataStore);
+        DefaultStoreMetadataService service = new DefaultStoreMetadataService(metadataStore, config);
         Assertions.assertEquals(1L, service.getRetryStreamId(3L, 1L, 2));
     }
 
@@ -105,7 +114,7 @@ class DefaultStoreMetadataServiceTest {
         Mockito.when(metadataStore.getStream(ArgumentMatchers.anyLong(), ArgumentMatchers.anyInt(),
                 ArgumentMatchers.nullable(Long.class), ArgumentMatchers.eq(StreamRole.STREAM_ROLE_RETRY)))
             .thenReturn(future);
-        DefaultStoreMetadataService service = new DefaultStoreMetadataService(metadataStore);
+        DefaultStoreMetadataService service = new DefaultStoreMetadataService(metadataStore, config);
         Assertions.assertEquals(-1L, service.getRetryStreamId(0L, 1L, 2));
     }
 

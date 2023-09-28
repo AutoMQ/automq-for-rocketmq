@@ -33,6 +33,8 @@ import apache.rocketmq.controller.v1.DescribeTopicReply;
 import apache.rocketmq.controller.v1.DescribeTopicRequest;
 import apache.rocketmq.controller.v1.HeartbeatReply;
 import apache.rocketmq.controller.v1.HeartbeatRequest;
+import apache.rocketmq.controller.v1.ListOpenStreamsReply;
+import apache.rocketmq.controller.v1.ListOpenStreamsRequest;
 import apache.rocketmq.controller.v1.MessageQueue;
 import apache.rocketmq.controller.v1.NodeRegistrationReply;
 import apache.rocketmq.controller.v1.NodeRegistrationRequest;
@@ -429,6 +431,27 @@ public class GrpcControllerClient implements ControllerClient {
             Futures.addCallback(this.buildStubForTarget(target).closeStream(request), new FutureCallback<>() {
                 @Override
                 public void onSuccess(CloseStreamReply result) {
+                    future.complete(result);
+                }
+
+                @Override
+                public void onFailure(@Nonnull Throwable t) {
+                    future.completeExceptionally(t);
+                }
+            }, MoreExecutors.directExecutor());
+        } catch (ControllerException e) {
+            future.completeExceptionally(e);
+        }
+        return future;
+    }
+
+    @Override
+    public CompletableFuture<ListOpenStreamsReply> listOpenStreams(String target, ListOpenStreamsRequest request) {
+        CompletableFuture<ListOpenStreamsReply> future = new CompletableFuture<>();
+        try {
+            Futures.addCallback(buildStubForTarget(target).listOpenStreams(request), new FutureCallback<>() {
+                @Override
+                public void onSuccess(ListOpenStreamsReply result) {
                     future.complete(result);
                 }
 

@@ -42,7 +42,7 @@ import apache.rocketmq.controller.v1.HeartbeatRequest;
 import apache.rocketmq.controller.v1.ListMessageQueueReassignmentsReply;
 import apache.rocketmq.controller.v1.ListMessageQueueReassignmentsRequest;
 import apache.rocketmq.controller.v1.ListOpenStreamsRequest;
-import apache.rocketmq.controller.v1.ListOpeningStreamsReply;
+import apache.rocketmq.controller.v1.ListOpenStreamsReply;
 import apache.rocketmq.controller.v1.ListTopicsReply;
 import apache.rocketmq.controller.v1.ListTopicsRequest;
 import apache.rocketmq.controller.v1.MessageQueue;
@@ -387,8 +387,22 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
 
     @Override
     public void listOpenStreams(ListOpenStreamsRequest request,
-        StreamObserver<ListOpeningStreamsReply> responseObserver) {
-        super.listOpenStreams(request, responseObserver);
+        StreamObserver<ListOpenStreamsReply> responseObserver) {
+        metadataStore.listOpenStreams(request.getBrokerId(), request.getBrokerEpoch())
+            .whenComplete((metadataList, e) -> {
+                if (null != e) {
+                    responseObserver.onError(e);
+                    return;
+                }
+                ListOpenStreamsReply reply = ListOpenStreamsReply.newBuilder()
+                    .setStatus(Status.newBuilder()
+                        .setCode(Code.OK)
+                        .build())
+                    .addAllStreamMetadata(metadataList)
+                    .build();
+                responseObserver.onNext(reply);
+                responseObserver.onCompleted();
+            });
     }
 
     @Override

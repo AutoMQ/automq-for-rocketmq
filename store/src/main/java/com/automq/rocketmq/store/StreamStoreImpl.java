@@ -64,7 +64,8 @@ public class StreamStoreImpl implements StreamStore {
         this.s3Config = configFrom(streamConfig);
 
         // Build meta service and related manager
-        this.metadataService = new DefaultStoreMetadataService(null);
+        // TODO: Assemble metadata store and config
+        this.metadataService = new DefaultStoreMetadataService(null, null);
         this.streamManager = new S3StreamManager(metadataService);
         this.objectManager = new S3ObjectManager(metadataService);
 

@@ -260,7 +260,7 @@ message ListOpenStreamsRequest {
   int64 broker_epoch = 3;
 }
 
-message ListOpeningStreamsReply {
+message ListOpenStreamsReply {
   Status status = 1;
 
   repeated StreamMetadata stream_metadata = 2;
@@ -403,7 +403,7 @@ service ControllerService {
   rpc trimStream(TrimStreamRequest) returns (TrimStreamReply) {}
 
   // List all streams opened on a specific broker.
-  rpc listOpenStreams(ListOpenStreamsRequest) returns (ListOpeningStreamsReply) {}
+  rpc listOpenStreams(ListOpenStreamsRequest) returns (ListOpenStreamsReply) {}
 
   // Prepare S3 objects before uploading.
   rpc prepareS3Objects(PrepareS3ObjectsRequest) returns (PrepareS3ObjectsReply) {}

@@ -21,6 +21,8 @@ import apache.rocketmq.controller.v1.CloseStreamReply;
 import apache.rocketmq.controller.v1.CloseStreamRequest;
 import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
+import apache.rocketmq.controller.v1.ListOpenStreamsReply;
+import apache.rocketmq.controller.v1.ListOpenStreamsRequest;
 import apache.rocketmq.controller.v1.OpenStreamReply;
 import apache.rocketmq.controller.v1.OpenStreamRequest;
 import apache.rocketmq.controller.v1.Topic;
@@ -64,6 +66,8 @@ public interface ControllerClient extends Closeable {
     CompletableFuture<OpenStreamReply> openStream(String target, OpenStreamRequest request);
 
     CompletableFuture<CloseStreamReply> closeStream(String target, CloseStreamRequest request);
+
+    CompletableFuture<ListOpenStreamsReply> listOpenStreams(String target, ListOpenStreamsRequest request);
 
     CompletableFuture<TrimStreamReply> trimStream(String target, TrimStreamRequest request) throws ControllerException;
 }

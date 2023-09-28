@@ -23,6 +23,7 @@ import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.StreamRole;
 import com.automq.rocketmq.common.util.Pair;
+import com.automq.rocketmq.controller.metadata.ControllerConfig;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.DefaultMetadataStore;
 import java.util.List;
@@ -37,8 +38,14 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
 
     private final MetadataStore metadataStore;
 
-    public DefaultStoreMetadataService(MetadataStore metadataStore) {
+    /**
+     * Provides identify and its epoch for the store.
+     */
+    private final ControllerConfig config;
+
+    public DefaultStoreMetadataService(MetadataStore metadataStore, ControllerConfig config) {
         this.metadataStore = metadataStore;
+        this.config = config;
     }
 
     @Override
@@ -134,7 +141,7 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
 
     @Override
     public CompletableFuture<List<StreamMetadata>> listOpenStreams() {
-        return null;
+        return metadataStore.listOpenStreams(config.nodeId(), config.epoch());
     }
 
     @Override

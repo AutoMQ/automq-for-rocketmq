@@ -25,6 +25,8 @@ import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.GroupStatus;
 import apache.rocketmq.controller.v1.GroupType;
+import apache.rocketmq.controller.v1.ListOpenStreamsReply;
+import apache.rocketmq.controller.v1.ListOpenStreamsRequest;
 import apache.rocketmq.controller.v1.MessageQueue;
 import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.OngoingMessageQueueReassignment;
@@ -1040,8 +1042,50 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public List<StreamMetadata> listOpenStreams() {
-        return null;
+    public CompletableFuture<List<StreamMetadata>> listOpenStreams(int nodeId, long epoch) {
+        CompletableFuture<List<StreamMetadata>> future = new CompletableFuture<>();
+        for (; ; ) {
+            if (isLeader()) {
+                try (SqlSession session = getSessionFactory().openSession()) {
+                    if (!maintainLeadershipWithSharedLock(session)) {
+                        continue;
+                    }
+                    StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+                    RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
+                    List<StreamMetadata> streams = streamMapper.listByNode(nodeId, StreamState.OPEN)
+                        .stream()
+                        .filter(stream -> stream.getEpoch() <= epoch)
+                        .map(stream -> {
+                            long rangeId = stream.getRangeId();
+                            Range range = rangeMapper.getById(rangeId);
+                            return StreamMetadata.newBuilder()
+                                .setStreamId(stream.getId())
+                                .setStartOffset(stream.getStartOffset())
+                                .setEndOffset(range.getEndOffset())
+                                .setEpoch(stream.getEpoch())
+                                .setState(stream.getState())
+                                .setRangeId(stream.getRangeId())
+                                .build();
+                        })
+                        .toList();
+                    future.complete(streams);
+                    break;
+                }
+            } else {
+                ListOpenStreamsRequest request = ListOpenStreamsRequest.newBuilder()
+                    .setBrokerId(nodeId)
+                    .setBrokerEpoch(epoch)
+                    .build();
+                try {
+                    return controllerClient.listOpenStreams(leaderAddress(), request)
+                        .thenApply((ListOpenStreamsReply::getStreamMetadataList));
+                } catch (ControllerException e) {
+                    future.completeExceptionally(e);
+                }
+                break;
+            }
+        }
+        return future;
     }
 
     @Override
