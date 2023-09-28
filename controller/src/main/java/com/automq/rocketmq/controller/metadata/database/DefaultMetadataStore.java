@@ -25,14 +25,13 @@ import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.GroupStatus;
 import apache.rocketmq.controller.v1.GroupType;
-import apache.rocketmq.controller.v1.ListOpenStreamsReply;
 import apache.rocketmq.controller.v1.ListOpenStreamsRequest;
+import apache.rocketmq.controller.v1.ListOpenStreamsReply;
 import apache.rocketmq.controller.v1.MessageQueue;
 import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.OngoingMessageQueueReassignment;
 import apache.rocketmq.controller.v1.OpenStreamReply;
 import apache.rocketmq.controller.v1.OpenStreamRequest;
-import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.StreamRole;
@@ -52,6 +51,7 @@ import com.automq.rocketmq.controller.metadata.database.dao.GroupProgress;
 import com.automq.rocketmq.controller.metadata.database.dao.Lease;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
+import com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject;
 import com.automq.rocketmq.controller.metadata.database.dao.Stream;
 import com.automq.rocketmq.controller.metadata.database.dao.S3Object;
 import com.automq.rocketmq.controller.metadata.database.dao.Range;
@@ -793,7 +793,7 @@ public class DefaultMetadataStore implements MetadataStore {
                             // stream object
                             s3StreamObjectMapper.delete(null, streamId, streamObject.getObjectId());
                             // markDestroyObjects
-                            S3Object s3Object = s3ObjectMapper.getByObjectId(streamObject.getObjectId());
+                            S3Object s3Object = s3ObjectMapper.getById(streamObject.getObjectId());
                             s3Object.setMarkedForDeletionTimestamp(System.currentTimeMillis());
                             s3ObjectMapper.delete(s3Object);
                         }
@@ -811,7 +811,7 @@ public class DefaultMetadataStore implements MetadataStore {
                         .forEach(s3WALObject -> {
                             if (s3WALObject.getSubStreamsMap().size() == 1) {
                                 // only this range, but we will remove this range, so now we can remove this wal object
-                                S3Object s3Object = s3ObjectMapper.getByObjectId(s3WALObject.getObjectId());
+                                S3Object s3Object = s3ObjectMapper.getById(s3WALObject.getObjectId());
                                 s3Object.setMarkedForDeletionTimestamp(System.currentTimeMillis());
                                 s3ObjectMapper.delete(s3Object);
                             }
@@ -1058,8 +1058,8 @@ public class DefaultMetadataStore implements MetadataStore {
                         .stream()
                         .filter(stream -> stream.getEpoch() <= epoch)
                         .map(stream -> {
-                            long rangeId = stream.getRangeId();
-                            Range range = rangeMapper.getById(rangeId);
+                            int rangeId = stream.getRangeId();
+                            Range range = rangeMapper.getByRangeId(rangeId);
                             return StreamMetadata.newBuilder()
                                 .setStreamId(stream.getId())
                                 .setStartOffset(stream.getStartOffset())
@@ -1092,19 +1092,82 @@ public class DefaultMetadataStore implements MetadataStore {
 
     @Override
     public long prepareS3Objects(int count, int ttlInMinutes) {
+        for (; ; ) {
+            if (isLeader()) {
+                try (SqlSession session = getSessionFactory().openSession()) {
+
+                }
+            } else {
+
+            }
+            break;
+        }
         return 0;
     }
 
     @Override
-    public void commitWalObject(S3WALObject walObject,
-        List<S3StreamObject> streamObjects, List<Long> compactedObjects) {
+    public void commitWalObject(apache.rocketmq.controller.v1.S3WALObject walObject, List<apache.rocketmq.controller.v1.S3StreamObject> streamObjects, List<Long> compactedObjects) {
+        for (; ; ) {
+            if (isLeader()) {
+                try (SqlSession session = getSessionFactory().openSession()) {
+                    long committedTs = System.currentTimeMillis();
 
+                    if (Objects.isNull(compactedObjects) || compactedObjects.isEmpty()) {
+                        // verify stream continuity
+
+
+                    }
+
+                    // commit object
+
+                    // mark destroy compacted object
+
+                    // update broker's wal object
+
+
+                }
+            } else {
+
+            }
+            break;
+        }
     }
 
     @Override
-    public void commitStreamObject(S3StreamObject streamObject,
-        List<Long> compactedObjects) {
+    public void commitStreamObject(apache.rocketmq.controller.v1.S3StreamObject streamObject, List<Long> compactedObjects) {
+        for (; ; ) {
+            if (isLeader()) {
+                try (SqlSession session = getSessionFactory().openSession()) {
+                    long committedTs = System.currentTimeMillis();
+                    S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
 
+                    // commit object --> store
+                    long dataTs = committedTs;
+
+                    if (!Objects.isNull(compactedObjects) && !compactedObjects.isEmpty()) {
+                        // mark destroy compacted object
+                        S3StreamObject s3StreamObject = new S3StreamObject();
+                        s3StreamObject.setObjectId(streamObject.getObjectId());
+                        s3StreamObject.setStreamId(streamObject.getStreamId());
+                        s3StreamObject.setCommittedTimestamp(committedTs);
+                        s3StreamObjectMapper.commit(s3StreamObject);
+
+                        // update dataTs to the min compacted object's dataTs
+                    }
+
+
+
+                    // mark destroy compacted object
+
+                    // update broker's wal object
+
+
+                }
+            } else {
+
+            }
+            break;
+        }
     }
 
     @Override
@@ -1154,12 +1217,12 @@ public class DefaultMetadataStore implements MetadataStore {
         }
     }
 
-    public List<S3StreamObject> listStreamObjects(long streamId, long startOffset,
+    public List<apache.rocketmq.controller.v1.S3StreamObject> listStreamObjects(long streamId, long startOffset,
         long endOffset, int limit) {
         try (SqlSession session = this.sessionFactory.openSession()) {
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
             return s3StreamObjectMapper.list(null, streamId, startOffset, endOffset, limit).stream()
-                .map(streamObject -> S3StreamObject.newBuilder()
+                .map(streamObject -> apache.rocketmq.controller.v1.S3StreamObject.newBuilder()
                     .setStreamId(streamObject.getStreamId())
                     .setObjectSize(streamObject.getObjectSize())
                     .setObjectId(streamObject.getObjectId())

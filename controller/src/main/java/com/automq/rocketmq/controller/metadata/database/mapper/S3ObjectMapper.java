@@ -28,8 +28,6 @@ public interface S3ObjectMapper {
 
     S3Object getById(long id);
 
-    S3Object getByObjectId(long objectId);
-
     int expired(S3Object s3Object);
 
     int commit(S3Object s3Object);

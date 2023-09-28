@@ -127,7 +127,6 @@ CREATE TABLE IF NOT EXISTS `range`
 CREATE TABLE IF NOT EXISTS s3object
 (
     id                            BIGINT  NOT NULL PRIMARY KEY AUTO_INCREMENT,
-    object_id                     BIGINT  NOT NULL,
     object_size                   BIGINT  NOT NULL,
     stream_id                     BIGINT  NOT NULL,
     prepared_timestamp            BIGINT,
@@ -136,7 +135,6 @@ CREATE TABLE IF NOT EXISTS s3object
     marked_for_deletion_timestamp BIGINT,
     state                         TINYINT NOT NULL
 );
-CREATE UNIQUE INDEX uk_s3_object_object_id ON s3object (object_id);
 CREATE INDEX idx_s3_object_state_expired_timestamp ON s3object (state, expired_timestamp);
 
 CREATE TABLE IF NOT EXISTS s3streamobject

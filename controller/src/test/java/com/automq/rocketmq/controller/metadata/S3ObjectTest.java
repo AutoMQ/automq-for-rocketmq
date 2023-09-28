@@ -39,7 +39,6 @@ public class S3ObjectTest extends DatabaseTestBase {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
             S3Object s3Object = new S3Object();
-            s3Object.setObjectId(987L);
             s3Object.setStreamId(1L);
             s3Object.setObjectSize(555L);
             s3Object.setState(S3ObjectState.BOS_PREPARED);
@@ -59,23 +58,15 @@ public class S3ObjectTest extends DatabaseTestBase {
             S3Object s3Object1 = s3ObjectMapper.getById(s3Object.getId());
             Assertions.assertEquals(s3Object, s3Object1);
 
-            // test getByObjectId
-            S3Object s3Object2 = s3ObjectMapper.getByObjectId(s3Object.getObjectId());
-            Assertions.assertEquals(1, affectedRows);
-            Assertions.assertEquals(987, s3Object2.getObjectId());
-            Assertions.assertEquals(555, s3Object2.getObjectSize());
-            Assertions.assertEquals(S3ObjectState.BOS_PREPARED, s3Object2.getState());
-            Assertions.assertEquals(time, s3Object2.getPreparedTimestamp());
-            Assertions.assertEquals(time + 5 * 1000, s3Object2.getExpiredTimestamp());
-
+            // test delete
             Calendar calendar1 = Calendar.getInstance();
             calendar1.add(Calendar.SECOND, 30);
             long time1 = calendar1.getTime().getTime();
-            s3Object2.setMarkedForDeletionTimestamp(time1 + 10 * 1000);
-            s3ObjectMapper.delete(s3Object2);
+            s3Object1.setMarkedForDeletionTimestamp(time1 + 10 * 1000);
+            s3ObjectMapper.delete(s3Object1);
 
-            S3Object s3Object3 = s3ObjectMapper.getByObjectId(s3Object2.getObjectId());
-            Assertions.assertEquals(s3Object2, s3Object3);
+            S3Object s3Object2 = s3ObjectMapper.getById(s3Object.getId());
+            Assertions.assertEquals(s3Object1, s3Object2);
         }
     }
 
@@ -86,7 +77,6 @@ public class S3ObjectTest extends DatabaseTestBase {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
             S3Object s3Object = new S3Object();
-            s3Object.setObjectId(987L);
             s3Object.setStreamId(1L);
             s3Object.setObjectSize(555L);
             s3Object.setState(S3ObjectState.BOS_PREPARED);
@@ -102,7 +92,7 @@ public class S3ObjectTest extends DatabaseTestBase {
             Assertions.assertTrue(s3Object.getId() > 0);
 
 
-            S3Object s3Object1 = s3ObjectMapper.getByObjectId(s3Object.getObjectId());
+            S3Object s3Object1 = s3ObjectMapper.getById(s3Object.getId());
             Calendar calendar1 = Calendar.getInstance();
             calendar1.add(Calendar.SECOND, 30);
             long time1 = calendar1.getTime().getTime();
@@ -110,7 +100,7 @@ public class S3ObjectTest extends DatabaseTestBase {
             affectedRows = s3ObjectMapper.expired(s3Object1);
             Assertions.assertEquals(1, affectedRows);
 
-            S3Object s3Object2 = s3ObjectMapper.getByObjectId(s3Object.getObjectId());
+            S3Object s3Object2 = s3ObjectMapper.getById(s3Object.getId());
             Assertions.assertEquals(s3Object1, s3Object2);
         }
     }
@@ -121,7 +111,6 @@ public class S3ObjectTest extends DatabaseTestBase {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
             S3Object s3Object = new S3Object();
-            s3Object.setObjectId(987L);
             s3Object.setStreamId(1L);
             s3Object.setObjectSize(555L);
             s3Object.setState(S3ObjectState.BOS_PREPARED);
@@ -137,7 +126,7 @@ public class S3ObjectTest extends DatabaseTestBase {
             Assertions.assertTrue(s3Object.getId() > 0);
 
 
-            S3Object s3Object1 = s3ObjectMapper.getByObjectId(s3Object.getObjectId());
+            S3Object s3Object1 = s3ObjectMapper.getById(s3Object.getId());
             Calendar calendar1 = Calendar.getInstance();
             calendar1.add(Calendar.SECOND, 30);
             long time1 = calendar1.getTime().getTime();
@@ -146,7 +135,7 @@ public class S3ObjectTest extends DatabaseTestBase {
             affectedRows = s3ObjectMapper.commit(s3Object1);
             Assertions.assertEquals(1, affectedRows);
 
-            S3Object s3Object2 = s3ObjectMapper.getByObjectId(s3Object1.getObjectId());
+            S3Object s3Object2 = s3ObjectMapper.getById(s3Object1.getId());
             Assertions.assertEquals(s3Object1, s3Object2);
         }
     }
