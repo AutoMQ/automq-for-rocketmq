@@ -67,16 +67,24 @@
     </update>
 
     <insert id="prepare" parameterType="S3Object" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
-        INSERT INTO s3object (prepared_timestamp, expired_timestamp, state, object_size, stream_id)
+        INSERT INTO s3object (prepared_timestamp, expired_timestamp, state
+        <if test="objectSize != null">
+            , object_size
+        </if>
+        <if test="streamId != null">
+            , stream_id
+        </if>
+        )
+
         VALUES (
         #{preparedTimestamp},
         #{expiredTimestamp},
-        #{state},
+        #{state}
         <if test="objectSize != null">
-            #{objectSize},
+            , #{objectSize}
         </if>
         <if test="streamId != null">
-            #{streamId}
+            , #{streamId}
         </if>
         )
     </insert>

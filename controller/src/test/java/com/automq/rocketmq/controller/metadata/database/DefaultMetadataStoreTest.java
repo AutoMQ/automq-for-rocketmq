@@ -21,6 +21,7 @@ import apache.rocketmq.controller.v1.AssignmentStatus;
 import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.GroupStatus;
 import apache.rocketmq.controller.v1.GroupType;
+import apache.rocketmq.controller.v1.S3ObjectState;
 import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
@@ -38,6 +39,7 @@ import com.automq.rocketmq.controller.metadata.database.dao.Group;
 import com.automq.rocketmq.controller.metadata.database.dao.Lease;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
+import com.automq.rocketmq.controller.metadata.database.dao.S3Object;
 import com.automq.rocketmq.controller.metadata.database.dao.Stream;
 import com.automq.rocketmq.controller.metadata.database.dao.Range;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
@@ -45,6 +47,7 @@ import com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.RangeMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.S3ObjectMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.S3StreamObjectMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.S3WALObjectMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
@@ -52,6 +55,7 @@ import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -1042,6 +1046,129 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
             streamMapper.delete(streamId);
             session.commit();
+        }
+    }
+
+    @Test
+    public void testPrepareS3Objects() throws IOException {
+        long objectId;
+        int nodeId = 1;
+
+        ControllerConfig config = Mockito.mock(ControllerConfig.class);
+        Mockito.when(config.nodeId()).thenReturn(nodeId);
+        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
+        Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
+        long time = System.currentTimeMillis();
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            Assertions.assertNull(metadataStore.getLease());
+            Lease lease = new Lease();
+            lease.setNodeId(config.nodeId());
+            metadataStore.setLease(lease);
+            metadataStore.setRole(Role.Leader);
+            objectId = metadataStore.prepareS3Objects(3, 5);
+        } catch (ControllerException e) {
+            throw new RuntimeException(e);
+        }
+
+        try (SqlSession session = getSessionFactory().openSession()) {
+            S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
+            for (long index = objectId; index < objectId + 3; index++) {
+                S3Object object = s3ObjectMapper.getById(index);
+                Assertions.assertEquals(S3ObjectState.BOS_PREPARED, object.getState());
+                if (object.getPreparedTimestamp() - time > 5 * 60) {
+                    Assertions.fail();
+                }
+                if (object.getExpiredTimestamp() - time - 5 * 60 * 1000 > 5 * 60) {
+                    Assertions.fail();
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testCommitStreamObject() throws IOException {
+        long objectId, streamId = 1;
+        int nodeId = 1;
+
+        ControllerConfig config = Mockito.mock(ControllerConfig.class);
+        Mockito.when(config.nodeId()).thenReturn(nodeId);
+        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
+        Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
+
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            Assertions.assertNull(metadataStore.getLease());
+            Lease lease = new Lease();
+            lease.setNodeId(config.nodeId());
+            metadataStore.setLease(lease);
+            metadataStore.setRole(Role.Leader);
+            objectId = metadataStore.prepareS3Objects(3, 5);
+        } catch (ControllerException e) {
+            throw new RuntimeException(e);
+        }
+
+        S3StreamObject s3StreamObject = S3StreamObject.newBuilder()
+            .setObjectId(objectId + 2)
+            .setStreamId(streamId)
+            .setObjectSize(111L)
+            .build();
+
+        try (SqlSession session = this.getSessionFactory().openSession()) {
+            S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
+            com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
+            object.setObjectId(objectId);
+            object.setStreamId(streamId);
+            object.setBaseDataTimestamp(1);
+            s3StreamObjectMapper.create(object);
+
+            com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object1 = new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
+            object1.setObjectId(objectId + 1);
+            object1.setStreamId(streamId);
+            object1.setBaseDataTimestamp(2);
+            s3StreamObjectMapper.create(object1);
+
+            session.commit();
+        }
+        long time = System.currentTimeMillis();
+        List<Long> compactedObjects = new ArrayList<>();
+        compactedObjects.add(objectId);
+        compactedObjects.add(objectId + 1);
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            Assertions.assertNull(metadataStore.getLease());
+            Lease lease = new Lease();
+            lease.setNodeId(config.nodeId());
+            metadataStore.setLease(lease);
+            metadataStore.setRole(Role.Leader);
+
+            metadataStore.commitStreamObject(s3StreamObject, compactedObjects);
+        } catch (ControllerException e) {
+            throw new RuntimeException(e);
+        }
+
+
+        try (SqlSession session = getSessionFactory().openSession()) {
+            S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
+            for (long index = objectId; index < objectId + 2; index++) {
+                S3Object object = s3ObjectMapper.getById(index);
+                Assertions.assertEquals(S3ObjectState.BOS_DELETED, object.getState());
+                if (object.getMarkedForDeletionTimestamp() - time > 5 * 60) {
+                    Assertions.fail();
+                }
+            }
+
+
+            S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
+            for (long index = objectId; index < objectId + 2; index++) {
+                com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = s3StreamObjectMapper.getByObjectId(index);
+                Assertions.assertNull(object);
+            }
+
+            com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = s3StreamObjectMapper.getByObjectId(objectId + 2);
+            Assertions.assertEquals(1L, object.getBaseDataTimestamp());
+            if (object.getCommittedTimestamp() - time > 5 * 60) {
+                Assertions.fail();
+            }
         }
     }
 }
