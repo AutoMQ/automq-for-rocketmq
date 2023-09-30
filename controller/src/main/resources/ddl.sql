@@ -133,7 +133,7 @@ CREATE TABLE IF NOT EXISTS s3object
     committed_timestamp           BIGINT,
     expired_timestamp             BIGINT,
     marked_for_deletion_timestamp BIGINT,
-    state                         TINYINT NOT NULL
+    state                         TINYINT NOT NULL DEFAULT 0
 );
 CREATE INDEX idx_s3_object_state_expired_timestamp ON s3object (state, expired_timestamp);
 

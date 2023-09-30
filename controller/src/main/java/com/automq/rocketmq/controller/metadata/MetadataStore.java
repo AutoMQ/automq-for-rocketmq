@@ -96,11 +96,11 @@ public interface MetadataStore extends Closeable {
 
     CompletableFuture<List<StreamMetadata>> listOpenStreams(int nodeId, long epoch);
 
-    long prepareS3Objects(int count, int ttlInMinutes) throws ControllerException;
+    CompletableFuture<Long> prepareS3Objects(int count, int ttlInMinutes) throws ControllerException;
 
-    void commitWalObject(S3WALObject walObject, List<S3StreamObject> streamObjects, List<Long> compactedObjects) throws ControllerException;
+    CompletableFuture<Void> commitWalObject(S3WALObject walObject, List<S3StreamObject> streamObjects, List<Long> compactedObjects) throws ControllerException;
 
-    void commitStreamObject(S3StreamObject streamObject, List<Long> compactedObjects) throws ControllerException;
+    CompletableFuture<Void> commitStreamObject(S3StreamObject streamObject, List<Long> compactedObjects) throws ControllerException;
 
     List<S3WALObject> listWALObjects() throws ControllerException;
 
