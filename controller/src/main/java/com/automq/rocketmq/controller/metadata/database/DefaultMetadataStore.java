@@ -1096,7 +1096,8 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public long prepareS3Objects(int count, int ttlInMinutes) throws ControllerException {
+    public CompletableFuture<Long> prepareS3Objects(int count, int ttlInMinutes) throws ControllerException {
+        CompletableFuture<Long> future = new CompletableFuture<>();
         for (; ; ) {
             if (isLeader()) {
                 try (SqlSession session = getSessionFactory().openSession()) {
@@ -1117,8 +1118,8 @@ public class DefaultMetadataStore implements MetadataStore {
                         .toList();
 
                     session.commit();
-
-                    return !Objects.isNull(objectIds) && objectIds.size() > 0 ? objectIds.get(0) : -1;
+                    long firstObjectId = !Objects.isNull(objectIds) && objectIds.size() > 0 ? objectIds.get(0) : -1;
+                    future.complete(firstObjectId);
                 }
             } else {
                 PrepareS3ObjectsRequest request = PrepareS3ObjectsRequest.newBuilder()
@@ -1126,22 +1127,20 @@ public class DefaultMetadataStore implements MetadataStore {
                     .setTimeToLiveMinutes(ttlInMinutes)
                     .build();
                 try {
-                    PrepareS3ObjectsReply reply = this.controllerClient.prepareS3Objects(this.leaderAddress(), request).get();
-                    return reply.getFirstObjectId();
-                } catch (InterruptedException e) {
-                    throw new ControllerException(Code.INTERNAL_VALUE, e);
-                } catch (ExecutionException e) {
-                    if (e.getCause() instanceof ControllerException) {
-                        throw (ControllerException) e.getCause();
-                    }
-                    throw new ControllerException(Code.INTERNAL_VALUE, e);
+                    this.controllerClient.prepareS3Objects(this.leaderAddress(), request)
+                        .thenApply(PrepareS3ObjectsReply::getFirstObjectId);
+                } catch (ControllerException e) {
+                    future.completeExceptionally(e);
                 }
             }
+            break;
         }
+        return future;
     }
 
     @Override
-    public void commitWalObject(apache.rocketmq.controller.v1.S3WALObject walObject, List<apache.rocketmq.controller.v1.S3StreamObject> streamObjects, List<Long> compactedObjects) throws ControllerException {
+    public CompletableFuture<Void> commitWalObject(apache.rocketmq.controller.v1.S3WALObject walObject, List<apache.rocketmq.controller.v1.S3StreamObject> streamObjects, List<Long> compactedObjects) throws ControllerException {
+        CompletableFuture<Void> future = new CompletableFuture<>();
         for (; ; ) {
             if (isLeader()) {
                 try (SqlSession session = getSessionFactory().openSession()) {
@@ -1165,13 +1164,19 @@ public class DefaultMetadataStore implements MetadataStore {
                                 .stream()
                                 .map(obj -> new long[]{obj.getKey(), obj.getValue().getStartOffset(), obj.getValue().getEndOffset()})
                         ).toList();
+
                         if (!checkStreamAdvance(session, offsets)) {
-                            return;
+                            LOGGER.error("S3WALObject[object-id={}]'s stream advance check failed", walObject.getObjectId());
+                            ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE, String.format("S3WALObject[object-id=%d]'s stream advance check failed", walObject.getObjectId()));
+                            future.completeExceptionally(e);
+                            break;
                         }
                     }
                     // commit object
                     if (!commitObject(walObject.getObjectId(), session, committedTs)) {
-                        return;
+                        ControllerException e = new ControllerException(Code.ILLEGAL_STATE_VALUE, String.format("S3WALObject[object-id=%d] is not prepare", walObject.getObjectId()));
+                        future.completeExceptionally(e);
+                        break;
                     }
 
                     long dataTs = committedTs;
@@ -1181,6 +1186,7 @@ public class DefaultMetadataStore implements MetadataStore {
                             .map(id -> {
                                 // mark destroy compacted object
                                 S3Object object = s3ObjectMapper.getById(id);
+                                object.setState(S3ObjectState.BOS_DELETED);
                                 object.setMarkedForDeletionTimestamp(System.currentTimeMillis());
                                 s3ObjectMapper.delete(object);
 
@@ -1190,15 +1196,9 @@ public class DefaultMetadataStore implements MetadataStore {
                             .min(Long::compareTo).get();
                     }
 
-                    List<long[]> subStreamIdxs = walObject.getSubStreamsMap().entrySet()
-                        .stream()
-                        .map(obj -> new long[]{obj.getKey(), obj.getValue().getStartOffset(), obj.getValue().getEndOffset()})
-                        .toList();
                     // update broker's wal object
-
                     if (objectId != -1) {
                         // generate broker's wal object record
-                        walObject.getSubStreamsMap();
                         S3WALObject s3WALObject = new S3WALObject();
                         s3WALObject.setObjectId(objectId);
                         s3WALObject.setBaseDataTimestamp(dataTs);
@@ -1212,27 +1212,28 @@ public class DefaultMetadataStore implements MetadataStore {
                         for (apache.rocketmq.controller.v1.S3StreamObject s3StreamObject : streamObjects) {
                             long oId = s3StreamObject.getObjectId();
                             if (!commitObject(oId, session, committedTs)) {
-                                return;
+                                ControllerException e = new ControllerException(Code.ILLEGAL_STATE_VALUE, String.format("S3StreamObject[object-id=%d] is not prepare", oId));
+                                future.completeExceptionally(e);
+                                return future;
                             }
                         }
                         // create stream object records
                         streamObjects.forEach(s3StreamObject -> {
                             S3StreamObject object = new S3StreamObject();
+                            object.setObjectId(s3StreamObject.getObjectId());
                             object.setStreamId(s3StreamObject.getStreamId());
-                            object.setObjectSize(s3StreamObject.getObjectSize());
-                            object.setStartOffset(s3StreamObject.getStartOffset());
-                            object.setEndOffset(s3StreamObject.getEndOffset());
-                            object.setBaseDataTimestamp(s3StreamObject.getBaseDataTimestamp());
                             object.setCommittedTimestamp(committedTs);
-                            s3StreamObjectMapper.create(object);
+                            s3StreamObjectMapper.commit(object);
                         });
                     }
 
                     // generate compacted objects' remove record ...
 
-                    LOGGER.info("broker: {} commit wal object: {} success, compacted objects: {}, stream objects: {}", brokerId, walObject.getObjectId(),
+                    LOGGER.info("broker[broke-id={}] commit wal object[object-id={}] success, compacted objects[{}], stream objects[{}]", brokerId, walObject.getObjectId(),
                         compactedObjects, streamObjects);
                     session.commit();
+
+                    future.complete(null);
                 }
             } else {
                 CommitWALObjectRequest request = CommitWALObjectRequest.newBuilder()
@@ -1241,22 +1242,25 @@ public class DefaultMetadataStore implements MetadataStore {
                     .addAllCompactedObjectIds(compactedObjects)
                     .build();
                 try {
-                    this.controllerClient.commitWALObject(leaderAddress(), request).get();
-                } catch (InterruptedException e) {
-                    throw new ControllerException(Code.INTERNAL_VALUE, e);
-                } catch (ExecutionException e) {
-                    if (e.getCause() instanceof ControllerException) {
-                        throw (ControllerException) e.getCause();
-                    }
-                    throw new ControllerException(Code.INTERNAL_VALUE, e);
+                    this.controllerClient.commitWALObject(this.leaderAddress(), request).whenComplete(((reply, e) -> {
+                        if (null != e) {
+                            future.completeExceptionally(e);
+                        } else {
+                            future.complete(null);
+                        }
+                    }));
+                } catch (ControllerException e) {
+                    future.completeExceptionally(e);
                 }
             }
             break;
         }
+        return future;
     }
 
     @Override
-    public void commitStreamObject(apache.rocketmq.controller.v1.S3StreamObject streamObject, List<Long> compactedObjects) throws ControllerException {
+    public CompletableFuture<Void> commitStreamObject(apache.rocketmq.controller.v1.S3StreamObject streamObject, List<Long> compactedObjects) throws ControllerException {
+        CompletableFuture<Void> future = new CompletableFuture<>();
         for (; ; ) {
             if (isLeader()) {
                 try (SqlSession session = getSessionFactory().openSession()) {
@@ -1269,11 +1273,12 @@ public class DefaultMetadataStore implements MetadataStore {
 
                     // commit object
                     if (!commitObject(streamObject.getObjectId(), session, committedTs)) {
-                        return;
+                        ControllerException e = new ControllerException(Code.ILLEGAL_STATE_VALUE, String.format("S3StreamObject[object-id=%d] is not prepare", streamObject.getObjectId()));
+                        future.completeExceptionally(e);
+                        break;
                     }
                     long dataTs = committedTs;
                     if (!Objects.isNull(compactedObjects) && !compactedObjects.isEmpty()) {
-                        // update dataTs to the min compacted object's dataTs
                         dataTs = compactedObjects.stream()
                             .map(id -> {
                                 // mark destroy compacted object
@@ -1282,11 +1287,13 @@ public class DefaultMetadataStore implements MetadataStore {
                                 object.setMarkedForDeletionTimestamp(System.currentTimeMillis());
                                 s3ObjectMapper.delete(object);
 
+                                // update dataTs to the min compacted object's dataTs
                                 S3StreamObject s3StreamObject = s3StreamObjectMapper.getByObjectId(id);
                                 return s3StreamObject.getBaseDataTimestamp();
                             })
                             .min(Long::compareTo).get();
                     }
+                    // create a new S3StreamObject to replace committed ones
                     S3StreamObject newS3StreamObj = new S3StreamObject();
                     newS3StreamObj.setStreamId(streamObject.getStreamId());
                     newS3StreamObj.setObjectId(streamObject.getObjectId());
@@ -1296,12 +1303,13 @@ public class DefaultMetadataStore implements MetadataStore {
                     newS3StreamObj.setCommittedTimestamp(committedTs);
                     s3StreamObjectMapper.create(newS3StreamObj);
 
+                    // delete the compactedObjects of S3Stream
                     if (!Objects.isNull(compactedObjects) && !compactedObjects.isEmpty()) {
                         compactedObjects.stream().forEach(id -> {
                             s3StreamObjectMapper.delete(null, null, id);
                         });
                     }
-                    LOGGER.info("stream object: {} commit success, compacted objects: {}", streamObject.getObjectId(), compactedObjects);
+                    LOGGER.info("S3StreamObject[object-id={}] commit success, compacted objects: {}", streamObject.getObjectId(), compactedObjects);
                     session.commit();
                 }
             } else {
@@ -1310,18 +1318,20 @@ public class DefaultMetadataStore implements MetadataStore {
                     .addAllCompactedObjectIds(compactedObjects)
                     .build();
                 try {
-                    this.controllerClient.commitStreamObject(leaderAddress(), request).get();
-                } catch (InterruptedException e) {
-                    throw new ControllerException(Code.INTERNAL_VALUE, e);
-                } catch (ExecutionException e) {
-                    if (e.getCause() instanceof ControllerException) {
-                        throw (ControllerException) e.getCause();
-                    }
-                    throw new ControllerException(Code.INTERNAL_VALUE, e);
+                    this.controllerClient.commitStreamObject(this.leaderAddress(), request).whenComplete(((reply, e) -> {
+                        if (null != e) {
+                            future.completeExceptionally(e);
+                        } else {
+                            future.complete(null);
+                        }
+                    }));
+                } catch (ControllerException e) {
+                    future.completeExceptionally(e);
                 }
             }
             break;
         }
+        return future;
     }
 
     @Override
@@ -1408,11 +1418,11 @@ public class DefaultMetadataStore implements MetadataStore {
         S3Object s3Object = s3ObjectMapper.getById(objectId);
         // verify the state
         if (s3Object.getState() == S3ObjectState.BOS_COMMITTED) {
-            LOGGER.warn("object {} already committed", objectId);
+            LOGGER.warn("object[object-id={}] already committed", objectId);
             return false;
         }
         if (s3Object.getState() != S3ObjectState.BOS_PREPARED) {
-            LOGGER.error("object {} is not prepared but try to commit", objectId);
+            LOGGER.error("object[object-id={}] is not prepared but try to commit", objectId);
             return false;
         }
         s3Object.setCommittedTimestamp(committedTs);
@@ -1432,19 +1442,20 @@ public class DefaultMetadataStore implements MetadataStore {
             // verify stream exist and open
             Stream stream = streamMapper.getByStreamId(streamId);
             if (stream.getState() != StreamState.OPEN) {
-                LOGGER.warn("stream {} not opened", streamId);
+                LOGGER.warn("Stream[stream-id={}] not opened", streamId);
                 return false;
             }
 
             Range range = rangeMapper.getByRangeId(stream.getRangeId());
             if (Objects.isNull(range)) {
-                LOGGER.error("stream {}'s current range {} not exist when stream has been ",
+                // should not happen
+                LOGGER.error("Stream[stream-id={}]'s current range[range-id={}] not exist when stream has been created",
                     streamId, stream.getRangeId());
                 return false;
             }
 
             if (range.getEndOffset() != startOffset) {
-                LOGGER.warn("stream {}'s current range {}'s end offset {} is not equal to request start offset {}",
+                LOGGER.warn("Stream[stream-id={}]'s current range[range-id={}]'s end offset[{}] is not equal to request start offset[{}]",
                     streamId, range.getRangeId(),
                     range.getEndOffset(), startOffset);
                 return false;
