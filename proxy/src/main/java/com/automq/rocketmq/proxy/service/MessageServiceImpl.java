@@ -17,10 +17,14 @@
 
 package com.automq.rocketmq.proxy.service;
 
+import apache.rocketmq.controller.v1.Code;
+import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.common.config.ProxyConfig;
 import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.util.CommonUtil;
+import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.metadata.ProxyMetadataService;
+import com.automq.rocketmq.proxy.model.VirtualQueue;
 import com.automq.rocketmq.proxy.util.RocketMQMessageUtil;
 import com.automq.rocketmq.store.api.MessageStore;
 import com.automq.rocketmq.store.model.message.Filter;
@@ -32,9 +36,9 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.rocketmq.client.consumer.AckResult;
@@ -42,16 +46,20 @@ import org.apache.rocketmq.client.consumer.AckStatus;
 import org.apache.rocketmq.client.consumer.PopResult;
 import org.apache.rocketmq.client.consumer.PopStatus;
 import org.apache.rocketmq.client.consumer.PullResult;
+import org.apache.rocketmq.client.exception.MQBrokerException;
 import org.apache.rocketmq.client.producer.SendResult;
 import org.apache.rocketmq.client.producer.SendStatus;
 import org.apache.rocketmq.common.consumer.ReceiptHandle;
 import org.apache.rocketmq.common.filter.ExpressionType;
 import org.apache.rocketmq.common.message.Message;
+import org.apache.rocketmq.common.message.MessageClientIDSetter;
 import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.proxy.common.ProxyContext;
+import org.apache.rocketmq.proxy.common.utils.ExceptionUtils;
 import org.apache.rocketmq.proxy.service.message.MessageService;
 import org.apache.rocketmq.proxy.service.route.AddressableMessageQueue;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
+import org.apache.rocketmq.remoting.protocol.ResponseCode;
 import org.apache.rocketmq.remoting.protocol.body.LockBatchRequestBody;
 import org.apache.rocketmq.remoting.protocol.body.UnlockBatchRequestBody;
 import org.apache.rocketmq.remoting.protocol.header.AckMessageRequestHeader;
@@ -65,8 +73,11 @@ import org.apache.rocketmq.remoting.protocol.header.PullMessageRequestHeader;
 import org.apache.rocketmq.remoting.protocol.header.QueryConsumerOffsetRequestHeader;
 import org.apache.rocketmq.remoting.protocol.header.SendMessageRequestHeader;
 import org.apache.rocketmq.remoting.protocol.header.UpdateConsumerOffsetRequestHeader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class MessageServiceImpl implements MessageService {
+    private static final Logger LOGGER = LoggerFactory.getLogger(MessageServiceImpl.class);
     private final ProxyConfig config;
     private final ProxyMetadataService metadataService;
     private final MessageStore store;
@@ -83,24 +94,43 @@ public class MessageServiceImpl implements MessageService {
     @Override
     public CompletableFuture<List<SendResult>> sendMessage(ProxyContext ctx, AddressableMessageQueue messageQueue,
         List<Message> msgList, SendMessageRequestHeader requestHeader, long timeoutMillis) {
-        long topicId = metadataService.queryTopicId(requestHeader.getTopic());
+        if (msgList.size() != 1) {
+            throw new UnsupportedOperationException("Batch message is not supported");
+        }
+        Message message = msgList.get(0);
 
-        List<CompletableFuture<PutResult>> completableFutureList = msgList.stream()
-            .map(message -> FlatMessageUtil.transferFrom(topicId, requestHeader.getQueueId(), message))
-            .map(store::put)
-            .toList();
+        CompletableFuture<Topic> topicFuture = metadataService.topicOf(requestHeader.getTopic());
 
-        return CompletableFuture.allOf(completableFutureList.toArray(CompletableFuture[]::new))
-            .thenApply(v -> completableFutureList.stream()
-                .map(future -> future.getNow(null))
-                .filter(Objects::nonNull)
-                .map(putResult -> {
-                    SendResult result = new SendResult();
-                    result.setSendStatus(SendStatus.SEND_OK);
-                    result.setMessageQueue(new MessageQueue(requestHeader.getTopic(), requestHeader.getBname(), requestHeader.getQueueId()));
-                    result.setQueueOffset(putResult.offset());
-                    return result;
-                }).toList());
+        // Convert ControllerException to MQBrokerException
+        topicFuture = topicFuture.exceptionally(throwable -> {
+            Throwable t = ExceptionUtils.getRealException(throwable);
+            if (t instanceof ControllerException controllerException) {
+                if (controllerException.getErrorCode() == Code.NOT_FOUND.ordinal()) {
+                    throw new CompletionException(new MQBrokerException(ResponseCode.TOPIC_NOT_EXIST, "Topic not exist"));
+                }
+            }
+            // Rethrow other exceptions.
+            throw new CompletionException(t);
+        });
+
+        CompletableFuture<PutResult> putFuture = topicFuture.thenCompose(topic -> {
+            VirtualQueue virtualQueue = new VirtualQueue(messageQueue);
+            if (topic.getTopicId() != virtualQueue.topicId()) {
+                LOGGER.error("Topic id in request header {} does not match topic id in message queue {}, maybe the topic is recreated.",
+                    topic.getTopicId(), virtualQueue.topicId());
+                return CompletableFuture.failedFuture(new MQBrokerException(ResponseCode.TOPIC_NOT_EXIST, "Topic not exist"));
+            }
+            return store.put(FlatMessageUtil.transferFrom(topic.getTopicId(), virtualQueue.queueId(), message));
+        });
+
+        return putFuture.thenApply(putResult -> {
+            SendResult result = new SendResult();
+            result.setSendStatus(SendStatus.SEND_OK);
+            result.setMsgId(MessageClientIDSetter.getUniqID(message));
+            result.setMessageQueue(new MessageQueue(messageQueue.getMessageQueue()));
+            result.setQueueOffset(putResult.offset());
+            return Collections.singletonList(result);
+        });
     }
 
     @Override

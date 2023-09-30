@@ -21,6 +21,7 @@ import com.automq.rocketmq.common.config.ProxyConfig;
 import com.automq.rocketmq.metadata.ProxyMetadataService;
 import com.automq.rocketmq.proxy.mock.MockMessageStore;
 import com.automq.rocketmq.proxy.mock.MockProxyMetadataService;
+import com.automq.rocketmq.proxy.model.VirtualQueue;
 import com.automq.rocketmq.store.api.MessageStore;
 import com.automq.rocketmq.store.model.message.TagFilter;
 import com.automq.rocketmq.proxy.util.FlatMessageUtil;
@@ -38,6 +39,7 @@ import org.apache.rocketmq.common.message.MessageExt;
 import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.proxy.common.ProxyContext;
 import org.apache.rocketmq.proxy.service.message.MessageService;
+import org.apache.rocketmq.proxy.service.route.AddressableMessageQueue;
 import org.apache.rocketmq.remoting.protocol.header.AckMessageRequestHeader;
 import org.apache.rocketmq.remoting.protocol.header.ChangeInvisibleTimeRequestHeader;
 import org.apache.rocketmq.remoting.protocol.header.PopMessageRequestHeader;
@@ -69,12 +71,19 @@ class MessageServiceImplTest {
 
     @Test
     void sendMessage() {
-        Message message = new Message("topic", "tag", new byte[] {});
+        String topicName = "topic";
+        VirtualQueue virtualQueue = new VirtualQueue(2, 0);
+
+        Message message = new Message(topicName, "tag", new byte[] {});
         SendMessageRequestHeader header = new SendMessageRequestHeader();
-        header.setBname("broker");
-        header.setTopic("topic");
+        header.setBname(virtualQueue.brokerName());
+        header.setTopic(topicName);
         header.setQueueId(0);
-        List<SendResult> resultList = messageService.sendMessage(ProxyContext.create(), null, List.of(message), header, 0).join();
+
+
+        AddressableMessageQueue messageQueue = new AddressableMessageQueue(new MessageQueue(topicName, virtualQueue.brokerName(), 0), null);
+
+        List<SendResult> resultList = messageService.sendMessage(ProxyContext.create(), messageQueue, List.of(message), header, 0).join();
         assertEquals(1, resultList.size());
 
         SendResult result = resultList.get(0);
