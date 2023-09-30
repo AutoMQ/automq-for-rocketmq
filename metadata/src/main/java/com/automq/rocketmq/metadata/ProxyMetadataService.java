@@ -18,6 +18,7 @@
 package com.automq.rocketmq.metadata;
 
 import apache.rocketmq.controller.v1.ConsumerGroup;
+import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.Topic;
 import java.util.List;
 import java.util.Set;
@@ -35,10 +36,17 @@ public interface ProxyMetadataService {
     /**
      * List all the queue assignments for a given topic that assigned to the current server.
      *
-     * @param topicId topic id
-     * @return {@link CompletableFuture} of {@link List<Integer>}
+     * @param topicName topic name
+     * @return {@link CompletableFuture} of {@link List<MessageQueueAssignment>}
      */
-    CompletableFuture<Set<Integer>> queueAssignmentsOf(long topicId);
+    CompletableFuture<List<MessageQueueAssignment>> queueAssignmentsOf(String topicName);
+
+    /**
+     * Query the advertised address of a given broker id.
+     * @param brokerId broker id
+     * @return {@link CompletableFuture} of {@link String}
+     */
+    CompletableFuture<String> addressOf(int brokerId);
 
     /**
      * Query the consumer group metadata of a given group name

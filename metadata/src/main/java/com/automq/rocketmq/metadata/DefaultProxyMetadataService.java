@@ -18,8 +18,10 @@
 package com.automq.rocketmq.metadata;
 
 import apache.rocketmq.controller.v1.ConsumerGroup;
+import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
@@ -36,7 +38,12 @@ public class DefaultProxyMetadataService implements ProxyMetadataService {
     }
 
     @Override
-    public CompletableFuture<Set<Integer>> queueAssignmentsOf(long topicId) {
+    public CompletableFuture<List<MessageQueueAssignment>> queueAssignmentsOf(String topicName) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<String> addressOf(int brokerId) {
         return null;
     }
 
