@@ -46,8 +46,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class StreamStoreImpl implements StreamStore {
-    private static final Logger LOGGER = LoggerFactory.getLogger(StreamStoreImpl.class);
+public class S3StreamStore implements StreamStore {
+    private static final Logger LOGGER = LoggerFactory.getLogger(S3StreamStore.class);
     private final Config s3Config;
     private final StreamClient streamClient;
     private final StoreMetadataService metadataService;
@@ -60,7 +60,7 @@ public class StreamStoreImpl implements StreamStore {
     private final S3BlockCache blockCache;
     private final Map<Long, Stream> openedStreams = new ConcurrentHashMap<>();
 
-    public StreamStoreImpl(S3StreamConfig streamConfig) {
+    public S3StreamStore(S3StreamConfig streamConfig) {
         this.s3Config = configFrom(streamConfig);
 
         // Build meta service and related manager

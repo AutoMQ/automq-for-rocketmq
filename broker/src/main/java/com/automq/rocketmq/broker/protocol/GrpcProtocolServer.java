@@ -38,12 +38,12 @@ import org.slf4j.LoggerFactory;
  * 1. The newest gRPC protocol introduced in Apache RocketMQ 5.0, see <a href="https://github.com/apache/rocketmq-apis/">RocketMQ APIs</a>.
  * 2. The classic remoting protocol born with RocketMQ.
  */
-public class ProtocolServer implements Lifecycle {
-    private static final Logger LOGGER = LoggerFactory.getLogger(ProtocolServer.class);
+public class GrpcProtocolServer implements Lifecycle {
+    private static final Logger LOGGER = LoggerFactory.getLogger(GrpcProtocolServer.class);
     private final GrpcServer grpcServer;
     private final ThreadPoolExecutor grpcExecutor;
 
-    public ProtocolServer(ProxyConfig config, MessagingProcessor messagingProcessor) {
+    public GrpcProtocolServer(ProxyConfig config, MessagingProcessor messagingProcessor) {
         initProxyConfig(config);
         grpcExecutor = createGrpcExecutor(config.grpcThreadPoolNums(), config.grpcThreadPoolQueueCapacity());
         grpcServer = GrpcServerBuilder.newBuilder(grpcExecutor, ConfigurationManager.getProxyConfig().getGrpcServerPort())
