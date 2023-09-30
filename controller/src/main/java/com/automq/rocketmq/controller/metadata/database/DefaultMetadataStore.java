@@ -44,6 +44,7 @@ import apache.rocketmq.controller.v1.SubStream;
 import apache.rocketmq.controller.v1.TopicStatus;
 import apache.rocketmq.controller.v1.TrimStreamRequest;
 import com.automq.rocketmq.common.PrefixThreadFactory;
+import com.automq.rocketmq.common.system.S3Constants;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.BrokerNode;
 import com.automq.rocketmq.controller.metadata.ControllerClient;
@@ -722,6 +723,7 @@ public class DefaultMetadataStore implements MetadataStore {
         return future;
     }
 
+    @Override
     public void trimStream(long streamId, long streamEpoch, long newStartOffset) throws ControllerException {
         for (; ; ) {
             if (this.isLeader()) {
@@ -1105,7 +1107,7 @@ public class DefaultMetadataStore implements MetadataStore {
                         continue;
                     }
                     S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
-                    long prepareTs = System.currentTimeMillis(), expiredTs = prepareTs + ttlInMinutes * 60 * 1000;
+                    long prepareTs = System.currentTimeMillis(), expiredTs = prepareTs + (long) ttlInMinutes * 60 * 1000;
                     List<Long> objectIds = IntStream.range(0, count)
                         .mapToObj(i -> {
                             S3Object object = new S3Object();
@@ -1118,7 +1120,7 @@ public class DefaultMetadataStore implements MetadataStore {
                         .toList();
 
                     session.commit();
-                    if (Objects.isNull(objectIds) || objectIds.size() == 0) {
+                    if (Objects.isNull(objectIds) || objectIds.isEmpty()) {
                         LOGGER.error("S3Object creation failed, count[{}], ttl[{}]", count, ttlInMinutes);
                         ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE, String.format("S3Object creation failed, count[%d], ttl[%d]", count, ttlInMinutes));
                         future.completeExceptionally(e);
@@ -1204,7 +1206,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     }
 
                     // update broker's wal object
-                    if (objectId != -1) {
+                    if (objectId != S3Constants.NOOP_OBJECT_ID) {
                         // generate broker's wal object record
                         S3WALObject s3WALObject = new S3WALObject();
                         s3WALObject.setObjectId(objectId);
