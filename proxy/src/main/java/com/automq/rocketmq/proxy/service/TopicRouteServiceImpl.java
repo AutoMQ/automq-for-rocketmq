@@ -40,7 +40,6 @@ import org.apache.rocketmq.proxy.service.route.TopicRouteService;
 import org.apache.rocketmq.remoting.protocol.route.BrokerData;
 import org.apache.rocketmq.remoting.protocol.route.QueueData;
 import org.apache.rocketmq.remoting.protocol.route.TopicRouteData;
-import org.checkerframework.checker.units.qual.A;
 
 public class TopicRouteServiceImpl extends TopicRouteService {
     public static final String VIRTUAL_CLUSTER_NAME = "DefaultCluster";
@@ -158,9 +157,9 @@ public class TopicRouteServiceImpl extends TopicRouteService {
             BrokerData brokerData = new BrokerData();
             brokerData.setBrokerName(virtualBrokerName(topicName, brokerId));
             brokerData.setCluster(VIRTUAL_CLUSTER_NAME);
-            brokerData.setBrokerAddrs(new HashMap<>() {{
-                put(0L, address);
-            }});
+            HashMap<Long, String> brokerAddrs = new HashMap<>();
+            brokerAddrs.put(0L, address);
+            brokerData.setBrokerAddrs(brokerAddrs);
             brokerDatas.add(brokerData);
         });
         return brokerDatas;
