@@ -21,6 +21,8 @@ import apache.rocketmq.controller.v1.AssignmentStatus;
 import apache.rocketmq.controller.v1.CloseStreamReply;
 import apache.rocketmq.controller.v1.CloseStreamRequest;
 import apache.rocketmq.controller.v1.Code;
+import apache.rocketmq.controller.v1.CommitStreamObjectRequest;
+import apache.rocketmq.controller.v1.CommitWALObjectRequest;
 import apache.rocketmq.controller.v1.ControllerServiceGrpc;
 import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
@@ -34,6 +36,8 @@ import apache.rocketmq.controller.v1.NodeRegistrationReply;
 import apache.rocketmq.controller.v1.NodeRegistrationRequest;
 import apache.rocketmq.controller.v1.OpenStreamReply;
 import apache.rocketmq.controller.v1.OpenStreamRequest;
+import apache.rocketmq.controller.v1.PrepareS3ObjectsReply;
+import apache.rocketmq.controller.v1.PrepareS3ObjectsRequest;
 import apache.rocketmq.controller.v1.S3ObjectState;
 import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.StreamState;
@@ -72,6 +76,7 @@ import io.grpc.ManagedChannel;
 import io.grpc.stub.StreamObserver;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -1244,5 +1249,254 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 client.listOpenStreams(String.format("localhost:%d", port), request).get();
             }
         }
+    }
+
+    @Test
+    public void test3StreamObjects_2PC() throws IOException, ExecutionException, InterruptedException {
+        ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
+        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
+        Mockito.when(controllerConfig.nodeId()).thenReturn(2);
+        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
+        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
+        long objectId, streamId = 1;
+
+        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
+            metadataStore.start();
+            Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
+                .atMost(10, TimeUnit.SECONDS)
+                .until(metadataStore::isLeader);
+
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
+                 ControllerClient client = new GrpcControllerClient()
+            ) {
+                testServer.start();
+                int port = testServer.getPort();
+                PrepareS3ObjectsRequest request = PrepareS3ObjectsRequest.newBuilder()
+                    .setPreparedCount(3)
+                    .setTimeToLiveMinutes(5)
+                    .build();
+
+                PrepareS3ObjectsReply reply = client.prepareS3Objects(String.format("localhost:%d", port), request).get();
+                objectId = reply.getFirstObjectId();
+            }
+
+            apache.rocketmq.controller.v1.S3StreamObject s3StreamObject = apache.rocketmq.controller.v1.S3StreamObject.newBuilder()
+                .setObjectId(objectId + 2)
+                .setStreamId(streamId)
+                .setObjectSize(111L)
+                .build();
+
+            try (SqlSession session = this.getSessionFactory().openSession()) {
+                S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
+                com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
+                object.setObjectId(objectId);
+                object.setStreamId(streamId);
+                object.setBaseDataTimestamp(1);
+                s3StreamObjectMapper.create(object);
+
+                com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object1 = new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
+                object1.setObjectId(objectId + 1);
+                object1.setStreamId(streamId);
+                object1.setBaseDataTimestamp(2);
+                s3StreamObjectMapper.create(object1);
+
+                session.commit();
+            }
+
+            List<Long> compactedObjects = new ArrayList<>();
+            compactedObjects.add(objectId);
+            compactedObjects.add(objectId + 1);
+
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
+                 ControllerClient client = new GrpcControllerClient()
+            ) {
+                testServer.start();
+                int port = testServer.getPort();
+
+                CommitStreamObjectRequest request1 = CommitStreamObjectRequest.newBuilder()
+                    .setS3StreamObject(s3StreamObject)
+                    .addAllCompactedObjectIds(compactedObjects)
+                    .build();
+
+                client.commitStreamObject(String.format("localhost:%d", port), request1).get();
+
+            }
+
+            long time = System.currentTimeMillis();
+            try (SqlSession session = getSessionFactory().openSession()) {
+                S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
+                for (long index = objectId; index < objectId + 2; index++) {
+                    S3Object object = s3ObjectMapper.getById(index);
+                    Assertions.assertEquals(S3ObjectState.BOS_DELETED, object.getState());
+                    if (object.getMarkedForDeletionTimestamp() - time > 5 * 60) {
+                        Assertions.fail();
+                    }
+                }
+
+                S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
+                for (long index = objectId; index < objectId + 2; index++) {
+                    com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = s3StreamObjectMapper.getByObjectId(index);
+                    Assertions.assertNull(object);
+                }
+
+                com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = s3StreamObjectMapper.getByObjectId(objectId + 2);
+                Assertions.assertEquals(1L, object.getBaseDataTimestamp());
+                if (object.getCommittedTimestamp() - time > 5 * 60) {
+                    Assertions.fail();
+                }
+            }
+        }
+
+    }
+
+    @Test
+    public void test3WALObjects_2PC() throws IOException, ExecutionException, InterruptedException {
+        ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
+        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
+        Mockito.when(controllerConfig.nodeId()).thenReturn(2);
+        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
+        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
+        long objectId, streamId = 1;
+        int nodeId = 2;
+
+        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
+            metadataStore.start();
+            Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
+                .atMost(10, TimeUnit.SECONDS)
+                .until(metadataStore::isLeader);
+
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
+                 ControllerClient client = new GrpcControllerClient()
+            ) {
+                testServer.start();
+                int port = testServer.getPort();
+                PrepareS3ObjectsRequest request = PrepareS3ObjectsRequest.newBuilder()
+                    .setPreparedCount(5)
+                    .setTimeToLiveMinutes(5)
+                    .build();
+
+                PrepareS3ObjectsReply reply = client.prepareS3Objects(String.format("localhost:%d", port), request).get();
+                objectId = reply.getFirstObjectId();
+            }
+
+            apache.rocketmq.controller.v1.S3WALObject walObject = apache.rocketmq.controller.v1.S3WALObject.newBuilder()
+                .setObjectId(objectId + 4)
+                .setSequenceId(11)
+                .setObjectSize(222L)
+                .setBrokerId(nodeId)
+                .build();
+
+            String expectSubStream = """
+            {
+              "1234567890": {
+                "streamId_": 1234567890,
+                "startOffset_": 0,
+                "endOffset_": 10
+              }}""";
+
+            try (SqlSession session = this.getSessionFactory().openSession()) {
+                S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
+                com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
+                object.setObjectId(objectId);
+                object.setStreamId(streamId);
+                object.setBaseDataTimestamp(1);
+                object.setStartOffset(111);
+                object.setEndOffset(222);
+                s3StreamObjectMapper.create(object);
+
+                com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object1 = new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
+                object1.setObjectId(objectId + 1);
+                object1.setStreamId(streamId);
+                object1.setBaseDataTimestamp(2);
+                object1.setStartOffset(222);
+                object1.setEndOffset(333);
+                s3StreamObjectMapper.create(object1);
+
+                S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
+                com.automq.rocketmq.controller.metadata.database.dao.S3WALObject s3WALObject = new com.automq.rocketmq.controller.metadata.database.dao.S3WALObject();
+                s3WALObject.setObjectId(objectId + 2);
+                s3WALObject.setObjectSize(333);
+                s3WALObject.setBaseDataTimestamp(3);
+                s3WALObject.setSequenceId(1);
+                s3WALObject.setSubStreams(expectSubStream.replace("1234567890", String.valueOf(streamId)));
+                s3WALObjectMapper.create(s3WALObject);
+
+                com.automq.rocketmq.controller.metadata.database.dao.S3WALObject s3WALObject1 = new com.automq.rocketmq.controller.metadata.database.dao.S3WALObject();
+                s3WALObject1.setObjectId(objectId + 3);
+                s3WALObject1.setObjectSize(444);
+                s3WALObject1.setBaseDataTimestamp(4);
+                s3WALObject.setSequenceId(2);
+                s3WALObject1.setSubStreams(expectSubStream.replace("1234567890", String.valueOf(streamId)));
+                s3WALObjectMapper.create(s3WALObject1);
+
+                session.commit();
+            }
+
+            long time = System.currentTimeMillis();
+            List<Long> compactedObjects = new ArrayList<>();
+            compactedObjects.add(objectId + 2);
+            compactedObjects.add(objectId + 3);
+
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
+                 ControllerClient client = new GrpcControllerClient()
+            ) {
+                testServer.start();
+                int port = testServer.getPort();
+
+                List<apache.rocketmq.controller.v1.S3StreamObject> s3StreamObjects = metadataStore.listStreamObjects(streamId, 222, 111, 2);
+
+                CommitWALObjectRequest request = CommitWALObjectRequest.newBuilder()
+                    .setS3WalObject(walObject)
+                    .addAllS3StreamObjects(s3StreamObjects)
+                    .addAllCompactedObjectIds(compactedObjects)
+                    .build();
+
+                client.commitWALObject(String.format("localhost:%d", port), request).get();
+            }
+
+            try (SqlSession session = getSessionFactory().openSession()) {
+                S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
+                for (long index = objectId; index < objectId + 2; index++) {
+                    S3Object object = s3ObjectMapper.getById(index);
+                    Assertions.assertEquals(S3ObjectState.BOS_COMMITTED, object.getState());
+                    if (object.getCommittedTimestamp() - time > 5 * 60) {
+                        Assertions.fail();
+                    }
+                }
+
+                for (long index = objectId + 2; index < objectId + 4; index++) {
+                    S3Object object = s3ObjectMapper.getById(index);
+                    Assertions.assertEquals(S3ObjectState.BOS_DELETED, object.getState());
+                    if (object.getMarkedForDeletionTimestamp() - time > 5 * 60) {
+                        Assertions.fail();
+                    }
+                }
+
+
+                S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
+                for (long index = objectId; index < objectId + 2; index++) {
+                    com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = s3StreamObjectMapper.getByObjectId(index);
+                    if (object.getCommittedTimestamp() - time > 5 * 60) {
+                        Assertions.fail();
+                    }
+                }
+
+                long baseTime = time;
+                S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
+                for (long index = objectId + 2; index < objectId + 4; index++) {
+                    com.automq.rocketmq.controller.metadata.database.dao.S3WALObject s3WALObject = s3WALObjectMapper.getByObjectId(index);
+                    baseTime = Math.min(baseTime, s3WALObject.getBaseDataTimestamp());
+                }
+
+                com.automq.rocketmq.controller.metadata.database.dao.S3WALObject object = s3WALObjectMapper.getByObjectId(objectId + 4);
+                Assertions.assertEquals(baseTime, object.getBaseDataTimestamp());
+                if (object.getCommittedTimestamp() - time > 5 * 60) {
+                    Assertions.fail();
+                }
+            }
+        }
+
     }
 }

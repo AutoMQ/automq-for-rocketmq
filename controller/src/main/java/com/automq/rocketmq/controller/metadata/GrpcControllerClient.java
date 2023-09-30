@@ -492,53 +492,65 @@ public class GrpcControllerClient implements ControllerClient {
 
     @Override
     public CompletableFuture<PrepareS3ObjectsReply> prepareS3Objects(String target,
-        PrepareS3ObjectsRequest request) throws ControllerException {
+        PrepareS3ObjectsRequest request) {
         CompletableFuture<PrepareS3ObjectsReply> future = new CompletableFuture<>();
-        Futures.addCallback(this.buildStubForTarget(target).prepareS3Objects(request), new FutureCallback<>() {
-            @Override
-            public void onSuccess(PrepareS3ObjectsReply result) {
-                future.complete(result);
-            }
+        try {
+            Futures.addCallback(this.buildStubForTarget(target).prepareS3Objects(request), new FutureCallback<>() {
+                @Override
+                public void onSuccess(PrepareS3ObjectsReply result) {
+                    future.complete(result);
+                }
 
-            @Override
-            public void onFailure(@Nonnull Throwable t) {
-                future.completeExceptionally(t);
-            }
-        }, MoreExecutors.directExecutor());
+                @Override
+                public void onFailure(@Nonnull Throwable t) {
+                    future.completeExceptionally(t);
+                }
+            }, MoreExecutors.directExecutor());
+        } catch (ControllerException e) {
+            future.completeExceptionally(e);
+        }
         return future;
     }
 
     @Override
-    public CompletableFuture<CommitStreamObjectReply> commitStreamObject(String target, CommitStreamObjectRequest request) throws ControllerException {
+    public CompletableFuture<CommitStreamObjectReply> commitStreamObject(String target, CommitStreamObjectRequest request) {
         CompletableFuture<CommitStreamObjectReply> future = new CompletableFuture<>();
-        Futures.addCallback(this.buildStubForTarget(target).commitStreamObject(request), new FutureCallback<>() {
-            @Override
-            public void onSuccess(CommitStreamObjectReply result) {
-                future.complete(result);
-            }
+        try {
+            Futures.addCallback(this.buildStubForTarget(target).commitStreamObject(request), new FutureCallback<>() {
+                @Override
+                public void onSuccess(CommitStreamObjectReply result) {
+                    future.complete(result);
+                }
 
-            @Override
-            public void onFailure(@Nonnull Throwable t) {
-                future.completeExceptionally(t);
-            }
-        }, MoreExecutors.directExecutor());
+                @Override
+                public void onFailure(@Nonnull Throwable t) {
+                    future.completeExceptionally(t);
+                }
+            }, MoreExecutors.directExecutor());
+        } catch (ControllerException e) {
+            future.completeExceptionally(e);
+        }
         return future;
     }
 
     @Override
-    public CompletableFuture<CommitWALObjectReply> commitWALObject(String target, CommitWALObjectRequest request) throws ControllerException {
+    public CompletableFuture<CommitWALObjectReply> commitWALObject(String target, CommitWALObjectRequest request) {
         CompletableFuture<CommitWALObjectReply> future = new CompletableFuture<>();
-        Futures.addCallback(this.buildStubForTarget(target).commitWALObject(request), new FutureCallback<>() {
-            @Override
-            public void onSuccess(CommitWALObjectReply result) {
-                future.complete(result);
-            }
+        try {
+            Futures.addCallback(this.buildStubForTarget(target).commitWALObject(request), new FutureCallback<>() {
+                @Override
+                public void onSuccess(CommitWALObjectReply result) {
+                    future.complete(result);
+                }
 
-            @Override
-            public void onFailure(@Nonnull Throwable t) {
-                future.completeExceptionally(t);
-            }
-        }, MoreExecutors.directExecutor());
+                @Override
+                public void onFailure(@Nonnull Throwable t) {
+                    future.completeExceptionally(t);
+                }
+            }, MoreExecutors.directExecutor());
+        } catch (ControllerException e) {
+            future.completeExceptionally(e);
+        }
         return future;
     }
 

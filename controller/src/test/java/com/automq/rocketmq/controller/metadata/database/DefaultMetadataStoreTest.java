@@ -1142,8 +1142,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             metadataStore.setRole(Role.Leader);
 
             metadataStore.commitStreamObject(s3StreamObject, compactedObjects);
-        } catch (ControllerException e) {
-            throw new RuntimeException(e);
         }
 
 
@@ -1262,8 +1260,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             List<S3StreamObject> s3StreamObjects = metadataStore.listStreamObjects(streamId, 222, 111, 2);
 
             metadataStore.commitWalObject(walObject, s3StreamObjects, compactedObjects);
-        } catch (ControllerException e) {
-            throw new RuntimeException(e);
         }
 
 

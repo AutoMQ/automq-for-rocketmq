@@ -1096,7 +1096,7 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public CompletableFuture<Long> prepareS3Objects(int count, int ttlInMinutes) throws ControllerException {
+    public CompletableFuture<Long> prepareS3Objects(int count, int ttlInMinutes) {
         CompletableFuture<Long> future = new CompletableFuture<>();
         for (; ; ) {
             if (isLeader()) {
@@ -1105,7 +1105,7 @@ public class DefaultMetadataStore implements MetadataStore {
                         continue;
                     }
                     S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
-                    long prepareTs = System.currentTimeMillis(), expiredTs = prepareTs + (long) ttlInMinutes * 60 * 1000;
+                    long prepareTs = System.currentTimeMillis(), expiredTs = prepareTs + ttlInMinutes * 60 * 1000;
                     List<Long> objectIds = IntStream.range(0, count)
                         .mapToObj(i -> {
                             S3Object object = new S3Object();
@@ -1118,8 +1118,13 @@ public class DefaultMetadataStore implements MetadataStore {
                         .toList();
 
                     session.commit();
-                    long firstObjectId = !Objects.isNull(objectIds) && objectIds.size() > 0 ? objectIds.get(0) : -1;
-                    future.complete(firstObjectId);
+                    if (Objects.isNull(objectIds) || objectIds.size() == 0) {
+                        LOGGER.error("S3Object creation failed, count[{}], ttl[{}]", count, ttlInMinutes);
+                        ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE, String.format("S3Object creation failed, count[%d], ttl[%d]", count, ttlInMinutes));
+                        future.completeExceptionally(e);
+                        break;
+                    }
+                    future.complete(objectIds.get(0));
                 }
             } else {
                 PrepareS3ObjectsRequest request = PrepareS3ObjectsRequest.newBuilder()
@@ -1139,7 +1144,9 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public CompletableFuture<Void> commitWalObject(apache.rocketmq.controller.v1.S3WALObject walObject, List<apache.rocketmq.controller.v1.S3StreamObject> streamObjects, List<Long> compactedObjects) throws ControllerException {
+    public CompletableFuture<Void> commitWalObject(apache.rocketmq.controller.v1.S3WALObject walObject,
+        List<apache.rocketmq.controller.v1.S3StreamObject> streamObjects,
+        List<Long> compactedObjects) {
         CompletableFuture<Void> future = new CompletableFuture<>();
         for (; ; ) {
             if (isLeader()) {
@@ -1259,7 +1266,7 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public CompletableFuture<Void> commitStreamObject(apache.rocketmq.controller.v1.S3StreamObject streamObject, List<Long> compactedObjects) throws ControllerException {
+    public CompletableFuture<Void> commitStreamObject(apache.rocketmq.controller.v1.S3StreamObject streamObject, List<Long> compactedObjects) {
         CompletableFuture<Void> future = new CompletableFuture<>();
         for (; ; ) {
             if (isLeader()) {
@@ -1311,6 +1318,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     }
                     LOGGER.info("S3StreamObject[object-id={}] commit success, compacted objects: {}", streamObject.getObjectId(), compactedObjects);
                     session.commit();
+                    future.complete(null);
                 }
             } else {
                 CommitStreamObjectRequest request = CommitStreamObjectRequest.newBuilder()
