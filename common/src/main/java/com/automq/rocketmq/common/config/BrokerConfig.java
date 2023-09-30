@@ -22,6 +22,7 @@ public class BrokerConfig {
     private ProxyConfig proxy;
     private StoreConfig store;
     private S3StreamConfig s3Stream;
+    private ControllerConfig controller;
 
     public ProxyConfig proxy() {
         return proxy;

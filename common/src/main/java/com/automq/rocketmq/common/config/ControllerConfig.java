@@ -17,35 +17,20 @@
 
 package com.automq.rocketmq.common.config;
 
-public class StoreConfig {
-    // Fetch limitation of a single request.
-    // Filtered out messages will also be counted.
+public class ControllerConfig {
+    private int nodeAliveIntervalInSecs;
+    private int leaseLifeSpanInSecs;
+    private int scanIntervalInSecs;
 
-    // Default is 1000
-    private int maxFetchCount = 1000;
-
-    // Default is 10MB, unit in bytes
-    private long maxFetchBytes = 10L * 1024 * 1024;
-
-    // Default is 10s, unit in nanoseconds
-    private long maxFetchTimeNanos = 10L * 1000 * 1000_000;
-
-    // Used for storing KV data based on RocksDB
-    private String kvPath = "/tmp/rocketmq/kvstore";
-
-    public int maxFetchCount() {
-        return maxFetchCount;
+    public int nodeAliveIntervalInSecs() {
+        return nodeAliveIntervalInSecs;
     }
 
-    public long maxFetchBytes() {
-        return maxFetchBytes;
+    public int leaseLifeSpanInSecs() {
+        return leaseLifeSpanInSecs;
     }
 
-    public long maxFetchTimeNanos() {
-        return maxFetchTimeNanos;
-    }
-
-    public String kvPath() {
-        return kvPath;
+    public int scanIntervalInSecs() {
+        return scanIntervalInSecs;
     }
 }

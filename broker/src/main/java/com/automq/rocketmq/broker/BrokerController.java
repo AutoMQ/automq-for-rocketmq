@@ -17,14 +17,28 @@
 
 package com.automq.rocketmq.broker;
 
+import com.automq.rocketmq.broker.protocol.GrpcProtocolServer;
 import com.automq.rocketmq.common.config.BrokerConfig;
 import com.automq.rocketmq.common.util.Lifecycle;
+import com.automq.rocketmq.metadata.ProxyMetadataService;
+import com.automq.rocketmq.metadata.StoreMetadataService;
+import com.automq.rocketmq.store.S3StreamStore;
+import com.automq.rocketmq.store.api.MessageStore;
+import com.automq.rocketmq.store.api.StreamStore;
+import org.apache.rocketmq.proxy.service.ServiceManager;
 
 public class BrokerController implements Lifecycle {
     private final BrokerConfig brokerConfig;
+    private final StreamStore streamStore;
+    private final ServiceManager serviceManager = null;
+    private final GrpcProtocolServer grpcServer = null;
+    private final MessageStore messageStore = null;
+    private final StoreMetadataService storeMetadataService = null;
+    private final ProxyMetadataService proxyMetadataService = null;
 
     public BrokerController(BrokerConfig brokerConfig) {
         this.brokerConfig = brokerConfig;
+        this.streamStore = new S3StreamStore(brokerConfig.s3Stream());
     }
 
     @Override

@@ -97,24 +97,18 @@ public class DefaultServiceManager implements ServiceManager {
 
     @Override
     public void shutdown() throws Exception {
-
     }
 
     @Override
     public void start() throws Exception {
-
     }
 
     protected static class ConsumerIdsChangeListenerImpl implements ConsumerIdsChangeListener {
-
         @Override
         public void handle(ConsumerGroupEvent event, String group, Object... args) {
-
         }
-
         @Override
         public void shutdown() {
-
         }
     }
 }
