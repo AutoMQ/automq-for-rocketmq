@@ -428,7 +428,7 @@ public class DefaultMetadataStore implements MetadataStore {
                                     .setQueue(MessageQueue.newBuilder()
                                         .setTopicId(assignment.getTopicId())
                                         .setQueueId(assignment.getQueueId()))
-                                    .setBrokerId(assignment.getDstNodeId())
+                                    .setNodeId(assignment.getDstNodeId())
                                     .build();
                                 topicBuilder.addAssignments(queueAssignment);
                             }
@@ -439,8 +439,8 @@ public class DefaultMetadataStore implements MetadataStore {
                                         .setTopicId(assignment.getTopicId())
                                         .setQueueId(assignment.getQueueId())
                                         .build())
-                                    .setSrcBrokerId(assignment.getSrcNodeId())
-                                    .setDstBrokerId(assignment.getDstNodeId())
+                                    .setSrcNodeId(assignment.getSrcNodeId())
+                                    .setDstNodeId(assignment.getDstNodeId())
                                     .build();
                                 topicBuilder.addReassignments(reassignment);
                             }

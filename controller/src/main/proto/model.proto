@@ -39,7 +39,7 @@ message MessageQueue {
 
 message MessageQueueAssignment {
   MessageQueue queue = 1;
-  int32 broker_id = 2;
+  int32 node_id = 2;
 }
 
 message OngoingTopicReassignment {
@@ -83,8 +83,8 @@ enum IsolationLevel {
 
 message OngoingMessageQueueReassignment {
   MessageQueue queue = 1;
-  int32 src_broker_id = 2;
-  int32 dst_broker_id = 3;
+  int32 src_node_id = 2;
+  int32 dst_node_id = 3;
 }
 
 message ConsumerGroup {

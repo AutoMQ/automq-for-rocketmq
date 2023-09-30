@@ -20,6 +20,7 @@ package com.automq.rocketmq.proxy.service;
 import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.metadata.ProxyMetadataService;
+import com.automq.rocketmq.proxy.model.VirtualQueue;
 import com.google.common.collect.Lists;
 import com.google.common.net.HostAndPort;
 import java.util.ArrayList;
@@ -59,22 +60,13 @@ public class TopicRouteServiceImpl extends TopicRouteService {
     @Override
     public MessageQueueView getAllMessageQueueView(ProxyContext ctx, String topicName) throws Exception {
         Topic topic = metadataService.topicOf(topicName).join();
-        TopicRouteData topicRouteData = new TopicRouteData();
-        // Build queue data
-        topicRouteData.setQueueDatas(queueDataFrom(topic.getAssignmentsList(), topicName));
-        // Build broker data
-        topicRouteData.setBrokerDatas(brokerDataFrom(topic.getAssignmentsList(), topicName));
-        return new MessageQueueView(topicName, topicRouteData);
+        return new MessageQueueView(topicName, routeDataFrom(topic.getAssignmentsList()));
     }
 
     @Override
     public MessageQueueView getCurrentMessageQueueView(ProxyContext ctx, String topicName) throws Exception {
         List<MessageQueueAssignment> assignments = metadataService.queueAssignmentsOf(topicName).join();
-        TopicRouteData topicRouteData = new TopicRouteData();
-        // Build queue data
-        topicRouteData.setQueueDatas(queueDataFrom(assignments, topicName));
-        topicRouteData.setBrokerDatas(brokerDataFrom(assignments, topicName));
-        return new MessageQueueView(topicName, topicRouteData);
+        return new MessageQueueView(topicName, routeDataFrom(assignments));
     }
 
     @Override
@@ -113,55 +105,47 @@ public class TopicRouteServiceImpl extends TopicRouteService {
         return new AddressableMessageQueue(messageQueue, null);
     }
 
-    /**
-     * Get the virtual broker name for a given topic queue.
-     *
-     * @param topicName topic name
-     * @param queueId   queue id
-     * @return virtual broker name
-     */
-    private String virtualBrokerName(String topicName, int queueId) {
-        return topicName + "%" + queueId;
-    }
-
-    private List<QueueData> queueDataFrom(List<MessageQueueAssignment> assignments, String topicName) {
+    private TopicRouteData routeDataFrom(List<MessageQueueAssignment> assignments) {
+        TopicRouteData topicRouteData = new TopicRouteData();
         List<QueueData> queueDatas = new ArrayList<>();
-        assignments.forEach(assignment -> {
-            QueueData queueData = new QueueData();
-            queueData.setBrokerName(virtualBrokerName(topicName, assignment.getQueue().getQueueId()));
-            queueData.setReadQueueNums(1);
-            queueData.setWriteQueueNums(1);
-            queueData.setPerm(PermName.PERM_READ | PermName.PERM_WRITE);
-            queueDatas.add(queueData);
-        });
-        return queueDatas;
-    }
+        List<BrokerData> brokerDatas = new ArrayList<>();
 
-    private List<BrokerData> brokerDataFrom(List<MessageQueueAssignment> assignments, String topicName) {
-        // Retrieve the broker list from the topic metadata.
         Map<Integer, String> addressMap = new HashMap<>();
-        Set<Integer> brokerIdSet = assignments.stream().map(MessageQueueAssignment::getBrokerId).collect(Collectors.toSet());
+        Set<Integer> nodeIdSet = assignments.stream().map(MessageQueueAssignment::getNodeId).collect(Collectors.toSet());
 
-        CompletableFuture<String>[] cfs = new CompletableFuture[brokerIdSet.size()];
+        @SuppressWarnings("unchecked")
+        CompletableFuture<String>[] cfs = new CompletableFuture[nodeIdSet.size()];
         int i = 0;
-        for (Integer brokerId : brokerIdSet) {
-            cfs[i++] = metadataService.addressOf(brokerId).thenApply(address -> {
-                addressMap.put(brokerId, address);
+        for (Integer nodeId : nodeIdSet) {
+            cfs[i++] = metadataService.addressOf(nodeId).thenApply(address -> {
+                addressMap.put(nodeId, address);
                 return address;
             });
         }
         CompletableFuture.allOf(cfs).join();
 
-        List<BrokerData> brokerDatas = new ArrayList<>();
-        addressMap.forEach((brokerId, address) -> {
+        assignments.forEach(assignment -> {
+            VirtualQueue virtualQueue = new VirtualQueue(assignment.getQueue().getTopicId(), assignment.getQueue().getQueueId());
+            QueueData queueData = new QueueData();
+            queueData.setBrokerName(virtualQueue.brokerName());
+            queueData.setReadQueueNums(1);
+            queueData.setWriteQueueNums(1);
+            queueData.setPerm(PermName.PERM_READ | PermName.PERM_WRITE);
+            queueDatas.add(queueData);
+
+            // Each MessageQueue has a virtual broker binding to it.
             BrokerData brokerData = new BrokerData();
-            brokerData.setBrokerName(virtualBrokerName(topicName, brokerId));
+            brokerData.setBrokerName(virtualQueue.brokerName());
             brokerData.setCluster(VIRTUAL_CLUSTER_NAME);
             HashMap<Long, String> brokerAddrs = new HashMap<>();
-            brokerAddrs.put(0L, address);
+            brokerAddrs.put(0L, addressMap.get(assignment.getNodeId()));
             brokerData.setBrokerAddrs(brokerAddrs);
             brokerDatas.add(brokerData);
         });
-        return brokerDatas;
+
+        topicRouteData.setBrokerDatas(brokerDatas);
+        topicRouteData.setQueueDatas(queueDatas);
+
+        return topicRouteData;
     }
 }
