@@ -408,18 +408,76 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     @Override
     public void prepareS3Objects(PrepareS3ObjectsRequest request,
         StreamObserver<PrepareS3ObjectsReply> responseObserver) {
-        super.prepareS3Objects(request, responseObserver);
+        metadataStore.prepareS3Objects(request.getPreparedCount(), (int) request.getTimeToLiveMinutes())
+            .whenComplete((objectId, e) -> {
+                if (null != e) {
+                    responseObserver.onError(e);
+                    return;
+                }
+
+                PrepareS3ObjectsReply reply = PrepareS3ObjectsReply.newBuilder()
+                    .setStatus(Status.newBuilder()
+                        .setCode(Code.OK).build())
+                    .setFirstObjectId(objectId)
+                    .build();
+                responseObserver.onNext(reply);
+                responseObserver.onCompleted();
+            });
     }
 
     @Override
     public void commitWALObject(CommitWALObjectRequest
         request, StreamObserver<CommitWALObjectReply> responseObserver) {
-        super.commitWALObject(request, responseObserver);
+        metadataStore.commitWalObject(request.getS3WalObject(), request.getS3StreamObjectsList(), request.getCompactedObjectIdsList())
+            .whenComplete((res, e) -> {
+                if (null != e) {
+                    if (e instanceof ControllerException ex) {
+                        CommitWALObjectReply reply = CommitWALObjectReply.newBuilder()
+                            .setStatus(Status.newBuilder()
+                                .setCode(Code.forNumber(ex.getErrorCode()))
+                                .setMessage(e.getMessage()).build())
+                            .build();
+                        responseObserver.onNext(reply);
+                        responseObserver.onCompleted();
+                    } else {
+                        responseObserver.onError(e);
+                    }
+                } else {
+                    CommitWALObjectReply reply = CommitWALObjectReply.newBuilder()
+                        .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                        .build();
+                    responseObserver.onNext(reply);
+                    responseObserver.onCompleted();
+                }
+            });
     }
 
+    @SuppressWarnings("checkstyle:Indentation")
     @Override
     public void commitStreamObject(CommitStreamObjectRequest request,
         StreamObserver<CommitStreamObjectReply> responseObserver) {
-        super.commitStreamObject(request, responseObserver);
+
+        metadataStore.commitStreamObject(request.getS3StreamObject(), request.getCompactedObjectIdsList())
+            .whenComplete((res, e) -> {
+                if (null != e) {
+                    if (e instanceof ControllerException ex) {
+                        CommitStreamObjectReply reply = CommitStreamObjectReply.newBuilder()
+                            .setStatus(Status.newBuilder()
+                                .setCode(Code.forNumber(ex.getErrorCode()))
+                                .setMessage(e.getMessage()).build())
+                            .build();
+                        responseObserver.onNext(reply);
+                        responseObserver.onCompleted();
+                    } else {
+                        responseObserver.onError(e);
+                    }
+                } else {
+                    CommitStreamObjectReply reply = CommitStreamObjectReply.newBuilder()
+                        .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                        .build();
+                    responseObserver.onNext(reply);
+                    responseObserver.onCompleted();
+                }
+            });
     }
 }

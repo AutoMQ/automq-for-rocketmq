@@ -77,9 +77,9 @@ public interface ControllerClient extends Closeable {
 
     CompletableFuture<TrimStreamReply> trimStream(String target, TrimStreamRequest request) throws ControllerException;
 
-    CompletableFuture<PrepareS3ObjectsReply> prepareS3Objects(String target, PrepareS3ObjectsRequest request) throws ControllerException;
+    CompletableFuture<PrepareS3ObjectsReply> prepareS3Objects(String target, PrepareS3ObjectsRequest request);
 
-    CompletableFuture<CommitStreamObjectReply> commitStreamObject(String target, CommitStreamObjectRequest request) throws ControllerException;
+    CompletableFuture<CommitStreamObjectReply> commitStreamObject(String target, CommitStreamObjectRequest request);
 
-    CompletableFuture<CommitWALObjectReply> commitWALObject(String target, CommitWALObjectRequest request) throws ControllerException;
+    CompletableFuture<CommitWALObjectReply> commitWALObject(String target, CommitWALObjectRequest request);
 }
