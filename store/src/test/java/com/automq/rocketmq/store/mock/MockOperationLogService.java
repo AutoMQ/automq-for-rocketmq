@@ -17,7 +17,9 @@
 
 package com.automq.rocketmq.store.mock;
 
-import com.automq.rocketmq.store.model.generated.ReceiptHandle;
+import com.automq.rocketmq.store.model.operation.AckOperation;
+import com.automq.rocketmq.store.model.operation.ChangeInvisibleDurationOperation;
+import com.automq.rocketmq.store.model.operation.PopOperation;
 import com.automq.rocketmq.store.service.api.OperationLogService;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
@@ -26,19 +28,22 @@ public class MockOperationLogService implements OperationLogService {
     AtomicLong operationCount = new AtomicLong(0);
 
     @Override
-    public CompletableFuture<Long> logPopOperation(long consumerGroupId, long topicId, int queueId, long offset,
-        int batchSize, boolean isOrder, long invisibleDuration, long operationTimestamp) {
-        return CompletableFuture.completedFuture(operationCount.incrementAndGet());
+    public CompletableFuture<Long> logPopOperation(PopOperation operation) {
+        return null;
     }
 
     @Override
-    public CompletableFuture<Long> logAckOperation(ReceiptHandle receiptHandle, long operationTimestamp) {
-        return CompletableFuture.completedFuture(operationCount.incrementAndGet());
+    public CompletableFuture<Long> logAckOperation(AckOperation operation) {
+        return null;
     }
 
     @Override
-    public CompletableFuture<Long> logChangeInvisibleDurationOperation(ReceiptHandle receiptHandle,
-        long invisibleDuration, long operationTimestamp) {
-        return CompletableFuture.completedFuture(operationCount.incrementAndGet());
+    public CompletableFuture<Long> logChangeInvisibleDurationOperation(ChangeInvisibleDurationOperation operation) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<Void> start() {
+        return null;
     }
 }

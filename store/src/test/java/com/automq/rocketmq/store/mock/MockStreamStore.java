@@ -55,6 +55,12 @@ public class MockStreamStore implements StreamStore {
     }
 
     @Override
+    public CompletableFuture<Void> open(long streamId) {
+        openStream(streamId);
+        return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
     public long startOffset(long streamId) {
         Stream stream = openStream(streamId);
         return stream.startOffset();

@@ -17,13 +17,13 @@
 
 package com.automq.rocketmq.store.util;
 
-import com.automq.rocketmq.store.model.generated.AckOperation;
 import com.automq.rocketmq.store.model.generated.ChangeInvisibleDurationOperation;
 import com.automq.rocketmq.store.model.generated.CheckPoint;
 import com.automq.rocketmq.store.model.generated.Operation;
 import com.automq.rocketmq.store.model.generated.OperationLogItem;
-import com.automq.rocketmq.store.model.generated.PopOperation;
 import com.automq.rocketmq.store.model.generated.ReceiptHandle;
+import com.automq.rocketmq.store.model.operation.PopOperation.PopOperationType;
+import com.automq.rocketmq.store.model.operation.AckOperation.AckOperationType;
 import java.nio.ByteBuffer;
 import org.junit.jupiter.api.Test;
 
@@ -34,8 +34,11 @@ public class SerializeUtilTest {
     public static final long TOPIC_ID = 0L;
     public static final int QUEUE_ID = 1;
     public static final long OFFSET = 2L;
+    public static final int COUNT = 1;
     public static final long OPERATION_ID = 3L;
     public static final long CONSUMER_GROUP_ID = 4L;
+    public static final PopOperationType POP_OPERATION_TYPE = PopOperationType.POP_ORDER;
+    public static final AckOperationType ACK_OPERATION_TYPE = AckOperationType.ACK_NORMAL;
     public static final boolean IS_ORDER = true;
     public static final boolean IS_RETRY = false;
     public static final long DELIVERY_TIMESTAMP = 5L;
@@ -44,7 +47,8 @@ public class SerializeUtilTest {
     public static final int BATCH_SIZE = 8;
     public static final long INVISIBLE_DURATION = 9L;
     public static final long OPERATION_TIMESTAMP = 10L;
-    public static final String RECEIPT_HANDLE = "EAAAAAwAGAAAAAQACAAQAAwAAAABAAAAAgAAAAAAAAADAAAAAAAAAA==";
+    public static final long RETRY_OFFSET = 11L;
+    public static final String RECEIPT_HANDLE = "GAAAAAAAAAAAAA4AIAAIAAAABAAQABgADgAAAAEAAAAEAAAAAAAAAAIAAAAAAAAAAwAAAAAAAAA=";
 
     @Test
     void buildCheckPointKey() {
@@ -54,17 +58,17 @@ public class SerializeUtilTest {
 
     @Test
     void buildCheckPointValue() {
-        byte[] value = SerializeUtil.buildCheckPointValue(TOPIC_ID, QUEUE_ID, OFFSET, CONSUMER_GROUP_ID, OPERATION_ID, IS_ORDER, IS_RETRY, DELIVERY_TIMESTAMP, NEXT_VISIBLE_TIMESTAMP, RECONSUME_COUNT);
+        byte[] value = SerializeUtil.buildCheckPointValue(TOPIC_ID, QUEUE_ID, OFFSET, COUNT, CONSUMER_GROUP_ID, OPERATION_ID, IS_ORDER, IS_RETRY, DELIVERY_TIMESTAMP, NEXT_VISIBLE_TIMESTAMP);
         CheckPoint checkPoint = CheckPoint.getRootAsCheckPoint(ByteBuffer.wrap(value));
         assertEquals(TOPIC_ID, checkPoint.topicId());
         assertEquals(QUEUE_ID, checkPoint.queueId());
         assertEquals(OFFSET, checkPoint.messageOffset());
+        assertEquals(COUNT, checkPoint.count());
         assertEquals(CONSUMER_GROUP_ID, checkPoint.consumerGroupId());
         assertEquals(OPERATION_ID, checkPoint.operationId());
         assertEquals(IS_ORDER, checkPoint.fifo());
         assertEquals(DELIVERY_TIMESTAMP, checkPoint.deliveryTimestamp());
         assertEquals(NEXT_VISIBLE_TIMESTAMP, checkPoint.nextVisibleTimestamp());
-        assertEquals(RECONSUME_COUNT, checkPoint.reconsumeCount());
     }
 
     @Test
@@ -87,7 +91,7 @@ public class SerializeUtilTest {
 
     @Test
     void encodeReceiptHandle() {
-        String receiptHandle = SerializeUtil.encodeReceiptHandle(TOPIC_ID, QUEUE_ID, OFFSET, OPERATION_ID);
+        String receiptHandle = SerializeUtil.encodeReceiptHandle(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, OFFSET, OPERATION_ID);
         assertEquals(RECEIPT_HANDLE, receiptHandle);
     }
 
@@ -102,40 +106,29 @@ public class SerializeUtilTest {
 
     @Test
     void encodePopOperation() {
-        byte[] bytes = SerializeUtil.encodePopOperation(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, OFFSET, BATCH_SIZE, IS_ORDER, INVISIBLE_DURATION, OPERATION_TIMESTAMP);
-        OperationLogItem operationLogItem = OperationLogItem.getRootAsOperationLogItem(ByteBuffer.wrap(bytes));
-        assertEquals(Operation.PopOperation, operationLogItem.operationType());
-
-        PopOperation operation = (PopOperation) operationLogItem.operation(new PopOperation());
-        assertNotNull(operation);
-        assertEquals(CONSUMER_GROUP_ID, operation.consumerGroupId());
-        assertEquals(TOPIC_ID, operation.topicId());
-        assertEquals(QUEUE_ID, operation.queueId());
-        assertEquals(OFFSET, operation.offset());
-        assertEquals(BATCH_SIZE, operation.batchSize());
-        assertEquals(IS_ORDER, operation.fifo());
-        assertEquals(INVISIBLE_DURATION, operation.invisibleDuration());
-        assertEquals(OPERATION_TIMESTAMP, operation.operationTimestamp());
+        com.automq.rocketmq.store.model.operation.PopOperation popOperation = new com.automq.rocketmq.store.model.operation.PopOperation(
+            CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, OFFSET, BATCH_SIZE, INVISIBLE_DURATION, OPERATION_TIMESTAMP, RETRY_OFFSET, POP_OPERATION_TYPE
+        );
+        byte[] bytes = SerializeUtil.encodePopOperation(popOperation);
+        com.automq.rocketmq.store.model.operation.Operation decodedOperation = SerializeUtil.decodeOperation(ByteBuffer.wrap(bytes));
+        assertEquals(popOperation, decodedOperation);
     }
 
     @Test
     void encodeAckOperation() {
-        byte[] bytes = SerializeUtil.encodeAckOperation(SerializeUtil.decodeReceiptHandle(RECEIPT_HANDLE), OPERATION_TIMESTAMP);
-        OperationLogItem operationLogItem = OperationLogItem.getRootAsOperationLogItem(ByteBuffer.wrap(bytes));
-        assertEquals(Operation.AckOperation, operationLogItem.operationType());
-
-        AckOperation operation = (AckOperation) operationLogItem.operation(new AckOperation());
-        assertNotNull(operation);
-        assertEquals(TOPIC_ID, operation.receiptHandle().topicId());
-        assertEquals(QUEUE_ID, operation.receiptHandle().queueId());
-        assertEquals(OFFSET, operation.receiptHandle().messageOffset());
-        assertEquals(OPERATION_ID, operation.receiptHandle().operationId());
-        assertEquals(OPERATION_TIMESTAMP, operation.operationTimestamp());
+        com.automq.rocketmq.store.model.operation.AckOperation ackOperation = new com.automq.rocketmq.store.model.operation.AckOperation(
+            CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, OFFSET, OPERATION_ID, OPERATION_TIMESTAMP, ACK_OPERATION_TYPE
+        );
+        byte[] bytes = SerializeUtil.encodeAckOperation(ackOperation);
+        com.automq.rocketmq.store.model.operation.Operation decodedOperation = SerializeUtil.decodeOperation(ByteBuffer.wrap(bytes));
+        assertEquals(ackOperation, decodedOperation);
     }
 
     @Test
     void encodeChangeInvisibleDurationOperation() {
-        byte[] bytes = SerializeUtil.encodeChangeInvisibleDurationOperation(SerializeUtil.decodeReceiptHandle(RECEIPT_HANDLE), INVISIBLE_DURATION, OPERATION_TIMESTAMP);
+        byte[] bytes = SerializeUtil.encodeChangeInvisibleDurationOperation(new com.automq.rocketmq.store.model.operation.ChangeInvisibleDurationOperation(
+            CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, OFFSET, OPERATION_ID, INVISIBLE_DURATION, OPERATION_TIMESTAMP
+        ));
         OperationLogItem operationLogItem = OperationLogItem.getRootAsOperationLogItem(ByteBuffer.wrap(bytes));
         assertEquals(Operation.ChangeInvisibleDurationOperation, operationLogItem.operationType());
 

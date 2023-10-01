@@ -17,35 +17,51 @@
 
 package com.automq.rocketmq.store.service;
 
-import com.automq.rocketmq.common.model.FlatMessageExt;
+import com.automq.rocketmq.common.config.StoreConfig;
+import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.metadata.StoreMetadataService;
+import com.automq.rocketmq.store.MemoryMessageStateMachine;
+import com.automq.rocketmq.store.StreamTopicQueue;
+import com.automq.rocketmq.store.api.MessageStateMachine;
 import com.automq.rocketmq.store.api.StreamStore;
+import com.automq.rocketmq.store.api.TopicQueue;
+import com.automq.rocketmq.store.api.TopicQueueManager;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.mock.MockStoreMetadataService;
 import com.automq.rocketmq.store.mock.MockStreamStore;
-import com.automq.rocketmq.store.model.stream.SingleRecord;
+import com.automq.rocketmq.store.model.message.Filter;
+import com.automq.rocketmq.store.model.message.PopResult;
+import com.automq.rocketmq.store.model.message.PullResult;
 import com.automq.rocketmq.store.service.api.KVService;
-import com.automq.rocketmq.store.util.FlatMessageUtil;
 import com.automq.rocketmq.store.util.SerializeUtil;
-import com.automq.stream.api.FetchResult;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import static com.automq.rocketmq.store.mock.MockMessageUtil.buildMessage;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 class ReviveServiceTest {
     private static final String PATH = "/tmp/test_revive_service/";
     protected static final String KV_NAMESPACE_CHECK_POINT = "check_point";
     protected static final String KV_NAMESPACE_TIMER_TAG = "timer_tag";
 
+    private static final long TOPIC_ID = 1313;
+    private static final int QUEUE_ID = 13;
+    private static final long CONSUMER_GROUP_ID = 131313;
+
+
     private KVService kvService;
     private StoreMetadataService metadataService;
     private StreamStore streamStore;
     private InflightService inflightService;
     private ReviveService reviveService;
+    private MessageStateMachine stateMachine;
+    private TopicQueue topicQueue;
 
     @BeforeEach
     public void setUp() throws StoreException {
@@ -53,7 +69,15 @@ class ReviveServiceTest {
         metadataService = new MockStoreMetadataService();
         streamStore = new MockStreamStore();
         inflightService = new InflightService();
-        reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, KV_NAMESPACE_TIMER_TAG, kvService, metadataService, inflightService, streamStore);
+        streamStore = new MockStreamStore();
+        stateMachine = new MemoryMessageStateMachine(TOPIC_ID, QUEUE_ID, kvService);
+        inflightService = new InflightService();
+        topicQueue = new StreamTopicQueue(new StoreConfig(), TOPIC_ID, QUEUE_ID, metadataService, stateMachine,
+            streamStore, inflightService);
+        TopicQueueManager manager = Mockito.mock(TopicQueueManager.class);
+        Mockito.when(manager.get(TOPIC_ID, QUEUE_ID)).thenReturn(topicQueue);
+        reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, KV_NAMESPACE_TIMER_TAG, kvService, metadataService, inflightService, manager);
+        topicQueue.open();
     }
 
     @AfterEach
@@ -64,63 +88,31 @@ class ReviveServiceTest {
     @Test
     void tryRevive() throws StoreException {
         // Append mock message.
-        long streamId = metadataService.getStreamId(32, 32);
-        streamStore.append(streamId, new SingleRecord(buildMessage(32, 32, ""))).join();
+        FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
+        topicQueue.put(message).join();
 
-        // Append mock check point and timer tag.
-        kvService.put(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(32, 32, 0, Long.MAX_VALUE), new byte[0]);
-        kvService.put(KV_NAMESPACE_TIMER_TAG, SerializeUtil.buildTimerTagKey(0, 32, 32, 0, Long.MAX_VALUE),
-            SerializeUtil.buildTimerTagValue(0, 32, 32, 32, streamId, 0, Long.MAX_VALUE));
-        inflightService.increaseInflightCount(32, 32, 32, 1);
-
-        kvService.put(KV_NAMESPACE_TIMER_TAG, SerializeUtil.buildTimerTagKey(Long.MAX_VALUE, 0, 0, 0, 0),
-            SerializeUtil.buildTimerTagValue(Long.MAX_VALUE, 0, 0, 0, 0, 0, 0));
-        inflightService.increaseInflightCount(0, 0, 0, 1);
-
+        // pop message
+        PopResult popResult = topicQueue.popNormal(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 1000).join();
+        assertEquals(1, popResult.messageList().size());
+        // check ck exist
+        byte[] ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, 0, popResult.operationId()));
+        assertNotNull(ckValue);
+        // now revive but can't clear ck
         reviveService.tryRevive();
-
-        assertEquals(1, inflightService.getInflightCount(0, 0, 0));
-
-        long retryStreamId = metadataService.getRetryStreamId(32, 32, 32);
-        FetchResult fetchResult = streamStore.fetch(retryStreamId, 0, 100).join();
-        assertEquals(1, fetchResult.recordBatchList().size());
-
-        FlatMessageExt messageExt = FlatMessageUtil.transferToMessageExt(fetchResult.recordBatchList().get(0));
-        assertEquals(1, messageExt.reconsumeCount());
-        assertEquals(32, messageExt.message().topicId());
-        assertEquals(32, messageExt.message().queueId());
-        assertEquals(0, messageExt.offset());
-
-        AtomicInteger checkPointCount = new AtomicInteger();
-        kvService.iterate(KV_NAMESPACE_CHECK_POINT, (key, value) -> checkPointCount.getAndIncrement());
-        assertEquals(0, checkPointCount.get());
-
-        AtomicInteger timerTagCount = new AtomicInteger();
-        kvService.iterate(KV_NAMESPACE_TIMER_TAG, (key, value) -> timerTagCount.getAndIncrement());
-        assertEquals(1, timerTagCount.get());
-
-        // Append timer tag of retry message.
-        long nextVisibleTimestamp = System.currentTimeMillis() - 100;
-        kvService.put(KV_NAMESPACE_TIMER_TAG, SerializeUtil.buildTimerTagKey(nextVisibleTimestamp, 32, 32, 0, Long.MAX_VALUE),
-            SerializeUtil.buildTimerTagValue(nextVisibleTimestamp, 32, 32, 32, retryStreamId, 0, Long.MAX_VALUE));
-        inflightService.increaseInflightCount(32, 32, 32, 1);
-
+        ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, 0, popResult.operationId()));
+        assertNotNull(ckValue);
+        // after 1s revive can clear ck
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            Assertions.assertNull(e);
+        }
         reviveService.tryRevive();
+        ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, 0, popResult.operationId()));
+        assertNull(ckValue);
 
-        assertEquals(1, inflightService.getInflightCount(0, 0, 0));
-
-        long deadLetterStreamId = metadataService.getDeadLetterStreamId(32, 32, 32);
-        fetchResult = streamStore.fetch(deadLetterStreamId, 0, 100).join();
-        assertEquals(1, fetchResult.recordBatchList().size());
-
-        messageExt = FlatMessageUtil.transferToMessageExt(fetchResult.recordBatchList().get(0));
-        assertEquals(2, messageExt.reconsumeCount());
-        assertEquals(32, messageExt.message().topicId());
-        assertEquals(32, messageExt.message().queueId());
-        assertEquals(0, messageExt.offset());
-
-        timerTagCount.set(0);
-        kvService.iterate(KV_NAMESPACE_TIMER_TAG, (key, value) -> timerTagCount.incrementAndGet());
-        assertEquals(1, timerTagCount.get());
+        // check if this message has been appended to retry stream
+        PullResult retryPullResult = topicQueue.pullRetry(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 0, 100).join();
+        assertEquals(1, retryPullResult.messageList().size());
     }
 }

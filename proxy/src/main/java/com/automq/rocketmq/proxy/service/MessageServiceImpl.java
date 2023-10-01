@@ -135,6 +135,65 @@ public class MessageServiceImpl implements MessageService {
         throw new UnsupportedOperationException();
     }
 
+    private CompletableFuture<Void> popSpecifiedQueueUnsafe(long consumerGroupId, long topicId, int queueId,
+        Filter filter, int batchSize, boolean fifo, long invisibleDuration, List<FlatMessageExt> messageList) {
+        long offset = metadataService.queryConsumerOffset(consumerGroupId, topicId, queueId);
+
+        boolean retryPriority = !fifo && CommonUtil.applyPercentage(config.retryPriorityPercentage());
+
+        // TODO: acquire lock if pop orderly.
+        // Assume the variable retryPriority is false, so try to pop origin messages first.
+        CompletableFuture<List<FlatMessageExt>> popFuture = store.pop(consumerGroupId, topicId, queueId, offset, filter, batchSize, fifo, retryPriority, invisibleDuration)
+            .thenApply(popResult -> {
+                // Advance consumer offset for origin topic.
+                List<FlatMessageExt> resultList = popResult.messageList();
+//                if (!resultList.isEmpty()) {
+//                    FlatMessageExt lastMessage = resultList.get(resultList.size() - 1);
+//                    metadataService.updateConsumerOffset(consumerGroupId, topicId, queueId, lastMessage.offset() + 1, retryPriority);
+//                }
+                // Add all messages popped from origin topic into result list.
+                messageList.addAll(resultList);
+                return resultList;
+            });
+
+        // There is no retry message when pop orderly. So that return origin messages directly.
+        if (fifo) {
+            return popFuture.thenAccept(resultMessageList -> {
+            });
+        }
+
+        // Try to pop retry messages.
+        return popFuture.thenCompose(resultMessageList -> {
+            if (resultMessageList.size() < batchSize) {
+                return store.pop(consumerGroupId, topicId, queueId, offset, filter, batchSize - resultMessageList.size(), false, !retryPriority, invisibleDuration)
+                    .thenApply(com.automq.rocketmq.store.model.message.PopResult::messageList);
+            }
+            return CompletableFuture.completedFuture(new ArrayList<FlatMessageExt>());
+        }).thenAccept(resultMessageList -> {
+            // Advance consumer offset for retry topic.
+//            if (!resultMessageList.isEmpty()) {
+//                FlatMessageExt lastMessage = resultMessageList.get(resultMessageList.size() - 1);
+//                metadataService.updateConsumerOffset(consumerGroupId, topicId, queueId, lastMessage.offset() + 1, !retryPriority);
+//            }
+            // Add all messages popped from retry topic into result list.
+            messageList.addAll(resultMessageList);
+        });
+    }
+
+    private CompletableFuture<Void> popSpecifiedQueue(long consumerGroupId, String clientId, long topicId, int queueId,
+        Filter filter, int batchSize, boolean fifo, long invisibleDuration, List<FlatMessageExt> messageList) {
+        if (lockService.tryLock(topicId, queueId, clientId, fifo)) {
+            return popSpecifiedQueueUnsafe(consumerGroupId, topicId, queueId, filter, batchSize, fifo, invisibleDuration, messageList)
+                .orTimeout(invisibleDuration, TimeUnit.NANOSECONDS)
+                .whenComplete((v, throwable) -> {
+                    // TODO: log exception.
+                    // Release lock since complete or timeout.
+                    lockService.release(topicId, queueId);
+                });
+        }
+        return CompletableFuture.completedFuture(null);
+    }
+
     @Override
     public CompletableFuture<PopResult> popMessage(ProxyContext ctx, AddressableMessageQueue messageQueue,
         PopMessageRequestHeader requestHeader, long timeoutMillis) {
@@ -281,94 +340,5 @@ public class MessageServiceImpl implements MessageService {
     public CompletableFuture<Void> requestOneway(ProxyContext ctx, String brokerName, RemotingCommand request,
         long timeoutMillis) {
         throw new UnsupportedOperationException();
-    }
-
-    private CompletableFuture<Void> popSpecifiedQueueUnsafe(long consumerGroupId, long topicId, int queueId,
-        Filter filter, int batchSize, boolean fifo, long invisibleDuration, List<FlatMessageExt> messageList) {
-        long offset = metadataService.queryConsumerOffset(consumerGroupId, topicId, queueId);
-
-        boolean retryPriority = !fifo && CommonUtil.applyPercentage(config.retryPriorityPercentage());
-
-        // TODO: acquire lock if pop orderly.
-        // Assume the variable retryPriority is false, so try to pop origin messages first.
-        CompletableFuture<List<FlatMessageExt>> popFuture = store.pop(consumerGroupId, topicId, queueId, offset, filter, batchSize, fifo, retryPriority, invisibleDuration)
-            .thenApply(popResult -> {
-                // Advance consumer offset for origin topic.
-                List<FlatMessageExt> resultList = popResult.messageList();
-                if (!resultList.isEmpty()) {
-                    FlatMessageExt lastMessage = resultList.get(resultList.size() - 1);
-                    metadataService.updateConsumerOffset(consumerGroupId, topicId, queueId, lastMessage.offset() + 1, retryPriority);
-                }
-                // Add all messages popped from origin topic into result list.
-                messageList.addAll(resultList);
-                return resultList;
-            });
-
-        // There is no retry message when pop orderly. So that return origin messages directly.
-        if (fifo) {
-            return popFuture.thenAccept(resultMessageList -> {
-            });
-        }
-
-        // Try to pop retry messages.
-        return popFuture.thenCompose(resultMessageList -> {
-            if (resultMessageList.size() < batchSize) {
-                return store.pop(consumerGroupId, topicId, queueId, offset, filter, batchSize - resultMessageList.size(), false, !retryPriority, invisibleDuration)
-                    .thenApply(com.automq.rocketmq.store.model.message.PopResult::messageList);
-            }
-            return CompletableFuture.completedFuture(new ArrayList<FlatMessageExt>());
-        }).thenAccept(resultMessageList -> {
-            // Advance consumer offset for retry topic.
-            if (!resultMessageList.isEmpty()) {
-                FlatMessageExt lastMessage = resultMessageList.get(resultMessageList.size() - 1);
-                metadataService.updateConsumerOffset(consumerGroupId, topicId, queueId, lastMessage.offset() + 1, !retryPriority);
-            }
-            // Add all messages popped from retry topic into result list.
-            messageList.addAll(resultMessageList);
-        });
-    }
-
-    private CompletableFuture<Void> popSpecifiedQueue(long consumerGroupId, String clientId, long topicId, int queueId,
-        Filter filter, int batchSize, boolean fifo, long invisibleDuration, List<FlatMessageExt> messageList) {
-        if (lockService.tryLock(topicId, queueId, clientId, fifo)) {
-            return popSpecifiedQueueUnsafe(consumerGroupId, topicId, queueId, filter, batchSize, fifo, invisibleDuration, messageList)
-                .orTimeout(invisibleDuration, TimeUnit.NANOSECONDS)
-                .whenComplete((v, throwable) -> {
-                    // TODO: log exception.
-                    // Release lock since complete or timeout.
-                    lockService.release(topicId, queueId);
-                });
-        }
-        return CompletableFuture.completedFuture(null);
-    }
-
-    private CompletableFuture<Topic> topicOf(String topicName) {
-        CompletableFuture<Topic> topicFuture = metadataService.topicOf(topicName);
-
-        return topicFuture.exceptionally(throwable -> {
-            Throwable t = ExceptionUtils.getRealException(throwable);
-            if (t instanceof ControllerException controllerException) {
-                if (controllerException.getErrorCode() == Code.NOT_FOUND.ordinal()) {
-                    throw new CompletionException(new MQBrokerException(ResponseCode.TOPIC_NOT_EXIST, "Topic not exist"));
-                }
-            }
-            // Rethrow other exceptions.
-            throw new CompletionException(t);
-        });
-    }
-
-    private CompletableFuture<ConsumerGroup> consumerGroupOf(String groupName) {
-        CompletableFuture<ConsumerGroup> groupFuture = metadataService.consumerGroupOf(groupName);
-
-        return groupFuture.exceptionally(throwable -> {
-            Throwable t = ExceptionUtils.getRealException(throwable);
-            if (t instanceof ControllerException controllerException) {
-                if (controllerException.getErrorCode() == Code.NOT_FOUND.ordinal()) {
-                    throw new CompletionException(new MQBrokerException(ResponseCode.SUBSCRIPTION_GROUP_NOT_EXIST, "Consumer group not found"));
-                }
-            }
-            // Rethrow other exceptions.
-            throw new CompletionException(t);
-        });
     }
 }

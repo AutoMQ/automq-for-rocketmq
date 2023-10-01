@@ -15,17 +15,16 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.store.model.message;
+package com.automq.rocketmq.store.model.operation;
 
-import com.automq.rocketmq.common.model.FlatMessageExt;
-import java.util.List;
+public interface Operation {
 
-public record PopResult(Status status, long operationId, long deliveryTimestamp, List<FlatMessageExt> messageList) {
-    public enum Status {
-        FOUND,
-        NOT_FOUND,
-        END_OF_QUEUE,
-        LOCKED,
-        ERROR
+    OperationType getOperationType();
+
+    enum OperationType {
+        POP,
+        ACK,
+        CHANGE_INVISIBLE_DURATION,
+        SNAPSHOT
     }
 }

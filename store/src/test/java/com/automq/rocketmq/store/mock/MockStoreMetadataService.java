@@ -76,17 +76,47 @@ public class MockStoreMetadataService implements StoreMetadataService {
 
     @Override
     public CompletableFuture<StreamMetadata> dataStreamOf(long topicId, int queueId) {
-        return null;
+        ByteBuffer buffer = ByteBuffer.allocate(8);
+        // Mark the stream type as origin topic.
+        buffer.putShort(0, (short) 0);
+        buffer.putShort(2, (short) topicId);
+        buffer.putShort(4, (short) queueId);
+        long id = buffer.getLong(0);
+        return CompletableFuture.completedFuture(StreamMetadata.newBuilder().setStreamId(id).build());
     }
 
     @Override
     public CompletableFuture<StreamMetadata> operationStreamOf(long topicId, int queueId) {
-        return null;
+        ByteBuffer buffer = ByteBuffer.allocate(8);
+        // Mark the stream type as operation log.
+        buffer.putShort(0, (short) 1);
+        buffer.putShort(2, (short) topicId);
+        buffer.putShort(4, (short) queueId);
+        long id = buffer.getLong(0);
+        return CompletableFuture.completedFuture(StreamMetadata.newBuilder().setStreamId(id).build());
+    }
+
+    @Override
+    public CompletableFuture<StreamMetadata> snapshotStreamOf(long topicId, int queueId) {
+        ByteBuffer buffer = ByteBuffer.allocate(8);
+        // Mark the stream type as snapshot.
+        buffer.putShort(0, (short) 4);
+        buffer.putShort(2, (short) topicId);
+        buffer.putShort(4, (short) queueId);
+        long id = buffer.getLong(0);
+        return CompletableFuture.completedFuture(StreamMetadata.newBuilder().setStreamId(id).build());
     }
 
     @Override
     public CompletableFuture<StreamMetadata> retryStreamOf(long consumerGroupId, long topicId, int queueId) {
-        return null;
+        ByteBuffer buffer = ByteBuffer.allocate(8);
+        // Mark the stream type as retry topic.
+        buffer.putShort(0, (short) 2);
+        buffer.putShort(2, (short) consumerGroupId);
+        buffer.putShort(4, (short) topicId);
+        buffer.putShort(6, (short) queueId);
+        long id = buffer.getLong(0);
+        return CompletableFuture.completedFuture(StreamMetadata.newBuilder().setStreamId(id).build());
     }
 
     @Override
@@ -96,7 +126,7 @@ public class MockStoreMetadataService implements StoreMetadataService {
 
     @Override
     public CompletableFuture<Integer> maxDeliveryAttemptsOf(long consumerGroupId) {
-        return null;
+        return CompletableFuture.completedFuture(1);
     }
 
     @Override

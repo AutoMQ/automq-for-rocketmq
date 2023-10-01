@@ -109,6 +109,11 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
     }
 
     @Override
+    public CompletableFuture<StreamMetadata> snapshotStreamOf(long topicId, int queueId) {
+        return null;
+    }
+
+    @Override
     public CompletableFuture<StreamMetadata> retryStreamOf(long consumerGroupId, long topicId, int queueId) {
         return metadataStore.getStream(topicId, queueId, consumerGroupId, StreamRole.STREAM_ROLE_RETRY);
     }

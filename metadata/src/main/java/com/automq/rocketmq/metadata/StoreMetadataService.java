@@ -43,6 +43,8 @@ public interface StoreMetadataService {
      */
     CompletableFuture<StreamMetadata> operationStreamOf(long topicId, int queueId);
 
+    CompletableFuture<StreamMetadata> snapshotStreamOf(long topicId, int queueId);
+
     /**
      * Get the retry stream metadata of the specified message queue and consumer group.
      *

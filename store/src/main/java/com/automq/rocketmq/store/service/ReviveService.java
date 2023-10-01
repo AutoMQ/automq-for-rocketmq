@@ -19,15 +19,15 @@ package com.automq.rocketmq.store.service;
 
 import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.metadata.StoreMetadataService;
-import com.automq.rocketmq.store.api.StreamStore;
+import com.automq.rocketmq.store.api.TopicQueue;
+import com.automq.rocketmq.store.api.TopicQueueManager;
 import com.automq.rocketmq.store.exception.StoreException;
-import com.automq.rocketmq.store.model.generated.TimerTag;
-import com.automq.rocketmq.store.model.kv.BatchDeleteRequest;
-import com.automq.rocketmq.store.model.stream.SingleRecord;
+import com.automq.rocketmq.store.model.generated.CheckPoint;
+import com.automq.rocketmq.store.model.generated.ReceiptHandle;
+import com.automq.rocketmq.store.model.message.Filter;
+import com.automq.rocketmq.store.model.message.PullResult;
 import com.automq.rocketmq.store.service.api.KVService;
-import com.automq.rocketmq.store.util.FlatMessageUtil;
 import com.automq.rocketmq.store.util.SerializeUtil;
-import com.automq.stream.api.FetchResult;
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -42,16 +42,17 @@ public class ReviveService implements Runnable {
     private final KVService kvService;
     private final StoreMetadataService metadataService;
     private final InflightService inflightService;
-    private final StreamStore streamStore;
+    private final TopicQueueManager topicQueueManager;
 
     public ReviveService(String checkPointNamespace, String timerTagNamespace, KVService kvService,
-        StoreMetadataService metadataService, InflightService inflightService, StreamStore streamStore) {
+        StoreMetadataService metadataService, InflightService inflightService,
+        TopicQueueManager topicQueueManager) {
         this.checkPointNamespace = checkPointNamespace;
         this.timerTagNamespace = timerTagNamespace;
         this.kvService = kvService;
         this.metadataService = metadataService;
         this.inflightService = inflightService;
-        this.streamStore = streamStore;
+        this.topicQueueManager = topicQueueManager;
     }
 
     public String getServiceName() {
@@ -96,38 +97,49 @@ public class ReviveService implements Runnable {
         kvService.iterate(timerTagNamespace, null, start, end, (key, value) -> {
             // Fetch the origin message from stream store.
             // TODO: async revive retry message
-            TimerTag timerTag = TimerTag.getRootAsTimerTag(ByteBuffer.wrap(value));
-            // The timer tag may belong to origin topic or retry topic.
-            FetchResult result = streamStore.fetch(timerTag.streamId(), timerTag.offset(), 1).join();
-            // TODO: log exception
-            assert result.recordBatchList().size() <= 1;
-            // Message has already been deleted.
-            if (result.recordBatchList().isEmpty()) {
-                // TODO: log the probable bug.
-                System.out.println("not found message in revive");
-                return;
-            }
-
-            // Build the retry message and append it to retry stream or dead letter stream.
-            FlatMessageExt messageExt = FlatMessageUtil.transferToMessageExt(result.recordBatchList().get(0));
-            messageExt.setReconsumeCount(messageExt.reconsumeCount() + 1);
-            if (messageExt.reconsumeCount() <= metadataService.getMaxDeliveryAttempts(timerTag.consumerGroupId())) {
-                long retryStreamId = metadataService.getRetryStreamId(timerTag.consumerGroupId(), timerTag.originTopicId(), timerTag.originQueueId());
-                streamStore.append(retryStreamId, new SingleRecord(messageExt.message().getByteBuffer())).join();
-            } else {
-                long deadLetterStreamId = metadataService.getDeadLetterStreamId(timerTag.consumerGroupId(), timerTag.originTopicId(), timerTag.originQueueId());
-                streamStore.append(deadLetterStreamId, new SingleRecord(messageExt.message().getByteBuffer())).join();
-            }
-
-            // Delete checkpoint and timer tag
+            ReceiptHandle receiptHandle = ReceiptHandle.getRootAsReceiptHandle(ByteBuffer.wrap(value));
+            long consumerGroupId = receiptHandle.consumerGroupId();
+            long topicId = receiptHandle.topicId();
+            int queueId = receiptHandle.queueId();
+            long offset = receiptHandle.messageOffset();
+            long operationId = receiptHandle.operationId();
+            byte[] ckKey = SerializeUtil.buildCheckPointKey(topicId, queueId, offset, operationId);
             try {
-                BatchDeleteRequest deleteCheckPointRequest = new BatchDeleteRequest(checkPointNamespace,
-                    SerializeUtil.buildCheckPointKey(timerTag.originTopicId(), timerTag.originQueueId(), timerTag.offset(), timerTag.operationId()));
+                byte[] ckValue = kvService.get(checkPointNamespace, ckKey);
+                if (ckValue == null) {
+                    System.out.println("not found check point in revive");
+                    return;
+                }
+                CheckPoint checkPoint = SerializeUtil.decodeCheckPoint(ByteBuffer.wrap(ckValue));
+                boolean retry = checkPoint.retry();
+                TopicQueue topicQueue = topicQueueManager.get(topicId, queueId);
+                // TODO: async
+                PullResult pullResult;
+                if (retry) {
+                    pullResult = topicQueue.pullRetry(consumerGroupId, Filter.DEFAULT_FILTER, offset, 1).join();
+                } else {
+                    pullResult = topicQueue.pullNormal(consumerGroupId, Filter.DEFAULT_FILTER, offset, 1).join();
+                }
+                // TODO: log exception
+                assert pullResult.messageList().size() <= 1;
+                // Message has already been deleted.
+                if (pullResult.messageList().isEmpty()) {
+                    // TODO: log the probable bug.
+                    System.out.println("not found message in revive");
+                    return;
+                }
+                // Build the retry message and append it to retry stream or dead letter stream.
+                FlatMessageExt messageExt = pullResult.messageList().get(0);
+                messageExt.setReconsumeCount(messageExt.reconsumeCount() + 1);
+                if (!checkPoint.fifo()) {
+                    if (messageExt.reconsumeCount() <= metadataService.maxRetryTimesOf(consumerGroupId).join()) {
+                        topicQueue.putRetry(consumerGroupId, messageExt.message()).join();
+                    } else {
+                        // TODO: dead letter
+                    }
+                }
 
-                BatchDeleteRequest deleteTimerTagRequest = new BatchDeleteRequest(timerTagNamespace,
-                    SerializeUtil.buildTimerTagKey(timerTag.nextVisibleTimestamp(), timerTag.originTopicId(), timerTag.originQueueId(), timerTag.offset(), timerTag.operationId()));
-                kvService.batch(deleteCheckPointRequest, deleteTimerTagRequest);
-                inflightService.decreaseInflightCount(timerTag.consumerGroupId(), timerTag.originTopicId(), timerTag.originQueueId(), 1);
+                topicQueue.ackTimeout(SerializeUtil.encodeReceiptHandle(receiptHandle)).join();
             } catch (StoreException e) {
                 // TODO: log exception
                 System.out.println("delete timer tag failed in revive");
