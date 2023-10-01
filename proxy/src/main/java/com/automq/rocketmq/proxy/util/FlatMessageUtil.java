@@ -17,21 +17,31 @@
 
 package com.automq.rocketmq.proxy.util;
 
+import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.common.model.generated.FlatMessageT;
+import com.automq.rocketmq.common.model.generated.KeyValue;
 import com.automq.rocketmq.common.model.generated.KeyValueT;
+import com.automq.rocketmq.common.model.generated.SystemProperties;
 import com.automq.rocketmq.common.model.generated.SystemPropertiesT;
+import com.automq.rocketmq.proxy.model.VirtualQueue;
 import com.google.common.base.Strings;
 import com.google.flatbuffers.FlatBufferBuilder;
+import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.rocketmq.common.message.Message;
+import org.apache.rocketmq.common.message.MessageAccessor;
 import org.apache.rocketmq.common.message.MessageConst;
+import org.apache.rocketmq.common.message.MessageExt;
 
 /**
  * An utility class to convert RocketMQ message models to {@link FlatMessage}, and vice versa.
  */
 public class FlatMessageUtil {
-    public static FlatMessage transferFrom(long topicId, int queueId, Message rmqMessage) {
+    public static FlatMessage convertFrom(long topicId, int queueId, String storeHost, Message rmqMessage) {
         FlatMessageT flatMessageT = new FlatMessageT();
         flatMessageT.setTopicId(topicId);
         flatMessageT.setQueueId(queueId);
@@ -42,6 +52,8 @@ public class FlatMessageUtil {
         Map<String, String> properties = rmqMessage.getProperties();
 
         SystemPropertiesT systemPropertiesT = splitSystemProperties(flatMessageT, properties);
+        systemPropertiesT.setStoreTimestamp(System.currentTimeMillis());
+        systemPropertiesT.setStoreHost(storeHost);
         flatMessageT.setSystemProperties(systemPropertiesT);
 
         // The rest of the properties are user properties.
@@ -63,6 +75,52 @@ public class FlatMessageUtil {
         int root = FlatMessage.pack(builder, flatMessageT);
         builder.finish(root);
         return FlatMessage.getRootAsFlatMessage(builder.dataBuffer());
+    }
+
+    public static MessageExt convertFrom(FlatMessageExt flatMessage, String topicName) {
+        MessageExt messageExt = new MessageExt();
+
+        VirtualQueue virtualQueue = new VirtualQueue(flatMessage.message().topicId(), flatMessage.message().queueId());
+
+        messageExt.setTopic(topicName);
+        messageExt.setBrokerName(virtualQueue.brokerName());
+        // The original queue id always is 0.
+        messageExt.setQueueId(0);
+        messageExt.setQueueOffset(flatMessage.offset());
+        ByteBuffer payloadBuffer = flatMessage.message().payloadAsByteBuffer();
+
+        // Convert buffer to byte array
+        if (payloadBuffer.hasArray()) {
+            messageExt.setBody(payloadBuffer.array());
+        } else {
+            byte[] payload = new byte[payloadBuffer.remaining()];
+            payloadBuffer.get(payload);
+            messageExt.setBody(payload);
+        }
+
+        SystemProperties systemProperties = flatMessage.message().systemProperties();
+        messageExt.setBornTimestamp(systemProperties.bornTimestamp());
+        messageExt.setBornHost(new InetSocketAddress(Objects.requireNonNull(systemProperties.bornHost()), 0));
+        messageExt.setStoreTimestamp(systemProperties.storeTimestamp());
+        messageExt.setStoreHost(new InetSocketAddress(Objects.requireNonNull(systemProperties.storeHost()), 0));
+        messageExt.setMsgId(systemProperties.messageId());
+        messageExt.setReconsumeTimes(systemProperties.deliveryAttempt());
+
+        KeyValue.Vector propertiesVector = flatMessage.message().userPropertiesVector();
+        for (int i = 0; i < propertiesVector.length(); i++) {
+            KeyValue keyValue = propertiesVector.get(i);
+            messageExt.putUserProperty(keyValue.key(), keyValue.value());
+        }
+
+        fillSystemProperties(messageExt, flatMessage);
+
+        return messageExt;
+    }
+
+    public static List<MessageExt> convertFrom(List<FlatMessageExt> messageList, String topicName) {
+        return messageList.stream()
+            .map(messageExt -> convertFrom(messageExt, topicName))
+            .toList();
     }
 
     /**
@@ -99,5 +157,14 @@ public class FlatMessageUtil {
         // TODO: Split transaction and timer properties
         // TODO: handle producer group for transaction message
         return systemPropertiesT;
+    }
+
+    private static void fillSystemProperties(MessageExt messageExt, FlatMessageExt flatMessage) {
+        SystemProperties systemProperties = flatMessage.message().systemProperties();
+        MessageAccessor.putProperty(messageExt, MessageConst.PROPERTY_POP_CK, flatMessage.receiptHandle().orElseThrow());
+        MessageAccessor.putProperty(messageExt, MessageConst.PROPERTY_TAGS, flatMessage.message().tag());
+        MessageAccessor.putProperty(messageExt, MessageConst.PROPERTY_KEYS, flatMessage.message().keys());
+        MessageAccessor.putProperty(messageExt, MessageConst.PROPERTY_SHARDING_KEY, flatMessage.message().messageGroup());
+        MessageAccessor.putProperty(messageExt, MessageConst.PROPERTY_TRACE_CONTEXT, systemProperties.traceContext());
     }
 }
