@@ -132,7 +132,7 @@ public class ReviveService implements Runnable {
                 FlatMessageExt messageExt = pullResult.messageList().get(0);
                 messageExt.setReconsumeCount(messageExt.reconsumeCount() + 1);
                 if (!checkPoint.fifo()) {
-                    if (messageExt.reconsumeCount() <= metadataService.maxRetryTimesOf(consumerGroupId).join()) {
+                    if (messageExt.reconsumeCount() <= metadataService.maxDeliveryAttemptsOf(consumerGroupId).join()) {
                         topicQueue.putRetry(consumerGroupId, messageExt.message()).join();
                     } else {
                         // TODO: dead letter
