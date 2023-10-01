@@ -90,9 +90,8 @@ class ReviveServiceTest {
         // Append mock message.
         FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
         topicQueue.put(message).join();
-
         // pop message
-        PopResult popResult = topicQueue.popNormal(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 1000).join();
+        PopResult popResult = topicQueue.popNormal(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 1000 * 1000 * 1000).join();
         assertEquals(1, popResult.messageList().size());
         // check ck exist
         byte[] ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, 0, popResult.operationId()));

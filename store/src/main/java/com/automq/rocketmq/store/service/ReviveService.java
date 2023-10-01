@@ -91,7 +91,7 @@ public class ReviveService implements Runnable {
 
     protected void tryRevive() throws StoreException {
         byte[] start = ByteBuffer.allocate(8).putLong(0).array();
-        byte[] end = ByteBuffer.allocate(8).putLong(System.currentTimeMillis() - 1).array();
+        byte[] end = ByteBuffer.allocate(8).putLong(System.nanoTime() - 1).array();
 
         // Iterate timer tag until now to find messages need to reconsume.
         kvService.iterate(timerTagNamespace, null, start, end, (key, value) -> {
