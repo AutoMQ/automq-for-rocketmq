@@ -341,4 +341,34 @@ public class MessageServiceImpl implements MessageService {
         long timeoutMillis) {
         throw new UnsupportedOperationException();
     }
+
+    private CompletableFuture<Topic> topicOf(String topicName) {
+        CompletableFuture<Topic> topicFuture = metadataService.topicOf(topicName);
+
+        return topicFuture.exceptionally(throwable -> {
+            Throwable t = ExceptionUtils.getRealException(throwable);
+            if (t instanceof ControllerException controllerException) {
+                if (controllerException.getErrorCode() == Code.NOT_FOUND.ordinal()) {
+                    throw new CompletionException(new MQBrokerException(ResponseCode.TOPIC_NOT_EXIST, "Topic not exist"));
+                }
+            }
+            // Rethrow other exceptions.
+            throw new CompletionException(t);
+        });
+    }
+
+    private CompletableFuture<ConsumerGroup> consumerGroupOf(String groupName) {
+        CompletableFuture<ConsumerGroup> groupFuture = metadataService.consumerGroupOf(groupName);
+
+        return groupFuture.exceptionally(throwable -> {
+            Throwable t = ExceptionUtils.getRealException(throwable);
+            if (t instanceof ControllerException controllerException) {
+                if (controllerException.getErrorCode() == Code.NOT_FOUND.ordinal()) {
+                    throw new CompletionException(new MQBrokerException(ResponseCode.SUBSCRIPTION_GROUP_NOT_EXIST, "Consumer group not found"));
+                }
+            }
+            // Rethrow other exceptions.
+            throw new CompletionException(t);
+        });
+    }
 }
