@@ -17,16 +17,24 @@
 
 package com.automq.rocketmq.proxy.service;
 
+import apache.rocketmq.controller.v1.ConsumerGroup;
+import apache.rocketmq.controller.v1.GroupType;
+import apache.rocketmq.controller.v1.MessageType;
+import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.metadata.ProxyMetadataService;
+import java.util.concurrent.CompletableFuture;
 import org.apache.rocketmq.common.attribute.TopicMessageType;
 import org.apache.rocketmq.proxy.common.ProxyContext;
 import org.apache.rocketmq.proxy.service.metadata.MetadataService;
 import org.apache.rocketmq.remoting.protocol.subscription.SubscriptionGroupConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Provide resource metadata service, such as topic message type, subscription group config.
  */
 public class ResourceMetadataService implements MetadataService {
+    public static final Logger LOGGER = LoggerFactory.getLogger(ResourceMetadataService.class);
     private final ProxyMetadataService metadataService;
 
     public ResourceMetadataService(ProxyMetadataService service) {
@@ -35,11 +43,50 @@ public class ResourceMetadataService implements MetadataService {
 
     @Override
     public TopicMessageType getTopicMessageType(ProxyContext ctx, String topic) {
-        return null;
+        CompletableFuture<Topic> topicFuture = metadataService.topicOf(topic);
+        try {
+            Topic topicObj = topicFuture.get();
+            if (topicObj.getAcceptMessageTypesCount() == 1) {
+                MessageType type = topicObj.getAcceptMessageTypes(0);
+                switch (type) {
+                    case NORMAL -> {
+                        return TopicMessageType.NORMAL;
+                    }
+                    case FIFO -> {
+                        return TopicMessageType.FIFO;
+                    }
+                    case DELAY -> {
+                        return TopicMessageType.DELAY;
+                    }
+                    case TRANSACTION -> {
+                        return TopicMessageType.TRANSACTION;
+                    }
+                }
+            } else {
+                LOGGER.warn("Topic {} has multiple message types, please specify only one accepted message type", topic);
+            }
+        } catch (Exception e) {
+            LOGGER.error("Failed to get topic message type for {}", topic, e);
+        }
+        return TopicMessageType.UNSPECIFIED;
     }
 
     @Override
     public SubscriptionGroupConfig getSubscriptionGroupConfig(ProxyContext ctx, String group) {
+        CompletableFuture<ConsumerGroup> groupFuture = metadataService.consumerGroupOf(group);
+        try {
+            ConsumerGroup consumerGroup = groupFuture.get();
+            SubscriptionGroupConfig groupConfig = new SubscriptionGroupConfig();
+            groupConfig.setGroupName(consumerGroup.getName());
+            if (consumerGroup.getGroupType() == GroupType.GROUP_TYPE_FIFO) {
+                groupConfig.setConsumeMessageOrderly(true);
+            }
+            groupConfig.setRetryMaxTimes(consumerGroup.getMaxDeliveryAttempt());
+            // TODO: Support exponential retry policy
+            return groupConfig;
+        } catch (Exception e) {
+            LOGGER.error("Failed to get subscription group config for {}", group, e);
+        }
         return null;
     }
 }
