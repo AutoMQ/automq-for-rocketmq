@@ -300,13 +300,15 @@ public class StreamTopicQueue extends TopicQueue {
     }
 
     @Override
-    public CompletableFuture<Void> ackTimeout(String receiptHandle) {
+    public CompletableFuture<AckResult> ackTimeout(String receiptHandle) {
         ReceiptHandle handle = decodeReceiptHandle(receiptHandle);
         AckOperation operation = new AckOperation(handle.consumerGroupId(), topicId, queueId, handle.messageOffset(), handle.operationId(),
             System.nanoTime(), AckOperation.AckOperationType.ACK_TIMEOUT);
         return operationLogService.logAckOperation(operation).thenApply(nil -> {
             inflightService.decreaseInflightCount(handle.consumerGroupId(), topicId, queueId, 1);
-            return null;
+            return new AckResult(AckResult.Status.SUCCESS);
+        }).exceptionally(throwable -> {
+            return new AckResult(AckResult.Status.ERROR);
         });
     }
 

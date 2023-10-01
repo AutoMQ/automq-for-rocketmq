@@ -69,7 +69,7 @@ public class TopicQueueTest {
         kvService = new RocksDBKVService(PATH);
         metadataService = new MockStoreMetadataService();
         streamStore = new MockStreamStore();
-        stateMachine = new MemoryMessageStateMachine(TOPIC_ID, QUEUE_ID, kvService);
+        stateMachine = new DefaultMessageStateMachine(TOPIC_ID, QUEUE_ID, kvService);
         inflightService = new InflightService();
         topicQueue = new StreamTopicQueue(new StoreConfig(), TOPIC_ID, QUEUE_ID, metadataService, stateMachine,
             streamStore, inflightService);
@@ -306,6 +306,58 @@ public class TopicQueueTest {
         assertEquals(3, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
         assertEquals(2, stateMachine.ackOffset(CONSUMER_GROUP_ID).join());
 
+    }
+
+    @Test
+    void pop_ack_timeout() throws StoreException {
+        // 1. append 5 messages
+        for (int i = 0; i < 5; i++) {
+            FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
+            topicQueue.put(message);
+        }
+
+        // 2. pop 2 messages
+        PopResult popResult = topicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 2, 100).join();
+        assertEquals(PopResult.Status.FOUND, popResult.status());
+        assertEquals(2, popResult.messageList().size());
+        assertEquals(2, topicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
+        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
+        String receiptHandle0 = popResult.messageList().get(0).receiptHandle().get();
+        String receiptHandle1 = popResult.messageList().get(1).receiptHandle().get();
+
+        // 3. pop 1 message
+        popResult = topicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
+        assertEquals(PopResult.Status.LOCKED, popResult.status());
+
+        // 3. ack 1 message
+        AckResult ackResult = topicQueue.ack(receiptHandle0).join();
+        assertEquals(AckResult.Status.SUCCESS, ackResult.status());
+        assertEquals(1, topicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
+        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(1, stateMachine.ackOffset(CONSUMER_GROUP_ID).join());
+
+        // 4. check ck
+        byte[] bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, 0, popResult.operationId()));
+        assertNull(bytes);
+
+        // 5. pop 1 message
+        popResult = topicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
+        assertEquals(PopResult.Status.LOCKED, popResult.status());
+
+        // 6. ack 1 message with timeout
+        ackResult = topicQueue.ackTimeout(receiptHandle1).join();
+        assertEquals(AckResult.Status.SUCCESS, ackResult.status());
+        assertEquals(0, topicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
+        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(1, stateMachine.ackOffset(CONSUMER_GROUP_ID).join());
+
+        // 7. pop 1 message
+        popResult = topicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
+        assertEquals(PopResult.Status.FOUND, popResult.status());
+        assertEquals(1, popResult.messageList().size());
+        assertEquals(1, topicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
+        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(1, stateMachine.ackOffset(CONSUMER_GROUP_ID).join());
     }
 
     @Test
