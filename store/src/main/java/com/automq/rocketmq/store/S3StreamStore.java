@@ -124,6 +124,12 @@ public class S3StreamStore implements StreamStore {
         this.streamClient.shutdown();
     }
 
+    @Override
+    public CompletableFuture<Void> open(long streamId) {
+        openStream(streamId);
+        return CompletableFuture.completedFuture(null);
+    }
+
     /**
      * Open the specified stream if not opened yet.
      *

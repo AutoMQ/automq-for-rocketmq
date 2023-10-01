@@ -30,6 +30,8 @@ public class StoreConfig {
     // Default is 10s, unit in nanoseconds
     private long maxFetchTimeNanos = 10L * 1000 * 1000_000;
 
+    private int fetchBatchSizeFactor = 2;
+
     // Used for storing KV data based on RocksDB
     private String kvPath = "/tmp/rocketmq/kvstore";
 
@@ -43,6 +45,10 @@ public class StoreConfig {
 
     public long maxFetchTimeNanos() {
         return maxFetchTimeNanos;
+    }
+
+    public int fetchBatchSizeFactor() {
+        return fetchBatchSizeFactor;
     }
 
     public String kvPath() {

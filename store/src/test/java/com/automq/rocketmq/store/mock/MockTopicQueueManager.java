@@ -15,17 +15,28 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.store.model.message;
+package com.automq.rocketmq.store.mock;
 
-import com.automq.rocketmq.common.model.FlatMessageExt;
-import java.util.List;
+import com.automq.rocketmq.common.util.Pair;
+import com.automq.rocketmq.store.api.TopicQueue;
+import com.automq.rocketmq.store.api.TopicQueueManager;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
-public record PopResult(Status status, long operationId, long deliveryTimestamp, List<FlatMessageExt> messageList) {
-    public enum Status {
-        FOUND,
-        NOT_FOUND,
-        END_OF_QUEUE,
-        LOCKED,
-        ERROR
+public class MockTopicQueueManager implements TopicQueueManager {
+    private final Map<Pair<Long, Integer>, TopicQueue> topicQueueMap;
+
+    public MockTopicQueueManager() {
+        this.topicQueueMap = new ConcurrentHashMap<>();
+    }
+
+    public MockTopicQueueManager(Map<Pair<Long, Integer>, TopicQueue> topicQueueMap) {
+        this.topicQueueMap = topicQueueMap;
+    }
+
+
+    @Override
+    public TopicQueue get(long topicId, int queueId) {
+        return topicQueueMap.get(new Pair<>(topicId, queueId));
     }
 }

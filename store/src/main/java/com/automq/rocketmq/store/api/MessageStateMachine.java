@@ -15,38 +15,35 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.store.service.api;
+package com.automq.rocketmq.store.api;
 
 import com.automq.rocketmq.store.model.operation.AckOperation;
 import com.automq.rocketmq.store.model.operation.ChangeInvisibleDurationOperation;
+import com.automq.rocketmq.store.model.operation.Operation;
+import com.automq.rocketmq.store.model.operation.OperationSnapshot;
 import com.automq.rocketmq.store.model.operation.PopOperation;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-public interface OperationLogService {
-    /**
-     * Log pop operation to WAL.
-     * Each queue has its own operation log.
-     *
-     * @return monotonic serial number
-     */
-    CompletableFuture<Long> logPopOperation(PopOperation operation);
+public interface MessageStateMachine {
 
-    /**
-     * Log ack operation to WAL.
-     * Each queue has its own operation log.
-     *
-     * @return monotonic serial number
-     */
-    CompletableFuture<Long> logAckOperation(AckOperation operation);
+    CompletableFuture<Void> replayPopOperation(PopOperation operation);
 
-    /**
-     * Log change invisible time operation to WAL.
-     * Each queue has its own operation log.
-     *
-     * @return monotonic serial number
-     */
-    CompletableFuture<Long> logChangeInvisibleDurationOperation(ChangeInvisibleDurationOperation operation);
+    CompletableFuture<Void> replayAckOperation(AckOperation operation);
 
-    CompletableFuture<Void> start();
+    CompletableFuture<Void> replayChangeInvisibleDurationOperation(ChangeInvisibleDurationOperation operation);
 
+    CompletableFuture<OperationSnapshot> takeSnapshot();
+
+    CompletableFuture<Void> loadSnapshot(OperationSnapshot snapshot);
+
+    CompletableFuture<List<Operation>> revive();
+
+    CompletableFuture<Long> consumeOffset(long consumerGroupId);
+
+    CompletableFuture<Long> ackOffset(long consumerGroupId);
+
+    CompletableFuture<Long> retryOffset(long consumerGroupId);
+
+    CompletableFuture<Boolean> isLocked(long consumerGroupId, long offset);
 }

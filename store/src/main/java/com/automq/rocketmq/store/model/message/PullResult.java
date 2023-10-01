@@ -20,12 +20,11 @@ package com.automq.rocketmq.store.model.message;
 import com.automq.rocketmq.common.model.FlatMessageExt;
 import java.util.List;
 
-public record PopResult(Status status, long operationId, long deliveryTimestamp, List<FlatMessageExt> messageList) {
+public record PullResult(Status status, long nextBeginOffset, long minOffset, long maxOffset, List<FlatMessageExt> messageList) {
     public enum Status {
         FOUND,
-        NOT_FOUND,
-        END_OF_QUEUE,
-        LOCKED,
-        ERROR
+        NO_NEW_MSG,
+        NO_MATCHED_MSG,
+        OFFSET_ILLEGAL;
     }
 }

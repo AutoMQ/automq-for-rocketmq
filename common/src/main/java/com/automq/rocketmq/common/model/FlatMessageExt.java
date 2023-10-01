@@ -94,4 +94,8 @@ public class FlatMessageExt {
     public void setReconsumeCount(int reconsumeCount) {
         message.systemProperties().mutateDeliveryAttempt(reconsumeCount);
     }
+
+    public void setReceiptHandle(String receiptHandle) {
+        this.receiptHandle = receiptHandle;
+    }
 }

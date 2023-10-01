@@ -4,26 +4,17 @@ table CheckPoint {
   topic_id:long;
   queue_id:int;
   message_offset:long;
+  count:int;
   consumer_group_id:long;
   operation_id:long;
   fifo:bool;
   retry:bool;
   delivery_timestamp:long;
   next_visible_timestamp:long;
-  reconsume_count:int;
-}
-
-table TimerTag {
-  next_visible_timestamp:long;
-  consumer_group_id:long;
-  origin_topic_id:long;
-  origin_queue_id:int;
-  stream_id:long;
-  offset:long;
-  operation_id:long;
 }
 
 table ReceiptHandle {
+  consumer_group_id:long;
   topic_id:long;
   queue_id:int;
   message_offset:long;
@@ -36,24 +27,62 @@ table OperationLogItem {
   operation:Operation;
 }
 
+enum PopOperationType:short {
+    POP_NORMAL,
+    POP_RETRY,
+    POP_ORDER
+}
+
 table PopOperation {
   consumer_group_id:long;
   topic_id:long;
   queue_id:int;
   offset:long;
-  batch_size:long;
-  fifo:bool;
+  count:int;
   invisible_duration:long;
   operation_timestamp:long;
+  retry_offset:long; // only for pop from retry stream
+  type:PopOperationType;
+}
+
+enum AckOperationType:short {
+    ACK_NORMAL,
+    ACK_TIMEOUT,
 }
 
 table AckOperation {
   receipt_handle:ReceiptHandle;
   operation_timestamp:long;
+  type:AckOperationType;
 }
 
 table ChangeInvisibleDurationOperation {
   receipt_handle:ReceiptHandle;
   invisible_duration:long;
   operation_timestamp:long;
+}
+
+table OperationSnapshot {
+  trim_offset:long;
+  pop_operations:[PopOperation];
+  ConsumerGroupMetadatas:[ConsumerGroupMetadata];
+}
+
+table ConsumerGroupMetadata {
+  consumer_group_id:long;
+  consume_offset:long;
+  ack_offset:long;
+  retry_offset:long;
+  offset_retry_times:[RetryTimes];
+  offset_consume_times:[ConsumeTimes];
+}
+
+table RetryTimes {
+  offset:long;
+  retry_times:int;
+}
+
+table ConsumeTimes {
+  offset:long;
+  consume_times:int;
 }
