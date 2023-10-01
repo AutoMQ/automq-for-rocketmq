@@ -38,6 +38,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -53,7 +54,7 @@ import static com.automq.rocketmq.store.util.SerializeUtil.buildOrderIndexValue;
 import static com.automq.rocketmq.store.util.SerializeUtil.buildReceiptHandle;
 import static com.automq.rocketmq.store.util.SerializeUtil.buildTimerTagKey;
 
-public class MemoryMessageStateMachine implements MessageStateMachine {
+public class DefaultMessageStateMachine implements MessageStateMachine {
     // TODO: concurrent protection
     private final long topicId;
     private final int queueId;
@@ -65,8 +66,8 @@ public class MemoryMessageStateMachine implements MessageStateMachine {
 
     private final KVService kvService;
 
-    public MemoryMessageStateMachine(long topicId, int queueId, KVService kvService) {
-        this.consumerGroupMetadataMap = new HashMap<>();
+    public DefaultMessageStateMachine(long topicId, int queueId, KVService kvService) {
+        this.consumerGroupMetadataMap = new ConcurrentHashMap<>();
         this.kvService = kvService;
         this.topicId = topicId;
         this.queueId = queueId;
@@ -84,7 +85,7 @@ public class MemoryMessageStateMachine implements MessageStateMachine {
         int count = operation.getCount();
         boolean fifo = operation.getPopOperationType() == PopOperation.PopOperationType.POP_ORDER;
         boolean retry = operation.getPopOperationType() == PopOperation.PopOperationType.POP_RETRY;
-
+        writeLock.lock();
         try {
             List<BatchRequest> requestList = new ArrayList<>();
             long baseOffset = offset - count + 1;
@@ -128,6 +129,8 @@ public class MemoryMessageStateMachine implements MessageStateMachine {
             kvService.batch(requestList.toArray(new BatchRequest[0]));
         } catch (StoreException e) {
             return CompletableFuture.failedFuture(e);
+        } finally {
+            writeLock.unlock();
         }
         return CompletableFuture.completedFuture(null);
     }
@@ -139,6 +142,7 @@ public class MemoryMessageStateMachine implements MessageStateMachine {
         long offset = operation.getOffset();
         long operationId = operation.getOperationId();
         AckOperation.AckOperationType type = operation.getAckOperationType();
+        writeLock.lock();
         try {
             // Check if ck exists
             byte[] ckKey = buildCheckPointKey(topicId, queueId, offset, operationId);
@@ -171,17 +175,18 @@ public class MemoryMessageStateMachine implements MessageStateMachine {
                     requestList.add(deleteOrderIndexRequest);
                 }
                 // advance ack offset
-                long consumerGroupId = ck.consumerGroupId();
-                ConsumerGroupMetadata metadata = this.consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId));
-                this.ackCommitterMap.computeIfAbsent(ck.consumerGroupId(), k -> new AckCommitter(consumerGroupId, metadata.getAckOffset())).commitAck(currOffset);
-                if (type == AckOperation.AckOperationType.ACK_TIMEOUT) {
-
+                if (type == AckOperation.AckOperationType.ACK_NORMAL || !ck.fifo()) {
+                    // only advance ack offset when ack-normal or ack-timeout but not fifo
+                    long consumerGroupId = ck.consumerGroupId();
+                    ConsumerGroupMetadata metadata = this.consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId));
+                    this.ackCommitterMap.computeIfAbsent(ck.consumerGroupId(), k -> new AckCommitter(consumerGroupId, metadata.getAckOffset())).commitAck(currOffset);
                 }
-
             }
             kvService.batch(requestList.toArray(new BatchRequest[0]));
         } catch (StoreException e) {
             return CompletableFuture.failedFuture(e);
+        } finally {
+            writeLock.unlock();
         }
         return CompletableFuture.completedFuture(null);
     }
@@ -195,6 +200,7 @@ public class MemoryMessageStateMachine implements MessageStateMachine {
         long offset = operation.getOffset();
         long operationId = operation.getOperationId();
         long nextInvisibleTimestamp = operationTimestamp + invisibleDuration;
+        writeLock.lock();
         try {
             // Check if check point exists.
             byte[] checkPointKey = buildCheckPointKey(topic, queue, offset, operationId);
@@ -220,21 +226,29 @@ public class MemoryMessageStateMachine implements MessageStateMachine {
             kvService.batch(deleteLastTimerTagRequest, writeCheckPointRequest, writeTimerTagRequest);
         } catch (StoreException e) {
             return CompletableFuture.failedFuture(e);
+        } finally {
+            writeLock.unlock();
         }
         return CompletableFuture.completedFuture(null);
     }
 
     @Override
     public CompletableFuture<OperationSnapshot> takeSnapshot() {
+
         return null;
     }
 
     @Override
     public CompletableFuture<Void> loadSnapshot(OperationSnapshot snapshot) {
-        this.consumerGroupMetadataMap = snapshot.getConsumerGroupMetadataList().stream().collect(Collectors.toMap(
-            ConsumerGroupMetadata::getConsumerGroupId, metadata -> metadata));
-        List<CompletableFuture<Void>> replayAllCfs = snapshot.getPopOperations().stream().map(this::replayPopOperation).collect(Collectors.toList());
-        return CompletableFuture.allOf(replayAllCfs.toArray(new CompletableFuture[0]));
+        writeLock.lock();
+        try {
+            this.consumerGroupMetadataMap = snapshot.getConsumerGroupMetadataList().stream().collect(Collectors.toMap(
+                ConsumerGroupMetadata::getConsumerGroupId, metadata -> metadata));
+            List<CompletableFuture<Void>> replayAllCfs = snapshot.getPopOperations().stream().map(this::replayPopOperation).collect(Collectors.toList());
+            return CompletableFuture.allOf(replayAllCfs.toArray(new CompletableFuture[0]));
+        } finally {
+            writeLock.unlock();
+        }
     }
 
     @Override
@@ -259,11 +273,14 @@ public class MemoryMessageStateMachine implements MessageStateMachine {
 
     @Override
     public CompletableFuture<Boolean> isLocked(long consumerGroupId, long offset) {
-        byte[] lockKey = buildOrderIndexKey(consumerGroupId, topicId, queueId, offset);
+        readLock.lock();
         try {
+            byte[] lockKey = buildOrderIndexKey(consumerGroupId, topicId, queueId, offset);
             return CompletableFuture.completedFuture(kvService.get(KV_NAMESPACE_FIFO_INDEX, lockKey) != null);
         } catch (StoreException e) {
             return CompletableFuture.failedFuture(e);
+        } finally {
+            readLock.unlock();
         }
     }
 
@@ -291,7 +308,7 @@ public class MemoryMessageStateMachine implements MessageStateMachine {
                     advance = true;
                 }
                 if (advance) {
-                    MemoryMessageStateMachine.this.consumerGroupMetadataMap
+                    DefaultMessageStateMachine.this.consumerGroupMetadataMap
                         .computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId))
                         .setAckOffset(ackOffset);
                     if (ackOffset - baseOffset >= BIT_SET_SIZE * BIT_SET_LOAD_FACTOR) {

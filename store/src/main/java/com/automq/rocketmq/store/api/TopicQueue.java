@@ -64,7 +64,7 @@ public abstract class TopicQueue {
 
     public abstract CompletableFuture<AckResult> ack(String receiptHandle);
 
-    public abstract CompletableFuture<Void> ackTimeout(String receiptHandle);
+    public abstract CompletableFuture<AckResult> ackTimeout(String receiptHandle);
 
     public abstract CompletableFuture<ChangeInvisibleDurationResult> changeInvisibleDuration(String receiptHandle,
         long invisibleDuration);
