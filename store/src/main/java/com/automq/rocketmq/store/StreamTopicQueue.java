@@ -168,7 +168,7 @@ public class StreamTopicQueue extends TopicQueue {
             fetchBatchSize = batchSize;
         }
         List<FlatMessageExt> messageList = new ArrayList<>();
-        long operationTimestamp = System.currentTimeMillis();
+        long operationTimestamp = System.nanoTime();
         CompletableFuture<List<FlatMessageExt>> fetchCf = fetchAndFilterMessages(streamId, startOffset, batchSize,
             fetchBatchSize, filter, messageList, 0, 0, operationTimestamp);
         CompletableFuture<Void> appendOpCf = fetchCf.thenCompose(messageExtList -> {

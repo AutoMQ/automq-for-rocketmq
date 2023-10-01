@@ -409,7 +409,9 @@ public class TopicQueueTest {
         topicQueue.put(message);
 
         // 2. pop message
+        long popStartTimestamp = System.nanoTime();
         PopResult popResult = topicQueue.popNormal(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
+        long popEndTimestamp = System.nanoTime();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertFalse(popResult.messageList().isEmpty());
         assertEquals(1, topicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
@@ -420,14 +422,16 @@ public class TopicQueueTest {
 
         CheckPoint checkPoint = CheckPoint.getRootAsCheckPoint(ByteBuffer.wrap(bytes));
 
-        long popEndTimestamp = System.nanoTime();
         long lastVisibleTime = checkPoint.nextVisibleTimestamp();
-        assertTrue(popEndTimestamp + 100 > checkPoint.nextVisibleTimestamp());
+        assertTrue(popStartTimestamp + 100 <= checkPoint.nextVisibleTimestamp());
+        assertTrue(popEndTimestamp + 100 >= checkPoint.nextVisibleTimestamp());
 
         // 3. change invisible duration.
         FlatMessageExt messageExt = popResult.messageList().get(0);
         String receiptHandle = SerializeUtil.encodeReceiptHandle(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, messageExt.offset(), popResult.operationId());
+        long changeStartTimestamp = System.nanoTime();
         topicQueue.changeInvisibleDuration(receiptHandle, 1000L).join();
+        long changeEndTimestamp = System.nanoTime();
         assertEquals(1, topicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
 
         bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, checkPointKey);
@@ -435,8 +439,8 @@ public class TopicQueueTest {
 
         checkPoint = CheckPoint.getRootAsCheckPoint(ByteBuffer.wrap(bytes));
 
-        assertTrue(lastVisibleTime < checkPoint.nextVisibleTimestamp());
-        assertTrue(popEndTimestamp + 100 < checkPoint.nextVisibleTimestamp());
+        assertTrue(changeStartTimestamp + 1000 <= checkPoint.nextVisibleTimestamp());
+        assertTrue(changeEndTimestamp + 1000 >= checkPoint.nextVisibleTimestamp());
     }
 
 }
