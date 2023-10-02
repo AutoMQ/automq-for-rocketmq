@@ -40,7 +40,7 @@ class MessageUtilTest {
         assertNotNull(messageExt);
         assertNotNull(messageExt.message());
         assertEquals(100, messageExt.offset());
-        assertEquals(0, messageExt.deliveryAttempts());
+        assertEquals(1, messageExt.deliveryAttempts());
         assertFalse(messageExt.receiptHandle().isPresent());
     }
 }

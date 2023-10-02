@@ -34,12 +34,16 @@ import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.service.InflightService;
 import com.automq.rocketmq.store.service.ReviveService;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import static com.automq.rocketmq.store.util.SerializeUtil.decodeReceiptHandle;
 
 public class MessageStoreImpl implements MessageStore {
     public static final String KV_NAMESPACE_CHECK_POINT = "check_point";
     public static final String KV_NAMESPACE_TIMER_TAG = "timer_tag";
     public static final String KV_NAMESPACE_FIFO_INDEX = "fifo_index";
+
+    private final AtomicBoolean started = new AtomicBoolean(false);
 
     StoreConfig config;
 
@@ -59,11 +63,23 @@ public class MessageStoreImpl implements MessageStore {
         this.metadataService = metadataService;
         this.kvService = kvService;
         this.topicQueueManager = topicQueueManager;
+        this.reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, KV_NAMESPACE_TIMER_TAG, kvService, metadataService, inflightService, topicQueueManager);
     }
 
-    public void startReviveService() {
-        reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, KV_NAMESPACE_TIMER_TAG, kvService, metadataService, inflightService, topicQueueManager);
+    @Override
+    public void start() throws Exception {
+        if (!started.compareAndSet(false, true)) {
+            return;
+        }
         reviveService.start();
+    }
+
+    @Override
+    public void shutdown() throws Exception {
+        if (!started.compareAndSet(true, false)) {
+            return;
+        }
+        reviveService.shutdown();
     }
 
     @Override

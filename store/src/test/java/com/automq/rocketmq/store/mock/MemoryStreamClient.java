@@ -90,11 +90,7 @@ public class MemoryStreamClient implements StreamClient {
 
         @Override
         public CompletableFuture<FetchResult> fetch(long startOffset, long endOffset, int maxBytesHint) {
-            Long floorKey = recordMap.floorKey(startOffset);
-            if (floorKey == null) {
-                return CompletableFuture.completedFuture(ArrayList::new);
-            }
-            List<RecordBatchWithContext> records = new ArrayList<>(recordMap.subMap(floorKey, endOffset).values());
+            List<RecordBatchWithContext> records = new ArrayList<>(recordMap.subMap(startOffset, endOffset).values());
             return CompletableFuture.completedFuture(() -> records);
         }
 
