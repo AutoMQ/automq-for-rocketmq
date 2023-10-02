@@ -103,7 +103,8 @@ public class PopOperation implements Operation {
     public enum PopOperationType {
         POP_NORMAL,
         POP_RETRY,
-        POP_ORDER
+        POP_ORDER,
+        POP_LAST
     }
 
 }

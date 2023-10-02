@@ -485,10 +485,14 @@ public class TopicQueueTest {
         assertEquals(2, popMessageList.size());
         popResult.messageList().forEach(messageExt -> assertEquals("TagB", messageExt.message().tag()));
         assertEquals(2, topicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
-        assertEquals(7, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(9, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
+
+        // 2. append 1 message with TagB
+        FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagB"));
+        topicQueue.put(message);
 
         // 2. pop fifo again
-        popResult = topicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
+        popResult = topicQueue.popFifo(CONSUMER_GROUP_ID, new TagFilter("TagB"), 1, 100).join();
         assertEquals(PopResult.Status.LOCKED, popResult.status());
 
         // 3. ack second message in result
@@ -497,20 +501,20 @@ public class TopicQueueTest {
         assertEquals(0, stateMachine.ackOffset(CONSUMER_GROUP_ID).join());
 
         // 4. pop fifo again
-        popResult = topicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
+        popResult = topicQueue.popFifo(CONSUMER_GROUP_ID, new TagFilter("TagB"), 1, 100).join();
         assertEquals(PopResult.Status.LOCKED, popResult.status());
 
         // 5. ack first message in result
         ackResult = topicQueue.ack(popMessageList.get(0).receiptHandle().get()).join();
         assertEquals(AckResult.Status.SUCCESS, ackResult.status());
-        assertEquals(7, stateMachine.ackOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(9, stateMachine.ackOffset(CONSUMER_GROUP_ID).join());
 
         // 6. pop fifo again
-        popResult = topicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
+        popResult = topicQueue.popFifo(CONSUMER_GROUP_ID, new TagFilter("TagB"), 1, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(1, popResult.messageList().size());
         assertEquals(1, topicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
-        assertEquals(8, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(10, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
     }
 
     @Test

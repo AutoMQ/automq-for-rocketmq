@@ -87,6 +87,25 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
         boolean retry = operation.getPopOperationType() == PopOperation.PopOperationType.POP_RETRY;
         writeLock.lock();
         try {
+            // update consume offset
+            ConsumerGroupMetadata metadata = this.consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId));
+            if (metadata.getConsumeOffset() < offset + 1) {
+                metadata.setConsumeOffset(offset + 1);
+            }
+            if (operation.getPopOperationType() == PopOperation.PopOperationType.POP_LAST) {
+                // TODO: handle this case with a separate operation type, now just handle it here
+                // if this is a pop-last operation, it only needs to update consume offset and advance ack offset
+                long baseOffset = offset - count + 1;
+                for (int i = 0; i < count; i++) {
+                    long currOffset = baseOffset + i;
+                    this.ackCommitterMap.computeIfAbsent(consumerGroupId, k -> new AckCommitter(consumerGroupId, metadata.getAckOffset())).commitAck(currOffset);
+                }
+                return CompletableFuture.completedFuture(null);
+            }
+            // add consume times
+            int consumeTimes = metadata.getConsumeTimesMap().getOrDefault(offset, 0) + 1;
+            metadata.getConsumeTimesMap().put(offset, consumeTimes);
+
             List<BatchRequest> requestList = new ArrayList<>();
             // write a ck for this offset
             BatchWriteRequest writeCheckPointRequest = new BatchWriteRequest(KV_NAMESPACE_CHECK_POINT,
@@ -100,14 +119,6 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
                 buildTimerTagKey(nextVisibleTimestamp, topicId, queueId, offset, operationId),
                 buildReceiptHandle(consumerGroupId, topicId, queueId, offset, operationId));
             requestList.add(writeTimerTagRequest);
-
-            // add consume count and consume offset
-            ConsumerGroupMetadata metadata = this.consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId));
-            int consumeTimes = metadata.getConsumeTimesMap().getOrDefault(offset, 0) + 1;
-            metadata.getConsumeTimesMap().put(offset, consumeTimes);
-            if (metadata.getConsumeOffset() < offset + 1) {
-                metadata.setConsumeOffset(offset + 1);
-            }
 
             // if this message is orderly, write order index for each offset in this operation to KV service
             if (fifo) {
