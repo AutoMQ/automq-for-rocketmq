@@ -88,44 +88,48 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
         writeLock.lock();
         try {
             List<BatchRequest> requestList = new ArrayList<>();
-            long baseOffset = offset - count + 1;
-            for (int i = 0; i < count; i++) {
-                long currOffset = baseOffset + i;
-                ConsumerGroupMetadata metadata = this.consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId));
-                int consumeTimes = metadata.getConsumeTimesMap().getOrDefault(currOffset, 0) + 1;
-                BatchWriteRequest writeCheckPointRequest = new BatchWriteRequest(KV_NAMESPACE_CHECK_POINT,
-                    buildCheckPointKey(topicId, queueId, currOffset, operationId),
-                    buildCheckPointValue(topicId, queueId, currOffset,
-                        currOffset == offset ? count : 1,
-                        consumerGroupId, operationId, fifo, retry, operationTimestamp, nextVisibleTimestamp));
-                requestList.add(writeCheckPointRequest);
+            // write a ck for this offset
+            BatchWriteRequest writeCheckPointRequest = new BatchWriteRequest(KV_NAMESPACE_CHECK_POINT,
+                buildCheckPointKey(topicId, queueId, offset, operationId),
+                buildCheckPointValue(topicId, queueId, offset,
+                    count,
+                    consumerGroupId, operationId, fifo, retry, operationTimestamp, nextVisibleTimestamp));
+            requestList.add(writeCheckPointRequest);
 
-                BatchWriteRequest writeTimerTagRequest = new BatchWriteRequest(KV_NAMESPACE_TIMER_TAG,
-                    buildTimerTagKey(nextVisibleTimestamp, topicId, queueId, currOffset, operationId),
-                    buildReceiptHandle(consumerGroupId, topicId, queueId, currOffset, operationId));
-                requestList.add(writeTimerTagRequest);
+            BatchWriteRequest writeTimerTagRequest = new BatchWriteRequest(KV_NAMESPACE_TIMER_TAG,
+                buildTimerTagKey(nextVisibleTimestamp, topicId, queueId, offset, operationId),
+                buildReceiptHandle(consumerGroupId, topicId, queueId, offset, operationId));
+            requestList.add(writeTimerTagRequest);
 
-                // add consume count and consume offset
-                metadata.getConsumeTimesMap().put(currOffset, consumeTimes);
-                if (metadata.getConsumeOffset() < currOffset + 1) {
-                    metadata.setConsumeOffset(currOffset + 1);
-                }
-                if (fifo) {
-                    // If this message is orderly, write order index to KV service.
+            // add consume count and consume offset
+            ConsumerGroupMetadata metadata = this.consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId));
+            int consumeTimes = metadata.getConsumeTimesMap().getOrDefault(offset, 0) + 1;
+            metadata.getConsumeTimesMap().put(offset, consumeTimes);
+            if (metadata.getConsumeOffset() < offset + 1) {
+                metadata.setConsumeOffset(offset + 1);
+            }
+
+            // if this message is orderly, write order index for each offset in this operation to KV service
+            if (fifo) {
+                long baseOffset = offset - count + 1;
+                for (int i = 0; i < count; i++) {
+                    long currOffset = baseOffset + i;
                     BatchWriteRequest writeOrderIndexRequest = new BatchWriteRequest(KV_NAMESPACE_FIFO_INDEX,
                         buildOrderIndexKey(consumerGroupId, topicId, queueId, currOffset), buildOrderIndexValue(operationId));
                     requestList.add(writeOrderIndexRequest);
                 }
+            }
 
-                if (retry) {
-                    // Advance offset of retry stream
-                    long currRetryOffset = metadata.getRetryOffset();
-                    long newRetryOffset = operation.getRetryOffset();
-                    if (newRetryOffset + 1 > currRetryOffset) {
-                        metadata.setRetryOffset(newRetryOffset + 1);
-                    }
+            // if this message is retry, advance retry offset
+            if (retry) {
+                // advance offset of retry stream
+                long currRetryOffset = metadata.getRetryOffset();
+                long newRetryOffset = operation.getRetryOffset();
+                if (newRetryOffset + 1 > currRetryOffset) {
+                    metadata.setRetryOffset(newRetryOffset + 1);
                 }
             }
+
             kvService.batch(requestList.toArray(new BatchRequest[0]));
         } catch (StoreException e) {
             return CompletableFuture.failedFuture(e);
@@ -144,7 +148,7 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
         AckOperation.AckOperationType type = operation.getAckOperationType();
         writeLock.lock();
         try {
-            // Check if ck exists
+            // check if ck exists
             byte[] ckKey = buildCheckPointKey(topicId, queueId, offset, operationId);
             byte[] ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, ckKey);
             if (ckValue == null) {
@@ -153,22 +157,19 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
             CheckPoint ck = CheckPoint.getRootAsCheckPoint(ByteBuffer.wrap(ckValue));
             List<BatchRequest> requestList = new ArrayList<>();
             int count = ck.count();
+
+            // delete ck, timer tag
+            BatchDeleteRequest deleteCheckPointRequest = new BatchDeleteRequest(KV_NAMESPACE_CHECK_POINT, ckKey);
+            requestList.add(deleteCheckPointRequest);
+
+            BatchDeleteRequest deleteTimerTagRequest = new BatchDeleteRequest(KV_NAMESPACE_TIMER_TAG,
+                buildTimerTagKey(ck.nextVisibleTimestamp(), topicId, queueId, offset, operationId));
+            requestList.add(deleteTimerTagRequest);
+
             long baseOffset = offset - count + 1;
             for (int i = 0; i < count; i++) {
                 long currOffset = baseOffset + i;
-                ckKey = buildCheckPointKey(topicId, queueId, currOffset, operationId);
-                ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, ckKey);
-                if (ckValue == null) {
-                    throw new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "Ack operation failed, check point not found");
-                }
-                ck = CheckPoint.getRootAsCheckPoint(ByteBuffer.wrap(ckValue));
-                BatchDeleteRequest deleteCheckPointRequest = new BatchDeleteRequest(KV_NAMESPACE_CHECK_POINT, ckKey);
-                requestList.add(deleteCheckPointRequest);
-
-                BatchDeleteRequest deleteTimerTagRequest = new BatchDeleteRequest(KV_NAMESPACE_TIMER_TAG,
-                    buildTimerTagKey(ck.nextVisibleTimestamp(), topicId, queueId, offset, operationId));
-                requestList.add(deleteTimerTagRequest);
-
+                // delete order index
                 if (ck.fifo()) {
                     BatchDeleteRequest deleteOrderIndexRequest = new BatchDeleteRequest(KV_NAMESPACE_FIFO_INDEX,
                         buildOrderIndexKey(ck.consumerGroupId(), topicId, queueId, offset));
@@ -182,6 +183,7 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
                     this.ackCommitterMap.computeIfAbsent(ck.consumerGroupId(), k -> new AckCommitter(consumerGroupId, metadata.getAckOffset())).commitAck(currOffset);
                 }
             }
+
             kvService.batch(requestList.toArray(new BatchRequest[0]));
         } catch (StoreException e) {
             return CompletableFuture.failedFuture(e);
