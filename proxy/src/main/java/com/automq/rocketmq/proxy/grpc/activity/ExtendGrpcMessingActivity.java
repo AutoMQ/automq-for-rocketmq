@@ -15,10 +15,21 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq;
+package com.automq.rocketmq.proxy.grpc.activity;
 
-public class Main {
-    public static void main(String[] args) {
-        System.out.println("Hello world!");
+import org.apache.rocketmq.proxy.grpc.v2.DefaultGrpcMessingActivity;
+import org.apache.rocketmq.proxy.processor.MessagingProcessor;
+
+public class ExtendGrpcMessingActivity extends DefaultGrpcMessingActivity {
+    public ExtendGrpcMessingActivity(MessagingProcessor messagingProcessor) {
+        super(messagingProcessor);
+    }
+
+    @Override
+    protected void init(MessagingProcessor messagingProcessor) {
+        super.init(messagingProcessor);
+
+        this.routeActivity = new ExtendRouteActivity(messagingProcessor, grpcClientSettingsManager, grpcChannelManager);
+        this.sendMessageActivity = new ExtendSendMessageActivity(messagingProcessor, grpcClientSettingsManager, grpcChannelManager);
     }
 }

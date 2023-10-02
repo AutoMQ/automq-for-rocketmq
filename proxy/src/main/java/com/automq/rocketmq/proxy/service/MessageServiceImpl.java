@@ -110,7 +110,7 @@ public class MessageServiceImpl implements MessageService {
                 return CompletableFuture.failedFuture(new MQBrokerException(ResponseCode.TOPIC_NOT_EXIST, "Topic not exist"));
             }
 
-            return store.put(FlatMessageUtil.convertFrom(topic.getTopicId(), virtualQueue.queueId(), ctx.getLocalAddress(), message));
+            return store.put(FlatMessageUtil.convertFrom(topic.getTopicId(), virtualQueue.physicalQueueId(), ctx.getLocalAddress(), message));
         });
 
         return putFuture.thenApply(putResult -> {
@@ -229,7 +229,7 @@ public class MessageServiceImpl implements MessageService {
                 filter = Filter.DEFAULT_FILTER;
             }
 
-            return popSpecifiedQueue(consumerGroupId, clientId, topicId, virtualQueue.queueId(), filter,
+            return popSpecifiedQueue(consumerGroupId, clientId, topicId, virtualQueue.physicalQueueId(), filter,
                 requestHeader.getMaxMsgNums(), requestHeader.isOrder(), requestHeader.getInvisibleTime(), messageList);
         });
 

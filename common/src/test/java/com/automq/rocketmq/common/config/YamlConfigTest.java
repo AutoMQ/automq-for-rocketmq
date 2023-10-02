@@ -49,5 +49,9 @@ class YamlConfigTest {
         assertEquals(3, config.store().maxFetchTimeNanos());
         assertEquals("us-east-1", config.s3Stream().s3Region());
         assertEquals("bucket1", config.s3Stream().s3Bucket());
+
+        // Default value kept.
+        assertEquals("/tmp/s3stream_wal", config.s3Stream().s3WALPath());
+
     }
 }
