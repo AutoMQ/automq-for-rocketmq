@@ -46,6 +46,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static com.automq.rocketmq.store.util.SerializeUtil.decodeReceiptHandle;
 
@@ -70,6 +71,8 @@ public class StreamTopicQueue extends TopicQueue {
 
     private InflightService inflightService;
 
+    private final AtomicReference<State> state;
+
     public StreamTopicQueue(StoreConfig config, long topicId, int queueId,
         StoreMetadataService metadataService, MessageStateMachine stateMachine, StreamStore streamStore,
         InflightService inflightService) {
@@ -80,35 +83,41 @@ public class StreamTopicQueue extends TopicQueue {
         this.streamStore = streamStore;
         this.retryStreamIds = new ConcurrentHashMap<>();
         this.inflightService = inflightService;
+        this.state = new AtomicReference<>(State.INIT);
     }
 
     @Override
     public CompletableFuture<Void> open() {
-        // open all streams and load snapshot
-        return CompletableFuture.allOf(
-            metadataService.dataStreamOf(topicId, queueId).thenCompose(streamMetadata -> {
-                this.dataStreamId = streamMetadata.getStreamId();
-                return streamStore.open(streamMetadata.getStreamId());
-            }),
-            metadataService.operationStreamOf(topicId, queueId).thenCompose(streamMetadata -> {
-                this.operationStreamId = streamMetadata.getStreamId();
-                return streamStore.open(streamMetadata.getStreamId());
-            }),
-            metadataService.snapshotStreamOf(topicId, queueId).thenCompose(streamMetadata -> {
-                this.snapshotStreamId = streamMetadata.getStreamId();
-                return streamStore.open(streamMetadata.getStreamId());
-            })
-        ).thenCompose(nil -> {
-            // recover from operation log
-            this.operationLogService = new StreamOperationLogService(
-                this.operationStreamId,
-                this.snapshotStreamId,
-                this.streamStore,
-                this.metadataService,
-                this.stateMachine
-            );
-            return recover();
-        });
+        if (state.compareAndSet(State.INIT, State.OPENING)) {
+            // open all streams and load snapshot
+            return CompletableFuture.allOf(
+                metadataService.dataStreamOf(topicId, queueId).thenCompose(streamMetadata -> {
+                    this.dataStreamId = streamMetadata.getStreamId();
+                    return streamStore.open(streamMetadata.getStreamId());
+                }),
+                metadataService.operationStreamOf(topicId, queueId).thenCompose(streamMetadata -> {
+                    this.operationStreamId = streamMetadata.getStreamId();
+                    return streamStore.open(streamMetadata.getStreamId());
+                }),
+                metadataService.snapshotStreamOf(topicId, queueId).thenCompose(streamMetadata -> {
+                    this.snapshotStreamId = streamMetadata.getStreamId();
+                    return streamStore.open(streamMetadata.getStreamId());
+                })
+            ).thenCompose(nil -> {
+                // recover from operation log
+                this.operationLogService = new StreamOperationLogService(
+                    this.operationStreamId,
+                    this.snapshotStreamId,
+                    this.streamStore,
+                    this.metadataService,
+                    this.stateMachine
+                );
+                return recover().thenAccept(v -> {
+                    state.set(State.OPENED);
+                });
+            });
+        }
+        return CompletableFuture.completedFuture(null);
     }
 
     private CompletableFuture<Void> recover() {
@@ -117,7 +126,13 @@ public class StreamTopicQueue extends TopicQueue {
 
     @Override
     public CompletableFuture<Void> close() {
-        return streamStore.close(Arrays.asList(dataStreamId, operationStreamId, snapshotStreamId));
+        if (state.compareAndSet(State.OPENED, State.CLOSING)) {
+            return streamStore.close(Arrays.asList(dataStreamId, operationStreamId, snapshotStreamId))
+                .thenAccept(nil -> {
+                    state.set(State.CLOSED);
+                });
+        }
+        return CompletableFuture.completedFuture(null);
     }
 
     @Override
@@ -338,37 +353,7 @@ public class StreamTopicQueue extends TopicQueue {
     @Override
     public CompletableFuture<PullResult> pullNormal(long consumerGroupId, Filter filter, long startOffset,
         int batchSize) {
-        int fetchBatchSize;
-        if (filter.needApply()) {
-            // If filter is applied, fetch more messages to apply filter.
-            fetchBatchSize = batchSize * config.fetchBatchSizeFactor();
-        } else {
-            // If filter is not applied, fetch batchSize messages.
-            fetchBatchSize = batchSize;
-        }
-        List<FlatMessageExt> messageList = new ArrayList<>();
-        long operationTimestamp = System.nanoTime();
-        CompletableFuture<List<FlatMessageExt>> fetchCf = fetchAndFilterMessages(dataStreamId, startOffset, batchSize,
-            fetchBatchSize, filter, messageList, 0, 0, operationTimestamp);
-        return fetchCf.thenApply(messageExtList -> {
-            // TODO: correct offset, ugly logic
-            PullResult.Status status;
-            long firstOffset = -1;
-            long endOffset = -1;
-            long nextOffset = -1;
-            if (messageExtList.isEmpty()) {
-                status = PullResult.Status.NO_MATCHED_MSG;
-                nextOffset = startOffset + 1;
-            } else {
-                status = PullResult.Status.FOUND;
-                firstOffset = messageExtList.get(0).offset();
-                endOffset = messageExtList.get(messageExtList.size() - 1).offset();
-                nextOffset = endOffset + 1;
-            }
-            return new PullResult(status, nextOffset, firstOffset, endOffset, messageExtList);
-        }).exceptionally(throwable -> {
-            return new PullResult(PullResult.Status.OFFSET_ILLEGAL, -1, -1, -1, Collections.emptyList());
-        });
+        return pull(dataStreamId, consumerGroupId, filter, startOffset, batchSize);
     }
 
     private CompletableFuture<PullResult> pull(long streamId, long consumerGroupId, Filter filter, long startOffset,
@@ -419,5 +404,13 @@ public class StreamTopicQueue extends TopicQueue {
     @Override
     public CompletableFuture<Long> getConsumeOffset(long consumerGroupId) {
         return stateMachine.consumeOffset(consumerGroupId);
+    }
+
+    public enum State {
+        INIT,
+        OPENING,
+        OPENED,
+        CLOSING,
+        CLOSED
     }
 }
