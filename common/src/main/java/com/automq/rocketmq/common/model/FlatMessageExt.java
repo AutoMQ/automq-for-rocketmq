@@ -87,6 +87,20 @@ public class FlatMessageExt {
         return offset;
     }
 
+    /**
+     * The original offset of the message in the queue.
+     * <p>
+     * For retry messages, this is the offset of the original message.
+     *
+     * @return the original offset of the message in the queue
+     */
+    public long originalOffset() {
+        if (message.systemProperties().deliveryAttempt() > 1) {
+            return message.systemProperties().originalQueueOffset();
+        }
+        return offset;
+    }
+
     public int reconsumeCount() {
         return message.systemProperties().deliveryAttempt();
     }

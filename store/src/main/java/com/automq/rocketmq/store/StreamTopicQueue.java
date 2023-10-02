@@ -166,9 +166,10 @@ public class StreamTopicQueue extends TopicQueue {
     public CompletableFuture<PopResult> popNormal(long consumerGroup, Filter filter, int batchSize,
         long invisibleDuration) {
         // start from consume offset
-        return stateMachine.consumeOffset(consumerGroup).thenCompose(offset -> {
-            return pop(consumerGroup, dataStreamId, offset, PopOperation.PopOperationType.POP_NORMAL, filter, batchSize, invisibleDuration);
-        });
+        return stateMachine
+            .consumeOffset(consumerGroup)
+            .thenCompose(offset -> pop(consumerGroup, dataStreamId, offset,
+                PopOperation.PopOperationType.POP_NORMAL, filter, batchSize, invisibleDuration));
     }
 
     private CompletableFuture<PopResult> pop(long consumerGroupId, long streamId, long startOffset,
@@ -328,9 +329,9 @@ public class StreamTopicQueue extends TopicQueue {
      * All matched messages in <code>[startOffset, endOffset)</code>
      */
     static class FilterFetchResult {
-        private long startOffset;
+        private final long startOffset;
         private long endOffset;
-        private List<FlatMessageExt> messageList = new ArrayList<>();
+        private final List<FlatMessageExt> messageList = new ArrayList<>();
 
         public FilterFetchResult(long startOffset) {
             this.startOffset = startOffset;
