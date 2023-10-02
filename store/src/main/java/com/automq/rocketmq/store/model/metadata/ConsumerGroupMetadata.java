@@ -17,32 +17,24 @@
 
 package com.automq.rocketmq.store.model.metadata;
 
-import java.util.HashMap;
-import java.util.Map;
 
 public class ConsumerGroupMetadata {
     private long consumerGroupId;
     private long consumeOffset;
     private long ackOffset;
-    private long retryOffset;
-    private Map<Long/*offset*/, Integer/*retryTimes*/> retryTimesMap;
-    private Map<Long/*offset*/, Integer/*consumeTimes*/> consumeTimesMap;
+    private long retryConsumeOffset;
+    private long retryAckOffset;
 
     public ConsumerGroupMetadata(long consumerGroupId) {
         this.consumerGroupId = consumerGroupId;
-        this.retryTimesMap = new HashMap<>();
-        this.consumeTimesMap = new HashMap<>();
     }
 
-    public ConsumerGroupMetadata(long consumerGroupId, long consumeOffset, long ackOffset,
-        long retryOffset,
-        Map<Long, Integer> retryTimesMap, Map<Long, Integer> consumeTimesMap) {
+    public ConsumerGroupMetadata(long consumerGroupId, long consumeOffset, long ackOffset, long retryConsumeOffset, long retryAckOffset) {
         this.consumerGroupId = consumerGroupId;
         this.consumeOffset = consumeOffset;
         this.ackOffset = ackOffset;
-        this.retryOffset = retryOffset;
-        this.retryTimesMap = retryTimesMap;
-        this.consumeTimesMap = consumeTimesMap;
+        this.retryConsumeOffset = retryConsumeOffset;
+        this.retryAckOffset = retryAckOffset;
     }
 
     public long getConsumeOffset() {
@@ -53,16 +45,12 @@ public class ConsumerGroupMetadata {
         return ackOffset;
     }
 
-    public long getRetryOffset() {
-        return retryOffset;
+    public long getRetryAckOffset() {
+        return retryAckOffset;
     }
 
-    public Map<Long, Integer> getRetryTimesMap() {
-        return retryTimesMap;
-    }
-
-    public Map<Long, Integer> getConsumeTimesMap() {
-        return consumeTimesMap;
+    public long getRetryConsumeOffset() {
+        return retryConsumeOffset;
     }
 
     public long getConsumerGroupId() {
@@ -77,7 +65,11 @@ public class ConsumerGroupMetadata {
         this.ackOffset = ackOffset;
     }
 
-    public void setRetryOffset(long retryOffset) {
-        this.retryOffset = retryOffset;
+    public void setRetryConsumeOffset(long retryConsumeOffset) {
+        this.retryConsumeOffset = retryConsumeOffset;
+    }
+
+    public void setRetryAckOffset(long retryAckOffset) {
+        this.retryAckOffset = retryAckOffset;
     }
 }

@@ -39,11 +39,12 @@ public class SerializeUtilTest {
     public static final long CONSUMER_GROUP_ID = 4L;
     public static final PopOperationType POP_OPERATION_TYPE = PopOperationType.POP_ORDER;
     public static final AckOperationType ACK_OPERATION_TYPE = AckOperationType.ACK_NORMAL;
+    public static final boolean IS_END_MARK = false;
     public static final boolean IS_ORDER = true;
     public static final boolean IS_RETRY = false;
     public static final long DELIVERY_TIMESTAMP = 5L;
     public static final long NEXT_VISIBLE_TIMESTAMP = 6L;
-    public static final int RECONSUME_COUNT = 7;
+    public static final int DELIVERY_ATTEMPTS = 7;
     public static final int BATCH_SIZE = 8;
     public static final long INVISIBLE_DURATION = 9L;
     public static final long OPERATION_TIMESTAMP = 10L;
@@ -58,7 +59,7 @@ public class SerializeUtilTest {
 
     @Test
     void buildCheckPointValue() {
-        byte[] value = SerializeUtil.buildCheckPointValue(TOPIC_ID, QUEUE_ID, OFFSET, COUNT, CONSUMER_GROUP_ID, OPERATION_ID, IS_ORDER, IS_RETRY, DELIVERY_TIMESTAMP, NEXT_VISIBLE_TIMESTAMP);
+        byte[] value = SerializeUtil.buildCheckPointValue(TOPIC_ID, QUEUE_ID, OFFSET, COUNT, CONSUMER_GROUP_ID, OPERATION_ID, POP_OPERATION_TYPE, DELIVERY_TIMESTAMP, NEXT_VISIBLE_TIMESTAMP);
         CheckPoint checkPoint = CheckPoint.getRootAsCheckPoint(ByteBuffer.wrap(value));
         assertEquals(TOPIC_ID, checkPoint.topicId());
         assertEquals(QUEUE_ID, checkPoint.queueId());
@@ -66,7 +67,7 @@ public class SerializeUtilTest {
         assertEquals(COUNT, checkPoint.count());
         assertEquals(CONSUMER_GROUP_ID, checkPoint.consumerGroupId());
         assertEquals(OPERATION_ID, checkPoint.operationId());
-        assertEquals(IS_ORDER, checkPoint.fifo());
+        assertEquals(POP_OPERATION_TYPE.value(), checkPoint.popOperationType());
         assertEquals(DELIVERY_TIMESTAMP, checkPoint.deliveryTimestamp());
         assertEquals(NEXT_VISIBLE_TIMESTAMP, checkPoint.nextVisibleTimestamp());
     }
@@ -107,7 +108,7 @@ public class SerializeUtilTest {
     @Test
     void encodePopOperation() {
         com.automq.rocketmq.store.model.operation.PopOperation popOperation = new com.automq.rocketmq.store.model.operation.PopOperation(
-            CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, OFFSET, BATCH_SIZE, INVISIBLE_DURATION, OPERATION_TIMESTAMP, RETRY_OFFSET, POP_OPERATION_TYPE
+            CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, OFFSET, BATCH_SIZE, INVISIBLE_DURATION, OPERATION_TIMESTAMP, IS_END_MARK, POP_OPERATION_TYPE
         );
         byte[] bytes = SerializeUtil.encodePopOperation(popOperation);
         com.automq.rocketmq.store.model.operation.Operation decodedOperation = SerializeUtil.decodeOperation(ByteBuffer.wrap(bytes));

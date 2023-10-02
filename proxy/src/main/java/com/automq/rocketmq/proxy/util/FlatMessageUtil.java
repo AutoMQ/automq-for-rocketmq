@@ -54,6 +54,7 @@ public class FlatMessageUtil {
         SystemPropertiesT systemPropertiesT = splitSystemProperties(flatMessageT, properties);
         systemPropertiesT.setStoreTimestamp(System.currentTimeMillis());
         systemPropertiesT.setStoreHost(storeHost);
+        systemPropertiesT.setDeliveryAttempts(1);
         flatMessageT.setSystemProperties(systemPropertiesT);
 
         // The rest of the properties are user properties.
@@ -107,7 +108,7 @@ public class FlatMessageUtil {
         messageExt.setMsgId(systemProperties.messageId());
 
         // Re-consume times is the number of delivery attempts minus 1.
-        messageExt.setReconsumeTimes(systemProperties.deliveryAttempt() - 1);
+        messageExt.setReconsumeTimes(systemProperties.deliveryAttempts());
 
         KeyValue.Vector propertiesVector = flatMessage.message().userPropertiesVector();
         for (int i = 0; i < propertiesVector.length(); i++) {
@@ -149,7 +150,7 @@ public class FlatMessageUtil {
         systemPropertiesT.setTraceContext(properties.remove(MessageConst.PROPERTY_TRACE_CONTEXT));
         String reconsumeTimes = properties.remove(MessageConst.PROPERTY_RECONSUME_TIME);
         if (!Strings.isNullOrEmpty(reconsumeTimes)) {
-            systemPropertiesT.setDeliveryAttempt(Integer.parseInt(reconsumeTimes));
+            systemPropertiesT.setDeliveryAttempts(Integer.parseInt(reconsumeTimes));
         }
 
         systemPropertiesT.setBornHost(properties.remove(MessageConst.PROPERTY_BORN_HOST));

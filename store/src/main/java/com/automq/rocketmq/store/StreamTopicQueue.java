@@ -20,6 +20,7 @@ package com.automq.rocketmq.store;
 import com.automq.rocketmq.common.config.StoreConfig;
 import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.model.generated.FlatMessage;
+import com.automq.rocketmq.common.util.Pair;
 import com.automq.rocketmq.metadata.StoreMetadataService;
 import com.automq.rocketmq.store.api.MessageStateMachine;
 import com.automq.rocketmq.store.api.StreamStore;
@@ -198,7 +199,7 @@ public class StreamTopicQueue extends TopicQueue {
                 preOffset = messageExt.offset();
                 PopOperation popOperation = new PopOperation(
                     consumerGroupId, topicId, queueId, messageExt.offset(), count, invisibleDuration, operationTimestamp,
-                    -1, operationType
+                    false, operationType
                 );
                 appendOpCfs.add(operationLogService.logPopOperation(popOperation));
             }
@@ -207,7 +208,7 @@ public class StreamTopicQueue extends TopicQueue {
             if (count > 0) {
                 PopOperation popOperation = new PopOperation(
                     consumerGroupId, topicId, queueId, fetchResult.endOffset - 1, count, invisibleDuration,
-                    operationTimestamp, -1, PopOperation.PopOperationType.POP_LAST
+                    operationTimestamp, true, operationType
                 );
                 appendOpCfs.add(operationLogService.logPopOperation(popOperation));
             }
@@ -247,25 +248,20 @@ public class StreamTopicQueue extends TopicQueue {
     }
 
     @Override
-    public CompletableFuture<PopResult> popRetry(long consumerGroup, Filter filter, int batchSize,
+    public CompletableFuture<PopResult> popRetry(long consumerGroupId, Filter filter, int batchSize,
         long invisibleDuration) {
-        CompletableFuture<Long> retryStreamIdCf;
-        if (!retryStreamIds.containsKey(consumerGroup)) {
-            retryStreamIdCf = metadataService.retryStreamOf(consumerGroup, topicId, queueId).thenCompose(streamMetadata -> {
-                long retryStreamId = streamMetadata.getStreamId();
-                retryStreamIds.put(consumerGroup, retryStreamId);
-                return streamStore.open(retryStreamId).thenApply(nil -> retryStreamId);
-            });
-        } else {
-            retryStreamIdCf = CompletableFuture.completedFuture(retryStreamIds.get(consumerGroup));
-        }
-        // start from retry offset
-        return retryStreamIdCf.thenCompose(streamId -> stateMachine.retryOffset(consumerGroup).thenCompose(offset -> {
-            return pop(consumerGroup, streamId, offset, PopOperation.PopOperationType.POP_RETRY, filter, batchSize, invisibleDuration);
-        }));
+        CompletableFuture<Long> retryStreamIdCf = retryStreamId(consumerGroupId);
+        CompletableFuture<Long> retryOffsetCf = stateMachine.retryConsumeOffset(consumerGroupId);
+        return retryStreamIdCf.thenCombine(retryOffsetCf, (streamId, startOffset) -> {
+            return new Pair<Long, Long>(streamId, startOffset);
+        }).thenCompose(pair -> {
+            Long retryStreamId = pair.left();
+            Long startOffset = pair.right();
+            return pop(consumerGroupId, retryStreamId, startOffset, PopOperation.PopOperationType.POP_RETRY, filter, batchSize, invisibleDuration);
+        });
     }
 
-    public CompletableFuture<List<FlatMessageExt>> fetchMessages(long streamId, long offset, int batchSize) {
+    private CompletableFuture<List<FlatMessageExt>> fetchMessages(long streamId, long offset, int batchSize) {
         return streamStore.fetch(streamId, offset, batchSize)
             .thenApply(fetchResult -> {
                 // TODO: Assume message count is always 1 in each batch for now.
@@ -284,7 +280,7 @@ public class StreamTopicQueue extends TopicQueue {
     }
 
     // Fetch and filter messages until exceeding the limit.
-    public CompletableFuture<FilterFetchResult> fetchAndFilterMessages(long streamId,
+    private CompletableFuture<FilterFetchResult> fetchAndFilterMessages(long streamId,
         long offset, int batchSize, int fetchBatchSize, Filter filter, FilterFetchResult result,
         int fetchCount, long fetchBytes, long operationTimestamp) {
         // Fetch more messages.

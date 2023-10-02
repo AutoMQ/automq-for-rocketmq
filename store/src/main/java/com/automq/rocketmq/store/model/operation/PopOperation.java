@@ -28,11 +28,11 @@ public class PopOperation implements Operation {
     private final int count;
     private final long invisibleDuration;
     private final long operationTimestamp;
-    private final long retryOffset;
+    private final boolean endMark;
     private final PopOperationType popOperationType;
 
     public PopOperation(long consumerGroupId, long topicId, int queueId, long offset, int count,
-        long invisibleDuration, long operationTimestamp, long retryOffset, PopOperationType popOperationType) {
+        long invisibleDuration, long operationTimestamp, boolean endMark, PopOperationType popOperationType) {
         this.consumerGroupId = consumerGroupId;
         this.topicId = topicId;
         this.queueId = queueId;
@@ -40,7 +40,7 @@ public class PopOperation implements Operation {
         this.count = count;
         this.invisibleDuration = invisibleDuration;
         this.operationTimestamp = operationTimestamp;
-        this.retryOffset = retryOffset;
+        this.endMark = endMark;
         this.popOperationType = popOperationType;
     }
 
@@ -81,8 +81,8 @@ public class PopOperation implements Operation {
         return OperationType.POP;
     }
 
-    public long getRetryOffset() {
-        return retryOffset;
+    public boolean isEndMark() {
+        return endMark;
     }
 
     @Override
@@ -92,19 +92,30 @@ public class PopOperation implements Operation {
         if (o == null || getClass() != o.getClass())
             return false;
         PopOperation that = (PopOperation) o;
-        return consumerGroupId == that.consumerGroupId && topicId == that.topicId && queueId == that.queueId && offset == that.offset && count == that.count && invisibleDuration == that.invisibleDuration && operationTimestamp == that.operationTimestamp && retryOffset == that.retryOffset && popOperationType == that.popOperationType;
+        return consumerGroupId == that.consumerGroupId && topicId == that.topicId && queueId == that.queueId
+            && offset == that.offset && count == that.count && invisibleDuration == that.invisibleDuration
+            && operationTimestamp == that.operationTimestamp && endMark == that.endMark
+            && popOperationType == that.popOperationType;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(consumerGroupId, topicId, queueId, offset, count, invisibleDuration, operationTimestamp, retryOffset, popOperationType);
+        return Objects.hash(consumerGroupId, topicId, queueId, offset, count, invisibleDuration, operationTimestamp,
+            endMark, popOperationType);
     }
 
     public enum PopOperationType {
         POP_NORMAL,
         POP_RETRY,
-        POP_ORDER,
-        POP_LAST
+        POP_ORDER;
+
+        public short value() {
+            return (short) ordinal();
+        }
+
+        public static PopOperationType valueOf(short value) {
+            return values()[value];
+        }
     }
 
 }

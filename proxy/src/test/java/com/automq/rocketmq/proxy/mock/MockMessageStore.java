@@ -20,6 +20,7 @@ package com.automq.rocketmq.proxy.mock;
 import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.store.api.MessageStore;
+import com.automq.rocketmq.store.api.TopicQueue;
 import com.automq.rocketmq.store.model.message.AckResult;
 import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
 import com.automq.rocketmq.store.model.message.Filter;
@@ -41,20 +42,22 @@ public class MockMessageStore implements MessageStore {
     private final Map<Long, List<FlatMessageExt>> messageMap = new HashMap<>();
     private final InflightService inflightService = new InflightService();
 
+    private long consumeOffset = 0;
+
     public MockMessageStore() {
         receiptHandleSet.add("FAAAAAAAAAAMABwABAAAAAwAFAAMAAAAAgAAAAAAAAACAAAAAAAAAAMAAAAAAAAA");
     }
 
     @Override
-    public CompletableFuture<PopResult> pop(long consumerGroupId, long topicId, int queueId, long offset, Filter filter,
+    public CompletableFuture<PopResult> pop(long consumerGroupId, long topicId, int queueId, Filter filter,
         int batchSize, boolean fifo, boolean retry, long invisibleDuration) {
         if (retry) {
             return CompletableFuture.completedFuture(new PopResult(PopResult.Status.END_OF_QUEUE, 0L, 0L, new ArrayList<>()));
         }
 
         List<FlatMessageExt> messageList = messageMap.computeIfAbsent(topicId + queueId, v -> new ArrayList<>());
-        int start = offset > messageList.size() ? -1 : (int) offset;
-        int end = offset + batchSize >= messageList.size() ? messageList.size() : (int) offset + batchSize;
+        int start = consumeOffset > messageList.size() ? -1 : (int) consumeOffset;
+        int end = consumeOffset + batchSize >= messageList.size() ? messageList.size() : (int) consumeOffset + batchSize;
 
         PopResult.Status status;
         if (start < 0) {
@@ -63,6 +66,7 @@ public class MockMessageStore implements MessageStore {
         } else {
             status = PopResult.Status.FOUND;
             messageList = messageList.subList(start, end);
+            consumeOffset = end;
             inflightService.increaseInflightCount(consumerGroupId, topicId, queueId, messageList.size());
         }
         return CompletableFuture.completedFuture(new PopResult(status, 0L, 0L, messageList));
@@ -107,21 +111,18 @@ public class MockMessageStore implements MessageStore {
     }
 
     @Override
-    public int getInflightStats(long consumerGroupId, long topicId, int queueId) {
-        return inflightService.getInflightCount(consumerGroupId, topicId, queueId);
+    public CompletableFuture<Integer> getInflightStats(long consumerGroupId, long topicId, int queueId) {
+        return CompletableFuture.completedFuture(inflightService.getInflightCount(consumerGroupId, topicId, queueId));
     }
 
     @Override
-    public long startOffset(long topicId, int queueId) {
+    public CompletableFuture<TopicQueue.QueueOffsetRange> getOffsetRange(long topicId, int queueId) {
+        long startOffset = 0;
         List<FlatMessageExt> messageList = messageMap.computeIfAbsent(topicId + queueId, v -> new ArrayList<>());
-        if (messageList.isEmpty()) {
-            return 0;
+        if (!messageList.isEmpty()) {
+            startOffset = messageList.get(0).offset();
         }
-        return messageList.get(0).offset();
-    }
-
-    @Override
-    public long nextOffset(long topicId, int queueId) {
-        return offsetMap.computeIfAbsent(topicId + queueId, v -> new AtomicLong()).get();
+        long endOffset = offsetMap.computeIfAbsent(topicId + queueId, v -> new AtomicLong()).get();
+        return CompletableFuture.completedFuture(new TopicQueue.QueueOffsetRange(startOffset, endOffset));
     }
 }

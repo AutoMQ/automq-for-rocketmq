@@ -32,14 +32,13 @@ public interface MessageStore {
      * @param consumerGroupId   consumer group id that launches this query
      * @param topicId           topic id to pop message from
      * @param queueId           queue id to pop message from
-     * @param offset            offset to start from
      * @param filter            filter to apply to messages
      * @param batchSize         maximum count of messages
      * @param fifo              is orderly pop
      * @param invisibleDuration the duration for the next time this batch of messages will be visible, in nanoseconds
      * @return pop result, see {@link PopResult}
      */
-    CompletableFuture<PopResult> pop(long consumerGroupId, long topicId, int queueId, long offset, Filter filter,
+    CompletableFuture<PopResult> pop(long consumerGroupId, long topicId, int queueId, Filter filter,
         int batchSize,
         boolean fifo, boolean retry, long invisibleDuration);
 
@@ -80,23 +79,13 @@ public interface MessageStore {
      */
     CompletableFuture<Void> closeQueue(long topicId, int queueId);
 
-    int getInflightStats(long consumerGroupId, long topicId, int queueId);
+    CompletableFuture<Integer> getInflightStats(long consumerGroupId, long topicId, int queueId);
 
     /**
-     * Get start record offset in queue.
-     *
-     * @param topicId topic id to query
-     * @param queueId queue id to query
-     * @return start offset in queue
+     * Get offset range in queue.
+     * @param topicId topic id
+     * @param queueId queue id
+     * @return offset range, <code>[startOffset, endOffset)</code>
      */
-    long startOffset(long topicId, int queueId);
-
-    /**
-     * Get next offset in queue.
-     *
-     * @param topicId topic id to query
-     * @param queueId queue id to query
-     * @return next offset in queue
-     */
-    long nextOffset(long topicId, int queueId);
+    CompletableFuture<TopicQueue.QueueOffsetRange> getOffsetRange(long topicId, int queueId);
 }
