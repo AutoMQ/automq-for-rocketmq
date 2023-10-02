@@ -39,4 +39,11 @@ public class BrokerConfig {
     public String name() {
         return name;
     }
+
+    public BrokerConfig() {
+        this.proxy = new ProxyConfig();
+        this.store = new StoreConfig();
+        this.s3Stream = new S3StreamConfig();
+        this.controller = new ControllerConfig();
+    }
 }

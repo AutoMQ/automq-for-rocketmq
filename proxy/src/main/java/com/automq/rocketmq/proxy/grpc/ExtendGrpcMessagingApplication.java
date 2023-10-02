@@ -15,27 +15,13 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.common.config;
+package com.automq.rocketmq.proxy.grpc;
 
-public class S3StreamConfig {
-    private String s3Endpoint;
-    private String s3Region = "cn-hangzhou";
-    private String s3Bucket;
-    private String s3WALPath = "/tmp/s3stream_wal";
+import org.apache.rocketmq.proxy.grpc.v2.GrpcMessagingApplication;
+import org.apache.rocketmq.proxy.grpc.v2.GrpcMessingActivity;
 
-    public String s3Endpoint() {
-        return s3Endpoint;
-    }
-
-    public String s3Region() {
-        return s3Region;
-    }
-
-    public String s3Bucket() {
-        return s3Bucket;
-    }
-
-    public String s3WALPath() {
-        return s3WALPath;
+public class ExtendGrpcMessagingApplication extends GrpcMessagingApplication {
+    public ExtendGrpcMessagingApplication(GrpcMessingActivity grpcMessingActivity) {
+        super(grpcMessingActivity);
     }
 }

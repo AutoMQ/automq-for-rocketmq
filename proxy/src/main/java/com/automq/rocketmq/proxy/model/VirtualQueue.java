@@ -25,32 +25,41 @@ import org.apache.rocketmq.proxy.service.route.AddressableMessageQueue;
  */
 public class VirtualQueue {
     private final long topicId;
-    private final int queueId;
+    private final int physicalQueueId;
     private final String brokerName;
 
-    public VirtualQueue(long topicId, int queueId) {
+    public VirtualQueue(long topicId, int physicalQueueId) {
         this.topicId = topicId;
-        this.queueId = queueId;
+        this.physicalQueueId = physicalQueueId;
         this.brokerName = buildBrokerName();
     }
 
     public VirtualQueue(AddressableMessageQueue messageQueue) {
-        this.brokerName = messageQueue.getBrokerName();
+        this(messageQueue.getBrokerName());
+    }
+
+    /**
+     * The physical queue id is encoded in the broker name.
+     *
+     * @param brokerName broker name
+     */
+    public VirtualQueue(String brokerName) {
+        this.brokerName = brokerName;
         String[] brokerNameParts = brokerName.split("%");
         this.topicId = Long.parseLong(brokerNameParts[0]);
-        this.queueId = Integer.parseInt(brokerNameParts[1]);
+        this.physicalQueueId = Integer.parseInt(brokerNameParts[1]);
     }
 
     private String buildBrokerName() {
-        return topicId + "%" + queueId;
+        return topicId + "%" + physicalQueueId;
     }
 
     public long topicId() {
         return topicId;
     }
 
-    public int queueId() {
-        return queueId;
+    public int physicalQueueId() {
+        return physicalQueueId;
     }
 
     public String brokerName() {

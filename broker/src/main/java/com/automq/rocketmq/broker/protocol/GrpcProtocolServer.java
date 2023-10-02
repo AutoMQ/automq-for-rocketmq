@@ -19,6 +19,9 @@ package com.automq.rocketmq.broker.protocol;
 
 import com.automq.rocketmq.common.config.ProxyConfig;
 import com.automq.rocketmq.common.util.Lifecycle;
+import com.automq.rocketmq.proxy.config.ProxyConfiguration;
+import com.automq.rocketmq.proxy.grpc.ExtendGrpcMessagingApplication;
+import com.automq.rocketmq.proxy.grpc.activity.ExtendGrpcMessingActivity;
 import io.grpc.protobuf.services.ChannelzService;
 import io.grpc.protobuf.services.ProtoReflectionService;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -66,7 +69,7 @@ public class GrpcProtocolServer implements Lifecycle {
     }
 
     private GrpcMessagingApplication createServiceProcessor(MessagingProcessor messagingProcessor) {
-        return GrpcMessagingApplication.create(messagingProcessor);
+        return new ExtendGrpcMessagingApplication(new ExtendGrpcMessingActivity(messagingProcessor));
     }
 
     private ThreadPoolExecutor createGrpcExecutor(int threadNums, int queueCapacity) {
@@ -80,22 +83,6 @@ public class GrpcProtocolServer implements Lifecycle {
     }
 
     private void initProxyConfig(ProxyConfig config) {
-        ConfigurationManager.initEnv();
-        try {
-            ConfigurationManager.intConfig();
-        } catch (Exception e) {
-            LOGGER.error("Failed to init proxy config.", e);
-        }
-
-        // Override the configuration with the given config
-        org.apache.rocketmq.proxy.config.ProxyConfig innerConfig = ConfigurationManager.getProxyConfig();
-        innerConfig.setGrpcBossLoopNum(config.grpcBossLoopNum());
-        innerConfig.setGrpcWorkerLoopNum(config.grpcWorkerLoopNum());
-        innerConfig.setGrpcThreadPoolNums(config.grpcThreadPoolNums());
-        innerConfig.setGrpcThreadPoolQueueCapacity(config.grpcThreadPoolQueueCapacity());
-        innerConfig.setGrpcServerPort(config.grpcServerPort());
-        innerConfig.setGrpcMaxInboundMessageSize(config.grpcMaxInboundMessageSize());
-        innerConfig.setGrpcClientIdleTimeMills(config.grpcClientIdleTimeMills());
-        innerConfig.setEnableGrpcEpoll(config.enableGrpcEpoll());
+        ProxyConfiguration.intConfig(config);
     }
 }
