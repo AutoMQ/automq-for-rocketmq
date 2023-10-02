@@ -182,14 +182,16 @@ public class StreamTopicQueue extends TopicQueue {
             // If filter is not applied, fetch batchSize messages.
             fetchBatchSize = batchSize;
         }
-        List<FlatMessageExt> messageList = new ArrayList<>();
+        FilterFetchResult fetchResult = new FilterFetchResult(startOffset);
         long operationTimestamp = System.nanoTime();
-        CompletableFuture<List<FlatMessageExt>> fetchCf = fetchAndFilterMessages(streamId, startOffset, batchSize,
-            fetchBatchSize, filter, messageList, 0, 0, operationTimestamp);
-        CompletableFuture<Void> appendOpCf = fetchCf.thenCompose(messageExtList -> {
+        CompletableFuture<FilterFetchResult> fetchCf = fetchAndFilterMessages(streamId, startOffset, batchSize,
+            fetchBatchSize, filter, fetchResult, 0, 0, operationTimestamp);
+        CompletableFuture<Void> appendOpCf = fetchCf.thenCompose(filterFetchResult -> {
+            List<FlatMessageExt> messageExtList = filterFetchResult.messageList;
             // write pop operation to operation log
-            long preOffset = startOffset - 1;
+            long preOffset = filterFetchResult.startOffset - 1;
             List<CompletableFuture<Long>> appendOpCfs = new ArrayList<>(messageExtList.size());
+            // write pop operation for each need consumed message
             for (FlatMessageExt messageExt : messageExtList) {
                 int count = (int) (messageExt.offset() - preOffset);
                 preOffset = messageExt.offset();
@@ -199,9 +201,19 @@ public class StreamTopicQueue extends TopicQueue {
                 );
                 appendOpCfs.add(operationLogService.logPopOperation(popOperation));
             }
+            // write special pop operation for the last message to update consume offset
+            int count = (int) (fetchResult.endOffset - 1 - preOffset);
+            if (count > 0) {
+                PopOperation popOperation = new PopOperation(
+                    consumerGroupId, topicId, queueId, fetchResult.endOffset - 1, count, invisibleDuration,
+                    operationTimestamp, -1, PopOperation.PopOperationType.POP_LAST
+                );
+                appendOpCfs.add(operationLogService.logPopOperation(popOperation));
+            }
             return CompletableFuture.allOf(appendOpCfs.toArray(new CompletableFuture[0]));
         });
-        return fetchCf.thenCombine(appendOpCf, (messageExtList, nil) -> {
+        return fetchCf.thenCombine(appendOpCf, (filterFetchResult, nil) -> {
+            List<FlatMessageExt> messageExtList = filterFetchResult.messageList;
             PopResult.Status status;
             if (messageExtList.isEmpty()) {
                 status = PopResult.Status.NOT_FOUND;
@@ -271,17 +283,26 @@ public class StreamTopicQueue extends TopicQueue {
     }
 
     // Fetch and filter messages until exceeding the limit.
-    public CompletableFuture<List<FlatMessageExt>> fetchAndFilterMessages(long streamId,
-        long offset, int batchSize, int fetchBatchSize, Filter filter, List<FlatMessageExt> messageList,
+    public CompletableFuture<FilterFetchResult> fetchAndFilterMessages(long streamId,
+        long offset, int batchSize, int fetchBatchSize, Filter filter, FilterFetchResult result,
         int fetchCount, long fetchBytes, long operationTimestamp) {
         // Fetch more messages.
         return fetchMessages(streamId, offset, fetchBatchSize)
             .thenCompose(fetchResult -> {
                 // Add filter result to message list.
-                messageList.addAll(filter.doFilter(fetchResult));
-
+                List<FlatMessageExt> matchedMessageList = filter.doFilter(fetchResult);
+                // Update end offset
+                int index = batchSize - result.size();
+                if (matchedMessageList.size() > index) {
+                    FlatMessageExt messageExt = matchedMessageList.get(index);
+                    result.setEndOffset(messageExt.offset());
+                    result.addMessageList(matchedMessageList.subList(0, index));
+                } else {
+                    result.setEndOffset(offset + fetchResult.size());
+                    result.addMessageList(matchedMessageList);
+                }
                 // If not enough messages after applying filter, fetch more messages.
-                boolean needToFetch = messageList.size() < batchSize;
+                boolean needToFetch = result.size() < batchSize;
                 boolean hasMoreMessages = fetchResult.size() >= fetchBatchSize;
 
                 int newFetchCount = fetchCount + fetchResult.size();
@@ -294,11 +315,39 @@ public class StreamTopicQueue extends TopicQueue {
 
                 if (needToFetch && hasMoreMessages && notExceedLimit) {
                     return fetchAndFilterMessages(streamId, offset + fetchResult.size(), batchSize, fetchBatchSize, filter,
-                        messageList, newFetchCount, newFetchBytes, operationTimestamp);
+                        result, newFetchCount, newFetchBytes, operationTimestamp);
                 } else {
-                    return CompletableFuture.completedFuture(messageList.subList(0, Math.min(messageList.size(), batchSize)));
+                    return CompletableFuture.completedFuture(result);
                 }
             });
+    }
+
+    /**
+     * Fetch and filter result.
+     * <p>
+     * All matched messages in <code>[startOffset, endOffset)</code>
+     */
+    static class FilterFetchResult {
+        private long startOffset;
+        private long endOffset;
+        private List<FlatMessageExt> messageList = new ArrayList<>();
+
+        public FilterFetchResult(long startOffset) {
+            this.startOffset = startOffset;
+            this.endOffset = startOffset;
+        }
+
+        public void setEndOffset(long endOffset) {
+            this.endOffset = endOffset;
+        }
+
+        public void addMessageList(List<FlatMessageExt> messageList) {
+            this.messageList.addAll(messageList);
+        }
+
+        public int size() {
+            return messageList.size();
+        }
     }
 
     @Override
@@ -366,26 +415,20 @@ public class StreamTopicQueue extends TopicQueue {
             // If filter is not applied, fetch batchSize messages.
             fetchBatchSize = batchSize;
         }
-        List<FlatMessageExt> messageList = new ArrayList<>();
+        FilterFetchResult fetchResult = new FilterFetchResult(startOffset);
         long operationTimestamp = System.nanoTime();
-        CompletableFuture<List<FlatMessageExt>> fetchCf = fetchAndFilterMessages(streamId, startOffset, batchSize,
-            fetchBatchSize, filter, messageList, 0, 0, operationTimestamp);
-        return fetchCf.thenApply(messageExtList -> {
+        CompletableFuture<FilterFetchResult> fetchCf = fetchAndFilterMessages(streamId, startOffset, batchSize,
+            fetchBatchSize, filter, fetchResult, 0, 0, operationTimestamp);
+        return fetchCf.thenApply(filterFetchResult -> {
+            List<FlatMessageExt> messageExtList = filterFetchResult.messageList;
             // TODO: correct offset, ugly logic
             PullResult.Status status;
-            long firstOffset = -1;
-            long endOffset = -1;
-            long nextOffset = -1;
             if (messageExtList.isEmpty()) {
                 status = PullResult.Status.NO_MATCHED_MSG;
-                nextOffset = startOffset + 1;
             } else {
                 status = PullResult.Status.FOUND;
-                firstOffset = messageExtList.get(0).offset();
-                endOffset = messageExtList.get(messageExtList.size() - 1).offset();
-                nextOffset = endOffset + 1;
             }
-            return new PullResult(status, nextOffset, firstOffset, endOffset, messageExtList);
+            return new PullResult(status, filterFetchResult.endOffset, filterFetchResult.startOffset, filterFetchResult.endOffset - 1, messageExtList);
         }).exceptionally(throwable -> {
             return new PullResult(PullResult.Status.OFFSET_ILLEGAL, -1, -1, -1, Collections.emptyList());
         });
