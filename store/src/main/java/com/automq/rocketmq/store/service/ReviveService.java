@@ -26,6 +26,7 @@ import com.automq.rocketmq.store.model.generated.CheckPoint;
 import com.automq.rocketmq.store.model.generated.ReceiptHandle;
 import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PullResult;
+import com.automq.rocketmq.store.model.operation.PopOperation;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.util.SerializeUtil;
 import java.nio.ByteBuffer;
@@ -111,11 +112,11 @@ public class ReviveService implements Runnable {
                     return;
                 }
                 CheckPoint checkPoint = SerializeUtil.decodeCheckPoint(ByteBuffer.wrap(ckValue));
-                boolean retry = checkPoint.retry();
+                PopOperation.PopOperationType operationType = PopOperation.PopOperationType.valueOf(checkPoint.popOperationType());
                 TopicQueue topicQueue = topicQueueManager.get(topicId, queueId);
                 // TODO: async
                 PullResult pullResult;
-                if (retry) {
+                if (operationType == PopOperation.PopOperationType.POP_RETRY) {
                     pullResult = topicQueue.pullRetry(consumerGroupId, Filter.DEFAULT_FILTER, offset, 1).join();
                 } else {
                     pullResult = topicQueue.pullNormal(consumerGroupId, Filter.DEFAULT_FILTER, offset, 1).join();
@@ -130,9 +131,10 @@ public class ReviveService implements Runnable {
                 }
                 // Build the retry message and append it to retry stream or dead letter stream.
                 FlatMessageExt messageExt = pullResult.messageList().get(0);
-                messageExt.setReconsumeCount(messageExt.reconsumeCount() + 1);
-                if (!checkPoint.fifo()) {
-                    if (messageExt.reconsumeCount() <= metadataService.maxDeliveryAttemptsOf(consumerGroupId).join()) {
+                messageExt.setOriginalQueueOffset(messageExt.originalOffset());
+                messageExt.setDeliveryAttempts(messageExt.deliveryAttempts() + 1);
+                if (operationType != PopOperation.PopOperationType.POP_ORDER) {
+                    if (messageExt.deliveryAttempts() <= metadataService.maxDeliveryAttemptsOf(consumerGroupId).join()) {
                         topicQueue.putRetry(consumerGroupId, messageExt.message()).join();
                     } else {
                         // TODO: dead letter

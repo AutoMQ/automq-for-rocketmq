@@ -95,21 +95,29 @@ public class FlatMessageExt {
      * @return the original offset of the message in the queue
      */
     public long originalOffset() {
-        if (message.systemProperties().deliveryAttempt() > 1) {
+        if (message.systemProperties().deliveryAttempts() > 1) {
             return message.systemProperties().originalQueueOffset();
         }
         return offset;
     }
 
-    public int reconsumeCount() {
-        return message.systemProperties().deliveryAttempt();
+    public int deliveryAttempts() {
+        return message.systemProperties().deliveryAttempts();
     }
 
-    public void setReconsumeCount(int reconsumeCount) {
-        message.systemProperties().mutateDeliveryAttempt(reconsumeCount);
+    public void setDeliveryAttempts(int deliveryAttempts) {
+        message.systemProperties().mutateDeliveryAttempts(deliveryAttempts);
     }
 
     public void setReceiptHandle(String receiptHandle) {
         this.receiptHandle = receiptHandle;
+    }
+
+    public void setOriginalQueueOffset(long offset) {
+        message.systemProperties().mutateOriginalQueueOffset(offset);
+    }
+
+    public long originalQueueOffset() {
+        return message.systemProperties().originalQueueOffset();
     }
 }

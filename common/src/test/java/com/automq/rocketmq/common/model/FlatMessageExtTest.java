@@ -42,8 +42,8 @@ class FlatMessageExtTest {
         assertTrue(messageExt.receiptHandle().isPresent());
         assertEquals("receiptHandle", messageExt.receiptHandle().get());
 
-        assertEquals(0, messageExt.reconsumeCount());
-        messageExt.setReconsumeCount(10);
-        assertEquals(10, messageExt.reconsumeCount());
+        assertEquals(0, messageExt.deliveryAttempts());
+        messageExt.setDeliveryAttempts(10);
+        assertEquals(10, messageExt.deliveryAttempts());
     }
 }

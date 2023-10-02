@@ -1,5 +1,11 @@
 namespace com.automq.rocketmq.store.model.generated;
 
+enum PopOperationType:short {
+    POP_NORMAL,
+    POP_RETRY,
+    POP_ORDER
+}
+
 table CheckPoint {
   topic_id:long;
   queue_id:int;
@@ -7,8 +13,7 @@ table CheckPoint {
   count:int;
   consumer_group_id:long;
   operation_id:long;
-  fifo:bool;
-  retry:bool;
+  PopOperationType:PopOperationType;
   delivery_timestamp:long;
   next_visible_timestamp:long;
 }
@@ -27,12 +32,6 @@ table OperationLogItem {
   operation:Operation;
 }
 
-enum PopOperationType:short {
-    POP_NORMAL,
-    POP_RETRY,
-    POP_ORDER
-}
-
 table PopOperation {
   consumer_group_id:long;
   topic_id:long;
@@ -41,7 +40,7 @@ table PopOperation {
   count:int;
   invisible_duration:long;
   operation_timestamp:long;
-  retry_offset:long; // only for pop from retry stream
+  end_mark:bool; // only used to advance consume offset when the last one message is popped but be filtered
   type:PopOperationType;
 }
 
@@ -65,16 +64,15 @@ table ChangeInvisibleDurationOperation {
 table OperationSnapshot {
   trim_offset:long;
   pop_operations:[PopOperation];
-  ConsumerGroupMetadatas:[ConsumerGroupMetadata];
+  consumer_group_metadatas:[ConsumerGroupMetadata];
 }
 
 table ConsumerGroupMetadata {
   consumer_group_id:long;
   consume_offset:long;
   ack_offset:long;
-  retry_offset:long;
-  offset_retry_times:[RetryTimes];
-  offset_consume_times:[ConsumeTimes];
+  retry_consume_offset:long;
+  retry_ack_offset:long;
 }
 
 table RetryTimes {

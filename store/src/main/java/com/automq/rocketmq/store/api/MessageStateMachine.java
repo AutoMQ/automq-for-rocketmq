@@ -43,7 +43,9 @@ public interface MessageStateMachine {
 
     CompletableFuture<Long> ackOffset(long consumerGroupId);
 
-    CompletableFuture<Long> retryOffset(long consumerGroupId);
+    CompletableFuture<Long> retryConsumeOffset(long consumerGroupId);
+
+    CompletableFuture<Long> retryAckOffset(long consumerGroupId);
 
     CompletableFuture<Boolean> isLocked(long consumerGroupId, long offset);
 }

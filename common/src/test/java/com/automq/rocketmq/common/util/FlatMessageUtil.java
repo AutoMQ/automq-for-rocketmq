@@ -47,7 +47,7 @@ public class FlatMessageUtil {
         systemPropertiesT.setBornTimestamp(System.currentTimeMillis());
         systemPropertiesT.setStoreTimestamp(System.currentTimeMillis());
         systemPropertiesT.setMessageId("0000000001");
-        systemPropertiesT.setDeliveryAttempt(0);
+        systemPropertiesT.setDeliveryAttempts(0);
         flatMessageT.setSystemProperties(systemPropertiesT);
 
         FlatBufferBuilder builder = new FlatBufferBuilder(1024);

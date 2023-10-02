@@ -19,10 +19,8 @@ package com.automq.rocketmq.store.util;
 
 import com.automq.rocketmq.store.model.generated.ChangeInvisibleDurationOperation;
 import com.automq.rocketmq.store.model.generated.CheckPoint;
-import com.automq.rocketmq.store.model.generated.ConsumeTimes;
 import com.automq.rocketmq.store.model.generated.OperationLogItem;
 import com.automq.rocketmq.store.model.generated.ReceiptHandle;
-import com.automq.rocketmq.store.model.generated.RetryTimes;
 import com.automq.rocketmq.store.model.metadata.ConsumerGroupMetadata;
 import com.automq.rocketmq.store.model.operation.AckOperation;
 import com.automq.rocketmq.store.model.operation.Operation;
@@ -32,9 +30,7 @@ import com.google.flatbuffers.FlatBufferBuilder;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Base64;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 public class SerializeUtil {
     // <topicId><queueId><offset><operationId>
@@ -48,10 +44,10 @@ public class SerializeUtil {
     }
 
     public static byte[] buildCheckPointValue(long topicId, int queueId, long offset, int count,
-        long consumerGroupId, long operationId, boolean isOrder, boolean isRetry, long deliveryTimestamp,
+        long consumerGroupId, long operationId, PopOperation.PopOperationType operationType, long deliveryTimestamp,
         long nextVisibleTimestamp) {
         FlatBufferBuilder builder = new FlatBufferBuilder();
-        int root = CheckPoint.createCheckPoint(builder, topicId, queueId, offset, count, consumerGroupId, operationId, isOrder, isRetry, deliveryTimestamp, nextVisibleTimestamp);
+        int root = CheckPoint.createCheckPoint(builder, topicId, queueId, offset, count, consumerGroupId, operationId, operationType.value(), deliveryTimestamp, nextVisibleTimestamp);
         builder.finish(root);
         return builder.sizedByteArray();
     }
@@ -117,7 +113,7 @@ public class SerializeUtil {
         int operation = com.automq.rocketmq.store.model.generated.PopOperation.createPopOperation(builder,
             popOperation.getConsumerGroupId(), popOperation.getTopicId(), popOperation.getQueueId(),
             popOperation.getOffset(), popOperation.getCount(), popOperation.getInvisibleDuration(),
-            popOperation.getOperationTimestamp(), popOperation.getRetryOffset(), (short) popOperation.getPopOperationType().ordinal()
+            popOperation.getOperationTimestamp(), popOperation.isEndMark(), popOperation.getPopOperationType().value()
         );
         int root = OperationLogItem.createOperationLogItem(builder, com.automq.rocketmq.store.model.generated.Operation.PopOperation, operation);
         builder.finish(root);
@@ -129,7 +125,7 @@ public class SerializeUtil {
         return new PopOperation(
             popOperation.consumerGroupId(), popOperation.topicId(), popOperation.queueId(),
             popOperation.offset(), popOperation.count(), popOperation.invisibleDuration(),
-            popOperation.operationTimestamp(), popOperation.retryOffset(), com.automq.rocketmq.store.model.operation.PopOperation.PopOperationType.values()[popOperation.type()]
+            popOperation.operationTimestamp(), popOperation.endMark(), com.automq.rocketmq.store.model.operation.PopOperation.PopOperationType.values()[popOperation.type()]
         );
     }
 
@@ -140,7 +136,7 @@ public class SerializeUtil {
             return new PopOperation(
                 popOperation.consumerGroupId(), popOperation.topicId(), popOperation.queueId(),
                 popOperation.offset(), popOperation.count(), popOperation.invisibleDuration(),
-                popOperation.operationTimestamp(), popOperation.retryOffset(), com.automq.rocketmq.store.model.operation.PopOperation.PopOperationType.values()[popOperation.type()]);
+                popOperation.operationTimestamp(), popOperation.endMark(), com.automq.rocketmq.store.model.operation.PopOperation.PopOperationType.values()[popOperation.type()]);
         } else if (operationLogItem.operationType() == com.automq.rocketmq.store.model.generated.Operation.AckOperation) {
             com.automq.rocketmq.store.model.generated.AckOperation ackOperation = (com.automq.rocketmq.store.model.generated.AckOperation) operationLogItem.operation(new com.automq.rocketmq.store.model.generated.AckOperation());
             return new AckOperation(
@@ -157,18 +153,8 @@ public class SerializeUtil {
         List<ConsumerGroupMetadata> consumerGroupMetadataList = new ArrayList<>();
         for (int i = 0; i < snapshot.consumerGroupMetadatasLength(); i++) {
             com.automq.rocketmq.store.model.generated.ConsumerGroupMetadata consumerGroupMetadata = snapshot.consumerGroupMetadatas(i);
-            Map<Long, Integer> retryTimes = new HashMap<>(consumerGroupMetadata.offsetRetryTimesLength());
-            for (int j = 0; j < consumerGroupMetadata.offsetRetryTimesLength(); j++) {
-                RetryTimes retryTime = consumerGroupMetadata.offsetRetryTimes(j);
-                retryTimes.put(retryTime.offset(), retryTime.retryTimes());
-            }
-            Map<Long, Integer> consumeTimes = new HashMap<>(consumerGroupMetadata.offsetConsumeTimesLength());
-            for (int j = 0; j < consumerGroupMetadata.offsetConsumeTimesLength(); j++) {
-                ConsumeTimes consumeTime = consumerGroupMetadata.offsetConsumeTimes(j);
-                consumeTimes.put(consumeTime.offset(), consumeTime.consumeTimes());
-            }
             consumerGroupMetadataList.add(new ConsumerGroupMetadata(consumerGroupMetadata.consumerGroupId(),
-                consumerGroupMetadata.consumeOffset(), consumerGroupMetadata.ackOffset(), consumerGroupMetadata.retryOffset(), retryTimes, consumeTimes));
+                consumerGroupMetadata.consumeOffset(), consumerGroupMetadata.ackOffset(), consumerGroupMetadata.retryConsumeOffset(), consumerGroupMetadata.retryAckOffset()));
         }
         List<PopOperation> popOperations = new ArrayList<>();
         for (int i = 0; i < snapshot.popOperationsLength(); i++) {
@@ -176,7 +162,7 @@ public class SerializeUtil {
             popOperations.add(new PopOperation(
                 popOperation.consumerGroupId(), popOperation.topicId(), popOperation.queueId(),
                 popOperation.offset(), popOperation.count(), popOperation.invisibleDuration(),
-                popOperation.operationTimestamp(), popOperation.retryOffset(), com.automq.rocketmq.store.model.operation.PopOperation.PopOperationType.values()[popOperation.type()]));
+                popOperation.operationTimestamp(), popOperation.endMark(), com.automq.rocketmq.store.model.operation.PopOperation.PopOperationType.values()[popOperation.type()]));
         }
 
         return new OperationSnapshot(snapshot.trimOffset(), popOperations, consumerGroupMetadataList);
