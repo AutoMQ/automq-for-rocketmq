@@ -18,6 +18,7 @@
 package com.automq.rocketmq.store.service;
 
 import com.automq.rocketmq.common.model.FlatMessageExt;
+import com.automq.rocketmq.common.util.Lifecycle;
 import com.automq.rocketmq.metadata.StoreMetadataService;
 import com.automq.rocketmq.store.api.TopicQueue;
 import com.automq.rocketmq.store.api.TopicQueueManager;
@@ -32,7 +33,7 @@ import com.automq.rocketmq.store.util.SerializeUtil;
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public class ReviveService implements Runnable {
+public class ReviveService implements Runnable, Lifecycle {
     private Thread thread;
     private final AtomicBoolean started = new AtomicBoolean(false);
 
@@ -60,6 +61,7 @@ public class ReviveService implements Runnable {
         return "ReviveService";
     }
 
+    @Override
     public void start() {
         if (!started.compareAndSet(false, true)) {
             return;
@@ -71,6 +73,7 @@ public class ReviveService implements Runnable {
 
     }
 
+    @Override
     public void shutdown() {
         this.stopped = true;
         this.thread.interrupt();
@@ -144,7 +147,7 @@ public class ReviveService implements Runnable {
                 topicQueue.ackTimeout(SerializeUtil.encodeReceiptHandle(receiptHandle)).join();
             } catch (StoreException e) {
                 // TODO: log exception
-                System.out.println("delete timer tag failed in revive");
+                System.out.println("delete timer tag failed in revive" + e);
             }
         });
     }

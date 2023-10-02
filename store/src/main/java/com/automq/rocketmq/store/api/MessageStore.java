@@ -18,6 +18,7 @@
 package com.automq.rocketmq.store.api;
 
 import com.automq.rocketmq.common.model.generated.FlatMessage;
+import com.automq.rocketmq.common.util.Lifecycle;
 import com.automq.rocketmq.store.model.message.AckResult;
 import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
 import com.automq.rocketmq.store.model.message.Filter;
@@ -25,7 +26,7 @@ import com.automq.rocketmq.store.model.message.PopResult;
 import com.automq.rocketmq.store.model.message.PutResult;
 import java.util.concurrent.CompletableFuture;
 
-public interface MessageStore {
+public interface MessageStore extends Lifecycle {
     /**
      * Pop message from specified topic and queue.
      *
