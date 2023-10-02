@@ -17,8 +17,15 @@
 
 package com.automq.rocketmq.common.config;
 
+import org.apache.rocketmq.common.utils.NetworkUtil;
+
 public class BrokerConfig {
     private String name;
+    /**
+     * If the broker is running on an EC2 instance, this is the instance-id.
+     */
+    private String instanceId;
+    private String address = NetworkUtil.getLocalAddress();
     private ProxyConfig proxy;
     private StoreConfig store;
     private S3StreamConfig s3Stream;
@@ -36,8 +43,20 @@ public class BrokerConfig {
         return s3Stream;
     }
 
+    public ControllerConfig controller() {
+        return controller;
+    }
+
     public String name() {
         return name;
+    }
+
+    public String instanceId() {
+        return instanceId;
+    }
+
+    public String address() {
+        return address;
     }
 
     public BrokerConfig() {
