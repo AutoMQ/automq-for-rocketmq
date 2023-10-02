@@ -86,7 +86,8 @@ public class FlatMessageUtil {
         messageExt.setBrokerName(virtualQueue.brokerName());
         // The original queue id always is 0.
         messageExt.setQueueId(0);
-        messageExt.setQueueOffset(flatMessage.offset());
+        messageExt.setQueueOffset(flatMessage.originalOffset());
+
         ByteBuffer payloadBuffer = flatMessage.message().payloadAsByteBuffer();
 
         // Convert buffer to byte array
@@ -104,7 +105,9 @@ public class FlatMessageUtil {
         messageExt.setStoreTimestamp(systemProperties.storeTimestamp());
         messageExt.setStoreHost(new InetSocketAddress(Objects.requireNonNull(systemProperties.storeHost()), 0));
         messageExt.setMsgId(systemProperties.messageId());
-        messageExt.setReconsumeTimes(systemProperties.deliveryAttempt());
+
+        // Re-consume times is the number of delivery attempts minus 1.
+        messageExt.setReconsumeTimes(systemProperties.deliveryAttempt() - 1);
 
         KeyValue.Vector propertiesVector = flatMessage.message().userPropertiesVector();
         for (int i = 0; i < propertiesVector.length(); i++) {
