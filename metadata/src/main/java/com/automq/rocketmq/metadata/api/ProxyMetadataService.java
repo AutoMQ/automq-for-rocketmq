@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.metadata;
+package com.automq.rocketmq.metadata.api;
 
 import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.MessageQueueAssignment;
@@ -43,10 +43,10 @@ public interface ProxyMetadataService {
 
     /**
      * Query the advertised address of a given broker id.
-     * @param brokerId broker id
+     * @param nodeId node id
      * @return {@link CompletableFuture} of {@link String}
      */
-    CompletableFuture<String> addressOf(int brokerId);
+    CompletableFuture<String> addressOf(int nodeId);
 
     /**
      * Query the consumer group metadata of a given group name

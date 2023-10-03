@@ -17,7 +17,7 @@
 
 package com.automq.rocketmq.store;
 
-import com.automq.rocketmq.metadata.StoreMetadataService;
+import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.stream.s3.metadata.StreamMetadata;
 import com.automq.stream.s3.metadata.StreamState;
 import com.automq.stream.s3.streams.StreamManager;

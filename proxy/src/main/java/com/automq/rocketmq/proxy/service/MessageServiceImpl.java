@@ -25,7 +25,7 @@ import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.util.CommonUtil;
 import com.automq.rocketmq.common.util.Pair;
 import com.automq.rocketmq.controller.exception.ControllerException;
-import com.automq.rocketmq.metadata.ProxyMetadataService;
+import com.automq.rocketmq.metadata.api.ProxyMetadataService;
 import com.automq.rocketmq.proxy.model.VirtualQueue;
 import com.automq.rocketmq.proxy.util.ReceiptHandleUtil;
 import com.automq.rocketmq.store.api.MessageStore;

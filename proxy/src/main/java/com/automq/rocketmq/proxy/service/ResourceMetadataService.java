@@ -21,7 +21,7 @@ import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.GroupType;
 import apache.rocketmq.controller.v1.MessageType;
 import apache.rocketmq.controller.v1.Topic;
-import com.automq.rocketmq.metadata.ProxyMetadataService;
+import com.automq.rocketmq.metadata.api.ProxyMetadataService;
 import java.util.concurrent.CompletableFuture;
 import org.apache.rocketmq.common.attribute.TopicMessageType;
 import org.apache.rocketmq.proxy.common.ProxyContext;

@@ -18,7 +18,7 @@
 package com.automq.rocketmq.proxy;
 
 import com.automq.rocketmq.common.config.ProxyConfig;
-import com.automq.rocketmq.metadata.ProxyMetadataService;
+import com.automq.rocketmq.metadata.api.ProxyMetadataService;
 import com.automq.rocketmq.proxy.service.LockService;
 import com.automq.rocketmq.proxy.service.MessageServiceImpl;
 import com.automq.rocketmq.proxy.service.ResourceMetadataService;

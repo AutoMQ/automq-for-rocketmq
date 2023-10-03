@@ -818,7 +818,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
         Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
         try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            ConsumerGroup got = metadataStore.getGroup(groupId).get();
+            ConsumerGroup got = metadataStore.describeConsumerGroup(groupId, null).get();
             Assertions.assertEquals(5, got.getMaxDeliveryAttempt());
             Assertions.assertEquals(GroupType.GROUP_TYPE_STANDARD, got.getGroupType());
             Assertions.assertEquals(1L, got.getDeadLetterTopicId());

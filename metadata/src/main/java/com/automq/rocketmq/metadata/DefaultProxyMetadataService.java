@@ -21,15 +21,19 @@ import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
+import com.automq.rocketmq.controller.metadata.database.dao.Node;
+import com.automq.rocketmq.metadata.api.ProxyMetadataService;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 public class DefaultProxyMetadataService implements ProxyMetadataService {
     private final MetadataStore metadataStore;
+    private final Node node;
 
-    public DefaultProxyMetadataService(MetadataStore metadataStore) {
+    public DefaultProxyMetadataService(MetadataStore metadataStore, Node node) {
         this.metadataStore = metadataStore;
+        this.node = node;
     }
 
     @Override
@@ -39,17 +43,19 @@ public class DefaultProxyMetadataService implements ProxyMetadataService {
 
     @Override
     public CompletableFuture<List<MessageQueueAssignment>> queueAssignmentsOf(String topicName) {
-        return null;
+        return metadataStore.describeTopic(null, topicName)
+            .thenApply(topic -> topic.getAssignmentsList().stream().filter(assignment -> assignment.getNodeId() == node.getId()).toList());
     }
 
     @Override
-    public CompletableFuture<String> addressOf(int brokerId) {
-        return null;
+    public CompletableFuture<String> addressOf(int nodeId) {
+        // TODO: Just for testing, return the address of current node
+        return CompletableFuture.completedFuture(node.getAddress());
     }
 
     @Override
     public CompletableFuture<ConsumerGroup> consumerGroupOf(String groupName) {
-        return null;
+        return metadataStore.describeConsumerGroup(null, groupName);
     }
 
     @Override

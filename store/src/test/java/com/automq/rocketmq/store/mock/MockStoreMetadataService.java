@@ -21,7 +21,7 @@ import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
 import com.automq.rocketmq.common.util.Pair;
-import com.automq.rocketmq.metadata.StoreMetadataService;
+import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
