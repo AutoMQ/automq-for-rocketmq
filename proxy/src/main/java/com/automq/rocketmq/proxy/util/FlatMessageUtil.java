@@ -37,6 +37,8 @@ import org.apache.rocketmq.common.message.MessageAccessor;
 import org.apache.rocketmq.common.message.MessageConst;
 import org.apache.rocketmq.common.message.MessageExt;
 
+import static com.automq.rocketmq.proxy.util.ReceiptHandleUtil.encodeReceiptHandle;
+
 /**
  * An utility class to convert RocketMQ message models to {@link FlatMessage}, and vice versa.
  */
@@ -78,7 +80,7 @@ public class FlatMessageUtil {
         return FlatMessage.getRootAsFlatMessage(builder.dataBuffer());
     }
 
-    public static MessageExt convertFrom(FlatMessageExt flatMessage, String topicName) {
+    public static MessageExt convertFrom(FlatMessageExt flatMessage, String topicName, long invisibleTime) {
         MessageExt messageExt = new MessageExt();
 
         VirtualQueue virtualQueue = new VirtualQueue(flatMessage.message().topicId(), flatMessage.message().queueId());
@@ -116,14 +118,14 @@ public class FlatMessageUtil {
             messageExt.putUserProperty(keyValue.key(), keyValue.value());
         }
 
-        fillSystemProperties(messageExt, flatMessage);
+        fillSystemProperties(messageExt, flatMessage, invisibleTime);
 
         return messageExt;
     }
 
-    public static List<MessageExt> convertFrom(List<FlatMessageExt> messageList, String topicName) {
+    public static List<MessageExt> convertFrom(List<FlatMessageExt> messageList, String topicName, long invisibleTime) {
         return messageList.stream()
-            .map(messageExt -> convertFrom(messageExt, topicName))
+            .map(messageExt -> convertFrom(messageExt, topicName, invisibleTime))
             .toList();
     }
 
@@ -163,9 +165,9 @@ public class FlatMessageUtil {
         return systemPropertiesT;
     }
 
-    private static void fillSystemProperties(MessageExt messageExt, FlatMessageExt flatMessage) {
+    private static void fillSystemProperties(MessageExt messageExt, FlatMessageExt flatMessage, long invisibleTime) {
         SystemProperties systemProperties = flatMessage.message().systemProperties();
-        MessageAccessor.putProperty(messageExt, MessageConst.PROPERTY_POP_CK, flatMessage.receiptHandle().orElseThrow());
+        MessageAccessor.putProperty(messageExt, MessageConst.PROPERTY_POP_CK, encodeReceiptHandle(flatMessage.receiptHandle().orElseThrow(), invisibleTime));
         MessageAccessor.putProperty(messageExt, MessageConst.PROPERTY_TAGS, flatMessage.message().tag());
         MessageAccessor.putProperty(messageExt, MessageConst.PROPERTY_KEYS, flatMessage.message().keys());
         MessageAccessor.putProperty(messageExt, MessageConst.PROPERTY_SHARDING_KEY, flatMessage.message().messageGroup());
