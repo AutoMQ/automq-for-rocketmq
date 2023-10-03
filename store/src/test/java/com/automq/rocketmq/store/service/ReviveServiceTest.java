@@ -74,8 +74,9 @@ class ReviveServiceTest {
         streamStore = new MockStreamStore();
         stateMachine = new DefaultMessageStateMachine(TOPIC_ID, QUEUE_ID, kvService);
         inflightService = new InflightService();
+        SnapshotService snapshotService = new SnapshotService(streamStore, kvService);
         topicQueue = new StreamTopicQueue(new StoreConfig(), TOPIC_ID, QUEUE_ID, metadataService, stateMachine,
-            streamStore, inflightService);
+            streamStore, inflightService, snapshotService);
         TopicQueueManager manager = Mockito.mock(TopicQueueManager.class);
         Mockito.when(manager.get(TOPIC_ID, QUEUE_ID)).thenReturn(topicQueue);
         reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, KV_NAMESPACE_TIMER_TAG, kvService, metadataService, inflightService, manager);

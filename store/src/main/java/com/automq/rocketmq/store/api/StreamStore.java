@@ -57,6 +57,8 @@ public interface StreamStore extends Lifecycle {
 
     CompletableFuture<Void> open(long streamId);
 
+    CompletableFuture<Void> trim(long streamId, long newStartOffset);
+
     /**
      * Get stream start record offset.
      */

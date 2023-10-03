@@ -35,6 +35,9 @@ public class StoreConfig {
     // Used for storing KV data based on RocksDB
     private String kvPath = "/tmp/rocketmq/kvstore";
 
+    // DEFAULT is 1000 * 1000, unit in records
+    private int operationSnapshotInterval = 1000 * 1000;
+
     public int maxFetchCount() {
         return maxFetchCount;
     }
@@ -53,5 +56,9 @@ public class StoreConfig {
 
     public String kvPath() {
         return kvPath;
+    }
+
+    public int operationSnapshotInterval() {
+        return operationSnapshotInterval;
     }
 }

@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.store.service;
 
+import com.automq.rocketmq.common.config.StoreConfig;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.store.api.MessageStateMachine;
 import com.automq.rocketmq.store.api.StreamStore;
@@ -33,22 +34,35 @@ import com.automq.stream.api.AppendResult;
 import com.automq.stream.api.RecordBatchWithContext;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class StreamOperationLogService implements OperationLogService {
-
+    private final long topicId;
+    private final int queueId;
     private final long opStreamId;
     private final long snapshotStreamId;
     private final StreamStore streamStore;
     private final StoreMetadataService metadataService;
     private final MessageStateMachine stateMachine;
+    private final SnapshotService snapshotService;
+    private final StoreConfig storeConfig;
+    private final AtomicLong snapshotEndOffset = new AtomicLong(-1);
+    private final AtomicLong opStartOffset = new AtomicLong(-1);
+    private final AtomicBoolean takingSnapshot = new AtomicBoolean(false);
 
-    public StreamOperationLogService(long opStreamId, long snapshotStreamId, StreamStore streamStore, StoreMetadataService metadataService,
-        MessageStateMachine stateMachine) {
+    public StreamOperationLogService(long topicId, int queueId,
+        long opStreamId, long snapshotStreamId, StreamStore streamStore, StoreMetadataService metadataService,
+        MessageStateMachine stateMachine, SnapshotService snapshotService, StoreConfig storeConfig) {
+        this.topicId = topicId;
+        this.queueId = queueId;
         this.opStreamId = opStreamId;
         this.snapshotStreamId = snapshotStreamId;
         this.streamStore = streamStore;
         this.metadataService = metadataService;
         this.stateMachine = stateMachine;
+        this.snapshotService = snapshotService;
+        this.storeConfig = storeConfig;
     }
 
     @Override
@@ -56,14 +70,15 @@ public class StreamOperationLogService implements OperationLogService {
         // TODO: clear all states of this queue before start
 
         // 1. get snapshot
-        long snapshotStartOffset = streamStore.startOffset(snapshotStreamId);
-        long snapshotEndOffset = streamStore.nextOffset(snapshotStreamId);
+        long snapStartOffset = streamStore.startOffset(snapshotStreamId);
+        snapshotEndOffset.set(streamStore.nextOffset(snapshotStreamId));
         CompletableFuture<OperationSnapshot> snapshotFetch;
-        if (snapshotStartOffset == snapshotEndOffset) {
+        long snapEndOffset = snapshotEndOffset.get();
+        if (snapStartOffset == snapEndOffset) {
             // no snapshot
             snapshotFetch = CompletableFuture.completedFuture(null);
         } else {
-            snapshotFetch = streamStore.fetch(snapshotStreamId, snapshotEndOffset - 1, 1)
+            snapshotFetch = streamStore.fetch(snapshotStreamId, snapEndOffset - 1, 1)
                 .thenApply(result -> {
                     return SerializeUtil.decodeOperationSnapshot(result.recordBatchList().get(0).rawPayload());
                 });
@@ -71,6 +86,7 @@ public class StreamOperationLogService implements OperationLogService {
         // 2. get all operations
         long startOffset = streamStore.startOffset(opStreamId);
         long endOffset = streamStore.nextOffset(opStreamId);
+        opStartOffset.set(startOffset);
         // TODO: batch fetch, fetch all at once may case some problems
         return snapshotFetch.thenCombine(streamStore.fetch(opStreamId, startOffset, (int) (endOffset - startOffset)), (snapshot, result) -> {
             // load snapshot first
@@ -106,8 +122,26 @@ public class StreamOperationLogService implements OperationLogService {
             } catch (StoreException e) {
                 throw new RuntimeException(e);
             }
+            if (result.baseOffset() - opStartOffset.get() >= storeConfig.operationSnapshotInterval()) {
+                notifySnapshot();
+            }
             return result.baseOffset();
         });
+    }
+
+    private void notifySnapshot() {
+        if (this.takingSnapshot.compareAndSet(false, true)) {
+            CompletableFuture<Long> taskCf = snapshotService.addSnapshotTask(new SnapshotService.SnapshotTask(
+                topicId,
+                queueId,
+                opStreamId,
+                snapshotStreamId,
+                stateMachine::takeSnapshot));
+            taskCf.thenAccept(newStartOffset -> {
+                this.takingSnapshot.set(false);
+                this.opStartOffset.set(newStartOffset);
+            });
+        }
     }
 
     private void loadSnapshot(OperationSnapshot snapshot) throws StoreException {

@@ -30,6 +30,7 @@ import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
 import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PopResult;
 import com.automq.rocketmq.store.model.message.PutResult;
+import com.automq.rocketmq.store.service.SnapshotService;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.service.InflightService;
 import com.automq.rocketmq.store.service.ReviveService;
@@ -53,6 +54,7 @@ public class MessageStoreImpl implements MessageStore {
 
     private ReviveService reviveService;
     private final InflightService inflightService;
+    private final SnapshotService snapshotService;
 
     private final TopicQueueManager topicQueueManager;
 
@@ -65,7 +67,8 @@ public class MessageStoreImpl implements MessageStore {
         this.kvService = kvService;
         this.inflightService = inflightService;
         this.topicQueueManager = topicQueueManager;
-        this.reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, KV_NAMESPACE_TIMER_TAG, kvService, metadataService, this.inflightService, this.topicQueueManager);
+        this.reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, KV_NAMESPACE_TIMER_TAG, kvService, metadataService, inflightService, topicQueueManager);
+        this.snapshotService = new SnapshotService(streamStore, kvService);
     }
 
     @Override
@@ -75,6 +78,7 @@ public class MessageStoreImpl implements MessageStore {
         }
         streamStore.start();
         reviveService.start();
+        snapshotService.start();
     }
 
     @Override
@@ -82,6 +86,7 @@ public class MessageStoreImpl implements MessageStore {
         if (!started.compareAndSet(true, false)) {
             return;
         }
+        snapshotService.shutdown();
         reviveService.shutdown();
         streamStore.shutdown();
     }

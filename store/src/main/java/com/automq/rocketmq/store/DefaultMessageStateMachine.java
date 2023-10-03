@@ -31,9 +31,9 @@ import com.automq.rocketmq.store.model.operation.Operation;
 import com.automq.rocketmq.store.model.operation.OperationSnapshot;
 import com.automq.rocketmq.store.model.operation.PopOperation;
 import com.automq.rocketmq.store.service.api.KVService;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.BitSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,6 +44,7 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import org.roaringbitmap.longlong.Roaring64Bitmap;
 
 import static com.automq.rocketmq.store.MessageStoreImpl.KV_NAMESPACE_CHECK_POINT;
 import static com.automq.rocketmq.store.MessageStoreImpl.KV_NAMESPACE_FIFO_INDEX;
@@ -56,6 +57,9 @@ import static com.automq.rocketmq.store.util.SerializeUtil.buildReceiptHandle;
 import static com.automq.rocketmq.store.util.SerializeUtil.buildTimerTagKey;
 
 public class DefaultMessageStateMachine implements MessageStateMachine {
+
+    public static final long DEFAULT_SNAPSHOT_INTERVAL = 1000 * 1000; // unit: record
+
     // TODO: concurrent protection
     private final long topicId;
     private final int queueId;
@@ -63,6 +67,7 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
     private Map<Long/*consumerGroup*/, AckCommitter> ackCommitterMap = new HashMap<>();
     private Map<Long/*consumerGroup*/, AckCommitter> retryAckCommitterMap = new HashMap<>();
     private long currentOperationOffset = -1;
+    private long lastSnapshotOffset = -1;
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
     private final Lock readLock = lock.readLock();
     private final Lock writeLock = lock.writeLock();
@@ -98,7 +103,8 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
         }
     }
 
-    private CompletableFuture<Void> replayPopNormalOperation(long operationOffset, PopOperation operation) throws StoreException {
+    private CompletableFuture<Void> replayPopNormalOperation(long operationOffset,
+        PopOperation operation) throws StoreException {
         long topicId = operation.getTopicId();
         int queueId = operation.getQueueId();
         long offset = operation.getOffset();
@@ -141,7 +147,8 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
         return CompletableFuture.completedFuture(null);
     }
 
-    private CompletableFuture<Void> replayPopRetryOperation(long operationOffset, PopOperation operation) throws StoreException {
+    private CompletableFuture<Void> replayPopRetryOperation(long operationOffset,
+        PopOperation operation) throws StoreException {
         long topicId = operation.getTopicId();
         int queueId = operation.getQueueId();
         long offset = operation.getOffset();
@@ -184,7 +191,8 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
         return CompletableFuture.completedFuture(null);
     }
 
-    private CompletableFuture<Void> replayPopFifoOperation(long operationOffset, PopOperation operation) throws StoreException {
+    private CompletableFuture<Void> replayPopFifoOperation(long operationOffset,
+        PopOperation operation) throws StoreException {
         long topicId = operation.getTopicId();
         int queueId = operation.getQueueId();
         long offset = operation.getOffset();
@@ -306,7 +314,8 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
     }
 
     @Override
-    public CompletableFuture<Void> replayChangeInvisibleDurationOperation(long operationOffset, ChangeInvisibleDurationOperation operation) {
+    public CompletableFuture<Void> replayChangeInvisibleDurationOperation(long operationOffset,
+        ChangeInvisibleDurationOperation operation) {
         long invisibleDuration = operation.getInvisibleDuration();
         long operationTimestamp = operation.getOperationTimestamp();
         long topic = operation.getTopicId();
@@ -348,8 +357,27 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
 
     @Override
     public CompletableFuture<OperationSnapshot> takeSnapshot() {
-
-        return null;
+        readLock.lock();
+        try {
+            List<OperationSnapshot.ConsumerGroupMetadataSnapshot> metadataSnapshots = consumerGroupMetadataMap.values().stream().map(metadata -> {
+                try {
+                    return new OperationSnapshot.ConsumerGroupMetadataSnapshot(metadata.getConsumerGroupId(), metadata.getConsumeOffset(), metadata.getAckOffset(),
+                        metadata.getRetryConsumeOffset(), metadata.getRetryAckOffset(),
+                        getAckCommitter(metadata.getConsumerGroupId()).getAckBitmapBuffer(),
+                        getRetryAckCommitter(metadata.getConsumerGroupId()).getAckBitmapBuffer());
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }).collect(Collectors.toList());
+            long snapshotVersion = kvService.takeSnapshot();
+            OperationSnapshot snapshot = new OperationSnapshot(currentOperationOffset, snapshotVersion, metadataSnapshots);
+            return CompletableFuture.completedFuture(snapshot);
+        } catch (Exception e) {
+            // TODO: log
+            return CompletableFuture.failedFuture(e);
+        } finally {
+            readLock.unlock();
+        }
     }
 
     @Override
@@ -405,47 +433,41 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
     }
 
     class AckCommitter {
-        public static final int BIT_SET_SIZE = 1024 * 8; // 1KB
-        public static final float BIT_SET_LOAD_FACTOR = 0.75f;
         private final long consumerGroupId;
         private long ackOffset;
-        private long baseOffset;
-        private BitSet bitSet;
+        private Roaring64Bitmap bitmap;
         private Consumer<Long> ackAdvanceFn;
 
         public AckCommitter(long consumerGroupId, long ackOffset, Consumer<Long> ackAdvanceFn) {
+            this(consumerGroupId, ackOffset, ackAdvanceFn, new Roaring64Bitmap());
+        }
+
+        public AckCommitter(long consumerGroupId, long ackOffset, Consumer<Long> ackAdvanceFn, Roaring64Bitmap bitmap) {
             this.consumerGroupId = consumerGroupId;
             this.ackOffset = ackOffset;
-            this.baseOffset = ackOffset;
             this.ackAdvanceFn = ackAdvanceFn;
-            this.bitSet = new BitSet(BIT_SET_SIZE);
+            this.bitmap = bitmap;
         }
 
         public void commitAck(long offset) {
             if (offset >= ackOffset) {
-                bitSet.set((int) (offset - baseOffset));
+                bitmap.add(offset);
                 boolean advance = false;
-                while (bitSet.get((int) (ackOffset - baseOffset))) {
+                while (bitmap.contains(ackOffset)) {
                     ackOffset++;
                     advance = true;
                 }
                 if (advance) {
                     ackAdvanceFn.accept(ackOffset);
-                    if (ackOffset - baseOffset >= BIT_SET_SIZE * BIT_SET_LOAD_FACTOR) {
-                        rollingBitSet();
-                    }
                 }
             }
         }
 
-        private void rollingBitSet() {
-            BitSet newBitSet = new BitSet(BIT_SET_SIZE);
-            long newBaseOffset = ackOffset;
-            for (int i = (int) (ackOffset - baseOffset); i < BIT_SET_SIZE; i++) {
-                newBitSet.set(i - (int) (ackOffset - baseOffset), bitSet.get(i));
-            }
-            this.bitSet = newBitSet;
-            this.baseOffset = newBaseOffset;
+        public ByteBuffer getAckBitmapBuffer() throws IOException {
+            long length = bitmap.serializedSizeInBytes();
+            ByteBuffer buffer = ByteBuffer.allocate((int) length);
+            bitmap.serialize(buffer);
+            return buffer;
         }
     }
 }

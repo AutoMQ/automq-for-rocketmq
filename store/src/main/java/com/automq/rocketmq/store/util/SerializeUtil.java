@@ -21,7 +21,6 @@ import com.automq.rocketmq.store.model.generated.ChangeInvisibleDurationOperatio
 import com.automq.rocketmq.store.model.generated.CheckPoint;
 import com.automq.rocketmq.store.model.generated.OperationLogItem;
 import com.automq.rocketmq.store.model.generated.ReceiptHandle;
-import com.automq.rocketmq.store.model.metadata.ConsumerGroupMetadata;
 import com.automq.rocketmq.store.model.operation.AckOperation;
 import com.automq.rocketmq.store.model.operation.Operation;
 import com.automq.rocketmq.store.model.operation.OperationSnapshot;
@@ -143,24 +142,47 @@ public class SerializeUtil {
         return null;
     }
 
+    public static byte[] encodeOperationSnapshot(OperationSnapshot snapshot) {
+        FlatBufferBuilder builder = new FlatBufferBuilder();
+        int[] consumerGroupMetadataOffsets = new int[snapshot.getConsumerGroupMetadataList().size()];
+        for (int i = 0; i < snapshot.getConsumerGroupMetadataList().size(); i++) {
+            OperationSnapshot.ConsumerGroupMetadataSnapshot consumerGroupMetadata = snapshot.getConsumerGroupMetadataList().get(i);
+            int ackOffsetBitmapOffset = builder.createByteVector(consumerGroupMetadata.getAckOffsetBitmapBuffer());
+            int retryAckOffsetBitmapOffset = builder.createByteVector(consumerGroupMetadata.getRetryAckOffsetBitmapBuffer());
+            int consumerGroupMetadataOffset = com.automq.rocketmq.store.model.generated.ConsumerGroupMetadata.createConsumerGroupMetadata(builder,
+                consumerGroupMetadata.getConsumerGroupId(), consumerGroupMetadata.getConsumeOffset(), consumerGroupMetadata.getAckOffset(),
+                ackOffsetBitmapOffset,
+                consumerGroupMetadata.getRetryConsumeOffset(), consumerGroupMetadata.getRetryAckOffset(),
+                retryAckOffsetBitmapOffset);
+            consumerGroupMetadataOffsets[i] = consumerGroupMetadataOffset;
+        }
+        int consumerGroupMetadataVectorOffset = com.automq.rocketmq.store.model.generated.OperationSnapshot.createConsumerGroupMetadatasVector(builder, consumerGroupMetadataOffsets);
+        int[] checkPointOffsets = new int[snapshot.getCheckPoints().size()];
+        for (int i = 0; i < snapshot.getCheckPoints().size(); i++) {
+            CheckPoint checkPoint = snapshot.getCheckPoints().get(i);
+            int checkPointOffset = CheckPoint.createCheckPoint(builder, checkPoint.topicId(), checkPoint.queueId(), checkPoint.messageOffset(), checkPoint.count(), checkPoint.consumerGroupId(), checkPoint.operationId(), (short) 0, 0, 0);
+            checkPointOffsets[i] = checkPointOffset;
+        }
+        int checkPointVectorOffset = com.automq.rocketmq.store.model.generated.OperationSnapshot.createCheckPointsVector(builder, checkPointOffsets);
+        int root = com.automq.rocketmq.store.model.generated.OperationSnapshot.createOperationSnapshot(builder, snapshot.getSnapshotEndOffset(), consumerGroupMetadataVectorOffset, checkPointVectorOffset);
+        builder.finish(root);
+        return builder.sizedByteArray();
+    }
+
     public static OperationSnapshot decodeOperationSnapshot(ByteBuffer buffer) {
         com.automq.rocketmq.store.model.generated.OperationSnapshot snapshot = com.automq.rocketmq.store.model.generated.OperationSnapshot.getRootAsOperationSnapshot(buffer);
-        List<ConsumerGroupMetadata> consumerGroupMetadataList = new ArrayList<>();
+        List<OperationSnapshot.ConsumerGroupMetadataSnapshot> consumerGroupMetadataList = new ArrayList<>();
         for (int i = 0; i < snapshot.consumerGroupMetadatasLength(); i++) {
             com.automq.rocketmq.store.model.generated.ConsumerGroupMetadata consumerGroupMetadata = snapshot.consumerGroupMetadatas(i);
-            consumerGroupMetadataList.add(new ConsumerGroupMetadata(consumerGroupMetadata.consumerGroupId(),
-                consumerGroupMetadata.consumeOffset(), consumerGroupMetadata.ackOffset(), consumerGroupMetadata.retryConsumeOffset(), consumerGroupMetadata.retryAckOffset()));
+            consumerGroupMetadataList.add(new OperationSnapshot.ConsumerGroupMetadataSnapshot(consumerGroupMetadata.consumerGroupId(),
+                consumerGroupMetadata.consumeOffset(), consumerGroupMetadata.ackOffset(), consumerGroupMetadata.retryConsumeOffset(), consumerGroupMetadata.retryAckOffset(),
+                consumerGroupMetadata.ackBitMapAsByteBuffer(), consumerGroupMetadata.retryAckBitMapAsByteBuffer()));
         }
-        List<PopOperation> popOperations = new ArrayList<>();
-        for (int i = 0; i < snapshot.popOperationsLength(); i++) {
-            com.automq.rocketmq.store.model.generated.PopOperation popOperation = snapshot.popOperations(i);
-            popOperations.add(new PopOperation(
-                popOperation.consumerGroupId(), popOperation.topicId(), popOperation.queueId(),
-                popOperation.offset(), popOperation.count(), popOperation.invisibleDuration(),
-                popOperation.operationTimestamp(), popOperation.endMark(), com.automq.rocketmq.store.model.operation.PopOperation.PopOperationType.values()[popOperation.type()]));
+        List<CheckPoint> checkPointList = new ArrayList<>(snapshot.checkPointsLength());
+        for (int i = 0; i < snapshot.checkPointsLength(); i++) {
+            checkPointList.add(snapshot.checkPoints(i));
         }
-
-        return new OperationSnapshot(snapshot.trimOffset(), popOperations, consumerGroupMetadataList);
+        return new OperationSnapshot(snapshot.snapshotEndOffset(), consumerGroupMetadataList, checkPointList);
     }
 
     public static byte[] encodeAckOperation(AckOperation ackOperation) {
