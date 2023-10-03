@@ -90,6 +90,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -117,7 +119,10 @@ public class DefaultMetadataStore implements MetadataStore {
 
     private final ConcurrentHashMap<Integer, BrokerNode> nodes;
 
-    private final ScheduledExecutorService executorService;
+    private final ScheduledExecutorService scheduledExecutorService;
+
+    private final ExecutorService asyncExecutorService;
+
 
     /// The following fields are runtime specific
     private Lease lease;
@@ -131,14 +136,15 @@ public class DefaultMetadataStore implements MetadataStore {
         this.role = Role.Follower;
         this.nodes = new ConcurrentHashMap<>();
         this.gson = new Gson();
-        this.executorService = new ScheduledThreadPoolExecutor(Runtime.getRuntime().availableProcessors(),
+        this.scheduledExecutorService = new ScheduledThreadPoolExecutor(Runtime.getRuntime().availableProcessors(),
             new PrefixThreadFactory("Controller"));
+        this.asyncExecutorService = Executors.newFixedThreadPool(10, new PrefixThreadFactory("Controller-Async"));
     }
 
     public void start() {
-        this.executorService.scheduleAtFixedRate(new LeaseTask(this), 1, config.scanIntervalInSecs(), TimeUnit.SECONDS);
-        this.executorService.scheduleWithFixedDelay(new ScanNodeTask(this), 1, config.scanIntervalInSecs(), TimeUnit.SECONDS);
-        this.executorService.scheduleAtFixedRate(new ScanAssignableMessageQueuesTask(this), 1, config.scanIntervalInSecs(), TimeUnit.SECONDS);
+        this.scheduledExecutorService.scheduleAtFixedRate(new LeaseTask(this), 1, config.scanIntervalInSecs(), TimeUnit.SECONDS);
+        this.scheduledExecutorService.scheduleWithFixedDelay(new ScanNodeTask(this), 1, config.scanIntervalInSecs(), TimeUnit.SECONDS);
+        this.scheduledExecutorService.scheduleAtFixedRate(new ScanAssignableMessageQueuesTask(this), 1, config.scanIntervalInSecs(), TimeUnit.SECONDS);
         LOGGER.info("MetadataStore tasks scheduled");
     }
 
@@ -673,29 +679,28 @@ public class DefaultMetadataStore implements MetadataStore {
 
     @Override
     public CompletableFuture<StreamMetadata> getStream(long topicId, int queueId, Long groupId, StreamRole streamRole) {
-        CompletableFuture<StreamMetadata> future = new CompletableFuture<>();
-        try (SqlSession session = getSessionFactory().openSession()) {
-            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
-            List<Stream> streams = streamMapper.list(topicId, queueId, groupId).stream()
-                .filter(stream -> stream.getStreamRole() == streamRole).toList();
-            if (streams.isEmpty()) {
-                ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE,
-                    String.format("Stream for topic-id=%d, queue-id=%d, stream-role=%s is not found", topicId, queueId, streamRole.name()));
-                future.completeExceptionally(e);
-            } else {
-                Stream stream = streams.get(0);
-                StreamMetadata metadata = StreamMetadata.newBuilder()
-                    .setEpoch(stream.getEpoch())
-                    .setStreamId(stream.getId())
-                    .setRangeId(stream.getRangeId())
-                    .setState(stream.getState())
-                    .setStartOffset(stream.getStartOffset())
-                    .build();
-                future.complete(metadata);
+        return CompletableFuture.supplyAsync(() -> {
+            try (SqlSession session = getSessionFactory().openSession()) {
+                StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+                List<Stream> streams = streamMapper.list(topicId, queueId, groupId).stream()
+                    .filter(stream -> stream.getStreamRole() == streamRole).toList();
+                if (streams.isEmpty()) {
+                    ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE,
+                        String.format("Stream for topic-id=%d, queue-id=%d, stream-role=%s is not found", topicId, queueId, streamRole.name()));
+                    // TODO: make ControllerException unchecked
+                    throw new RuntimeException(e);
+                } else {
+                    Stream stream = streams.get(0);
+                    return StreamMetadata.newBuilder()
+                        .setEpoch(stream.getEpoch())
+                        .setStreamId(stream.getId())
+                        .setRangeId(stream.getRangeId())
+                        .setState(stream.getState())
+                        .setStartOffset(stream.getStartOffset())
+                        .build();
+                }
             }
-        }
-
-        return future;
+        }, asyncExecutorService);
     }
 
     @Override
@@ -1540,7 +1545,8 @@ public class DefaultMetadataStore implements MetadataStore {
 
     @Override
     public void close() throws IOException {
-        this.executorService.shutdown();
+        this.scheduledExecutorService.shutdown();
+        this.asyncExecutorService.shutdown();
     }
 
     public void setRole(Role role) {
