@@ -35,6 +35,7 @@ import com.automq.rocketmq.store.model.message.PopResult;
 import com.automq.rocketmq.store.model.message.TagFilter;
 import com.automq.rocketmq.store.service.InflightService;
 import com.automq.rocketmq.store.service.RocksDBKVService;
+import com.automq.rocketmq.store.service.SnapshotService;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.util.SerializeUtil;
 import java.nio.ByteBuffer;
@@ -72,8 +73,9 @@ public class TopicQueueTest {
         streamStore = new MockStreamStore();
         stateMachine = new DefaultMessageStateMachine(TOPIC_ID, QUEUE_ID, kvService);
         inflightService = new InflightService();
+        SnapshotService snapshotService = new SnapshotService(streamStore, kvService);
         topicQueue = new StreamTopicQueue(new StoreConfig(), TOPIC_ID, QUEUE_ID, metadataService, stateMachine,
-            streamStore, inflightService);
+            streamStore, inflightService, snapshotService);
         topicQueue.open().join();
     }
 

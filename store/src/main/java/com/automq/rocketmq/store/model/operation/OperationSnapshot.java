@@ -17,31 +17,65 @@
 
 package com.automq.rocketmq.store.model.operation;
 
+import com.automq.rocketmq.store.model.generated.CheckPoint;
 import com.automq.rocketmq.store.model.metadata.ConsumerGroupMetadata;
+import java.nio.ByteBuffer;
 import java.util.List;
 
 public class OperationSnapshot {
 
     private final long snapshotEndOffset;
-    private final List<PopOperation> popOperations;
-    private final List<ConsumerGroupMetadata> consumerGroupMetadataList;
+    private List<CheckPoint> checkPoints;
+    private long kvServiceSnapshotVersion;
+    private final List<ConsumerGroupMetadataSnapshot> consumerGroupMetadataList;
 
-    public OperationSnapshot(long snapshotEndOffset, List<PopOperation> popOperations, List<ConsumerGroupMetadata> consumerGroupMetadataList) {
+    public OperationSnapshot(long snapshotEndOffset, long kvServiceSnapshotVersion, List<ConsumerGroupMetadataSnapshot> consumerGroupMetadataList) {
         this.snapshotEndOffset = snapshotEndOffset;
-        this.popOperations = popOperations;
+        this.kvServiceSnapshotVersion = kvServiceSnapshotVersion;
         this.consumerGroupMetadataList = consumerGroupMetadataList;
+    }
+
+    public OperationSnapshot(long snapshotEndOffset, List<ConsumerGroupMetadataSnapshot> consumerGroupMetadataList, List<CheckPoint> checkPoints) {
+        this.snapshotEndOffset = snapshotEndOffset;
+        this.consumerGroupMetadataList = consumerGroupMetadataList;
+        this.checkPoints = checkPoints;
     }
 
     public long getSnapshotEndOffset() {
         return snapshotEndOffset;
     }
 
-    public List<PopOperation> getPopOperations() {
-        return popOperations;
+    public List<CheckPoint> getCheckPoints() {
+        return checkPoints;
     }
 
-    public List<ConsumerGroupMetadata> getConsumerGroupMetadataList() {
+    public long getKvServiceSnapshotVersion() {
+        return kvServiceSnapshotVersion;
+    }
+
+    public List<ConsumerGroupMetadataSnapshot> getConsumerGroupMetadataList() {
         return consumerGroupMetadataList;
+    }
+
+    public static class ConsumerGroupMetadataSnapshot extends ConsumerGroupMetadata {
+        private final ByteBuffer ackOffsetBitmapBuffer;
+        private final ByteBuffer retryAckOffsetBitmapBuffer;
+
+        public ConsumerGroupMetadataSnapshot(long consumerGroupId, long consumeOffset, long ackOffset,
+            long retryConsumeOffset, long retryAckOffset,
+            ByteBuffer ackOffsetBitmapBuffer, ByteBuffer retryAckOffsetBitmapBuffer) {
+            super(consumerGroupId, consumeOffset, ackOffset, retryConsumeOffset, retryAckOffset);
+            this.ackOffsetBitmapBuffer = ackOffsetBitmapBuffer;
+            this.retryAckOffsetBitmapBuffer = retryAckOffsetBitmapBuffer;
+        }
+
+        public ByteBuffer getAckOffsetBitmapBuffer() {
+            return ackOffsetBitmapBuffer;
+        }
+
+        public ByteBuffer getRetryAckOffsetBitmapBuffer() {
+            return retryAckOffsetBitmapBuffer;
+        }
     }
 
 }

@@ -62,7 +62,7 @@ public class MockMessageStore implements MessageStore {
     public CompletableFuture<PopResult> pop(long consumerGroupId, long topicId, int queueId, Filter filter,
         int batchSize, boolean fifo, boolean retry, long invisibleDuration) {
         if (retry) {
-            return CompletableFuture.completedFuture(new PopResult(PopResult.Status.END_OF_QUEUE, 0L, 0L, new ArrayList<>()));
+            return CompletableFuture.completedFuture(new PopResult(PopResult.Status.END_OF_QUEUE, 0L, new ArrayList<>()));
         }
 
         List<FlatMessageExt> messageList = messageMap.computeIfAbsent(topicId + queueId, v -> new ArrayList<>());
@@ -79,7 +79,7 @@ public class MockMessageStore implements MessageStore {
             consumeOffset = end;
             inflightService.increaseInflightCount(consumerGroupId, topicId, queueId, messageList.size());
         }
-        return CompletableFuture.completedFuture(new PopResult(status, 0L, 0L, messageList));
+        return CompletableFuture.completedFuture(new PopResult(status, 0L, messageList));
     }
 
     @Override

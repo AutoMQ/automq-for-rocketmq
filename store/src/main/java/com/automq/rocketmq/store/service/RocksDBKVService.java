@@ -21,6 +21,7 @@ import com.automq.rocketmq.store.exception.StoreErrorCode;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.kv.BatchRequest;
 import com.automq.rocketmq.store.model.kv.IteratorCallback;
+import com.automq.rocketmq.store.model.kv.KVReadOptions;
 import com.automq.rocketmq.store.service.api.KVService;
 import java.io.File;
 import java.util.ArrayList;
@@ -40,6 +41,7 @@ import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.RocksIterator;
 import org.rocksdb.Slice;
+import org.rocksdb.Snapshot;
 import org.rocksdb.WriteBatch;
 import org.rocksdb.WriteOptions;
 
@@ -48,6 +50,7 @@ public class RocksDBKVService implements KVService {
     private final ColumnFamilyOptions columnFamilyOptions;
     private final DBOptions dbOptions;
     private final ConcurrentMap<String, ColumnFamilyHandle> columnFamilyNameHandleMap;
+    private final ConcurrentMap<Long, Snapshot> snapshotMap;
     private final RocksDB rocksDB;
     private volatile boolean stopped;
 
@@ -83,6 +86,7 @@ public class RocksDBKVService implements KVService {
             columnFamilyNameHandleMap.put(new String(columnFamilyNames.get(i)),
                 columnFamilyHandles.get(i));
         }
+        snapshotMap = new ConcurrentHashMap<>();
     }
 
     protected interface RocksDBSupplier<T> {
@@ -118,7 +122,7 @@ public class RocksDBKVService implements KVService {
     }
 
     @Override
-    public byte[] get(final String namespace, final byte[] key) throws StoreException {
+    public byte[] get(final String namespace, final byte[] key, final KVReadOptions kvReadOptions) throws StoreException {
         if (stopped) {
             throw new StoreException(StoreErrorCode.KV_SERVICE_IS_NOT_RUNNING, "KV service is stopped.");
         }
@@ -126,10 +130,17 @@ public class RocksDBKVService implements KVService {
         if (!columnFamilyNameHandleMap.containsKey(namespace)) {
             return null;
         }
-
+        ReadOptions readOptions = new ReadOptions();
+        transformKVReadOptions(readOptions, kvReadOptions);
         ColumnFamilyHandle handle = columnFamilyNameHandleMap.get(namespace);
-        return transformException(() -> rocksDB.get(handle, key)
+        return transformException(() -> rocksDB.get(handle, readOptions, key)
             , "Failed to get value from RocksDB.");
+    }
+
+    private void transformKVReadOptions(ReadOptions readOptions, KVReadOptions kvReadOptions) {
+        if (kvReadOptions.isSnapshotRead()) {
+            readOptions.setSnapshot(snapshotMap.get(kvReadOptions.getSnapshotVersion()));
+        }
     }
 
     private boolean checkPrefix(byte[] key, byte[] upperBound) {
@@ -145,7 +156,7 @@ public class RocksDBKVService implements KVService {
     }
 
     @Override
-    public void iterate(final String namespace, IteratorCallback callback) throws StoreException {
+    public void iterate(final String namespace, IteratorCallback callback, KVReadOptions kvReadOptions) throws StoreException {
         if (stopped) {
             throw new StoreException(StoreErrorCode.KV_SERVICE_IS_NOT_RUNNING, "KV service is stopped.");
         }
@@ -158,7 +169,9 @@ public class RocksDBKVService implements KVService {
         if (columnFamilyHandle == null) {
             return;
         }
-        try (RocksIterator iterator = rocksDB.newIterator(columnFamilyHandle)) {
+        ReadOptions readOptions = new ReadOptions();
+        transformKVReadOptions(readOptions, kvReadOptions);
+        try (RocksIterator iterator = rocksDB.newIterator(columnFamilyHandle, readOptions)) {
             for (iterator.seekToFirst(); iterator.isValid(); iterator.next()) {
                 callback.onRead(iterator.key(), iterator.value());
             }
@@ -167,7 +180,7 @@ public class RocksDBKVService implements KVService {
 
     @Override
     public void iterate(final String namespace, final byte[] prefix, final byte[] start,
-        final byte[] end, IteratorCallback callback) throws StoreException {
+        final byte[] end, IteratorCallback callback, KVReadOptions kvReadOptions) throws StoreException {
         if (stopped) {
             throw new StoreException(StoreErrorCode.KV_SERVICE_IS_NOT_RUNNING, "KV service is stopped.");
         }
@@ -198,6 +211,7 @@ public class RocksDBKVService implements KVService {
             readOptions = new ReadOptions();
             readOptions.setTotalOrderSeek(true);
             readOptions.setReadaheadSize(4L * 1024 * 1024);
+            transformKVReadOptions(readOptions, kvReadOptions);
             boolean hasStart = !Objects.isNull(start);
             boolean hasPrefix = !Objects.isNull(prefix);
 
@@ -344,5 +358,27 @@ public class RocksDBKVService implements KVService {
         close();
         transformException(() -> RocksDB.destroyDB(path, new Options()),
             "Failed to destroy RocksDB.");
+    }
+
+    @Override
+    public long takeSnapshot() throws StoreException {
+        if (stopped) {
+            throw new StoreException(StoreErrorCode.KV_SERVICE_IS_NOT_RUNNING, "KV service is stopped.");
+        }
+        Snapshot snapshot = rocksDB.getSnapshot();
+        long snapshotVersion = snapshot.getSequenceNumber();
+        snapshotMap.put(snapshotVersion, snapshot);
+        return snapshotVersion;
+    }
+
+    @Override
+    public void releaseSnapshot(long snapshotVersionId) throws StoreException {
+        if (stopped) {
+            throw new StoreException(StoreErrorCode.KV_SERVICE_IS_NOT_RUNNING, "KV service is stopped.");
+        }
+        Snapshot snapshot = snapshotMap.remove(snapshotVersionId);
+        if (snapshot != null) {
+            snapshot.close();
+        }
     }
 }

@@ -101,6 +101,12 @@ public class S3StreamStore implements StreamStore {
     }
 
     @Override
+    public CompletableFuture<Void> trim(long streamId, long newStartOffset) {
+        Stream stream = openStream(streamId);
+        return stream.trim(newStartOffset);
+    }
+
+    @Override
     public long startOffset(long streamId) {
         Stream stream = openStream(streamId);
         return stream.startOffset();

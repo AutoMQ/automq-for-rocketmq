@@ -37,6 +37,7 @@ import com.automq.rocketmq.store.model.operation.ChangeInvisibleDurationOperatio
 import com.automq.rocketmq.store.model.operation.PopOperation;
 import com.automq.rocketmq.store.model.stream.SingleRecord;
 import com.automq.rocketmq.store.service.InflightService;
+import com.automq.rocketmq.store.service.SnapshotService;
 import com.automq.rocketmq.store.service.StreamOperationLogService;
 import com.automq.rocketmq.store.service.api.OperationLogService;
 import com.automq.rocketmq.store.util.SerializeUtil;
@@ -70,13 +71,14 @@ public class StreamTopicQueue extends TopicQueue {
     private final StreamStore streamStore;
     private final StoreConfig config;
 
-    private InflightService inflightService;
+    private final InflightService inflightService;
+    private final SnapshotService snapshotService;
 
     private final AtomicReference<State> state;
 
     public StreamTopicQueue(StoreConfig config, long topicId, int queueId,
         StoreMetadataService metadataService, MessageStateMachine stateMachine, StreamStore streamStore,
-        InflightService inflightService) {
+        InflightService inflightService, SnapshotService snapshotService) {
         super(topicId, queueId);
         this.config = config;
         this.metadataService = metadataService;
@@ -84,6 +86,7 @@ public class StreamTopicQueue extends TopicQueue {
         this.streamStore = streamStore;
         this.retryStreamIds = new ConcurrentHashMap<>();
         this.inflightService = inflightService;
+        this.snapshotService = snapshotService;
         this.state = new AtomicReference<>(State.INIT);
     }
 
@@ -107,11 +110,15 @@ public class StreamTopicQueue extends TopicQueue {
             ).thenCompose(nil -> {
                 // recover from operation log
                 this.operationLogService = new StreamOperationLogService(
+                    this.topicId,
+                    this.queueId,
                     this.operationStreamId,
                     this.snapshotStreamId,
                     this.streamStore,
                     this.metadataService,
-                    this.stateMachine
+                    this.stateMachine,
+                    this.snapshotService,
+                    this.config
                 );
                 return recover().thenAccept(v -> {
                     state.set(State.OPENED);
