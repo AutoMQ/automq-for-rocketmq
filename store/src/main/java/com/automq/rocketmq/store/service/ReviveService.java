@@ -19,7 +19,7 @@ package com.automq.rocketmq.store.service;
 
 import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.util.Lifecycle;
-import com.automq.rocketmq.metadata.StoreMetadataService;
+import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.store.api.TopicQueue;
 import com.automq.rocketmq.store.api.TopicQueueManager;
 import com.automq.rocketmq.store.exception.StoreException;

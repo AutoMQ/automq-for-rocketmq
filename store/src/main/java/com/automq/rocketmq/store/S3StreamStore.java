@@ -19,7 +19,7 @@ package com.automq.rocketmq.store;
 
 import com.automq.rocketmq.common.config.S3StreamConfig;
 import com.automq.rocketmq.metadata.DefaultStoreMetadataService;
-import com.automq.rocketmq.metadata.StoreMetadataService;
+import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.stream.api.AppendResult;
 import com.automq.stream.api.FetchResult;

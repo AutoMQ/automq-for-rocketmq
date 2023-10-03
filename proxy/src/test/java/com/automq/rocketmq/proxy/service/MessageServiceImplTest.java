@@ -18,7 +18,7 @@
 package com.automq.rocketmq.proxy.service;
 
 import com.automq.rocketmq.common.config.ProxyConfig;
-import com.automq.rocketmq.metadata.ProxyMetadataService;
+import com.automq.rocketmq.metadata.api.ProxyMetadataService;
 import com.automq.rocketmq.proxy.mock.MockMessageStore;
 import com.automq.rocketmq.proxy.mock.MockProxyMetadataService;
 import com.automq.rocketmq.proxy.model.VirtualQueue;

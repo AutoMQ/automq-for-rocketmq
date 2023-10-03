@@ -19,7 +19,7 @@ package com.automq.rocketmq.store.service;
 
 import com.automq.rocketmq.common.config.StoreConfig;
 import com.automq.rocketmq.common.model.generated.FlatMessage;
-import com.automq.rocketmq.metadata.StoreMetadataService;
+import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.store.DefaultMessageStateMachine;
 import com.automq.rocketmq.store.StreamTopicQueue;
 import com.automq.rocketmq.store.api.MessageStateMachine;

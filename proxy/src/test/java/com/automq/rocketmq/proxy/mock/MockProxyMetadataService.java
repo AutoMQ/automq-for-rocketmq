@@ -22,7 +22,7 @@ import apache.rocketmq.controller.v1.MessageQueue;
 import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.MessageType;
 import apache.rocketmq.controller.v1.Topic;
-import com.automq.rocketmq.metadata.ProxyMetadataService;
+import com.automq.rocketmq.metadata.api.ProxyMetadataService;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

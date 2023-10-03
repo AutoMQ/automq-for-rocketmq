@@ -86,7 +86,7 @@ public interface MetadataStore extends Closeable {
 
     CompletableFuture<StreamMetadata> getStream(long topicId, int queueId, Long groupId, StreamRole streamRole);
 
-    CompletableFuture<ConsumerGroup> getGroup(long groupId);
+    CompletableFuture<ConsumerGroup> describeConsumerGroup(Long groupId, String groupName);
 
     void trimStream(long streamId, long streamEpoch, long newStartOffset) throws ControllerException;
 

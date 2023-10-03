@@ -23,9 +23,11 @@ import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.StreamRole;
 import com.automq.rocketmq.common.util.Pair;
-import com.automq.rocketmq.controller.metadata.ControllerConfig;
+import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.DefaultMetadataStore;
+import com.automq.rocketmq.controller.metadata.database.dao.Node;
+import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -38,14 +40,11 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
 
     private final MetadataStore metadataStore;
 
-    /**
-     * Provides identify and its epoch for the store.
-     */
-    private final ControllerConfig config;
+    private final Node node;
 
-    public DefaultStoreMetadataService(MetadataStore metadataStore, ControllerConfig config) {
+    public DefaultStoreMetadataService(MetadataStore metadataStore, Node node) {
         this.metadataStore = metadataStore;
-        this.config = config;
+        this.node = node;
     }
 
     @Override
@@ -90,7 +89,7 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
     @Override
     public int getMaxDeliveryAttempts(long consumerGroupId) {
         try {
-            ConsumerGroup group = metadataStore.getGroup(consumerGroupId).get();
+            ConsumerGroup group = metadataStore.describeConsumerGroup(consumerGroupId, null).get();
             return group.getMaxDeliveryAttempt();
         } catch (ExecutionException | InterruptedException e) {
             LOGGER.error("Exception raised while retrieving group for {}", consumerGroupId, e);
@@ -110,7 +109,7 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
 
     @Override
     public CompletableFuture<StreamMetadata> snapshotStreamOf(long topicId, int queueId) {
-        return null;
+        throw new RuntimeException("Unsupported operation");
     }
 
     @Override
@@ -125,13 +124,19 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
 
     @Override
     public CompletableFuture<Integer> maxDeliveryAttemptsOf(long consumerGroupId) {
-        return metadataStore.getGroup(consumerGroupId).thenApply((ConsumerGroup::getMaxDeliveryAttempt));
+        return metadataStore.describeConsumerGroup(consumerGroupId, null).thenApply((ConsumerGroup::getMaxDeliveryAttempt));
     }
 
     @Override
     public CompletableFuture<Void> trimStream(long streamId, long streamEpoch,
         long newStartOffset) {
-        return null;
+        // TODO: Make trim stream async
+        try {
+            metadataStore.trimStream(streamId, streamEpoch, newStartOffset);
+        } catch (ControllerException e) {
+            return CompletableFuture.failedFuture(e);
+        }
+        return CompletableFuture.completedFuture(null);
     }
 
     @Override
@@ -146,44 +151,56 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
 
     @Override
     public CompletableFuture<List<StreamMetadata>> listOpenStreams() {
-        return metadataStore.listOpenStreams(config.nodeId(), config.epoch());
+        return metadataStore.listOpenStreams(node.getId(), node.getEpoch());
     }
 
     @Override
     public CompletableFuture<Long> prepareS3Objects(int count, int ttlInMinutes) {
-        return null;
+        return metadataStore.prepareS3Objects(count, ttlInMinutes);
     }
 
     @Override
     public CompletableFuture<Void> commitWalObject(S3WALObject walObject, List<S3StreamObject> streamObjects,
         List<Long> compactedObjects) {
-        return null;
+        return metadataStore.commitWalObject(walObject, streamObjects, compactedObjects);
     }
 
     @Override
     public CompletableFuture<Void> commitStreamObject(S3StreamObject streamObject, List<Long> compactedObjects) {
-        return null;
+        return metadataStore.commitStreamObject(streamObject, compactedObjects);
     }
 
     @Override
     public CompletableFuture<List<S3WALObject>> listWALObjects() {
-        return null;
+        // TODO: Make list WAL objects async
+        List<S3WALObject> walObjects;
+        try {
+            walObjects = metadataStore.listWALObjects();
+        } catch (ControllerException e) {
+            return CompletableFuture.failedFuture(e);
+        }
+        return CompletableFuture.completedFuture(walObjects);
     }
 
     @Override
     public CompletableFuture<List<S3WALObject>> listWALObjects(long streamId, long startOffset, long endOffset,
         int limit) {
-        return null;
+        // TODO: Make list WAL objects async
+        return CompletableFuture.completedFuture(metadataStore.listWALObjects(streamId, startOffset, endOffset, limit));
     }
 
     @Override
     public CompletableFuture<List<S3StreamObject>> listStreamObjects(long streamId, long startOffset, long endOffset,
         int limit) {
-        return null;
+        // TODO: Make list stream objects async
+        return CompletableFuture.completedFuture(metadataStore.listStreamObjects(streamId, startOffset, endOffset, limit));
     }
 
     public CompletableFuture<Pair<List<S3StreamObject>, List<S3WALObject>>> listObjects(long streamId, long startOffset,
         long endOffset, int limit) {
-        return null;
+        // TODO: 1. Make listObjects async 2. Make an atomic listObjects
+        return CompletableFuture.completedFuture(new Pair<>(
+            metadataStore.listStreamObjects(streamId, startOffset, endOffset, limit),
+            metadataStore.listWALObjects(streamId, startOffset, endOffset, limit)));
     }
 }

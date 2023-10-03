@@ -704,11 +704,11 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public CompletableFuture<ConsumerGroup> getGroup(long groupId) {
+    public CompletableFuture<ConsumerGroup> describeConsumerGroup(Long groupId, String groupName) {
         CompletableFuture<ConsumerGroup> future = new CompletableFuture<>();
         try (SqlSession session = getSessionFactory().openSession()) {
             GroupMapper groupMapper = session.getMapper(GroupMapper.class);
-            List<Group> groups = groupMapper.list(groupId, null, null, null);
+            List<Group> groups = groupMapper.list(groupId, groupName, null, null);
             if (groups.isEmpty()) {
                 ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE,
                     String.format("Group with group-id=%d is not found", groupId));
