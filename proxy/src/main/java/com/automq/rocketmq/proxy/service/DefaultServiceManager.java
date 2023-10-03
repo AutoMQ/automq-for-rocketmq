@@ -15,14 +15,10 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.proxy;
+package com.automq.rocketmq.proxy.service;
 
 import com.automq.rocketmq.common.config.ProxyConfig;
 import com.automq.rocketmq.metadata.api.ProxyMetadataService;
-import com.automq.rocketmq.proxy.service.LockService;
-import com.automq.rocketmq.proxy.service.MessageServiceImpl;
-import com.automq.rocketmq.proxy.service.ResourceMetadataService;
-import com.automq.rocketmq.proxy.service.TopicRouteServiceImpl;
 import com.automq.rocketmq.store.api.MessageStore;
 import org.apache.rocketmq.broker.client.ConsumerGroupEvent;
 import org.apache.rocketmq.broker.client.ConsumerIdsChangeListener;

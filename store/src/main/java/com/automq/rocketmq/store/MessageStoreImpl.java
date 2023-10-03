@@ -52,18 +52,20 @@ public class MessageStoreImpl implements MessageStore {
     private final KVService kvService;
 
     private ReviveService reviveService;
-    private final InflightService inflightService = new InflightService();
+    private final InflightService inflightService;
 
     private final TopicQueueManager topicQueueManager;
 
     public MessageStoreImpl(StoreConfig config, StreamStore streamStore,
-        StoreMetadataService metadataService, KVService kvService, TopicQueueManager topicQueueManager) {
+        StoreMetadataService metadataService, KVService kvService, InflightService inflightService,
+        TopicQueueManager topicQueueManager) {
         this.config = config;
         this.streamStore = streamStore;
         this.metadataService = metadataService;
         this.kvService = kvService;
+        this.inflightService = inflightService;
         this.topicQueueManager = topicQueueManager;
-        this.reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, KV_NAMESPACE_TIMER_TAG, kvService, metadataService, inflightService, topicQueueManager);
+        this.reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, KV_NAMESPACE_TIMER_TAG, kvService, metadataService, this.inflightService, this.topicQueueManager);
     }
 
     @Override
@@ -71,6 +73,7 @@ public class MessageStoreImpl implements MessageStore {
         if (!started.compareAndSet(false, true)) {
             return;
         }
+        streamStore.start();
         reviveService.start();
     }
 
@@ -80,6 +83,7 @@ public class MessageStoreImpl implements MessageStore {
             return;
         }
         reviveService.shutdown();
+        streamStore.shutdown();
     }
 
     @Override

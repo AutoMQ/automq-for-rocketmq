@@ -35,7 +35,7 @@ import org.yaml.snakeyaml.introspector.BeanAccess;
 public class BrokerStartup {
     private static final Logger LOGGER = LoggerFactory.getLogger(BrokerStartup.class);
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
         Options options = buildCommandlineOptions();
 
         CommandLine commandLine = ServerUtil.parseCmdLine(
@@ -71,7 +71,7 @@ public class BrokerStartup {
         }
     }
 
-    private static BrokerController buildBrokerController(BrokerConfig config) {
+    private static BrokerController buildBrokerController(BrokerConfig config) throws Exception {
         return new BrokerController(config);
     }
 
