@@ -119,11 +119,30 @@ public class MessageStoreTest {
         assertEquals(3, popResult.messageList().size());
         assertEquals(0, popResult.messageList().get(0).offset());
         assertEquals(0, popResult.messageList().get(0).originalOffset());
+        assertEquals(2, popResult.messageList().get(0).deliveryAttempts());
         assertEquals(1, popResult.messageList().get(1).offset());
         assertEquals(1, popResult.messageList().get(1).originalOffset());
+        assertEquals(2, popResult.messageList().get(1).deliveryAttempts());
         assertEquals(2, popResult.messageList().get(2).offset());
         assertEquals(4, popResult.messageList().get(2).originalOffset());
+        assertEquals(2, popResult.messageList().get(2).deliveryAttempts());
 
+        // 7. after 1100ms, pop again
+        Thread.sleep(1100);
+        popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, 800 * 1000 * 1000).join();
+        assertEquals(PopResult.Status.NOT_FOUND, popResult.status());
+        popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, true, 800 * 1000 * 1000).join();
+        assertEquals(PopResult.Status.FOUND, popResult.status());
+        assertEquals(3, popResult.messageList().size());
+        assertEquals(3, popResult.messageList().get(0).offset());
+        assertEquals(0, popResult.messageList().get(0).originalOffset());
+        assertEquals(3, popResult.messageList().get(0).deliveryAttempts());
+        assertEquals(4, popResult.messageList().get(1).offset());
+        assertEquals(1, popResult.messageList().get(1).originalOffset());
+        assertEquals(3, popResult.messageList().get(1).deliveryAttempts());
+        assertEquals(5, popResult.messageList().get(2).offset());
+        assertEquals(4, popResult.messageList().get(2).originalOffset());
+        assertEquals(3, popResult.messageList().get(2).deliveryAttempts());
     }
 
     @Test
@@ -181,7 +200,8 @@ public class MessageStoreTest {
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(2, popResult.messageList().size());
         assertEquals(3, popResult.messageList().get(0).offset());
+        assertEquals(2, popResult.messageList().get(0).deliveryAttempts());
         assertEquals(4, popResult.messageList().get(1).offset());
-
+        assertEquals(2, popResult.messageList().get(1).deliveryAttempts());
     }
 }

@@ -21,6 +21,7 @@ import com.automq.rocketmq.common.config.StoreConfig;
 import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.store.DefaultMessageStateMachine;
+import com.automq.rocketmq.store.MessageStoreImpl;
 import com.automq.rocketmq.store.StreamTopicQueue;
 import com.automq.rocketmq.store.api.MessageStateMachine;
 import com.automq.rocketmq.store.api.StreamStore;
@@ -29,6 +30,7 @@ import com.automq.rocketmq.store.api.TopicQueueManager;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.mock.MockStoreMetadataService;
 import com.automq.rocketmq.store.mock.MockStreamStore;
+import com.automq.rocketmq.store.model.generated.ReceiptHandle;
 import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PopResult;
 import com.automq.rocketmq.store.model.message.PullResult;
@@ -94,11 +96,13 @@ class ReviveServiceTest {
         PopResult popResult = topicQueue.popNormal(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 1000 * 1000 * 1000).join();
         assertEquals(1, popResult.messageList().size());
         // check ck exist
-        byte[] ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, 0, popResult.operationId()));
+        ReceiptHandle handle = SerializeUtil.decodeReceiptHandle(popResult.messageList().get(0).receiptHandle().get());
+        byte[] bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.operationId()));
+        byte[] ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.operationId()));
         assertNotNull(ckValue);
         // now revive but can't clear ck
         reviveService.tryRevive();
-        ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, 0, popResult.operationId()));
+        ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.operationId()));
         assertNotNull(ckValue);
         // after 1s revive can clear ck
         try {
@@ -107,7 +111,7 @@ class ReviveServiceTest {
             Assertions.assertNull(e);
         }
         reviveService.tryRevive();
-        ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, 0, popResult.operationId()));
+        ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.operationId()));
         assertNull(ckValue);
 
         // check if this message has been appended to retry stream

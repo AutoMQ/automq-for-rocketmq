@@ -105,9 +105,8 @@ public class ReviveService implements Runnable, Lifecycle {
             long consumerGroupId = receiptHandle.consumerGroupId();
             long topicId = receiptHandle.topicId();
             int queueId = receiptHandle.queueId();
-            long offset = receiptHandle.messageOffset();
             long operationId = receiptHandle.operationId();
-            byte[] ckKey = SerializeUtil.buildCheckPointKey(topicId, queueId, offset, operationId);
+            byte[] ckKey = SerializeUtil.buildCheckPointKey(topicId, queueId, operationId);
             try {
                 byte[] ckValue = kvService.get(checkPointNamespace, ckKey);
                 if (ckValue == null) {
@@ -120,9 +119,9 @@ public class ReviveService implements Runnable, Lifecycle {
                 // TODO: async
                 PullResult pullResult;
                 if (operationType == PopOperation.PopOperationType.POP_RETRY) {
-                    pullResult = topicQueue.pullRetry(consumerGroupId, Filter.DEFAULT_FILTER, offset, 1).join();
+                    pullResult = topicQueue.pullRetry(consumerGroupId, Filter.DEFAULT_FILTER, checkPoint.messageOffset(), 1).join();
                 } else {
-                    pullResult = topicQueue.pullNormal(consumerGroupId, Filter.DEFAULT_FILTER, offset, 1).join();
+                    pullResult = topicQueue.pullNormal(consumerGroupId, Filter.DEFAULT_FILTER, checkPoint.messageOffset(), 1).join();
                 }
                 // TODO: log exception
                 assert pullResult.messageList().size() <= 1;

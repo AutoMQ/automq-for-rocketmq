@@ -23,16 +23,14 @@ public class AckOperation implements Operation {
     private final long consumerGroupId;
     private final long topicId;
     private final int queueId;
-    private final long offset;
     private final long operationId;
     private final long operationTimestamp;
     private final AckOperationType ackOperationType;
 
-    public AckOperation(long consumerGroupId, long topicId, int queueId, long offset, long operationId, long operationTimestamp, AckOperationType ackOperationType) {
+    public AckOperation(long consumerGroupId, long topicId, int queueId, long operationId, long operationTimestamp, AckOperationType ackOperationType) {
         this.consumerGroupId = consumerGroupId;
         this.topicId = topicId;
         this.queueId = queueId;
-        this.offset = offset;
         this.operationId = operationId;
         this.operationTimestamp = operationTimestamp;
         this.ackOperationType = ackOperationType;
@@ -60,10 +58,6 @@ public class AckOperation implements Operation {
         return queueId;
     }
 
-    public long getOffset() {
-        return offset;
-    }
-
     public long getOperationId() {
         return operationId;
     }
@@ -83,11 +77,11 @@ public class AckOperation implements Operation {
         if (o == null || getClass() != o.getClass())
             return false;
         AckOperation operation = (AckOperation) o;
-        return consumerGroupId == operation.consumerGroupId && topicId == operation.topicId && queueId == operation.queueId && offset == operation.offset && operationId == operation.operationId && operationTimestamp == operation.operationTimestamp && ackOperationType == operation.ackOperationType;
+        return consumerGroupId == operation.consumerGroupId && topicId == operation.topicId && queueId == operation.queueId && operationId == operation.operationId && operationTimestamp == operation.operationTimestamp && ackOperationType == operation.ackOperationType;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(consumerGroupId, topicId, queueId, offset, operationId, operationTimestamp, ackOperationType);
+        return Objects.hash(consumerGroupId, topicId, queueId, operationId, operationTimestamp, ackOperationType);
     }
 }

@@ -86,7 +86,7 @@ public class StreamOperationLogService implements OperationLogService {
                 // TODO: assume that a batch only contains one operation
                 Operation operation = SerializeUtil.decodeOperation(batchWithContext.rawPayload());
                 try {
-                    replay(operation);
+                    replay(batchWithContext.baseOffset(), operation);
                 } catch (StoreException e) {
                     throw new RuntimeException(e);
                 }
@@ -102,11 +102,11 @@ public class StreamOperationLogService implements OperationLogService {
         return append.thenApply(result -> {
             // TODO: think about append return order
             try {
-                replay(operation);
+                replay(result.baseOffset(), operation);
             } catch (StoreException e) {
                 throw new RuntimeException(e);
             }
-            return operation.getOperationTimestamp();
+            return result.baseOffset();
         });
     }
 
@@ -114,12 +114,12 @@ public class StreamOperationLogService implements OperationLogService {
         stateMachine.loadSnapshot(snapshot);
     }
 
-    private void replay(Operation operation) throws StoreException {
+    private void replay(long operationOffset, Operation operation) throws StoreException {
         // TODO: optimize concurrent control
         switch (operation.getOperationType()) {
-            case POP -> stateMachine.replayPopOperation((PopOperation) operation);
-            case ACK -> stateMachine.replayAckOperation((AckOperation) operation);
-            case CHANGE_INVISIBLE_DURATION -> stateMachine.replayChangeInvisibleDurationOperation((ChangeInvisibleDurationOperation) operation);
+            case POP -> stateMachine.replayPopOperation(operationOffset, (PopOperation) operation);
+            case ACK -> stateMachine.replayAckOperation(operationOffset, (AckOperation) operation);
+            case CHANGE_INVISIBLE_DURATION -> stateMachine.replayChangeInvisibleDurationOperation(operationOffset, (ChangeInvisibleDurationOperation) operation);
             default -> throw new IllegalStateException("Unexpected value: " + operation.getOperationType());
         }
     }
@@ -130,11 +130,11 @@ public class StreamOperationLogService implements OperationLogService {
             ByteBuffer.wrap(SerializeUtil.encodeAckOperation(operation))));
         return append.thenApply(result -> {
             try {
-                replay(operation);
+                replay(result.baseOffset(), operation);
             } catch (StoreException e) {
                 throw new RuntimeException(e);
             }
-            return operation.getOperationTimestamp();
+            return result.baseOffset();
         });
     }
 
@@ -145,11 +145,11 @@ public class StreamOperationLogService implements OperationLogService {
             ByteBuffer.wrap(SerializeUtil.encodeChangeInvisibleDurationOperation(operation))));
         return append.thenApply(result -> {
             try {
-                replay(operation);
+                replay(result.baseOffset(), operation);
             } catch (StoreException e) {
                 throw new RuntimeException(e);
             }
-            return operation.getOperationTimestamp();
+            return result.baseOffset();
         });
     }
 }

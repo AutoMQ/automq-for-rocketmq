@@ -28,6 +28,7 @@ import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.mock.MockStoreMetadataService;
 import com.automq.rocketmq.store.mock.MockStreamStore;
 import com.automq.rocketmq.store.model.generated.CheckPoint;
+import com.automq.rocketmq.store.model.generated.ReceiptHandle;
 import com.automq.rocketmq.store.model.message.AckResult;
 import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PopResult;
@@ -114,12 +115,6 @@ public class TopicQueueTest {
 
         assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
 
-        byte[] bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, 0, popResult.operationId()));
-        CheckPoint checkPoint = SerializeUtil.decodeCheckPoint(ByteBuffer.wrap(bytes));
-        assertEquals(popResult.deliveryTimestamp() + 100, checkPoint.nextVisibleTimestamp());
-        assertEquals(TOPIC_ID, checkPoint.topicId());
-        assertEquals(QUEUE_ID, checkPoint.queueId());
-
         List<CheckPoint> allCheckPointList = new ArrayList<>();
         kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, (key, value) ->
             allCheckPointList.add(CheckPoint.getRootAsCheckPoint(ByteBuffer.wrap(value))));
@@ -166,12 +161,6 @@ public class TopicQueueTest {
         assertEquals(2, topicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
 
         assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
-
-        byte[] bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, 0, popResult.operationId()));
-        CheckPoint checkPoint = SerializeUtil.decodeCheckPoint(ByteBuffer.wrap(bytes));
-        assertEquals(popResult.deliveryTimestamp() + 100, checkPoint.nextVisibleTimestamp());
-        assertEquals(TOPIC_ID, checkPoint.topicId());
-        assertEquals(QUEUE_ID, checkPoint.queueId());
 
         List<CheckPoint> allCheckPointList = new ArrayList<>();
         kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, (key, value) ->
@@ -284,7 +273,8 @@ public class TopicQueueTest {
         assertEquals(1, stateMachine.ackOffset(CONSUMER_GROUP_ID).join());
 
         // 4. check ck
-        byte[] bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, 0, popResult.operationId()));
+        ReceiptHandle handle0 = SerializeUtil.decodeReceiptHandle(receiptHandle0);
+        byte[] bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle0.operationId()));
         assertNull(bytes);
 
         // 5. pop 1 message
@@ -337,7 +327,8 @@ public class TopicQueueTest {
         assertEquals(1, stateMachine.ackOffset(CONSUMER_GROUP_ID).join());
 
         // 4. check ck
-        byte[] bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, 0, popResult.operationId()));
+        ReceiptHandle handle0 = SerializeUtil.decodeReceiptHandle(receiptHandle0);
+        byte[] bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle0.operationId()));
         assertNull(bytes);
 
         // 5. pop 1 message
@@ -389,7 +380,8 @@ public class TopicQueueTest {
         assertEquals(0, stateMachine.ackOffset(CONSUMER_GROUP_ID).join());
 
         // 4. check ck
-        byte[] bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, 0, popResult.operationId()));
+        ReceiptHandle handle1 = SerializeUtil.decodeReceiptHandle(receiptHandle1);
+        byte[] bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle1.operationId()));
         assertNull(bytes);
 
         // 5. pop 1 message
@@ -530,8 +522,8 @@ public class TopicQueueTest {
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertFalse(popResult.messageList().isEmpty());
         assertEquals(1, topicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
-
-        byte[] checkPointKey = SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, 0, popResult.operationId());
+        ReceiptHandle handle = SerializeUtil.decodeReceiptHandle(popResult.messageList().get(0).receiptHandle().get());
+        byte[] checkPointKey = SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.operationId());
         byte[] bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, checkPointKey);
         assertNotNull(bytes);
 
@@ -543,7 +535,7 @@ public class TopicQueueTest {
 
         // 3. change invisible duration.
         FlatMessageExt messageExt = popResult.messageList().get(0);
-        String receiptHandle = SerializeUtil.encodeReceiptHandle(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, messageExt.offset(), popResult.operationId());
+        String receiptHandle = SerializeUtil.encodeReceiptHandle(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, handle.operationId());
         long changeStartTimestamp = System.nanoTime();
         topicQueue.changeInvisibleDuration(receiptHandle, 1000L).join();
         long changeEndTimestamp = System.nanoTime();
@@ -599,8 +591,6 @@ public class TopicQueueTest {
         assertEquals(1, stateMachine.retryAckOffset(CONSUMER_GROUP_ID).join());
 
         // 4. check ck
-        byte[] bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, 0, popResult.operationId()));
-        assertNull(bytes);
 
         // 5. ack msg_2 timeout
         ackResult = topicQueue.ackTimeout(receiptHandle2).join();
