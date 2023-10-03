@@ -49,6 +49,16 @@ public class MockMessageStore implements MessageStore {
     }
 
     @Override
+    public void start() throws Exception {
+
+    }
+
+    @Override
+    public void shutdown() throws Exception {
+
+    }
+
+    @Override
     public CompletableFuture<PopResult> pop(long consumerGroupId, long topicId, int queueId, Filter filter,
         int batchSize, boolean fifo, boolean retry, long invisibleDuration) {
         if (retry) {
