@@ -25,6 +25,7 @@ public class BrokerConfig {
      * If the broker is running on an EC2 instance, this is the instance-id.
      */
     private String instanceId;
+    int nodeId;
     private String address = NetworkUtil.getLocalAddress();
     private ProxyConfig proxy;
     private StoreConfig store;
@@ -57,6 +58,10 @@ public class BrokerConfig {
 
     public String address() {
         return address;
+    }
+
+    public int nodeId() {
+        return nodeId;
     }
 
     public BrokerConfig() {

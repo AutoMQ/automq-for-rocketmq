@@ -69,7 +69,7 @@ public class MessageStoreTest {
         topicQueue.open().join();
         TopicQueueManager manager = Mockito.mock(TopicQueueManager.class);
         Mockito.when(manager.get(TOPIC_ID, QUEUE_ID)).thenReturn(topicQueue);
-        messageStore = new MessageStoreImpl(new StoreConfig(), streamStore, metadataService, kvService, manager);
+        messageStore = new MessageStoreImpl(new StoreConfig(), streamStore, metadataService, kvService, inflightService, manager);
         messageStore.start();
     }
 
