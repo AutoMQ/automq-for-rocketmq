@@ -33,12 +33,11 @@ import java.util.Base64;
 import java.util.List;
 
 public class SerializeUtil {
-    // <topicId><queueId><offset><operationId>
-    public static byte[] buildCheckPointKey(long topicId, int queueId, long offset, long operationId) {
-        ByteBuffer buffer = ByteBuffer.allocate(28);
+    // <topicId><queueId><operationId>
+    public static byte[] buildCheckPointKey(long topicId, int queueId, long operationId) {
+        ByteBuffer buffer = ByteBuffer.allocate(20);
         buffer.putLong(topicId);
         buffer.putInt(queueId);
-        buffer.putLong(offset);
         buffer.putLong(operationId);
         return buffer.array();
     }
@@ -53,13 +52,11 @@ public class SerializeUtil {
     }
 
     // <deliveryTimestamp + invisibleDuration><topicId><queueId><operationId>
-    public static byte[] buildTimerTagKey(long nextVisibleTimestamp, long topicId, int queueId, long offset,
-        long operationId) {
-        ByteBuffer buffer = ByteBuffer.allocate(36);
+    public static byte[] buildTimerTagKey(long nextVisibleTimestamp, long topicId, int queueId, long operationId) {
+        ByteBuffer buffer = ByteBuffer.allocate(28);
         buffer.putLong(nextVisibleTimestamp);
         buffer.putLong(topicId);
         buffer.putInt(queueId);
-        buffer.putLong(offset);
         buffer.putLong(operationId);
         return buffer.array();
     }
@@ -85,20 +82,18 @@ public class SerializeUtil {
         return CheckPoint.getRootAsCheckPoint(buffer);
     }
 
-    public static String encodeReceiptHandle(long consumerGroupId, long topicId, int queueId, long offset,
-        long operationId) {
-        return new String(Base64.getEncoder().encode(buildReceiptHandle(consumerGroupId, topicId, queueId, offset, operationId)));
+    public static String encodeReceiptHandle(long consumerGroupId, long topicId, int queueId, long operationId) {
+        return new String(Base64.getEncoder().encode(buildReceiptHandle(consumerGroupId, topicId, queueId, operationId)));
     }
 
     public static String encodeReceiptHandle(ReceiptHandle receiptHandle) {
         return new String(Base64.getEncoder().encode(buildReceiptHandle(receiptHandle.consumerGroupId(), receiptHandle.topicId(),
-            receiptHandle.queueId(), receiptHandle.messageOffset(), receiptHandle.operationId())));
+            receiptHandle.queueId(), receiptHandle.operationId())));
     }
 
-    public static byte[] buildReceiptHandle(long consumerGroupId, long topicId, int queueId, long offset,
-        long operationId) {
+    public static byte[] buildReceiptHandle(long consumerGroupId, long topicId, int queueId, long operationId) {
         FlatBufferBuilder builder = new FlatBufferBuilder();
-        int root = ReceiptHandle.createReceiptHandle(builder, consumerGroupId, topicId, queueId, offset, operationId);
+        int root = ReceiptHandle.createReceiptHandle(builder, consumerGroupId, topicId, queueId, operationId);
         builder.finish(root);
         return builder.sizedByteArray();
     }
@@ -142,7 +137,7 @@ public class SerializeUtil {
             return new AckOperation(
                 ackOperation.receiptHandle().consumerGroupId(),
                 ackOperation.receiptHandle().topicId(), ackOperation.receiptHandle().queueId(),
-                ackOperation.receiptHandle().messageOffset(), ackOperation.receiptHandle().operationId(),
+                ackOperation.receiptHandle().operationId(),
                 ackOperation.operationTimestamp(), com.automq.rocketmq.store.model.operation.AckOperation.AckOperationType.values()[ackOperation.type()]);
         }
         return null;
@@ -171,12 +166,11 @@ public class SerializeUtil {
     public static byte[] encodeAckOperation(AckOperation ackOperation) {
         long topicId = ackOperation.getTopicId();
         int queueId = ackOperation.getQueueId();
-        long offset = ackOperation.getOffset();
         long operationId = ackOperation.getOperationId();
         long operationTimestamp = ackOperation.getOperationTimestamp();
         long consumerGroupId = ackOperation.getConsumerGroupId();
         FlatBufferBuilder builder = new FlatBufferBuilder();
-        int receiptHandleId = ReceiptHandle.createReceiptHandle(builder, consumerGroupId, topicId, queueId, offset, operationId);
+        int receiptHandleId = ReceiptHandle.createReceiptHandle(builder, consumerGroupId, topicId, queueId, operationId);
         int operation = com.automq.rocketmq.store.model.generated.AckOperation.createAckOperation(builder, receiptHandleId, operationTimestamp, (short) ackOperation.getAckOperationType().ordinal());
         int root = OperationLogItem.createOperationLogItem(builder, com.automq.rocketmq.store.model.generated.Operation.AckOperation, operation);
         builder.finish(root);
@@ -186,7 +180,7 @@ public class SerializeUtil {
     public static byte[] encodeChangeInvisibleDurationOperation(
         com.automq.rocketmq.store.model.operation.ChangeInvisibleDurationOperation durationOperation) {
         FlatBufferBuilder builder = new FlatBufferBuilder();
-        int receiptHandleId = ReceiptHandle.createReceiptHandle(builder, durationOperation.getConsumerGroupId(), durationOperation.getTopicId(), durationOperation.getQueueId(), durationOperation.getOffset(), durationOperation.getOperationId());
+        int receiptHandleId = ReceiptHandle.createReceiptHandle(builder, durationOperation.getConsumerGroupId(), durationOperation.getTopicId(), durationOperation.getQueueId(), durationOperation.getOperationId());
         int operation = ChangeInvisibleDurationOperation.createChangeInvisibleDurationOperation(builder, receiptHandleId, durationOperation.getInvisibleDuration(), durationOperation.getOperationTimestamp());
         int root = OperationLogItem.createOperationLogItem(builder, com.automq.rocketmq.store.model.generated.Operation.ChangeInvisibleDurationOperation, operation);
         builder.finish(root);
@@ -198,7 +192,7 @@ public class SerializeUtil {
         ChangeInvisibleDurationOperation durationOperation = ChangeInvisibleDurationOperation.getRootAsChangeInvisibleDurationOperation(buffer);
         return new com.automq.rocketmq.store.model.operation.ChangeInvisibleDurationOperation(
             durationOperation.receiptHandle().consumerGroupId(), durationOperation.receiptHandle().topicId(), durationOperation.receiptHandle().queueId(),
-            durationOperation.receiptHandle().messageOffset(), durationOperation.receiptHandle().operationId(),
+            durationOperation.receiptHandle().operationId(),
             durationOperation.invisibleDuration(), durationOperation.operationTimestamp());
     }
 }

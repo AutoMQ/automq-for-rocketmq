@@ -27,11 +27,11 @@ import java.util.concurrent.CompletableFuture;
 
 public interface MessageStateMachine {
 
-    CompletableFuture<Void> replayPopOperation(PopOperation operation);
+    CompletableFuture<Void> replayPopOperation(long operationOffset, PopOperation operation);
 
-    CompletableFuture<Void> replayAckOperation(AckOperation operation);
+    CompletableFuture<Void> replayAckOperation(long operationOffset, AckOperation operation);
 
-    CompletableFuture<Void> replayChangeInvisibleDurationOperation(ChangeInvisibleDurationOperation operation);
+    CompletableFuture<Void> replayChangeInvisibleDurationOperation(long operationOffset, ChangeInvisibleDurationOperation operation);
 
     CompletableFuture<OperationSnapshot> takeSnapshot();
 

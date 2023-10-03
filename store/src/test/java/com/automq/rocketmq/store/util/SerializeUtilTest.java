@@ -49,12 +49,12 @@ public class SerializeUtilTest {
     public static final long INVISIBLE_DURATION = 9L;
     public static final long OPERATION_TIMESTAMP = 10L;
     public static final long RETRY_OFFSET = 11L;
-    public static final String RECEIPT_HANDLE = "GAAAAAAAAAAAAA4AIAAIAAAABAAQABgADgAAAAEAAAAEAAAAAAAAAAIAAAAAAAAAAwAAAAAAAAA=";
+    public static final String RECEIPT_HANDLE = "EAAAAAwAGAAIAAAABAAQAAwAAAABAAAABAAAAAAAAAADAAAAAAAAAA==";
 
     @Test
     void buildCheckPointKey() {
-        byte[] key = SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, OFFSET, OPERATION_ID);
-        assertEquals(28, key.length);
+        byte[] key = SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, OPERATION_ID);
+        assertEquals(20, key.length);
     }
 
     @Test
@@ -74,8 +74,8 @@ public class SerializeUtilTest {
 
     @Test
     void buildTimerTagKey() {
-        byte[] key = SerializeUtil.buildTimerTagKey(NEXT_VISIBLE_TIMESTAMP, TOPIC_ID, QUEUE_ID, OFFSET, OPERATION_ID);
-        assertEquals(36, key.length);
+        byte[] key = SerializeUtil.buildTimerTagKey(NEXT_VISIBLE_TIMESTAMP, TOPIC_ID, QUEUE_ID, OPERATION_ID);
+        assertEquals(28, key.length);
     }
 
     @Test
@@ -92,16 +92,16 @@ public class SerializeUtilTest {
 
     @Test
     void encodeReceiptHandle() {
-        String receiptHandle = SerializeUtil.encodeReceiptHandle(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, OFFSET, OPERATION_ID);
+        String receiptHandle = SerializeUtil.encodeReceiptHandle(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, OPERATION_ID);
         assertEquals(RECEIPT_HANDLE, receiptHandle);
     }
 
     @Test
     void decodeReceiptHandle() {
         ReceiptHandle receiptHandle = SerializeUtil.decodeReceiptHandle(RECEIPT_HANDLE);
+        assertEquals(CONSUMER_GROUP_ID, receiptHandle.consumerGroupId());
         assertEquals(TOPIC_ID, receiptHandle.topicId());
         assertEquals(QUEUE_ID, receiptHandle.queueId());
-        assertEquals(OFFSET, receiptHandle.messageOffset());
         assertEquals(OPERATION_ID, receiptHandle.operationId());
     }
 
@@ -118,7 +118,7 @@ public class SerializeUtilTest {
     @Test
     void encodeAckOperation() {
         com.automq.rocketmq.store.model.operation.AckOperation ackOperation = new com.automq.rocketmq.store.model.operation.AckOperation(
-            CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, OFFSET, OPERATION_ID, OPERATION_TIMESTAMP, ACK_OPERATION_TYPE
+            CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, OPERATION_ID, OPERATION_TIMESTAMP, ACK_OPERATION_TYPE
         );
         byte[] bytes = SerializeUtil.encodeAckOperation(ackOperation);
         com.automq.rocketmq.store.model.operation.Operation decodedOperation = SerializeUtil.decodeOperation(ByteBuffer.wrap(bytes));
@@ -128,7 +128,7 @@ public class SerializeUtilTest {
     @Test
     void encodeChangeInvisibleDurationOperation() {
         byte[] bytes = SerializeUtil.encodeChangeInvisibleDurationOperation(new com.automq.rocketmq.store.model.operation.ChangeInvisibleDurationOperation(
-            CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, OFFSET, OPERATION_ID, INVISIBLE_DURATION, OPERATION_TIMESTAMP
+            CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, OPERATION_ID, INVISIBLE_DURATION, OPERATION_TIMESTAMP
         ));
         OperationLogItem operationLogItem = OperationLogItem.getRootAsOperationLogItem(ByteBuffer.wrap(bytes));
         assertEquals(Operation.ChangeInvisibleDurationOperation, operationLogItem.operationType());
@@ -137,7 +137,6 @@ public class SerializeUtilTest {
         assertNotNull(operation);
         assertEquals(TOPIC_ID, operation.receiptHandle().topicId());
         assertEquals(QUEUE_ID, operation.receiptHandle().queueId());
-        assertEquals(OFFSET, operation.receiptHandle().messageOffset());
         assertEquals(OPERATION_ID, operation.receiptHandle().operationId());
         assertEquals(INVISIBLE_DURATION, operation.invisibleDuration());
         assertEquals(OPERATION_TIMESTAMP, operation.operationTimestamp());

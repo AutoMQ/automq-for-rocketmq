@@ -126,7 +126,7 @@ public class MockStoreMetadataService implements StoreMetadataService {
 
     @Override
     public CompletableFuture<Integer> maxDeliveryAttemptsOf(long consumerGroupId) {
-        return CompletableFuture.completedFuture(2);
+        return CompletableFuture.completedFuture(10);
     }
 
     @Override

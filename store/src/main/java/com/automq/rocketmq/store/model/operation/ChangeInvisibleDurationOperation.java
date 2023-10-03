@@ -24,16 +24,14 @@ public class ChangeInvisibleDurationOperation implements Operation {
     private final long consumerGroupId;
     private final long topicId;
     private final int queueId;
-    private final long offset;
     private final long operationId;
     private final long invisibleDuration;
     private final long operationTimestamp;
 
-    public ChangeInvisibleDurationOperation(long consumerGroupId, long topicId, int queueId, long offset, long operationId, long invisibleDuration, long operationTimestamp) {
+    public ChangeInvisibleDurationOperation(long consumerGroupId, long topicId, int queueId, long operationId, long invisibleDuration, long operationTimestamp) {
         this.consumerGroupId = consumerGroupId;
         this.topicId = topicId;
         this.queueId = queueId;
-        this.offset = offset;
         this.operationId = operationId;
         this.invisibleDuration = invisibleDuration;
         this.operationTimestamp = operationTimestamp;
@@ -49,10 +47,6 @@ public class ChangeInvisibleDurationOperation implements Operation {
 
     public int getQueueId() {
         return queueId;
-    }
-
-    public long getOffset() {
-        return offset;
     }
 
     public long getOperationId() {
@@ -74,12 +68,12 @@ public class ChangeInvisibleDurationOperation implements Operation {
         if (o == null || getClass() != o.getClass())
             return false;
         ChangeInvisibleDurationOperation operation = (ChangeInvisibleDurationOperation) o;
-        return consumerGroupId == operation.consumerGroupId && topicId == operation.topicId && queueId == operation.queueId && offset == operation.offset && operationId == operation.operationId && invisibleDuration == operation.invisibleDuration && operationTimestamp == operation.operationTimestamp;
+        return consumerGroupId == operation.consumerGroupId && topicId == operation.topicId && queueId == operation.queueId && operationId == operation.operationId && invisibleDuration == operation.invisibleDuration && operationTimestamp == operation.operationTimestamp;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(consumerGroupId, topicId, queueId, offset, operationId, invisibleDuration, operationTimestamp);
+        return Objects.hash(consumerGroupId, topicId, queueId, operationId, invisibleDuration, operationTimestamp);
     }
 
     @Override

@@ -186,9 +186,11 @@ public class StreamTopicQueue extends TopicQueue {
         }
         FilterFetchResult fetchResult = new FilterFetchResult(startOffset);
         long operationTimestamp = System.nanoTime();
+        // fetch messages
         CompletableFuture<FilterFetchResult> fetchCf = fetchAndFilterMessages(streamId, startOffset, batchSize,
             fetchBatchSize, filter, fetchResult, 0, 0, operationTimestamp);
-        CompletableFuture<Void> appendOpCf = fetchCf.thenCompose(filterFetchResult -> {
+        // log op
+        CompletableFuture<FilterFetchResult> fetchAndLogOpCf = fetchCf.thenCompose(filterFetchResult -> {
             List<FlatMessageExt> messageExtList = filterFetchResult.messageList;
             // write pop operation to operation log
             long preOffset = filterFetchResult.startOffset - 1;
@@ -201,7 +203,10 @@ public class StreamTopicQueue extends TopicQueue {
                     consumerGroupId, topicId, queueId, messageExt.offset(), count, invisibleDuration, operationTimestamp,
                     false, operationType
                 );
-                appendOpCfs.add(operationLogService.logPopOperation(popOperation));
+                appendOpCfs.add(operationLogService.logPopOperation(popOperation).thenApply(operationId -> {
+                    messageExt.setReceiptHandle(SerializeUtil.encodeReceiptHandle(consumerGroupId, topicId, queueId, operationId));
+                    return operationId;
+                }));
             }
             // write special pop operation for the last message to update consume offset
             int count = (int) (fetchResult.endOffset - 1 - preOffset);
@@ -212,23 +217,23 @@ public class StreamTopicQueue extends TopicQueue {
                 );
                 appendOpCfs.add(operationLogService.logPopOperation(popOperation));
             }
-            return CompletableFuture.allOf(appendOpCfs.toArray(new CompletableFuture[0]));
+            return CompletableFuture.allOf(appendOpCfs.toArray(new CompletableFuture[0])).thenApply(nil -> {
+                return fetchResult;
+            });
         });
-        return fetchCf.thenCombine(appendOpCf, (filterFetchResult, nil) -> {
+
+        return fetchAndLogOpCf.thenApply(filterFetchResult -> {
             List<FlatMessageExt> messageExtList = filterFetchResult.messageList;
             PopResult.Status status;
             if (messageExtList.isEmpty()) {
                 status = PopResult.Status.NOT_FOUND;
             } else {
                 status = PopResult.Status.FOUND;
-                messageExtList.forEach(messageExt -> {
-                    messageExt.setReceiptHandle(SerializeUtil.encodeReceiptHandle(consumerGroupId, topicId, queueId, messageExt.offset(), operationTimestamp));
-                });
             }
             inflightService.increaseInflightCount(consumerGroupId, topicId, queueId, messageExtList.size());
-            return new PopResult(status, operationTimestamp, operationTimestamp, messageExtList);
+            return new PopResult(status, operationTimestamp, messageExtList);
         }).exceptionally(throwable -> {
-            return new PopResult(PopResult.Status.ERROR, operationTimestamp, operationTimestamp, Collections.emptyList());
+            return new PopResult(PopResult.Status.ERROR, operationTimestamp, Collections.emptyList());
         });
     }
 
@@ -239,7 +244,7 @@ public class StreamTopicQueue extends TopicQueue {
         return stateMachine.ackOffset(consumerGroup).thenCompose(offset -> {
             return stateMachine.isLocked(consumerGroup, offset).thenCompose(isLocked -> {
                 if (isLocked) {
-                    return CompletableFuture.completedFuture(new PopResult(PopResult.Status.LOCKED, 0, 0, Collections.emptyList()));
+                    return CompletableFuture.completedFuture(new PopResult(PopResult.Status.LOCKED, 0, Collections.emptyList()));
                 } else {
                     return pop(consumerGroup, dataStreamId, offset, PopOperation.PopOperationType.POP_ORDER, filter, batchSize, invisibleDuration);
                 }
@@ -350,10 +355,10 @@ public class StreamTopicQueue extends TopicQueue {
     @Override
     public CompletableFuture<AckResult> ack(String receiptHandle) {
         ReceiptHandle handle = decodeReceiptHandle(receiptHandle);
-        AckOperation operation = new AckOperation(handle.consumerGroupId(), topicId, queueId, handle.messageOffset(), handle.operationId(),
+        AckOperation operation = new AckOperation(handle.consumerGroupId(), handle.topicId(), handle.queueId(), handle.operationId(),
             System.nanoTime(), AckOperation.AckOperationType.ACK_NORMAL);
         return operationLogService.logAckOperation(operation).thenApply(nil -> {
-            inflightService.decreaseInflightCount(handle.consumerGroupId(), topicId, queueId, 1);
+            inflightService.decreaseInflightCount(handle.consumerGroupId(), handle.topicId(), handle.queueId(), 1);
             return new AckResult(AckResult.Status.SUCCESS);
         }).exceptionally(throwable -> {
             return new AckResult(AckResult.Status.ERROR);
@@ -363,10 +368,10 @@ public class StreamTopicQueue extends TopicQueue {
     @Override
     public CompletableFuture<AckResult> ackTimeout(String receiptHandle) {
         ReceiptHandle handle = decodeReceiptHandle(receiptHandle);
-        AckOperation operation = new AckOperation(handle.consumerGroupId(), topicId, queueId, handle.messageOffset(), handle.operationId(),
+        AckOperation operation = new AckOperation(handle.consumerGroupId(), handle.topicId(), handle.queueId(), handle.operationId(),
             System.nanoTime(), AckOperation.AckOperationType.ACK_TIMEOUT);
         return operationLogService.logAckOperation(operation).thenApply(nil -> {
-            inflightService.decreaseInflightCount(handle.consumerGroupId(), topicId, queueId, 1);
+            inflightService.decreaseInflightCount(handle.consumerGroupId(), handle.topicId(), handle.queueId(), 1);
             return new AckResult(AckResult.Status.SUCCESS);
         }).exceptionally(throwable -> {
             return new AckResult(AckResult.Status.ERROR);
@@ -377,8 +382,7 @@ public class StreamTopicQueue extends TopicQueue {
     public CompletableFuture<ChangeInvisibleDurationResult> changeInvisibleDuration(String receiptHandle,
         long invisibleDuration) {
         ReceiptHandle handle = decodeReceiptHandle(receiptHandle);
-        ChangeInvisibleDurationOperation operation = new ChangeInvisibleDurationOperation(handle.consumerGroupId(), topicId, queueId,
-            handle.messageOffset(), handle.operationId(), System.nanoTime(), invisibleDuration);
+        ChangeInvisibleDurationOperation operation = new ChangeInvisibleDurationOperation(handle.consumerGroupId(), handle.topicId(), handle.queueId(), handle.operationId(), System.nanoTime(), invisibleDuration);
         return operationLogService.logChangeInvisibleDurationOperation(operation).thenApply(nil -> {
             return new ChangeInvisibleDurationResult(ChangeInvisibleDurationResult.Status.SUCCESS);
         }).exceptionally(throwable -> {
