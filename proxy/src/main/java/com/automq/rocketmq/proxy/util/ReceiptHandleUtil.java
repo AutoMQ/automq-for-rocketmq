@@ -30,14 +30,14 @@ public class ReceiptHandleUtil {
 
         VirtualQueue virtualQueue = new VirtualQueue(rawHandle.topicId(), rawHandle.queueId());
         ReceiptHandleBuilder rmqHandle = new ReceiptHandleBuilder()
-            .startOffset(rawHandle.messageOffset())
+            .startOffset(rawHandle.operationId())
             .retrieveTime(System.currentTimeMillis())
             .invisibleTime(invisibleTime)
             .reviveQueueId(0) // No revive queue in S3RocketMQ
             .topicType(rawReceiptHandle) // S3RocketMQ occupies the topic type field for store raw receipt handle
             .brokerName(virtualQueue.brokerName())
             .queueId(rawHandle.queueId())
-            .offset(rawHandle.messageOffset()); // Each message has a unique receipt handle, so offset is the same as start offset
+            .offset(rawHandle.operationId()); // Each message has a unique receipt handle, so offset is the same as start offset
 
         return rmqHandle.build();
     }
