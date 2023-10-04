@@ -36,7 +36,7 @@ public class CreateGroup implements Callable<Void>  {
     private String groupName;
     @CommandLine.Option(names = {"-r", "--maxRetryAttempt"}, description = "Max retry attempt", defaultValue = "16")
     private int maxRetryAttempt;
-    @CommandLine.Option(names = {"-t", "--groupType"}, description = "Group type", defaultValue = "FIFO")
+    @CommandLine.Option(names = {"-t", "--groupType"}, description = "Group type", defaultValue = "STANDARD")
     private GroupType groupType;
 
     @Override
