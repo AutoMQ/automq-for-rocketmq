@@ -911,7 +911,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Assertions.assertEquals(0, stream.getRangeId());
 
             RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
-            Range range = rangeMapper.getByRangeId(rangId);
+            Range range = rangeMapper.get(rangId, streamId, null);
             Assertions.assertEquals(newStartOffset, range.getStartOffset());
             Assertions.assertEquals(2345, range.getEndOffset());
             Assertions.assertEquals(nodeId, range.getBrokerId());

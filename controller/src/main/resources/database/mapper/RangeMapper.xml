@@ -60,7 +60,7 @@
         </if>
     </update>
 
-    <select id="getByRangeId" resultType="Range">
+    <select id="listByRangeId" resultType="Range">
         SELECT id, range_id, stream_id, epoch, start_offset, end_offset, broker_id
         FROM `range`
         WHERE range_id = #{rangeId}
@@ -76,11 +76,11 @@
         SELECT id, range_id, stream_id, epoch, start_offset, end_offset, broker_id
         FROM `range`
         WHERE 1 = 1
-        <if test="null != rangeId">
+        <if test="null != streamId and null != rangeId">
+            AND stream_id = #{streamId}
             AND range_id = #{rangeId}
         </if>
-        <if test="null != streamId and null != brokerId">
-            AND stream_id = #{streamId}
+        <if test="null != brokerId">
             AND broker_id = #{brokerId}
         </if>
     </select>
