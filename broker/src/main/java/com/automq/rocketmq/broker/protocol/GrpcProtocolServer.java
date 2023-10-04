@@ -47,7 +47,6 @@ public class GrpcProtocolServer implements Lifecycle {
     private final ThreadPoolExecutor grpcExecutor;
 
     public GrpcProtocolServer(ProxyConfig config, MessagingProcessor messagingProcessor) {
-        initProxyConfig(config);
         grpcExecutor = createGrpcExecutor(config.grpcThreadPoolNums(), config.grpcThreadPoolQueueCapacity());
         grpcServer = GrpcServerBuilder.newBuilder(grpcExecutor, ConfigurationManager.getProxyConfig().getGrpcServerPort())
             .addService(createServiceProcessor(messagingProcessor))
@@ -80,9 +79,5 @@ public class GrpcProtocolServer implements Lifecycle {
             "GrpcRequestExecutorThread",
             queueCapacity
         );
-    }
-
-    private void initProxyConfig(ProxyConfig config) {
-        ProxyConfiguration.intConfig(config);
     }
 }

@@ -39,6 +39,9 @@ public class DefaultServiceManager implements ServiceManager {
     private final MetadataService resourceMetadataService;
     private final ProducerManager producerManager;
     private final ConsumerManager consumerManager;
+    private final ProxyRelayService proxyRelayService;
+    private final TransactionService transactionService;
+    private final AdminService adminService;
 
     public DefaultServiceManager(ProxyConfig config, ProxyMetadataService metadataService, MessageStore messageStore) {
         this.metadataService = metadataService;
@@ -48,6 +51,9 @@ public class DefaultServiceManager implements ServiceManager {
         this.topicRouteService = new TopicRouteServiceImpl(metadataService);
         this.producerManager = new ProducerManager();
         this.consumerManager = new ConsumerManager(new ConsumerIdsChangeListenerImpl(), config.channelExpiredTimeout());
+        this.proxyRelayService = new ProxyRelayServiceImpl();
+        this.transactionService = new TransactionServiceImpl();
+        this.adminService = new AdminServiceImpl();
     }
 
     @Override
@@ -72,12 +78,12 @@ public class DefaultServiceManager implements ServiceManager {
 
     @Override
     public TransactionService getTransactionService() {
-        throw new UnsupportedOperationException("Not implemented yet");
+        return transactionService;
     }
 
     @Override
     public ProxyRelayService getProxyRelayService() {
-        throw new UnsupportedOperationException("Not implemented yet");
+        return proxyRelayService;
     }
 
     @Override
@@ -88,11 +94,12 @@ public class DefaultServiceManager implements ServiceManager {
     @Override
     public AdminService getAdminService() {
         // We don't need this for the current design
-        throw new UnsupportedOperationException("Not implemented yet");
+        return adminService;
     }
 
     @Override
     public void shutdown() throws Exception {
+        topicRouteService.shutdown();
     }
 
     @Override

@@ -133,7 +133,8 @@ public class DefaultMetadataStore implements MetadataStore {
         this.controllerClient = client;
         this.sessionFactory = sessionFactory;
         this.config = config;
-        this.role = Role.Follower;
+        // TODO: set leader here to bypass leader election, just for testing purpose.
+        this.role = Role.Leader;
         this.nodes = new ConcurrentHashMap<>();
         this.gson = new Gson();
         this.scheduledExecutorService = new ScheduledThreadPoolExecutor(Runtime.getRuntime().availableProcessors(),
@@ -142,7 +143,9 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     public void start() {
-        this.scheduledExecutorService.scheduleAtFixedRate(new LeaseTask(this), 1, config.scanIntervalInSecs(), TimeUnit.SECONDS);
+        LeaseTask leaseTask = new LeaseTask(this);
+        leaseTask.run();
+        this.scheduledExecutorService.scheduleAtFixedRate(leaseTask, 1, config.scanIntervalInSecs(), TimeUnit.SECONDS);
         this.scheduledExecutorService.scheduleWithFixedDelay(new ScanNodeTask(this), 1, config.scanIntervalInSecs(), TimeUnit.SECONDS);
         this.scheduledExecutorService.scheduleAtFixedRate(new ScanAssignableMessageQueuesTask(this), 1, config.scanIntervalInSecs(), TimeUnit.SECONDS);
         LOGGER.info("MetadataStore tasks scheduled");

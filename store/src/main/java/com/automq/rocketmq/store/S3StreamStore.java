@@ -60,12 +60,11 @@ public class S3StreamStore implements StreamStore {
     private final S3BlockCache blockCache;
     private final Map<Long, Stream> openedStreams = new ConcurrentHashMap<>();
 
-    public S3StreamStore(S3StreamConfig streamConfig) {
+    public S3StreamStore(S3StreamConfig streamConfig, StoreMetadataService metadataService) {
         this.s3Config = configFrom(streamConfig);
 
         // Build meta service and related manager
-        // TODO: Assemble metadata store and config
-        this.metadataService = new DefaultStoreMetadataService(null, null);
+        this.metadataService = metadataService;
         this.streamManager = new S3StreamManager(metadataService);
         this.objectManager = new S3ObjectManager(metadataService);
 

@@ -33,7 +33,7 @@ import com.automq.rocketmq.store.service.api.KVService;
 public class MessageStoreBuilder {
     public static MessageStore build(StoreConfig storeConfig, S3StreamConfig s3StreamConfig,
         StoreMetadataService metadataService) throws StoreException {
-        StreamStore streamStore = new S3StreamStore(s3StreamConfig);
+        StreamStore streamStore = new S3StreamStore(s3StreamConfig, metadataService);
         KVService kvService = new RocksDBKVService(storeConfig.kvPath());
         InflightService inflightService = new InflightService();
         SnapshotService snapshotService = new SnapshotService(streamStore, kvService);
