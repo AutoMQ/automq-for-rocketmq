@@ -34,7 +34,7 @@ public interface RangeMapper {
 
     Range getById(long id);
 
-    Range getByRangeId(int rangeId);
+    List<Range> listByRangeId(int rangeId);
 
     List<Range> listByStreamId(long streamId);
 

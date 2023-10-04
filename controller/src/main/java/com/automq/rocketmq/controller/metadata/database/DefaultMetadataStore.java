@@ -955,7 +955,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     if (stream.getEpoch() == streamEpoch) {
                         // broker may use the same epoch to open -> close -> open stream.
                         // verify broker
-                        Range range = rangeMapper.getByRangeId(stream.getRangeId());
+                        Range range = rangeMapper.get(stream.getRangeId(), streamId, null);
 
                         if (Objects.isNull(range)) {
                             LOGGER.warn("stream {}'s current range {} not exist when open stream with epoch: {}",
@@ -1018,7 +1018,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     // default regard this range is the first range in stream, use 0 as start offset
                     long startOffset = 0;
                     if (rangeId > 0) {
-                        Range prevRange = rangeMapper.getByRangeId(rangeId - 1);
+                        Range prevRange = rangeMapper.get(rangeId - 1, streamId, null);
                         startOffset = prevRange.getEndOffset();
                     }
                     // range create record
@@ -1138,7 +1138,7 @@ public class DefaultMetadataStore implements MetadataStore {
                         .filter(stream -> stream.getEpoch() <= epoch)
                         .map(stream -> {
                             int rangeId = stream.getRangeId();
-                            Range range = rangeMapper.getByRangeId(rangeId);
+                            Range range = rangeMapper.get(rangeId, stream.getId(), null);
                             return StreamMetadata.newBuilder()
                                 .setStreamId(stream.getId())
                                 .setStartOffset(stream.getStartOffset())
@@ -1532,7 +1532,7 @@ public class DefaultMetadataStore implements MetadataStore {
                 return false;
             }
 
-            Range range = rangeMapper.getByRangeId(stream.getRangeId());
+            Range range = rangeMapper.get(stream.getRangeId(), streamId, null);
             if (Objects.isNull(range)) {
                 // should not happen
                 LOGGER.error("Stream[stream-id={}]'s current range[range-id={}] not exist when stream has been created",
