@@ -21,6 +21,7 @@ import com.automq.rocketmq.broker.manager.NodeRegistrar;
 import com.automq.rocketmq.broker.protocol.GrpcProtocolServer;
 import com.automq.rocketmq.common.config.BrokerConfig;
 import com.automq.rocketmq.common.util.Lifecycle;
+import com.automq.rocketmq.controller.ControllerServiceImpl;
 import com.automq.rocketmq.controller.MetadataStoreBuilder;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
@@ -70,7 +71,9 @@ public class BrokerController implements Lifecycle {
         serviceManager = new DefaultServiceManager(brokerConfig.proxy(), proxyMetadataService, messageStore);
         messagingProcessor = ExtendMessagingProcessor.createForS3RocketMQ(serviceManager);
 
-        grpcServer = new GrpcProtocolServer(brokerConfig.proxy(), messagingProcessor);
+        // TODO: Split controller to a separate port
+        ControllerServiceImpl controllerService = MetadataStoreBuilder.build(metadataStore);
+        grpcServer = new GrpcProtocolServer(brokerConfig.proxy(), messagingProcessor, controllerService);
     }
 
     @Override

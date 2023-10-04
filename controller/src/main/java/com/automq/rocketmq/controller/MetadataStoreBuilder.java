@@ -30,6 +30,9 @@ import org.apache.ibatis.session.SqlSessionFactory;
 import org.apache.ibatis.session.SqlSessionFactoryBuilder;
 
 public class MetadataStoreBuilder {
+    public static ControllerServiceImpl build(MetadataStore metadataStore) {
+        return new ControllerServiceImpl(metadataStore);
+    }
     public static MetadataStore build(ControllerConfig config, Node node) throws IOException {
         SqlSessionFactory sessionFactory = getSessionFactory(config.dbUrl(), config.dbUser(), config.dbPassword());
 
