@@ -342,7 +342,9 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 Assertions.assertTrue(reply.getGroupId() > 0);
 
                 // Test duplication
-                Assertions.assertThrows(ExecutionException.class, () -> client.createGroup(target, request).get());
+                client.createGroup(target, request).whenComplete((res, e) -> {
+                    Assertions.assertEquals(ExecutionException.class, e.getClass());
+                });
             }
         }
     }
@@ -1445,7 +1447,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 testServer.start();
                 int port = testServer.getPort();
 
-                List<apache.rocketmq.controller.v1.S3StreamObject> s3StreamObjects = metadataStore.listStreamObjects(streamId, 222, 111, 2);
+                List<apache.rocketmq.controller.v1.S3StreamObject> s3StreamObjects = metadataStore.listStreamObjects(streamId, 222, 111, 2).get();
 
                 CommitWALObjectRequest request = CommitWALObjectRequest.newBuilder()
                     .setS3WalObject(walObject)

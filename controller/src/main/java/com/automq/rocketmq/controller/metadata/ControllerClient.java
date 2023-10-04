@@ -42,20 +42,18 @@ import java.util.concurrent.CompletableFuture;
 
 public interface ControllerClient extends Closeable {
 
-    CompletableFuture<Node> registerBroker(String target, String name, String address, String instanceId)
-        throws ControllerException;
+    CompletableFuture<Node> registerBroker(String target, String name, String address, String instanceId);
 
     CompletableFuture<Long> createTopic(String target, String topicName, int queueNum) throws ControllerException;
 
     CompletableFuture<Void> deleteTopic(String target, long topicId) throws ControllerException;
 
-    CompletableFuture<Topic> describeTopic(String target, Long topicId, String topicName) throws ControllerException;
+    CompletableFuture<Topic> describeTopic(String target, Long topicId, String topicName);
 
     CompletableFuture<Void> heartbeat(String target, int nodeId, long epoch,
         boolean goingAway) throws ControllerException;
 
-    CompletableFuture<Void> reassignMessageQueue(String target, long topicId, int queueId, int dstNodeId)
-        throws ControllerException;
+    CompletableFuture<Void> reassignMessageQueue(String target, long topicId, int queueId, int dstNodeId);
 
     CompletableFuture<Void> notifyMessageQueueAssignable(String target, long topicId,
         int queueId) throws ControllerException;
@@ -63,11 +61,10 @@ public interface ControllerClient extends Closeable {
     CompletableFuture<CreateGroupReply> createGroup(String target, CreateGroupRequest request)
         throws ControllerException;
 
-    CompletableFuture<Long> createRetryStream(String target, String groupName, long topicId, int queueId)
-        throws ControllerException;
+    CompletableFuture<Long> createRetryStream(String target, String groupName, long topicId, int queueId);
 
     CompletableFuture<Void> commitOffset(String target, long groupId, long topicId, int queueId,
-        long offset) throws ControllerException;
+        long offset);
 
     CompletableFuture<OpenStreamReply> openStream(String target, OpenStreamRequest request);
 
@@ -75,7 +72,7 @@ public interface ControllerClient extends Closeable {
 
     CompletableFuture<ListOpenStreamsReply> listOpenStreams(String target, ListOpenStreamsRequest request);
 
-    CompletableFuture<TrimStreamReply> trimStream(String target, TrimStreamRequest request) throws ControllerException;
+    CompletableFuture<TrimStreamReply> trimStream(String target, TrimStreamRequest request);
 
     CompletableFuture<PrepareS3ObjectsReply> prepareS3Objects(String target, PrepareS3ObjectsRequest request);
 

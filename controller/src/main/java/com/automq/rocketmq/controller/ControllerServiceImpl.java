@@ -65,11 +65,10 @@ import apache.rocketmq.controller.v1.TrimStreamRequest;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
-import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.google.protobuf.TextFormat;
 import io.grpc.stub.StreamObserver;
 
-import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -88,15 +87,30 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     public void registerNode(NodeRegistrationRequest request,
         StreamObserver<NodeRegistrationReply> responseObserver) {
         try {
-            Node node = metadataStore.registerBrokerNode(request.getBrokerName(), request.getAddress(),
-                request.getInstanceId());
-            NodeRegistrationReply reply = NodeRegistrationReply.newBuilder()
-                .setStatus(Status.newBuilder().setCode(Code.OK).build())
-                .setId(node.getId())
-                .setEpoch(node.getEpoch())
-                .build();
-            responseObserver.onNext(reply);
-            responseObserver.onCompleted();
+            metadataStore.registerBrokerNode(request.getBrokerName(), request.getAddress(),
+                request.getInstanceId()).whenComplete((res, e) -> {
+                    if (null != e) {
+                        if (e instanceof ControllerException ex) {
+                            NodeRegistrationReply reply = NodeRegistrationReply.newBuilder()
+                                .setStatus(Status.newBuilder()
+                                    .setCode(Code.forNumber(ex.getErrorCode()))
+                                    .setMessage(e.getMessage()).build())
+                                .build();
+                            responseObserver.onNext(reply);
+                            responseObserver.onCompleted();
+                        } else {
+                            responseObserver.onError(e);
+                        }
+                    } else {
+                        NodeRegistrationReply reply = NodeRegistrationReply.newBuilder()
+                            .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                            .setId(res.getId())
+                            .setEpoch(res.getEpoch())
+                            .build();
+                        responseObserver.onNext(reply);
+                        responseObserver.onCompleted();
+                    }
+                });
         } catch (ControllerException e) {
             responseObserver.onError(e);
         }
@@ -134,13 +148,18 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
         }
 
         try {
-            long topicId = this.metadataStore.createTopic(request.getTopic(), request.getCount());
-            CreateTopicReply reply = CreateTopicReply.newBuilder()
-                .setStatus(Status.newBuilder().setCode(Code.OK).build())
-                .setTopicId(topicId)
-                .build();
-            responseObserver.onNext(reply);
-            responseObserver.onCompleted();
+            this.metadataStore.createTopic(request.getTopic(), request.getCount()).whenCompleteAsync((topicId, e) -> {
+                if (null != e) {
+                    responseObserver.onError(e);
+                } else {
+                    CreateTopicReply reply = CreateTopicReply.newBuilder()
+                        .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                        .setTopicId(topicId)
+                        .build();
+                    responseObserver.onNext(reply);
+                    responseObserver.onCompleted();
+                }
+            });
         } catch (ControllerException e) {
             if (Code.DUPLICATED_VALUE == e.getErrorCode()) {
                 CreateTopicReply reply = CreateTopicReply.newBuilder()
@@ -159,45 +178,55 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
 
     @Override
     public void describeTopic(DescribeTopicRequest request, StreamObserver<DescribeTopicReply> responseObserver) {
-        metadataStore.describeTopic(request.getTopicId(), request.getTopicName()).whenCompleteAsync((topic, e) -> {
-            if (null != e) {
-                if (e instanceof ControllerException ex) {
-                    DescribeTopicReply reply = DescribeTopicReply.newBuilder()
-                        .setStatus(Status.newBuilder()
-                            .setCode(Code.forNumber(ex.getErrorCode())).setMessage(ex.getMessage()).build()).build();
-                    responseObserver.onNext(reply);
-                    responseObserver.onCompleted();
+        try {
+            metadataStore.describeTopic(request.getTopicId(), request.getTopicName()).whenCompleteAsync((topic, e) -> {
+                if (null != e) {
+                    responseObserver.onError(e);
                     return;
                 }
 
-                responseObserver.onError(e);
-                return;
-            }
-
+                DescribeTopicReply reply = DescribeTopicReply.newBuilder()
+                    .setTopic(topic)
+                    .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                    .build();
+                responseObserver.onNext(reply);
+                responseObserver.onCompleted();
+            });
+        } catch (ControllerException e) {
             DescribeTopicReply reply = DescribeTopicReply.newBuilder()
-                .setTopic(topic)
-                .setStatus(Status.newBuilder().setCode(Code.OK).build())
-                .build();
+                .setStatus(Status.newBuilder()
+                    .setCode(Code.forNumber(e.getErrorCode())).setMessage(e.getMessage()).build()).build();
             responseObserver.onNext(reply);
             responseObserver.onCompleted();
-        });
+        }
     }
 
     @Override
     public void listAllTopics(ListTopicsRequest request, StreamObserver<ListTopicsReply> responseObserver) {
-        try {
-            List<Topic> topics = metadataStore.listTopics();
-            for (Topic topic : topics) {
-                ListTopicsReply reply = ListTopicsReply.newBuilder()
-                    .setStatus(Status.newBuilder().setCode(Code.OK).build())
-                    .setTopic(topic)
-                    .build();
-                responseObserver.onNext(reply);
+        metadataStore.listTopics().whenComplete(((topics, e) -> {
+            if (null != e) {
+                if (e instanceof ControllerException ex) {
+                    ListTopicsReply reply = ListTopicsReply.newBuilder()
+                        .setStatus(Status.newBuilder()
+                            .setCode(Code.forNumber(ex.getErrorCode()))
+                            .setMessage(e.getMessage()).build())
+                        .build();
+                    responseObserver.onNext(reply);
+                    responseObserver.onCompleted();
+                } else {
+                    responseObserver.onError(e);
+                }
+            } else {
+                for (Topic topic : topics) {
+                    ListTopicsReply reply = ListTopicsReply.newBuilder()
+                        .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                        .setTopic(topic)
+                        .build();
+                    responseObserver.onNext(reply);
+                }
+                responseObserver.onCompleted();
             }
-            responseObserver.onCompleted();
-        } catch (ControllerException e) {
-            responseObserver.onError(e);
-        }
+        }));
     }
 
     @Override
@@ -208,12 +237,17 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     @Override
     public void deleteTopic(DeleteTopicRequest request, StreamObserver<DeleteTopicReply> responseObserver) {
         try {
-            this.metadataStore.deleteTopic(request.getTopicId());
-            DeleteTopicReply reply = DeleteTopicReply.newBuilder()
-                .setStatus(Status.newBuilder().setCode(Code.OK).build()
-                ).build();
-            responseObserver.onNext(reply);
-            responseObserver.onCompleted();
+            this.metadataStore.deleteTopic(request.getTopicId()).whenComplete((res, e) -> {
+                if (null != e) {
+                    responseObserver.onError(e);
+                } else {
+                    DeleteTopicReply reply = DeleteTopicReply.newBuilder()
+                        .setStatus(Status.newBuilder().setCode(Code.OK).build()
+                        ).build();
+                    responseObserver.onNext(reply);
+                    responseObserver.onCompleted();
+                }
+            });
         } catch (ControllerException e) {
             if (e.getErrorCode() == Code.NOT_FOUND_VALUE) {
                 DeleteTopicReply reply = DeleteTopicReply.newBuilder()
@@ -231,29 +265,55 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     public void reassignMessageQueue(ReassignMessageQueueRequest request,
         StreamObserver<ReassignMessageQueueReply> responseObserver) {
         try {
-            metadataStore.reassignMessageQueue(request.getQueue().getTopicId(), request.getQueue().getQueueId(), request.getDstNodeId());
+            metadataStore.reassignMessageQueue(request.getQueue().getTopicId(), request.getQueue().getQueueId(), request.getDstNodeId()).whenComplete((res, e) -> {
+                if (null != e) {
+                    responseObserver.onError(e);
+                } else {
+                    ReassignMessageQueueReply reply = ReassignMessageQueueReply.newBuilder()
+                        .setStatus(Status.newBuilder().setCode(Code.OK).build()).build();
+                    responseObserver.onNext(reply);
+                    responseObserver.onCompleted();
+                }
+            });
+        } catch (ControllerException e) {
             ReassignMessageQueueReply reply = ReassignMessageQueueReply.newBuilder()
-                .setStatus(Status.newBuilder().setCode(Code.OK).build()).build();
+                .setStatus(Status.newBuilder()
+                    .setCode(Code.forNumber(e.getErrorCode()))
+                    .setMessage(e.getMessage()).build())
+                .build();
             responseObserver.onNext(reply);
             responseObserver.onCompleted();
-        } catch (ControllerException e) {
-            responseObserver.onError(e);
         }
     }
 
     @Override
     public void notifyMessageQueueAssignable(NotifyMessageQueuesAssignableRequest request,
         StreamObserver<NotifyMessageQueuesAssignableReply> responseObserver) {
-        try {
-            for (MessageQueue messageQueue : request.getQueuesList()) {
-                this.metadataStore.markMessageQueueAssignable(messageQueue.getTopicId(), messageQueue.getQueueId());
-            }
+        AtomicInteger successCount = new AtomicInteger(0);
+        for (MessageQueue messageQueue : request.getQueuesList()) {
+            this.metadataStore.markMessageQueueAssignable(messageQueue.getTopicId(), messageQueue.getQueueId()).whenComplete((res, e) -> {
+                if (null != e) {
+                    if (e instanceof ControllerException ex) {
+                        NotifyMessageQueuesAssignableReply reply = NotifyMessageQueuesAssignableReply.newBuilder()
+                            .setStatus(Status.newBuilder()
+                                .setCode(Code.forNumber(ex.getErrorCode()))
+                                .setMessage(e.getMessage()).build())
+                            .build();
+                        responseObserver.onNext(reply);
+                        responseObserver.onCompleted();
+                    } else {
+                        responseObserver.onError(e);
+                    }
+                } else {
+                    successCount.incrementAndGet();
+                }
+            });
+        }
+        if (successCount.get() == request.getQueuesList().size()) {
             NotifyMessageQueuesAssignableReply reply = NotifyMessageQueuesAssignableReply.newBuilder()
                 .setStatus(Status.newBuilder().setCode(Code.OK).build()).build();
             responseObserver.onNext(reply);
             responseObserver.onCompleted();
-        } catch (ControllerException e) {
-            responseObserver.onError(e);
         }
     }
 
@@ -265,35 +325,56 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
 
     @Override
     public void commitOffset(CommitOffsetRequest request, StreamObserver<CommitOffsetReply> responseObserver) {
-        try {
-            metadataStore.commitOffset(request.getGroupId(),
-                request.getQueue().getTopicId(),
-                request.getQueue().getQueueId(),
-                request.getOffset());
-            CommitOffsetReply reply = CommitOffsetReply.newBuilder()
-                .setStatus(Status.newBuilder().setCode(Code.OK).build())
-                .build();
-            responseObserver.onNext(reply);
-            responseObserver.onCompleted();
-        } catch (ControllerException e) {
-            responseObserver.onError(e);
-        }
+        metadataStore.commitOffset(request.getGroupId(),
+            request.getQueue().getTopicId(),
+            request.getQueue().getQueueId(),
+            request.getOffset()).whenComplete((res, e) -> {
+                if (null != e) {
+                    if (e instanceof ControllerException ex) {
+                        CommitOffsetReply reply = CommitOffsetReply.newBuilder()
+                            .setStatus(Status.newBuilder()
+                                .setCode(Code.forNumber(ex.getErrorCode()))
+                                .setMessage(e.getMessage()).build())
+                            .build();
+                        responseObserver.onNext(reply);
+                        responseObserver.onCompleted();
+                    } else {
+                        responseObserver.onError(e);
+                    }
+                } else {
+                    CommitOffsetReply reply = CommitOffsetReply.newBuilder()
+                        .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                        .build();
+                    responseObserver.onNext(reply);
+                    responseObserver.onCompleted();
+                }
+            });
     }
 
     @Override
     public void createGroup(CreateGroupRequest request, StreamObserver<CreateGroupReply> responseObserver) {
-
         try {
-            long groupId = metadataStore.createGroup(request.getName(), request.getMaxRetryAttempt(),
-                request.getGroupType(), request.getDeadLetterTopicId());
+            metadataStore.createGroup(request.getName(), request.getMaxRetryAttempt(), request.getGroupType(),
+                request.getDeadLetterTopicId()).whenComplete((groupId, e) -> {
+                    if (null != e) {
+                        responseObserver.onError(e);
+                    } else {
+                        CreateGroupReply reply = CreateGroupReply.newBuilder()
+                            .setGroupId(groupId)
+                            .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                            .build();
+                        responseObserver.onNext(reply);
+                        responseObserver.onCompleted();
+                    }
+                });
+        } catch (ControllerException e) {
             CreateGroupReply reply = CreateGroupReply.newBuilder()
-                .setGroupId(groupId)
-                .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                .setStatus(Status.newBuilder()
+                    .setCode(Code.forNumber(e.getErrorCode()))
+                    .setMessage(e.getMessage()).build())
                 .build();
             responseObserver.onNext(reply);
             responseObserver.onCompleted();
-        } catch (ControllerException e) {
-            responseObserver.onError(e);
         }
     }
 
@@ -301,15 +382,26 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     public void createRetryStream(CreateRetryStreamRequest request,
         StreamObserver<CreateRetryStreamReply> responseObserver) {
         try {
-            long streamId = metadataStore.getOrCreateRetryStream(request.getGroupName(), request.getQueue().getTopicId(), request.getQueue().getQueueId());
+            metadataStore.getOrCreateRetryStream(request.getGroupName(), request.getQueue().getTopicId(), request.getQueue().getQueueId()).whenComplete((streamId, e) -> {
+                if (null != e) {
+                    responseObserver.onError(e);
+                } else {
+                    CreateRetryStreamReply reply = CreateRetryStreamReply.newBuilder()
+                        .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                        .setStreamId(streamId)
+                        .build();
+                    responseObserver.onNext(reply);
+                    responseObserver.onCompleted();
+                }
+            });
+        } catch (ControllerException e) {
             CreateRetryStreamReply reply = CreateRetryStreamReply.newBuilder()
-                .setStatus(Status.newBuilder().setCode(Code.OK).build())
-                .setStreamId(streamId)
+                .setStatus(Status.newBuilder()
+                    .setCode(Code.forNumber(e.getErrorCode()))
+                    .setMessage(e.getMessage()).build())
                 .build();
             responseObserver.onNext(reply);
             responseObserver.onCompleted();
-        } catch (ControllerException e) {
-            responseObserver.onError(e);
         }
     }
 
@@ -366,12 +458,17 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     @Override
     public void trimStream(TrimStreamRequest request, StreamObserver<TrimStreamReply> responseObserver) {
         try {
-            metadataStore.trimStream(request.getStreamId(), request.getStreamEpoch(), request.getNewStartOffset());
-            TrimStreamReply reply = TrimStreamReply.newBuilder()
-                .setStatus(Status.newBuilder().setCode(Code.OK).build())
-                .build();
-            responseObserver.onNext(reply);
-            responseObserver.onCompleted();
+            metadataStore.trimStream(request.getStreamId(), request.getStreamEpoch(), request.getNewStartOffset()).whenComplete((res, e) -> {
+                if (null != e) {
+                    responseObserver.onError(e);
+                } else {
+                    TrimStreamReply reply = TrimStreamReply.newBuilder()
+                        .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                        .build();
+                    responseObserver.onNext(reply);
+                    responseObserver.onCompleted();
+                }
+            });
         } catch (ControllerException e) {
             TrimStreamReply reply = TrimStreamReply.newBuilder()
                 .setStatus(Status.newBuilder()
@@ -380,8 +477,6 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
                 .build();
             responseObserver.onNext(reply);
             responseObserver.onCompleted();
-        } catch (Throwable e) {
-            responseObserver.onError(e);
         }
     }
 
@@ -428,28 +523,28 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     @Override
     public void commitWALObject(CommitWALObjectRequest
         request, StreamObserver<CommitWALObjectReply> responseObserver) {
-        metadataStore.commitWalObject(request.getS3WalObject(), request.getS3StreamObjectsList(), request.getCompactedObjectIdsList())
-            .whenComplete((res, e) -> {
-                if (null != e) {
-                    if (e instanceof ControllerException ex) {
+        try {
+            metadataStore.commitWalObject(request.getS3WalObject(), request.getS3StreamObjectsList(), request.getCompactedObjectIdsList())
+                .whenComplete((res, e) -> {
+                    if (null != e) {
+                        responseObserver.onError(e);
+                    } else {
                         CommitWALObjectReply reply = CommitWALObjectReply.newBuilder()
-                            .setStatus(Status.newBuilder()
-                                .setCode(Code.forNumber(ex.getErrorCode()))
-                                .setMessage(e.getMessage()).build())
+                            .setStatus(Status.newBuilder().setCode(Code.OK).build())
                             .build();
                         responseObserver.onNext(reply);
                         responseObserver.onCompleted();
-                    } else {
-                        responseObserver.onError(e);
                     }
-                } else {
-                    CommitWALObjectReply reply = CommitWALObjectReply.newBuilder()
-                        .setStatus(Status.newBuilder().setCode(Code.OK).build())
-                        .build();
-                    responseObserver.onNext(reply);
-                    responseObserver.onCompleted();
-                }
-            });
+                });
+        } catch (ControllerException e) {
+            CommitWALObjectReply reply = CommitWALObjectReply.newBuilder()
+                .setStatus(Status.newBuilder()
+                    .setCode(Code.forNumber(e.getErrorCode()))
+                    .setMessage(e.getMessage()).build())
+                .build();
+            responseObserver.onNext(reply);
+            responseObserver.onCompleted();
+        }
     }
 
     @SuppressWarnings("checkstyle:Indentation")
@@ -457,27 +552,27 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     public void commitStreamObject(CommitStreamObjectRequest request,
         StreamObserver<CommitStreamObjectReply> responseObserver) {
 
-        metadataStore.commitStreamObject(request.getS3StreamObject(), request.getCompactedObjectIdsList())
-            .whenComplete((res, e) -> {
-                if (null != e) {
-                    if (e instanceof ControllerException ex) {
+        try {
+            metadataStore.commitStreamObject(request.getS3StreamObject(), request.getCompactedObjectIdsList())
+                .whenComplete((res, e) -> {
+                    if (null != e) {
+                        responseObserver.onError(e);
+                    } else {
                         CommitStreamObjectReply reply = CommitStreamObjectReply.newBuilder()
-                            .setStatus(Status.newBuilder()
-                                .setCode(Code.forNumber(ex.getErrorCode()))
-                                .setMessage(e.getMessage()).build())
+                            .setStatus(Status.newBuilder().setCode(Code.OK).build())
                             .build();
                         responseObserver.onNext(reply);
                         responseObserver.onCompleted();
-                    } else {
-                        responseObserver.onError(e);
                     }
-                } else {
-                    CommitStreamObjectReply reply = CommitStreamObjectReply.newBuilder()
-                        .setStatus(Status.newBuilder().setCode(Code.OK).build())
-                        .build();
-                    responseObserver.onNext(reply);
-                    responseObserver.onCompleted();
-                }
-            });
+                });
+        } catch (ControllerException e) {
+            CommitStreamObjectReply reply = CommitStreamObjectReply.newBuilder()
+                .setStatus(Status.newBuilder()
+                    .setCode(Code.forNumber(e.getErrorCode()))
+                    .setMessage(e.getMessage()).build())
+                .build();
+            responseObserver.onNext(reply);
+            responseObserver.onCompleted();
+        }
     }
 }
