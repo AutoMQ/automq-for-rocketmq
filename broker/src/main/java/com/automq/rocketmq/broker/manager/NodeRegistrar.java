@@ -70,7 +70,7 @@ public class NodeRegistrar implements Lifecycle {
         return node;
     }
 
-    private void registerNode() throws Exception {
+    public void registerNode() throws Exception {
         node = metadataStore.registerBrokerNode(brokerConfig.name(), nodeAddress, brokerConfig.instanceId());
     }
 }

@@ -1,1 +1,14 @@
 name: DefaultBroker
+instanceId: "ec2-test"
+nodeId: 1
+s3Stream:
+  s3WALPath: "/tmp/s3rocketmq/wal"
+  s3Endpoint: "http://127.0.0.1:4566"
+  s3Bucket: "s3rocketmq"
+  s3Region: "us-east-1"
+  s3AccessKey: "test"
+  s3SecretKey: "test"
+controller:
+  dbUrl: "jdbc:mysql://127.0.0.1:3306/s3rocketmq"
+  dbUser: "root"
+  dbPassword: "root"

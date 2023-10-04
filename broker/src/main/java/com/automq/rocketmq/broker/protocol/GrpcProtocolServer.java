@@ -19,7 +19,6 @@ package com.automq.rocketmq.broker.protocol;
 
 import com.automq.rocketmq.common.config.ProxyConfig;
 import com.automq.rocketmq.common.util.Lifecycle;
-import com.automq.rocketmq.proxy.config.ProxyConfiguration;
 import com.automq.rocketmq.proxy.grpc.ExtendGrpcMessagingApplication;
 import com.automq.rocketmq.proxy.grpc.activity.ExtendGrpcMessingActivity;
 import io.grpc.protobuf.services.ChannelzService;
@@ -47,7 +46,6 @@ public class GrpcProtocolServer implements Lifecycle {
     private final ThreadPoolExecutor grpcExecutor;
 
     public GrpcProtocolServer(ProxyConfig config, MessagingProcessor messagingProcessor) {
-        initProxyConfig(config);
         grpcExecutor = createGrpcExecutor(config.grpcThreadPoolNums(), config.grpcThreadPoolQueueCapacity());
         grpcServer = GrpcServerBuilder.newBuilder(grpcExecutor, ConfigurationManager.getProxyConfig().getGrpcServerPort())
             .addService(createServiceProcessor(messagingProcessor))
@@ -80,9 +78,5 @@ public class GrpcProtocolServer implements Lifecycle {
             "GrpcRequestExecutorThread",
             queueCapacity
         );
-    }
-
-    private void initProxyConfig(ProxyConfig config) {
-        ProxyConfiguration.intConfig(config);
     }
 }

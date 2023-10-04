@@ -22,23 +22,16 @@ import com.automq.rocketmq.controller.metadata.GrpcControllerClient;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.DefaultMetadataStore;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
-import org.apache.ibatis.datasource.pooled.PooledDataSource;
-import org.apache.ibatis.mapping.Environment;
-import org.apache.ibatis.session.Configuration;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Properties;
+import org.apache.ibatis.io.Resources;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.apache.ibatis.session.SqlSessionFactoryBuilder;
-import org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory;
 
 public class MetadataStoreBuilder {
-    public static MetadataStore build(ControllerConfig config, Node node) {
-        PooledDataSource dataSource = new PooledDataSource("com.mysql.jdbc.Driver", config.dbUrl(),
-            config.dbUser(), config.dbPassword());
-
-        // Build SqlSessionFactory
-        Environment environment = new Environment("default", new JdbcTransactionFactory(), dataSource);
-        Configuration configuration = new Configuration(environment);
-
-        SqlSessionFactory sessionFactory = new SqlSessionFactoryBuilder().build(configuration);
+    public static MetadataStore build(ControllerConfig config, Node node) throws IOException {
+        SqlSessionFactory sessionFactory = getSessionFactory(config.dbUrl(), config.dbUser(), config.dbPassword());
 
         // TODO: Should unify the config interface.
         return new DefaultMetadataStore(new GrpcControllerClient(), sessionFactory, new com.automq.rocketmq.controller.metadata.ControllerConfig() {
@@ -67,5 +60,16 @@ public class MetadataStoreBuilder {
                 return config.nodeAliveIntervalInSecs();
             }
         });
+    }
+
+    private static SqlSessionFactory getSessionFactory(String dbUrl, String dbUser, String dbPassword) throws IOException {
+        String resource = "database/mybatis-config.xml";
+        InputStream inputStream = Resources.getResourceAsStream(resource);
+
+        Properties properties = new Properties();
+        properties.put("userName", dbUser);
+        properties.put("password", dbPassword);
+        properties.put("jdbcUrl", dbUrl + "?TC_REUSABLE=true");
+        return new SqlSessionFactoryBuilder().build(inputStream, properties);
     }
 }
