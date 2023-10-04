@@ -27,4 +27,17 @@
     </parent>
 
     <artifactId>rocketmq-cli</artifactId>
+
+    <dependencies>
+        <dependency>
+            <groupId>info.picocli</groupId>
+            <artifactId>picocli</artifactId>
+            <version>4.7.5</version>
+        </dependency>
+        <dependency>
+            <groupId>com.automq.rocketmq</groupId>
+            <artifactId>rocketmq-controller</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+    </dependencies>
 </project>
