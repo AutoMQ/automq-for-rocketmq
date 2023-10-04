@@ -61,6 +61,9 @@ public class ResourceMetadataService implements MetadataService {
                     case TRANSACTION -> {
                         return TopicMessageType.TRANSACTION;
                     }
+                    case MESSAGE_TYPE_UNSPECIFIED -> {
+                        return TopicMessageType.UNSPECIFIED;
+                    }
                 }
             } else {
                 LOGGER.warn("Topic {} has multiple message types, please specify only one accepted message type", topic);
