@@ -33,7 +33,6 @@ import com.automq.rocketmq.proxy.processor.ExtendMessagingProcessor;
 import com.automq.rocketmq.proxy.service.DefaultServiceManager;
 import com.automq.rocketmq.store.MessageStoreBuilder;
 import com.automq.rocketmq.store.api.MessageStore;
-import com.google.gson.Gson;
 import org.apache.rocketmq.proxy.processor.MessagingProcessor;
 import org.apache.rocketmq.proxy.service.ServiceManager;
 

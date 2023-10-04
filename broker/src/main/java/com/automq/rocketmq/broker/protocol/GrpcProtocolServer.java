@@ -19,7 +19,6 @@ package com.automq.rocketmq.broker.protocol;
 
 import com.automq.rocketmq.common.config.ProxyConfig;
 import com.automq.rocketmq.common.util.Lifecycle;
-import com.automq.rocketmq.proxy.config.ProxyConfiguration;
 import com.automq.rocketmq.proxy.grpc.ExtendGrpcMessagingApplication;
 import com.automq.rocketmq.proxy.grpc.activity.ExtendGrpcMessingActivity;
 import io.grpc.protobuf.services.ChannelzService;
