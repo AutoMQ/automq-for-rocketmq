@@ -18,7 +18,6 @@
 package com.automq.rocketmq.store;
 
 import com.automq.rocketmq.common.config.S3StreamConfig;
-import com.automq.rocketmq.metadata.DefaultStoreMetadataService;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.stream.api.AppendResult;
@@ -68,7 +67,8 @@ public class S3StreamStore implements StreamStore {
         this.streamManager = new S3StreamManager(metadataService);
         this.objectManager = new S3ObjectManager(metadataService);
 
-        this.operator = new DefaultS3Operator(s3Config.s3Endpont(), s3Config.s3Region(), s3Config.s3Bucket());
+        this.operator = new DefaultS3Operator(s3Config.s3Endpont(), s3Config.s3Region(), s3Config.s3Bucket(),
+            s3Config.s3AccessKey(), s3Config.s3SecretKey());
         this.writeAheadLog = BlockWALService.builder(s3Config.s3WALPath(), s3Config.s3WALCapacity()).config(s3Config).build();
         this.blockCache = new DefaultS3BlockCache(s3Config.s3CacheSize(), objectManager, operator);
 
@@ -153,6 +153,8 @@ public class S3StreamStore implements StreamStore {
         config.s3Region(streamConfig.s3Region());
         config.s3Bucket(streamConfig.s3Bucket());
         config.s3WALPath(streamConfig.s3WALPath());
+        config.s3AccessKey(streamConfig.s3AccessKey());
+        config.s3SecretKey(streamConfig.s3SecretKey());
         return config;
     }
 }

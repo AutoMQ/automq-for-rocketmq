@@ -25,13 +25,9 @@ import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
-import org.apache.ibatis.datasource.pooled.PooledDataSource;
 import org.apache.ibatis.io.Resources;
-import org.apache.ibatis.mapping.Environment;
-import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.apache.ibatis.session.SqlSessionFactoryBuilder;
-import org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory;
 
 public class MetadataStoreBuilder {
     public static MetadataStore build(ControllerConfig config, Node node) throws IOException {
@@ -73,7 +69,7 @@ public class MetadataStoreBuilder {
         Properties properties = new Properties();
         properties.put("userName", dbUser);
         properties.put("password", dbPassword);
-        properties.put("jdbcUrl", dbUrl+ "?TC_REUSABLE=true");
+        properties.put("jdbcUrl", dbUrl + "?TC_REUSABLE=true");
         return new SqlSessionFactoryBuilder().build(inputStream, properties);
     }
 }
