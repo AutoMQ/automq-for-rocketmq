@@ -27,16 +27,20 @@ import com.automq.rocketmq.store.api.TopicQueueManager;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.service.InflightService;
 import com.automq.rocketmq.store.service.RocksDBKVService;
+import com.automq.rocketmq.store.service.SnapshotService;
 import com.automq.rocketmq.store.service.api.KVService;
 
 public class MessageStoreBuilder {
-    public static MessageStore build(StoreConfig storeConfig, S3StreamConfig s3StreamConfig, StoreMetadataService metadataService) throws StoreException {
+    public static MessageStore build(StoreConfig storeConfig, S3StreamConfig s3StreamConfig,
+        StoreMetadataService metadataService) throws StoreException {
         StreamStore streamStore = new S3StreamStore(s3StreamConfig);
         KVService kvService = new RocksDBKVService(storeConfig.kvPath());
         InflightService inflightService = new InflightService();
+        SnapshotService snapshotService = new SnapshotService(streamStore, kvService);
         TopicQueueManager topicQueueManager = (topicId, queueId) -> {
             MessageStateMachine stateMachine = new DefaultMessageStateMachine(topicId, queueId, kvService);
-            return new StreamTopicQueue(storeConfig, topicId, queueId, metadataService, stateMachine, streamStore, inflightService);            };
+            return new StreamTopicQueue(storeConfig, topicId, queueId, metadataService, stateMachine, streamStore, inflightService, snapshotService);
+        };
 
         return new MessageStoreImpl(storeConfig, streamStore, metadataService, kvService, inflightService, topicQueueManager);
     }
