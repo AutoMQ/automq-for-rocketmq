@@ -18,7 +18,6 @@
 package com.automq.rocketmq.cli;
 
 import com.automq.rocketmq.controller.metadata.GrpcControllerClient;
-import java.io.IOException;
 import java.util.concurrent.Callable;
 import picocli.CommandLine;
 
