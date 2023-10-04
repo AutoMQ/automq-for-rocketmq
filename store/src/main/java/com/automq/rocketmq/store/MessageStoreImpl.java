@@ -110,7 +110,7 @@ public class MessageStoreImpl implements MessageStore {
     @Override
     public CompletableFuture<PutResult> put(FlatMessage message) {
         TopicQueue topicQueue = topicQueueManager.get(message.topicId(), message.queueId());
-        return topicQueue.put(message);
+        return topicQueue.open().thenCompose(v -> topicQueue.put(message));
     }
 
     @Override

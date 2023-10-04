@@ -24,6 +24,7 @@ import org.apache.rocketmq.proxy.service.route.AddressableMessageQueue;
  * In current implementation, we assign each MessageQueue to a virtual broker for more flexible routing.
  */
 public class VirtualQueue {
+    public static final String VIRTUAL_QUEUE_SEPARATOR = "_";
     private final long topicId;
     private final int physicalQueueId;
     private final String brokerName;
@@ -45,13 +46,13 @@ public class VirtualQueue {
      */
     public VirtualQueue(String brokerName) {
         this.brokerName = brokerName;
-        String[] brokerNameParts = brokerName.split("%");
+        String[] brokerNameParts = brokerName.split(VIRTUAL_QUEUE_SEPARATOR);
         this.topicId = Long.parseLong(brokerNameParts[0]);
         this.physicalQueueId = Integer.parseInt(brokerNameParts[1]);
     }
 
     private String buildBrokerName() {
-        return topicId + "%" + physicalQueueId;
+        return topicId + VIRTUAL_QUEUE_SEPARATOR + physicalQueueId;
     }
 
     public long topicId() {
