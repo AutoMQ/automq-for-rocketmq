@@ -8,3 +8,7 @@ s3Stream:
   s3Region: "us-east-1"
   s3AccessKey: "test"
   s3SecretKey: "test"
+controller:
+  dbUrl: "jdbc:mysql://127.0.0.1:3306/s3rocketmq"
+  dbUser: "root"
+  dbPassword: "root"

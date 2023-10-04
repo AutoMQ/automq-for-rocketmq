@@ -23,9 +23,9 @@ public class ControllerConfig {
     private int scanIntervalInSecs = 10;
 
     // Database related configs
-    private String dbUrl = "jdbc:mysql://10.43.88.46:3306/s3rocketmq";
-    private String dbUser = "root";
-    private String dbPassword = "root";
+    private String dbUrl;
+    private String dbUser;
+    private String dbPassword;
 
     public int nodeAliveIntervalInSecs() {
         return nodeAliveIntervalInSecs;
