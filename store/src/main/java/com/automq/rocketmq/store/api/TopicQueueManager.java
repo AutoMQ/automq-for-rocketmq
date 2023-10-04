@@ -17,7 +17,9 @@
 
 package com.automq.rocketmq.store.api;
 
-public interface TopicQueueManager {
+import com.automq.rocketmq.common.util.Lifecycle;
+
+public interface TopicQueueManager extends Lifecycle {
     TopicQueue get(long topicId, int queueId);
 
 }

@@ -19,10 +19,8 @@ package com.automq.rocketmq.store.api;
 
 import com.automq.rocketmq.store.model.operation.AckOperation;
 import com.automq.rocketmq.store.model.operation.ChangeInvisibleDurationOperation;
-import com.automq.rocketmq.store.model.operation.Operation;
 import com.automq.rocketmq.store.model.operation.OperationSnapshot;
 import com.automq.rocketmq.store.model.operation.PopOperation;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 public interface MessageStateMachine {
@@ -37,7 +35,7 @@ public interface MessageStateMachine {
 
     CompletableFuture<Void> loadSnapshot(OperationSnapshot snapshot);
 
-    CompletableFuture<List<Operation>> revive();
+    CompletableFuture<Void> clear();
 
     CompletableFuture<Long> consumeOffset(long consumerGroupId);
 

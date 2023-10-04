@@ -61,4 +61,8 @@ public class StoreConfig {
     public int operationSnapshotInterval() {
         return operationSnapshotInterval;
     }
+
+    public void setOperationSnapshotInterval(int operationSnapshotInterval) {
+        this.operationSnapshotInterval = operationSnapshotInterval;
+    }
 }

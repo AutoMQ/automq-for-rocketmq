@@ -96,7 +96,7 @@ public class S3StreamStore implements StreamStore {
     @Override
     public CompletableFuture<Void> close(List<Long> streamIds) {
         // TODO: Close Stream
-        return null;
+        return CompletableFuture.completedFuture(null);
     }
 
     @Override

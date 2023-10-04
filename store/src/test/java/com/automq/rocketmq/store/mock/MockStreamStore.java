@@ -57,7 +57,8 @@ public class MockStreamStore implements StreamStore {
 
     @Override
     public CompletableFuture<Void> close(List<Long> streams) {
-        return null;
+        streams.forEach(this::closeStream);
+        return CompletableFuture.completedFuture(null);
     }
 
     @Override
@@ -88,6 +89,13 @@ public class MockStreamStore implements StreamStore {
         // Open the specified stream if not opened yet.
         // TODO: Build a real OpenStreamOptions
         return openedStreams.computeIfAbsent(streamId, id -> streamClient.openStream(id, null).join());
+    }
+
+    private void closeStream(long streamId) {
+        Stream stream = openedStreams.remove(streamId);
+        if (stream != null) {
+            stream.close();
+        }
     }
 
     @Override

@@ -81,6 +81,16 @@ public abstract class TopicQueue {
 
     public abstract CompletableFuture<Long> getConsumeOffset(long consumerGroupId);
 
+    public abstract CompletableFuture<State> getState();
+
+    public enum State {
+        INIT,
+        OPENING,
+        OPENED,
+        CLOSING,
+        CLOSED
+    }
+
     public static class QueueOffsetRange {
         private final long startOffset;
         private final long endOffset;

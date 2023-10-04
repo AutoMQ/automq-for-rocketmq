@@ -22,10 +22,14 @@ import com.automq.rocketmq.store.model.generated.CheckPoint;
 import com.automq.rocketmq.store.model.generated.Operation;
 import com.automq.rocketmq.store.model.generated.OperationLogItem;
 import com.automq.rocketmq.store.model.generated.ReceiptHandle;
+import com.automq.rocketmq.store.model.operation.OperationSnapshot;
 import com.automq.rocketmq.store.model.operation.PopOperation.PopOperationType;
 import com.automq.rocketmq.store.model.operation.AckOperation.AckOperationType;
 import java.nio.ByteBuffer;
+import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.roaringbitmap.RoaringBitmap;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -140,5 +144,57 @@ public class SerializeUtilTest {
         assertEquals(OPERATION_ID, operation.receiptHandle().operationId());
         assertEquals(INVISIBLE_DURATION, operation.invisibleDuration());
         assertEquals(OPERATION_TIMESTAMP, operation.operationTimestamp());
+    }
+
+    @Test
+    void encodeOperationSnapshot() throws Exception {
+        RoaringBitmap ackBitmap = new RoaringBitmap();
+        ackBitmap.add(1, 3, 5);
+        int ackBitmapLength = ackBitmap.serializedSizeInBytes();
+        ByteBuffer ackBitmapBuffer = ByteBuffer.allocate(ackBitmapLength);
+        ackBitmap.serialize(ackBitmapBuffer);
+        ackBitmapBuffer.flip();
+
+        RoaringBitmap retryAckBitmap = new RoaringBitmap();
+        retryAckBitmap.add(2, 4, 6);
+        int retryAckBitmapLength = retryAckBitmap.serializedSizeInBytes();
+        ByteBuffer retryAckBitmapBuffer = ByteBuffer.allocate(retryAckBitmapLength);
+        retryAckBitmap.serialize(retryAckBitmapBuffer);
+        retryAckBitmapBuffer.flip();
+
+        OperationSnapshot.ConsumerGroupMetadataSnapshot consumerGroupMetadataSnapshot = new OperationSnapshot.ConsumerGroupMetadataSnapshot(
+            CONSUMER_GROUP_ID, 1, 2, 3, 4, ackBitmapBuffer.array(), retryAckBitmapBuffer.array()
+        );
+        byte[] checkPointValue = SerializeUtil.buildCheckPointValue(TOPIC_ID, QUEUE_ID, OFFSET, COUNT, CONSUMER_GROUP_ID, OPERATION_ID, POP_OPERATION_TYPE, DELIVERY_TIMESTAMP, NEXT_VISIBLE_TIMESTAMP);
+        CheckPoint checkPoint = CheckPoint.getRootAsCheckPoint(ByteBuffer.wrap(checkPointValue));
+        OperationSnapshot operationSnapshot = new OperationSnapshot(
+            13, List.of(consumerGroupMetadataSnapshot), List.of(checkPoint)
+        );
+        byte[] bytes = SerializeUtil.encodeOperationSnapshot(operationSnapshot);
+        OperationSnapshot decodedOperationSnapshot = SerializeUtil.decodeOperationSnapshot(ByteBuffer.wrap(bytes));
+        assertEquals(operationSnapshot.getSnapshotEndOffset(), decodedOperationSnapshot.getSnapshotEndOffset());
+        assertEquals(operationSnapshot.getConsumerGroupMetadataList().get(0).getConsumerGroupId(), decodedOperationSnapshot.getConsumerGroupMetadataList().get(0).getConsumerGroupId());
+        assertEquals(operationSnapshot.getConsumerGroupMetadataList().get(0).getConsumeOffset(), decodedOperationSnapshot.getConsumerGroupMetadataList().get(0).getConsumeOffset());
+        assertEquals(operationSnapshot.getConsumerGroupMetadataList().get(0).getRetryConsumeOffset(), decodedOperationSnapshot.getConsumerGroupMetadataList().get(0).getRetryConsumeOffset());
+        assertEquals(operationSnapshot.getConsumerGroupMetadataList().get(0).getAckOffset(), decodedOperationSnapshot.getConsumerGroupMetadataList().get(0).getAckOffset());
+        assertEquals(operationSnapshot.getConsumerGroupMetadataList().get(0).getRetryAckOffset(), decodedOperationSnapshot.getConsumerGroupMetadataList().get(0).getRetryAckOffset());
+
+        assertEquals(operationSnapshot.getCheckPoints().get(0).operationId(), decodedOperationSnapshot.getCheckPoints().get(0).operationId());
+        assertEquals(operationSnapshot.getCheckPoints().get(0).topicId(), decodedOperationSnapshot.getCheckPoints().get(0).topicId());
+        assertEquals(operationSnapshot.getCheckPoints().get(0).queueId(), decodedOperationSnapshot.getCheckPoints().get(0).queueId());
+        assertEquals(operationSnapshot.getCheckPoints().get(0).messageOffset(), decodedOperationSnapshot.getCheckPoints().get(0).messageOffset());
+        assertEquals(operationSnapshot.getCheckPoints().get(0).count(), decodedOperationSnapshot.getCheckPoints().get(0).count());
+        assertEquals(operationSnapshot.getCheckPoints().get(0).consumerGroupId(), decodedOperationSnapshot.getCheckPoints().get(0).consumerGroupId());
+        assertEquals(operationSnapshot.getCheckPoints().get(0).popOperationType(), decodedOperationSnapshot.getCheckPoints().get(0).popOperationType());
+        assertEquals(operationSnapshot.getCheckPoints().get(0).deliveryTimestamp(), decodedOperationSnapshot.getCheckPoints().get(0).deliveryTimestamp());
+        assertEquals(operationSnapshot.getCheckPoints().get(0).nextVisibleTimestamp(), decodedOperationSnapshot.getCheckPoints().get(0).nextVisibleTimestamp());
+
+        assertEquals(operationSnapshot.getConsumerGroupMetadataList(), decodedOperationSnapshot.getConsumerGroupMetadataList());
+        byte[] decodedAckBitmapBuffer = decodedOperationSnapshot.getConsumerGroupMetadataList().get(0).getAckOffsetBitmapBuffer();
+        RoaringBitmap decodedAckBitmap = new RoaringBitmap(new ImmutableRoaringBitmap(ByteBuffer.wrap(decodedAckBitmapBuffer)));
+        assertEquals(ackBitmap, decodedAckBitmap);
+        byte[] decodedRetryAckBitmapBuffer = decodedOperationSnapshot.getConsumerGroupMetadataList().get(0).getRetryAckOffsetBitmapBuffer();
+        RoaringBitmap decodedRetryAckBitmap = new RoaringBitmap(new ImmutableRoaringBitmap(ByteBuffer.wrap(decodedRetryAckBitmapBuffer)));
+        assertEquals(retryAckBitmap, decodedRetryAckBitmap);
     }
 }

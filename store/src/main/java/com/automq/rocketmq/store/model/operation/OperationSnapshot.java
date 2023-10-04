@@ -19,8 +19,8 @@ package com.automq.rocketmq.store.model.operation;
 
 import com.automq.rocketmq.store.model.generated.CheckPoint;
 import com.automq.rocketmq.store.model.metadata.ConsumerGroupMetadata;
-import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.Objects;
 
 public class OperationSnapshot {
 
@@ -49,6 +49,10 @@ public class OperationSnapshot {
         return checkPoints;
     }
 
+    public void setCheckPoints(List<CheckPoint> checkPoints) {
+        this.checkPoints = checkPoints;
+    }
+
     public long getKvServiceSnapshotVersion() {
         return kvServiceSnapshotVersion;
     }
@@ -57,25 +61,41 @@ public class OperationSnapshot {
         return consumerGroupMetadataList;
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o)
+            return true;
+        if (o == null || getClass() != o.getClass())
+            return false;
+        OperationSnapshot that = (OperationSnapshot) o;
+        return snapshotEndOffset == that.snapshotEndOffset && kvServiceSnapshotVersion == that.kvServiceSnapshotVersion && Objects.equals(checkPoints, that.checkPoints) && Objects.equals(consumerGroupMetadataList, that.consumerGroupMetadataList);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(snapshotEndOffset, checkPoints, kvServiceSnapshotVersion, consumerGroupMetadataList);
+    }
+
     public static class ConsumerGroupMetadataSnapshot extends ConsumerGroupMetadata {
-        private final ByteBuffer ackOffsetBitmapBuffer;
-        private final ByteBuffer retryAckOffsetBitmapBuffer;
+        private final byte[] ackOffsetBitmapBuffer;
+        private final byte[] retryAckOffsetBitmapBuffer;
 
         public ConsumerGroupMetadataSnapshot(long consumerGroupId, long consumeOffset, long ackOffset,
             long retryConsumeOffset, long retryAckOffset,
-            ByteBuffer ackOffsetBitmapBuffer, ByteBuffer retryAckOffsetBitmapBuffer) {
+            byte[] ackOffsetBitmapBuffer, byte[] retryAckOffsetBitmapBuffer) {
             super(consumerGroupId, consumeOffset, ackOffset, retryConsumeOffset, retryAckOffset);
             this.ackOffsetBitmapBuffer = ackOffsetBitmapBuffer;
             this.retryAckOffsetBitmapBuffer = retryAckOffsetBitmapBuffer;
         }
 
-        public ByteBuffer getAckOffsetBitmapBuffer() {
+        public byte[] getAckOffsetBitmapBuffer() {
             return ackOffsetBitmapBuffer;
         }
 
-        public ByteBuffer getRetryAckOffsetBitmapBuffer() {
+        public byte[] getRetryAckOffsetBitmapBuffer() {
             return retryAckOffsetBitmapBuffer;
         }
+
     }
 
 }

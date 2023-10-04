@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.store.model.metadata;
 
+import java.util.Objects;
 
 public class ConsumerGroupMetadata {
     private long consumerGroupId;
@@ -71,5 +72,20 @@ public class ConsumerGroupMetadata {
 
     public void setRetryAckOffset(long retryAckOffset) {
         this.retryAckOffset = retryAckOffset;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o)
+            return true;
+        if (o == null || getClass() != o.getClass())
+            return false;
+        ConsumerGroupMetadata metadata = (ConsumerGroupMetadata) o;
+        return consumerGroupId == metadata.consumerGroupId && consumeOffset == metadata.consumeOffset && ackOffset == metadata.ackOffset && retryConsumeOffset == metadata.retryConsumeOffset && retryAckOffset == metadata.retryAckOffset;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(consumerGroupId, consumeOffset, ackOffset, retryConsumeOffset, retryAckOffset);
     }
 }

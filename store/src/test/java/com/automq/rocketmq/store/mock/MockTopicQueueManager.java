@@ -39,4 +39,14 @@ public class MockTopicQueueManager implements TopicQueueManager {
     public TopicQueue get(long topicId, int queueId) {
         return topicQueueMap.get(new Pair<>(topicId, queueId));
     }
+
+    @Override
+    public void start() throws Exception {
+
+    }
+
+    @Override
+    public void shutdown() throws Exception {
+
+    }
 }

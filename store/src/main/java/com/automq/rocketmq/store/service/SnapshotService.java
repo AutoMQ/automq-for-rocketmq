@@ -33,17 +33,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.Supplier;
 
-public class SnapshotService implements Lifecycle {
+public class SnapshotService implements Lifecycle, Runnable {
 
     private final StreamStore streamStore;
     private final BlockingQueue<SnapshotTask> snapshotTaskQueue;
-    private final ExecutorService snapshotService = Executors.newSingleThreadScheduledExecutor();
+    private Thread snapshotTaker;
     private final KVService kvService;
+    private volatile boolean stopped = false;
 
     public SnapshotService(StreamStore streamStore, KVService kvService) {
         this.streamStore = streamStore;
@@ -53,12 +52,18 @@ public class SnapshotService implements Lifecycle {
 
     @Override
     public void start() throws Exception {
-        this.snapshotService.submit(new SnapshotTaker());
+        this.stopped = false;
+        this.snapshotTaker = new Thread(this, "snapshot-taker");
+        this.snapshotTaker.setDaemon(true);
+        this.snapshotTaker.start();
     }
 
     @Override
     public void shutdown() throws Exception {
-        this.snapshotService.shutdown();
+        this.stopped = true;
+        if (this.snapshotTaker != null) {
+            this.snapshotTaker.interrupt();
+        }
     }
 
     public CompletableFuture<Long> addSnapshotTask(SnapshotTask task) {
@@ -68,16 +73,22 @@ public class SnapshotService implements Lifecycle {
         return cf;
     }
 
-    class SnapshotTaker implements Runnable {
-        @Override
-        public void run() {
-            while (true) {
-                try {
-                    SnapshotTask snapshotTask = snapshotTaskQueue.take();
-                    takeSnapshot(snapshotTask).join();
-                } catch (Exception e) {
-                    // TODO: how handle? should we retry?
+    @Override
+    public void run() {
+        while (!stopped) {
+            try {
+                SnapshotTask snapshotTask = snapshotTaskQueue.poll();
+                if (snapshotTask == null) {
+                    Thread.sleep(100);
+                    continue;
                 }
+                takeSnapshot(snapshotTask)
+                    .exceptionally(e -> {
+                        snapshotTask.successCf.completeExceptionally(e);
+                        return null;
+                    }).join();
+            } catch (Exception e) {
+                // TODO: log it
             }
         }
     }
@@ -104,9 +115,12 @@ public class SnapshotService implements Lifecycle {
                     CheckPoint checkPoint = SerializeUtil.decodeCheckPoint(ByteBuffer.wrap(value));
                     checkPointList.add(checkPoint);
                 }, readOptions);
+                // release snapshot
+                kvService.releaseSnapshot(snapshot.getKvServiceSnapshotVersion());
             } catch (StoreException e) {
                 throw new RuntimeException(e);
             }
+            snapshot.setCheckPoints(checkPointList);
             byte[] snapshotData = SerializeUtil.encodeOperationSnapshot(snapshot);
             return snapshotData;
         });
@@ -116,8 +130,9 @@ public class SnapshotService implements Lifecycle {
         });
         return snapshotAppendCf.thenCombine(snapshotFuture, (appendResult, snapshot) -> {
             // trim operation stream
-            streamStore.trim(operationStreamId, snapshot.getSnapshotEndOffset());
+            streamStore.trim(operationStreamId, snapshot.getSnapshotEndOffset() + 1);
             task.successCf.complete(snapshot.getSnapshotEndOffset() + 1);
+            // release snapshot
             return null;
         });
     }

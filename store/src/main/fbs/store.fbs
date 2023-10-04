@@ -73,7 +73,7 @@ table ConsumerGroupMetadata {
   ack_bit_map:[byte];
   retry_consume_offset:long;
   retry_ack_offset:long;
-  retry_ack_bit_map:[byte];
+  retry_ack_bit_map:[ubyte];
 }
 
 table RetryTimes {
