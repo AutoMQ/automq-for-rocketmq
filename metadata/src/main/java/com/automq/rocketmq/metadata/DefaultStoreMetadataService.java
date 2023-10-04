@@ -130,13 +130,12 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
     @Override
     public CompletableFuture<Void> trimStream(long streamId, long streamEpoch,
         long newStartOffset) {
-        // TODO: Make trim stream async
         try {
-            metadataStore.trimStream(streamId, streamEpoch, newStartOffset);
+            return metadataStore.trimStream(streamId, streamEpoch, newStartOffset);
         } catch (ControllerException e) {
-            return CompletableFuture.failedFuture(e);
+            LOGGER.error("Exception raised while trim stream for {}, {}, {}", streamId, streamEpoch, newStartOffset, e);
+            return null;
         }
-        return CompletableFuture.completedFuture(null);
     }
 
     @Override
@@ -162,45 +161,47 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
     @Override
     public CompletableFuture<Void> commitWalObject(S3WALObject walObject, List<S3StreamObject> streamObjects,
         List<Long> compactedObjects) {
-        return metadataStore.commitWalObject(walObject, streamObjects, compactedObjects);
+        try {
+            return metadataStore.commitWalObject(walObject, streamObjects, compactedObjects);
+        } catch (ControllerException e) {
+            LOGGER.error("Exception raised while commit Wal Object for {}, {}, {}", walObject, streamObjects, compactedObjects, e);
+            return null;
+        }
     }
 
     @Override
     public CompletableFuture<Void> commitStreamObject(S3StreamObject streamObject, List<Long> compactedObjects) {
-        return metadataStore.commitStreamObject(streamObject, compactedObjects);
+        try {
+            return metadataStore.commitStreamObject(streamObject, compactedObjects);
+        } catch (ControllerException e) {
+            LOGGER.error("Exception raised while commit Stream Object for {}, {}", streamObject, compactedObjects, e);
+            return null;
+        }
     }
 
     @Override
     public CompletableFuture<List<S3WALObject>> listWALObjects() {
-        // TODO: Make list WAL objects async
-        List<S3WALObject> walObjects;
-        try {
-            walObjects = metadataStore.listWALObjects();
-        } catch (ControllerException e) {
-            return CompletableFuture.failedFuture(e);
-        }
-        return CompletableFuture.completedFuture(walObjects);
+        return metadataStore.listWALObjects();
     }
 
     @Override
     public CompletableFuture<List<S3WALObject>> listWALObjects(long streamId, long startOffset, long endOffset,
         int limit) {
-        // TODO: Make list WAL objects async
-        return CompletableFuture.completedFuture(metadataStore.listWALObjects(streamId, startOffset, endOffset, limit));
+        return metadataStore.listWALObjects(streamId, startOffset, endOffset, limit);
     }
 
     @Override
     public CompletableFuture<List<S3StreamObject>> listStreamObjects(long streamId, long startOffset, long endOffset,
         int limit) {
-        // TODO: Make list stream objects async
-        return CompletableFuture.completedFuture(metadataStore.listStreamObjects(streamId, startOffset, endOffset, limit));
+        return metadataStore.listStreamObjects(streamId, startOffset, endOffset, limit);
     }
 
     public CompletableFuture<Pair<List<S3StreamObject>, List<S3WALObject>>> listObjects(long streamId, long startOffset,
         long endOffset, int limit) {
-        // TODO: 1. Make listObjects async 2. Make an atomic listObjects
-        return CompletableFuture.completedFuture(new Pair<>(
-            metadataStore.listStreamObjects(streamId, startOffset, endOffset, limit),
-            metadataStore.listWALObjects(streamId, startOffset, endOffset, limit)));
+        CompletableFuture<List<S3StreamObject>> streamObjectsFuture = metadataStore.listStreamObjects(streamId, startOffset, endOffset, limit);
+        CompletableFuture<List<S3WALObject>> walObjectsFuture = metadataStore.listWALObjects(streamId, startOffset, endOffset, limit);
+
+        return CompletableFuture.allOf(streamObjectsFuture, walObjectsFuture)
+            .thenApplyAsync(v -> new Pair<>(streamObjectsFuture.join(), walObjectsFuture.join()));
     }
 }

@@ -78,7 +78,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    void testRegisterNode() throws ControllerException, IOException {
+    void testRegisterNode() throws IOException, ExecutionException, InterruptedException, ControllerException {
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.nodeId()).thenReturn(1);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
@@ -92,13 +92,13 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             String name = "broker-0";
             String address = "localhost:1234";
             String instanceId = "i-register";
-            Node node = metadataStore.registerBrokerNode(name, address, instanceId);
+            Node node = metadataStore.registerBrokerNode(name, address, instanceId).get();
             Assertions.assertTrue(node.getId() > 0);
         }
     }
 
     @Test
-    void testRegisterBroker_badArguments() throws IOException {
+    void testRegisterBroker_badArguments() throws IOException, ControllerException {
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.nodeId()).thenReturn(1);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
@@ -116,6 +116,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Assertions.assertThrows(ControllerException.class, () -> metadataStore.registerBrokerNode(name, address, ""));
         }
     }
+
 
     /**
      * Dummy test, should be removed later
@@ -215,7 +216,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    void testCreateTopic() throws ControllerException, IOException {
+    void testCreateTopic() throws IOException, ControllerException, ExecutionException, InterruptedException {
         String address = "localhost:1234";
         int nodeId;
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -243,7 +244,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
                 .pollInterval(100, TimeUnit.MILLISECONDS)
                 .until(metadataStore::isLeader);
 
-            topicId = metadataStore.createTopic(topicName, queueNum);
+            topicId = metadataStore.createTopic(topicName, queueNum).get();
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -262,7 +263,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testListAssignments() throws IOException {
+    public void testListAssignments() throws IOException, ExecutionException, InterruptedException {
         try (SqlSession session = getSessionFactory().openSession()) {
             QueueAssignmentMapper mapper = session.getMapper(QueueAssignmentMapper.class);
             QueueAssignment assignment = new QueueAssignment();
@@ -278,7 +279,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
         try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            List<QueueAssignment> assignmentList = metadataStore.listAssignments(null, null, null, null);
+            List<QueueAssignment> assignmentList = metadataStore.listAssignments(null, null, null, null).get();
             Assertions.assertEquals(1, assignmentList.size());
             QueueAssignment assignment = assignmentList.get(0);
             Assertions.assertEquals(1, assignment.getTopicId());
@@ -290,7 +291,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testDeleteTopic() throws IOException {
+    public void testDeleteTopic() throws IOException, ExecutionException, InterruptedException, ControllerException {
         String address = "localhost:1234";
         int nodeId;
         long topicId;
@@ -323,14 +324,12 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Awaitility.await().with().atMost(10, TimeUnit.SECONDS).pollInterval(100, TimeUnit.MILLISECONDS)
                 .until(metadataStore::isLeader);
 
-            metadataStore.deleteTopic(topicId);
-        } catch (ControllerException e) {
-            Assertions.fail(e);
+            metadataStore.deleteTopic(topicId).get();
         }
     }
 
     @Test
-    public void testDeleteTopic_NotFound() throws IOException {
+    public void testDeleteTopic_NotFound() throws IOException, ControllerException {
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.nodeId()).thenReturn(1);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
@@ -344,7 +343,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testDescribeTopic() throws IOException, ExecutionException, InterruptedException {
+    public void testDescribeTopic() throws IOException, ExecutionException, InterruptedException, ControllerException {
         long topicId;
         try (SqlSession session = getSessionFactory().openSession()) {
 
@@ -390,7 +389,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testMarkMessageQueueAssignable() throws IOException, ControllerException {
+    public void testMarkMessageQueueAssignable() throws IOException, ControllerException, ExecutionException, InterruptedException {
         try (SqlSession session = getSessionFactory().openSession()) {
             QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
             QueueAssignment assignment = new QueueAssignment();
@@ -411,7 +410,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
                 .until(metadataStore::isLeader);
             metadataStore.markMessageQueueAssignable(2, 1);
 
-            List<QueueAssignment> assignments = metadataStore.listAssignments(2L, null, null, null);
+            List<QueueAssignment> assignments = metadataStore.listAssignments(2L, null, null, null).get();
             for (QueueAssignment assignment : assignments) {
                 if (assignment.getQueueId() == 1) {
                     Assertions.assertEquals(AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNABLE, assignment.getStatus());
@@ -421,7 +420,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testListStreamObjects() throws IOException {
+    public void testListStreamObjects() throws IOException, ExecutionException, InterruptedException {
         long streamId, startOffset, endOffset;
         startOffset = 2000L;
         endOffset = 2111L;
@@ -449,7 +448,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
         Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            List<S3StreamObject> s3StreamObjects = metadataStore.listStreamObjects(streamId, startOffset, endOffset, limit);
+            List<S3StreamObject> s3StreamObjects = metadataStore.listStreamObjects(streamId, startOffset, endOffset, limit).get();
             S3StreamObject s3StreamObject = s3StreamObjects.get(0);
             Assertions.assertEquals(11, s3StreamObject.getObjectId());
             Assertions.assertEquals(123, s3StreamObject.getObjectSize());
@@ -460,7 +459,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testListWALObjects_WithPrams() throws IOException {
+    public void testListWALObjects_WithPrams() throws IOException, ExecutionException, InterruptedException {
         long streamId, startOffset, endOffset;
         streamId = 1234567890;
         startOffset = 0L;
@@ -523,7 +522,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Lease lease = new Lease();
             lease.setNodeId(config.nodeId());
             metadataStore.setLease(lease);
-            List<S3WALObject> s3WALObjects = metadataStore.listWALObjects(streamId, startOffset, endOffset, limit);
+            List<S3WALObject> s3WALObjects = metadataStore.listWALObjects(streamId, startOffset, endOffset, limit).get();
 
             Assertions.assertFalse(s3WALObjects.isEmpty());
             S3WALObject s3WALObject = s3WALObjects.get(0);
@@ -542,7 +541,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testListWALObjects_NotParams() throws IOException {
+    public void testListWALObjects_NotParams() throws IOException, ExecutionException, InterruptedException {
         Gson gson = new Gson();
         String subStreamsJson = """
             {
@@ -593,7 +592,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Lease lease = new Lease();
             lease.setNodeId(config.nodeId());
             metadataStore.setLease(lease);
-            List<S3WALObject> s3WALObjects = metadataStore.listWALObjects();
+            List<S3WALObject> s3WALObjects = metadataStore.listWALObjects().get();
 
             Assertions.assertFalse(s3WALObjects.isEmpty());
             S3WALObject s3WALObject = s3WALObjects.get(0);
@@ -860,7 +859,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testTrimStream() throws IOException {
+    public void testTrimStream() throws IOException, ControllerException {
         long streamId, streamEpoch = 1, newStartOffset = 2000;
         int nodeId = 1, rangId = 0;
         try (SqlSession session = this.getSessionFactory().openSession()) {
@@ -901,8 +900,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
                 .until(metadataStore::isLeader);
 
             metadataStore.trimStream(streamId, streamEpoch, newStartOffset);
-        } catch (ControllerException e) {
-            Assertions.fail(e);
         }
 
         try (SqlSession session = this.getSessionFactory().openSession()) {
@@ -924,7 +921,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testListOpenStream() throws IOException {
+    public void testListOpenStream() throws IOException, ExecutionException, InterruptedException {
         long streamId;
         int nodeId = 1, rangId = 0;
         try (SqlSession session = this.getSessionFactory().openSession()) {
@@ -975,10 +972,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Assertions.assertEquals(StreamState.OPEN, streamMetadata.getState());
             Assertions.assertEquals(1234, streamMetadata.getStartOffset());
             Assertions.assertEquals(2345, streamMetadata.getEndOffset());
-        } catch (ExecutionException e) {
-            throw new RuntimeException(e);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -990,7 +983,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testListOpenStream_NotFound() throws IOException {
+    public void testListOpenStream_NotFound() throws IOException, ExecutionException, InterruptedException {
         long streamId;
         int nodeId = 1, rangId = 0;
         try (SqlSession session = this.getSessionFactory().openSession()) {
@@ -1036,10 +1029,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             List<StreamMetadata> streams = metadataStore.listOpenStreams(nodeId, 0).get();
 
             Assertions.assertTrue(streams.isEmpty());
-        } catch (ExecutionException e) {
-            throw new RuntimeException(e);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -1087,7 +1076,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testCommitStreamObject() throws IOException {
+    public void testCommitStreamObject() throws IOException, ControllerException {
         long objectId, streamId = 1;
         int nodeId = 1;
 
@@ -1171,7 +1160,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testCommitWALObject() throws IOException {
+    public void testCommitWALObject() throws IOException, ExecutionException, InterruptedException, ControllerException {
         long objectId, streamId = 1;
         int nodeId = 1;
 
@@ -1257,7 +1246,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             metadataStore.setLease(lease);
             metadataStore.setRole(Role.Leader);
 
-            List<S3StreamObject> s3StreamObjects = metadataStore.listStreamObjects(streamId, 222, 111, 2);
+            List<S3StreamObject> s3StreamObjects = metadataStore.listStreamObjects(streamId, 222, 111, 2).get();
 
             metadataStore.commitWalObject(walObject, s3StreamObjects, compactedObjects);
         }
