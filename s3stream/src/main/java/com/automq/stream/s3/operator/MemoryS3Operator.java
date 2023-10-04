@@ -16,6 +16,7 @@
  */
 package com.automq.stream.s3.operator;
 
+import com.automq.stream.s3.compact.TokenBucketThrottle;
 import com.automq.stream.utils.FutureUtil;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
@@ -52,7 +53,7 @@ public class MemoryS3Operator implements S3Operator {
     }
 
     @Override
-    public Writer writer(String path, String logIdent) {
+    public Writer writer(String path, String logIdent, TokenBucketThrottle readThrottle) {
         ByteBuf buf = Unpooled.buffer();
         storage.put(path, buf);
         return new Writer() {
@@ -69,6 +70,9 @@ public class MemoryS3Operator implements S3Operator {
 
             @Override
             public void copyWrite(String sourcePath, long start, long end) {
+                if (readThrottle != null) {
+                    readThrottle.throttle(end - start);
+                }
                 ByteBuf source = storage.get(sourcePath);
                 if (source == null) {
                     throw new IllegalArgumentException("object not exist");
