@@ -160,11 +160,12 @@ public class SerializeUtil {
         int[] checkPointOffsets = new int[snapshot.getCheckPoints().size()];
         for (int i = 0; i < snapshot.getCheckPoints().size(); i++) {
             CheckPoint checkPoint = snapshot.getCheckPoints().get(i);
-            int checkPointOffset = CheckPoint.createCheckPoint(builder, checkPoint.topicId(), checkPoint.queueId(), checkPoint.messageOffset(), checkPoint.count(), checkPoint.consumerGroupId(), checkPoint.operationId(), (short) 0, 0, 0);
+            int checkPointOffset = CheckPoint.createCheckPoint(builder, checkPoint.topicId(), checkPoint.queueId(), checkPoint.messageOffset(), checkPoint.count(), checkPoint.consumerGroupId(), checkPoint.operationId(),
+                checkPoint.popOperationType(), checkPoint.deliveryTimestamp(), checkPoint.nextVisibleTimestamp());
             checkPointOffsets[i] = checkPointOffset;
         }
         int checkPointVectorOffset = com.automq.rocketmq.store.model.generated.OperationSnapshot.createCheckPointsVector(builder, checkPointOffsets);
-        int root = com.automq.rocketmq.store.model.generated.OperationSnapshot.createOperationSnapshot(builder, snapshot.getSnapshotEndOffset(), consumerGroupMetadataVectorOffset, checkPointVectorOffset);
+        int root = com.automq.rocketmq.store.model.generated.OperationSnapshot.createOperationSnapshot(builder, snapshot.getSnapshotEndOffset(), checkPointVectorOffset, consumerGroupMetadataVectorOffset);
         builder.finish(root);
         return builder.sizedByteArray();
     }
@@ -174,9 +175,13 @@ public class SerializeUtil {
         List<OperationSnapshot.ConsumerGroupMetadataSnapshot> consumerGroupMetadataList = new ArrayList<>();
         for (int i = 0; i < snapshot.consumerGroupMetadatasLength(); i++) {
             com.automq.rocketmq.store.model.generated.ConsumerGroupMetadata consumerGroupMetadata = snapshot.consumerGroupMetadatas(i);
+            byte[] ackBitMap = new byte[consumerGroupMetadata.ackBitMapLength()];
+            consumerGroupMetadata.ackBitMapAsByteBuffer().get(ackBitMap);
+            byte[] retryAckBitMap = new byte[consumerGroupMetadata.retryAckBitMapLength()];
+            consumerGroupMetadata.retryAckBitMapAsByteBuffer().get(retryAckBitMap);
             consumerGroupMetadataList.add(new OperationSnapshot.ConsumerGroupMetadataSnapshot(consumerGroupMetadata.consumerGroupId(),
                 consumerGroupMetadata.consumeOffset(), consumerGroupMetadata.ackOffset(), consumerGroupMetadata.retryConsumeOffset(), consumerGroupMetadata.retryAckOffset(),
-                consumerGroupMetadata.ackBitMapAsByteBuffer(), consumerGroupMetadata.retryAckBitMapAsByteBuffer()));
+                ackBitMap, retryAckBitMap));
         }
         List<CheckPoint> checkPointList = new ArrayList<>(snapshot.checkPointsLength());
         for (int i = 0; i < snapshot.checkPointsLength(); i++) {

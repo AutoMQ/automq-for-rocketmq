@@ -122,7 +122,7 @@ public class StreamOperationLogService implements OperationLogService {
             } catch (StoreException e) {
                 throw new RuntimeException(e);
             }
-            if (result.baseOffset() - opStartOffset.get() >= storeConfig.operationSnapshotInterval()) {
+            if (result.baseOffset() - opStartOffset.get() + 1 >= storeConfig.operationSnapshotInterval()) {
                 notifySnapshot();
             }
             return result.baseOffset();
@@ -140,6 +140,10 @@ public class StreamOperationLogService implements OperationLogService {
             taskCf.thenAccept(newStartOffset -> {
                 this.takingSnapshot.set(false);
                 this.opStartOffset.set(newStartOffset);
+            }).exceptionally(e -> {
+                // TODO: log it
+                this.takingSnapshot.set(false);
+                return null;
             });
         }
     }
@@ -168,6 +172,9 @@ public class StreamOperationLogService implements OperationLogService {
             } catch (StoreException e) {
                 throw new RuntimeException(e);
             }
+            if (result.baseOffset() - opStartOffset.get() + 1 >= storeConfig.operationSnapshotInterval()) {
+                notifySnapshot();
+            }
             return result.baseOffset();
         });
     }
@@ -182,6 +189,9 @@ public class StreamOperationLogService implements OperationLogService {
                 replay(result.baseOffset(), operation);
             } catch (StoreException e) {
                 throw new RuntimeException(e);
+            }
+            if (result.baseOffset() - opStartOffset.get() + 1 >= storeConfig.operationSnapshotInterval()) {
+                notifySnapshot();
             }
             return result.baseOffset();
         });

@@ -379,6 +379,7 @@ public class RocksDBKVService implements KVService {
         Snapshot snapshot = snapshotMap.remove(snapshotVersionId);
         if (snapshot != null) {
             snapshot.close();
+            rocksDB.releaseSnapshot(snapshot);
         }
     }
 }
