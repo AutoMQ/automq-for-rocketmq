@@ -148,7 +148,7 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
         }
 
         try {
-            this.metadataStore.createTopic(request.getTopic(), request.getCount()).whenCompleteAsync((topicId, e) -> {
+            this.metadataStore.createTopic(request.getTopic(), request.getCount(), request.getAcceptMessageTypesList()).whenCompleteAsync((topicId, e) -> {
                 if (null != e) {
                     responseObserver.onError(e);
                 } else {

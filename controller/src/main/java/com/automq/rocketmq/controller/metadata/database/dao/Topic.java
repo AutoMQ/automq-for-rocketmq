@@ -24,10 +24,12 @@ import java.util.Objects;
 public class Topic {
     private long id;
     private String name;
-    private int queueNum;
+    private Integer queueNum;
     private TopicStatus status = TopicStatus.TOPIC_STATUS_ACTIVE;
     private Date createTime;
     private Date updateTime;
+
+    private String acceptMessageTypes;
 
     public long getId() {
         return id;
@@ -45,11 +47,11 @@ public class Topic {
         this.name = name;
     }
 
-    public int getQueueNum() {
+    public Integer getQueueNum() {
         return queueNum;
     }
 
-    public void setQueueNum(int queueNum) {
+    public void setQueueNum(Integer queueNum) {
         this.queueNum = queueNum;
     }
 
@@ -77,6 +79,14 @@ public class Topic {
         this.updateTime = updateTime;
     }
 
+    public String getAcceptMessageTypes() {
+        return acceptMessageTypes;
+    }
+
+    public void setAcceptMessageTypes(String acceptMessageTypes) {
+        this.acceptMessageTypes = acceptMessageTypes;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o)
@@ -84,7 +94,7 @@ public class Topic {
         if (o == null || getClass() != o.getClass())
             return false;
         Topic topic = (Topic) o;
-        return id == topic.id && queueNum == topic.queueNum && name.equals(topic.name) && status == topic.status;
+        return id == topic.id && Objects.equals(queueNum, topic.queueNum) && name.equals(topic.name) && status == topic.status;
     }
 
     @Override

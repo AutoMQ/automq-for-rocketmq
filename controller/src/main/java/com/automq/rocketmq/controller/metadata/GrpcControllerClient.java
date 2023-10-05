@@ -144,11 +144,10 @@ public class GrpcControllerClient implements ControllerClient {
     }
 
     @Override
-    public CompletableFuture<Long> createTopic(String target, String topicName, int queueNum)
+    public CompletableFuture<Long> createTopic(String target, CreateTopicRequest request)
         throws ControllerException {
         ControllerServiceGrpc.ControllerServiceFutureStub stub = this.buildStubForTarget(target);
-        CreateTopicRequest request = CreateTopicRequest.newBuilder().setTopic(topicName).setCount(queueNum).build();
-
+        String topicName = request.getTopic();
         CompletableFuture<Long> future = new CompletableFuture<>();
         Futures.addCallback(stub.createTopic(request), new FutureCallback<>() {
             @Override

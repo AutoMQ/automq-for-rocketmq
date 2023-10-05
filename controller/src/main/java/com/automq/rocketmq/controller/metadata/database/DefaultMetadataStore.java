@@ -24,12 +24,14 @@ import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.CommitStreamObjectRequest;
 import apache.rocketmq.controller.v1.CommitWALObjectRequest;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
+import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.GroupStatus;
 import apache.rocketmq.controller.v1.GroupType;
 import apache.rocketmq.controller.v1.ListOpenStreamsRequest;
 import apache.rocketmq.controller.v1.ListOpenStreamsReply;
 import apache.rocketmq.controller.v1.MessageQueue;
 import apache.rocketmq.controller.v1.MessageQueueAssignment;
+import apache.rocketmq.controller.v1.MessageType;
 import apache.rocketmq.controller.v1.OngoingMessageQueueReassignment;
 import apache.rocketmq.controller.v1.OpenStreamReply;
 import apache.rocketmq.controller.v1.OpenStreamRequest;
@@ -219,6 +221,7 @@ public class DefaultMetadataStore implements MetadataStore {
         }
     }
 
+    //TODO: version to identify epoch
     public boolean assignMessageQueues(List<QueueAssignment> assignments, SqlSession session) {
         if (!maintainLeadershipWithSharedLock(session)) {
             return false;
@@ -261,7 +264,7 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public CompletableFuture<Long> createTopic(String topicName, int queueNum) throws ControllerException {
+    public CompletableFuture<Long> createTopic(String topicName, int queueNum, List<MessageType> acceptMessageTypesList) throws ControllerException {
         CompletableFuture<Long> future = new CompletableFuture<>();
         for (; ; ) {
             if (this.isLeader()) {
@@ -280,6 +283,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     topic.setName(topicName);
                     topic.setQueueNum(queueNum);
                     topic.setStatus(TopicStatus.TOPIC_STATUS_ACTIVE);
+                    topic.setAcceptMessageTypes(gson.toJson(acceptMessageTypesList));
                     topicMapper.create(topic);
 
                     QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
@@ -342,8 +346,13 @@ public class DefaultMetadataStore implements MetadataStore {
                     future.complete(topicId);
                 }
             } else {
+                CreateTopicRequest request = CreateTopicRequest.newBuilder()
+                    .setTopic(topicName)
+                    .setCount(queueNum)
+                    .addAllAcceptMessageTypes(acceptMessageTypesList)
+                    .build();
                 try {
-                    controllerClient.createTopic(this.leaderAddress(), topicName, queueNum).whenComplete((res, e) -> {
+                    controllerClient.createTopic(this.leaderAddress(), request).whenComplete((res, e) -> {
                         if (null != e) {
                             future.completeExceptionally(e);
                         } else {
