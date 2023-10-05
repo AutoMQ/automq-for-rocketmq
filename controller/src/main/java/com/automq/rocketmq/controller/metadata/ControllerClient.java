@@ -34,6 +34,7 @@ import apache.rocketmq.controller.v1.PrepareS3ObjectsRequest;
 import apache.rocketmq.controller.v1.Topic;
 import apache.rocketmq.controller.v1.TrimStreamReply;
 import apache.rocketmq.controller.v1.TrimStreamRequest;
+import apache.rocketmq.controller.v1.CreateTopicRequest;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 
@@ -44,7 +45,7 @@ public interface ControllerClient extends Closeable {
 
     CompletableFuture<Node> registerBroker(String target, String name, String address, String instanceId);
 
-    CompletableFuture<Long> createTopic(String target, String topicName, int queueNum) throws ControllerException;
+    CompletableFuture<Long> createTopic(String target, CreateTopicRequest request) throws ControllerException;
 
     CompletableFuture<Void> deleteTopic(String target, long topicId) throws ControllerException;
 

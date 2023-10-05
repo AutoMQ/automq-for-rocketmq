@@ -25,6 +25,7 @@ import apache.rocketmq.controller.v1.Topic;
 import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
+import apache.rocketmq.controller.v1.MessageType;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
@@ -46,7 +47,7 @@ public interface MetadataStore extends Closeable {
 
     void keepAlive(int nodeId, long epoch, boolean goingAway);
 
-    CompletableFuture<Long> createTopic(String topicName, int queueNum) throws ControllerException;
+    CompletableFuture<Long> createTopic(String topicName, int queueNum, List<MessageType> acceptMessageTypesList) throws ControllerException;
 
     CompletableFuture<Void> deleteTopic(long topicId) throws ControllerException;
 

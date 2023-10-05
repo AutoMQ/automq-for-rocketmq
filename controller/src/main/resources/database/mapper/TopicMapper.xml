@@ -22,17 +22,35 @@
 <mapper namespace="com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper">
 
     <insert id="create" parameterType="Topic" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
-        INSERT INTO topic(name, queue_num, status)
+        INSERT INTO topic(name, queue_num, status, accept_message_types)
         VALUES (
             #{name},
             #{queueNum},
-            #{status}
+            #{status},
+            #{acceptMessageTypes}
         )
     </insert>
 
     <update id="updateStatusById">
         UPDATE topic
         SET status = #{status}
+        WHERE id = #{id}
+    </update>
+
+
+    <update id="update">
+        UPDATE topic
+        <set>
+            <if test="null != status">
+                status = #{status},
+            </if>
+            <if test="null != queueNum">
+                queue_num = #{queueNum},
+            </if>
+            <if test="null != acceptMessageTypes">
+                accept_message_types = #{acceptMessageTypes},
+            </if>
+        </set>
         WHERE id = #{id}
     </update>
 
@@ -46,7 +64,7 @@
     </delete>
 
     <select id="get" resultType="Topic">
-        SELECT id, name, queue_num, status, create_time, update_time
+        SELECT id, name, queue_num, status, create_time, update_time, accept_message_types
         FROM topic
         WHERE 1 = 1
         <if test="null != id">
@@ -58,7 +76,7 @@
     </select>
 
     <select id="list" resultType="Topic">
-        SELECT id, name, queue_num, status, create_time, update_time
+        SELECT id, name, queue_num, status, create_time, update_time, accept_message_types
         FROM topic
         WHERE 1 = 1
         <if test="status != null">

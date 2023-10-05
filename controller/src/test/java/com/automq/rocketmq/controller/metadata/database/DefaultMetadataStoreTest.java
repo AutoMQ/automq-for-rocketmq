@@ -29,6 +29,7 @@ import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.StreamState;
 import apache.rocketmq.controller.v1.SubStream;
 import apache.rocketmq.controller.v1.TopicStatus;
+import apache.rocketmq.controller.v1.MessageType;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.ControllerClient;
 import com.automq.rocketmq.controller.metadata.ControllerConfig;
@@ -238,13 +239,21 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         long topicId;
         int queueNum = 4;
         String topicName = "t1";
+        List<MessageType> messageTypes = new ArrayList<>()
+        {
+            {
+                add(MessageType.NORMAL);
+                add(MessageType.FIFO);
+                add(MessageType.TRANSACTION);
+            }
+        };
         try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().atMost(10, TimeUnit.SECONDS)
                 .pollInterval(100, TimeUnit.MILLISECONDS)
                 .until(metadataStore::isLeader);
 
-            topicId = metadataStore.createTopic(topicName, queueNum).get();
+            topicId = metadataStore.createTopic(topicName, queueNum, messageTypes).get();
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -309,6 +318,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             topic.setStatus(TopicStatus.TOPIC_STATUS_ACTIVE);
             topic.setName("T");
             topic.setQueueNum(1);
+            topic.setAcceptMessageTypes("[1, 2, 3]");
             topicMapper.create(topic);
             topicId = topic.getId();
             session.commit();
@@ -351,6 +361,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Topic topic = new Topic();
             topic.setName("T1");
             topic.setStatus(TopicStatus.TOPIC_STATUS_ACTIVE);
+            topic.setAcceptMessageTypes("[1, 2, 3]");
             topicMapper.create(topic);
             topicId = topic.getId();
 

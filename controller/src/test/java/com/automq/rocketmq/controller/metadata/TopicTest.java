@@ -17,11 +17,15 @@
 
 package com.automq.rocketmq.controller.metadata;
 
+import apache.rocketmq.controller.v1.MessageType;
 import apache.rocketmq.controller.v1.TopicStatus;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
+
+import com.google.gson.Gson;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -36,10 +40,12 @@ public class TopicTest extends DatabaseTestBase {
             String name = "T1";
             int queueNum = 16;
             TopicStatus status = TopicStatus.TOPIC_STATUS_DELETED;
+            String acceptMessageTypes = "[\"NORMAL\",\"FIFO\",\"DELAY\"]";
 
             topic.setName(name);
             topic.setQueueNum(queueNum);
             topic.setStatus(status);
+            topic.setAcceptMessageTypes(acceptMessageTypes);
             int affectedRows = topicMapper.create(topic);
 
             Assertions.assertEquals(1, affectedRows);
@@ -62,6 +68,34 @@ public class TopicTest extends DatabaseTestBase {
 
             topics = topicMapper.list(TopicStatus.TOPIC_STATUS_DELETED, null);
             Assertions.assertEquals(0, topics.size());
+
+            Topic topic1 = topicMapper.get(topic.getId(), null);
+            List<MessageType> messageTypeList = new ArrayList<>();
+            messageTypeList.add(MessageType.NORMAL);
+            messageTypeList.add(MessageType.FIFO);
+            messageTypeList.add(MessageType.DELAY);
+            Gson gson = new Gson();
+            String expect = gson.toJson(messageTypeList);
+            apache.rocketmq.controller.v1.Topic topic2 = apache.rocketmq.controller.v1.Topic.newBuilder()
+                    .setTopicId(topic1.getId())
+                    .setName(topic1.getName())
+                    .setCount(topic1.getQueueNum())
+                    .addAllAcceptMessageTypes(gson.fromJson(String.valueOf(topic1.getAcceptMessageTypes()), new ArrayList<MessageType>()
+                    {
+
+                    }.getClass().getGenericSuperclass()))
+                    .build();
+            Assertions.assertNotNull(topic2.getAcceptMessageTypesList());
+            Assertions.assertEquals(expect, gson.toJson(topic2.getAcceptMessageTypesList()));
+
+            String updateMessageType = "[\"NORMAL\",\"DELAY\"]";
+            Topic topic3 = new Topic();
+            topic3.setId(topic1.getId());
+            topic3.setAcceptMessageTypes(updateMessageType);
+            topicMapper.update(topic3);
+
+            Topic topic4 = topicMapper.get(topic.getId(), null);
+            Assertions.assertEquals(updateMessageType, topic4.getAcceptMessageTypes());
         }
     }
 }
