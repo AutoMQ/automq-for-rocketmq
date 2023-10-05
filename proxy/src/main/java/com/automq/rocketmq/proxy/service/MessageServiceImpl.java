@@ -100,6 +100,7 @@ public class MessageServiceImpl implements MessageService {
             throw new UnsupportedOperationException("Batch message is not supported");
         }
         Message message = msgList.get(0);
+        String messageId = MessageClientIDSetter.getUniqID(message);
 
         CompletableFuture<Topic> topicFuture = topicOf(requestHeader.getTopic());
 
@@ -117,7 +118,7 @@ public class MessageServiceImpl implements MessageService {
         return putFuture.thenApply(putResult -> {
             SendResult result = new SendResult();
             result.setSendStatus(SendStatus.SEND_OK);
-            result.setMsgId(MessageClientIDSetter.getUniqID(message));
+            result.setMsgId(messageId);
             result.setMessageQueue(new MessageQueue(messageQueue.getMessageQueue()));
             result.setQueueOffset(putResult.offset());
             return Collections.singletonList(result);

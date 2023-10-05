@@ -58,6 +58,10 @@ public class TopicQueueTest {
     private static final long TOPIC_ID = 1313;
     private static final int QUEUE_ID = 13;
     private static final long CONSUMER_GROUP_ID = 131313;
+    private static final long DATA_STREAM_ID = 13131313;
+    private static final long OP_STREAM_ID = 1313131313;
+    private static final long SNAPSHOT_STREAM_ID = 131313131313L;
+    private static final long EPOCH = 13131313131313L;
 
     private static KVService kvService;
     private static StoreMetadataService metadataService;
@@ -74,7 +78,9 @@ public class TopicQueueTest {
         stateMachine = new DefaultMessageStateMachine(TOPIC_ID, QUEUE_ID, kvService);
         inflightService = new InflightService();
         SnapshotService snapshotService = new SnapshotService(streamStore, kvService);
-        topicQueue = new StreamTopicQueue(new StoreConfig(), TOPIC_ID, QUEUE_ID, metadataService, stateMachine,
+        topicQueue = new StreamTopicQueue(new StoreConfig(), TOPIC_ID, QUEUE_ID, EPOCH,
+            DATA_STREAM_ID, OP_STREAM_ID, SNAPSHOT_STREAM_ID,
+            metadataService, stateMachine,
             streamStore, inflightService, snapshotService);
         topicQueue.open().join();
     }

@@ -20,6 +20,7 @@ package com.automq.rocketmq.metadata;
 import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.Topic;
+import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.metadata.api.ProxyMetadataService;
@@ -38,13 +39,21 @@ public class DefaultProxyMetadataService implements ProxyMetadataService {
 
     @Override
     public CompletableFuture<Topic> topicOf(String topicName) {
-        return metadataStore.describeTopic(null, topicName);
+        try {
+            return metadataStore.describeTopic(null, topicName);
+        } catch (ControllerException e) {
+            return CompletableFuture.failedFuture(e);
+        }
     }
 
     @Override
     public CompletableFuture<List<MessageQueueAssignment>> queueAssignmentsOf(String topicName) {
-        return metadataStore.describeTopic(null, topicName)
-            .thenApply(topic -> topic.getAssignmentsList().stream().filter(assignment -> assignment.getNodeId() == node.getId()).toList());
+        try {
+            return metadataStore.describeTopic(null, topicName)
+                .thenApply(topic -> topic.getAssignmentsList().stream().filter(assignment -> assignment.getNodeId() == node.getId()).toList());
+        } catch (ControllerException e) {
+            return CompletableFuture.failedFuture(e);
+        }
     }
 
     @Override

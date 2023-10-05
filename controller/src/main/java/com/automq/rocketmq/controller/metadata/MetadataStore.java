@@ -25,6 +25,7 @@ import apache.rocketmq.controller.v1.Topic;
 import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
+import apache.rocketmq.controller.v1.MessageType;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
@@ -42,17 +43,19 @@ public interface MetadataStore extends Closeable {
      * @return broker epoch
      * @throws ControllerException If there is an I/O error.
      */
-    Node registerBrokerNode(String name, String address, String instanceId) throws ControllerException;
+    CompletableFuture<Node> registerBrokerNode(String name, String address, String instanceId) throws ControllerException;
 
     void keepAlive(int nodeId, long epoch, boolean goingAway);
 
-    long createTopic(String topicName, int queueNum) throws ControllerException;
+    CompletableFuture<Long> createTopic(String topicName, int queueNum, List<MessageType> acceptMessageTypesList) throws ControllerException;
 
-    void deleteTopic(long topicId) throws ControllerException;
+    CompletableFuture<Void> deleteTopic(long topicId) throws ControllerException;
 
-    CompletableFuture<Topic> describeTopic(Long topicId, String topicName);
+    CompletableFuture<Topic> describeTopic(Long topicId, String topicName) throws ControllerException;
 
-    List<Topic> listTopics() throws ControllerException;
+    CompletableFuture<List<Topic>> listTopics();
+
+    CompletableFuture<Topic> updateTopic(long topicId, String topicName, List<MessageType> acceptMessageTypesList) throws ControllerException;
 
     /**
      * Check if current controller is playing leader role
@@ -73,22 +76,22 @@ public interface MetadataStore extends Closeable {
      * @param status    Optional queue assignment status
      * @return List of the queue assignments meeting the specified criteria
      */
-    List<QueueAssignment> listAssignments(Long topicId, Integer srcNodeId, Integer dstNodeId,
+    CompletableFuture<List<QueueAssignment>> listAssignments(Long topicId, Integer srcNodeId, Integer dstNodeId,
         AssignmentStatus status);
 
-    void reassignMessageQueue(long topicId, int queueId, int dstNodeId) throws ControllerException;
+    CompletableFuture<Void> reassignMessageQueue(long topicId, int queueId, int dstNodeId) throws ControllerException;
 
-    void markMessageQueueAssignable(long topicId, int queueId) throws ControllerException;
+    CompletableFuture<Void> markMessageQueueAssignable(long topicId, int queueId);
 
-    void commitOffset(long groupId, long topicId, int queueId, long offset) throws ControllerException;
+    CompletableFuture<Void> commitOffset(long groupId, long topicId, int queueId, long offset);
 
-    long createGroup(String groupName, int maxRetry, GroupType type, long dlq) throws ControllerException;
+    CompletableFuture<Long> createGroup(String groupName, int maxRetry, GroupType type, long dlq) throws ControllerException;
 
     CompletableFuture<StreamMetadata> getStream(long topicId, int queueId, Long groupId, StreamRole streamRole);
 
     CompletableFuture<ConsumerGroup> describeConsumerGroup(Long groupId, String groupName);
 
-    void trimStream(long streamId, long streamEpoch, long newStartOffset) throws ControllerException;
+    CompletableFuture<Void> trimStream(long streamId, long streamEpoch, long newStartOffset) throws ControllerException;
 
     CompletableFuture<StreamMetadata> openStream(long streamId, long streamEpoch);
 
@@ -98,15 +101,15 @@ public interface MetadataStore extends Closeable {
 
     CompletableFuture<Long> prepareS3Objects(int count, int ttlInMinutes);
 
-    CompletableFuture<Void> commitWalObject(S3WALObject walObject, List<S3StreamObject> streamObjects, List<Long> compactedObjects);
+    CompletableFuture<Void> commitWalObject(S3WALObject walObject, List<S3StreamObject> streamObjects, List<Long> compactedObjects) throws ControllerException;
 
-    CompletableFuture<Void> commitStreamObject(S3StreamObject streamObject, List<Long> compactedObjects);
+    CompletableFuture<Void> commitStreamObject(S3StreamObject streamObject, List<Long> compactedObjects) throws ControllerException;
 
-    List<S3WALObject> listWALObjects() throws ControllerException;
+    CompletableFuture<List<S3WALObject>> listWALObjects();
 
-    List<S3WALObject> listWALObjects(long streamId, long startOffset, long endOffset, int limit);
+    CompletableFuture<List<S3WALObject>> listWALObjects(long streamId, long startOffset, long endOffset, int limit);
 
-    List<S3StreamObject> listStreamObjects(long streamId, long startOffset, long endOffset, int limit);
+    CompletableFuture<List<S3StreamObject>> listStreamObjects(long streamId, long startOffset, long endOffset, int limit);
 
-    long getOrCreateRetryStream(String groupName, long topicId, int queueId) throws ControllerException;
+    CompletableFuture<Long> getOrCreateRetryStream(String groupName, long topicId, int queueId) throws ControllerException;
 }

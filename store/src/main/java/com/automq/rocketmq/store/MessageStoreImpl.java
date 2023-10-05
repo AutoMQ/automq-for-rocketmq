@@ -60,15 +60,15 @@ public class MessageStoreImpl implements MessageStore {
 
     public MessageStoreImpl(StoreConfig config, StreamStore streamStore,
         StoreMetadataService metadataService, KVService kvService, InflightService inflightService,
-        TopicQueueManager topicQueueManager) {
+        SnapshotService snapshotService, TopicQueueManager topicQueueManager) {
         this.config = config;
         this.streamStore = streamStore;
         this.metadataService = metadataService;
         this.kvService = kvService;
         this.inflightService = inflightService;
+        this.snapshotService = snapshotService;
         this.topicQueueManager = topicQueueManager;
         this.reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, KV_NAMESPACE_TIMER_TAG, kvService, metadataService, inflightService, topicQueueManager);
-        this.snapshotService = new SnapshotService(streamStore, kvService);
     }
 
     @Override
@@ -79,6 +79,7 @@ public class MessageStoreImpl implements MessageStore {
         streamStore.start();
         reviveService.start();
         snapshotService.start();
+        topicQueueManager.start();
     }
 
     @Override
@@ -86,6 +87,7 @@ public class MessageStoreImpl implements MessageStore {
         if (!started.compareAndSet(true, false)) {
             return;
         }
+        topicQueueManager.shutdown();
         snapshotService.shutdown();
         reviveService.shutdown();
         streamStore.shutdown();
@@ -110,7 +112,7 @@ public class MessageStoreImpl implements MessageStore {
     @Override
     public CompletableFuture<PutResult> put(FlatMessage message) {
         TopicQueue topicQueue = topicQueueManager.get(message.topicId(), message.queueId());
-        return topicQueue.put(message);
+        return topicQueue.open().thenCompose(v -> topicQueue.put(message));
     }
 
     @Override

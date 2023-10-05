@@ -20,7 +20,6 @@ package com.automq.rocketmq.store;
 import com.automq.rocketmq.common.config.S3StreamConfig;
 import com.automq.rocketmq.common.config.StoreConfig;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
-import com.automq.rocketmq.store.api.MessageStateMachine;
 import com.automq.rocketmq.store.api.MessageStore;
 import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.rocketmq.store.api.TopicQueueManager;
@@ -37,11 +36,8 @@ public class MessageStoreBuilder {
         KVService kvService = new RocksDBKVService(storeConfig.kvPath());
         InflightService inflightService = new InflightService();
         SnapshotService snapshotService = new SnapshotService(streamStore, kvService);
-        TopicQueueManager topicQueueManager = (topicId, queueId) -> {
-            MessageStateMachine stateMachine = new DefaultMessageStateMachine(topicId, queueId, kvService);
-            return new StreamTopicQueue(storeConfig, topicId, queueId, metadataService, stateMachine, streamStore, inflightService, snapshotService);
-        };
-
-        return new MessageStoreImpl(storeConfig, streamStore, metadataService, kvService, inflightService, topicQueueManager);
+        TopicQueueManager topicQueueManager = new DefaultTopicQueueManager(storeConfig, metadataService, streamStore,
+            inflightService, snapshotService, kvService);
+        return new MessageStoreImpl(storeConfig, streamStore, metadataService, kvService, inflightService, snapshotService, topicQueueManager);
     }
 }

@@ -61,6 +61,9 @@ public class ResourceMetadataService implements MetadataService {
                     case TRANSACTION -> {
                         return TopicMessageType.TRANSACTION;
                     }
+                    case MESSAGE_TYPE_UNSPECIFIED -> {
+                        return TopicMessageType.UNSPECIFIED;
+                    }
                 }
             } else {
                 LOGGER.warn("Topic {} has multiple message types, please specify only one accepted message type", topic);
@@ -68,7 +71,8 @@ public class ResourceMetadataService implements MetadataService {
         } catch (Exception e) {
             LOGGER.error("Failed to get topic message type for {}", topic, e);
         }
-        return TopicMessageType.UNSPECIFIED;
+        LOGGER.warn("Topic {} has no message type specified, use normal message type as default", topic);
+        return TopicMessageType.NORMAL;
     }
 
     @Override

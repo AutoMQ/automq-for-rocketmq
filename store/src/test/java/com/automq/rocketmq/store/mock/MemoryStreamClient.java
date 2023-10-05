@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -41,15 +42,18 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class MemoryStreamClient implements StreamClient {
     private final AtomicLong streamIdAlloc = new AtomicLong();
+    private final ConcurrentHashMap<Long, Stream> streamMap = new ConcurrentHashMap<>();
 
     @Override
     public CompletableFuture<Stream> createAndOpenStream(CreateStreamOptions options) {
-        return CompletableFuture.completedFuture(new MemoryStream(streamIdAlloc.getAndIncrement()));
+        long id = streamIdAlloc.getAndIncrement();
+        return openStream(id, null);
     }
 
     @Override
     public CompletableFuture<Stream> openStream(long streamId, OpenStreamOptions options) {
-        return CompletableFuture.completedFuture(new MemoryStream(streamId));
+        Stream stream = streamMap.computeIfAbsent(streamId, id -> new MemoryStream(id));
+        return CompletableFuture.completedFuture(stream);
     }
 
     @Override
@@ -59,6 +63,7 @@ public class MemoryStreamClient implements StreamClient {
 
     static class MemoryStream implements Stream {
         private final AtomicLong nextOffsetAlloc = new AtomicLong();
+        private final AtomicLong startOffset = new AtomicLong();
         private NavigableMap<Long, RecordBatchWithContext> recordMap = new ConcurrentSkipListMap<>();
         private final long streamId;
 
@@ -73,7 +78,7 @@ public class MemoryStreamClient implements StreamClient {
 
         @Override
         public long startOffset() {
-            return 0;
+            return startOffset.get();
         }
 
         @Override
@@ -97,6 +102,7 @@ public class MemoryStreamClient implements StreamClient {
         @Override
         public CompletableFuture<Void> trim(long newStartOffset) {
             recordMap = new ConcurrentSkipListMap<>(recordMap.tailMap(newStartOffset));
+            startOffset.set(newStartOffset);
             return CompletableFuture.completedFuture(null);
         }
 

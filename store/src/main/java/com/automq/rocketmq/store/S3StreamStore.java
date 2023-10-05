@@ -22,6 +22,7 @@ import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.stream.api.AppendResult;
 import com.automq.stream.api.FetchResult;
+import com.automq.stream.api.OpenStreamOptions;
 import com.automq.stream.api.RecordBatch;
 import com.automq.stream.api.Stream;
 import com.automq.stream.api.StreamClient;
@@ -57,7 +58,8 @@ public class S3StreamStore implements StreamStore {
     private final Storage storage;
     private final CompactionManager compactionManager;
     private final S3BlockCache blockCache;
-    private final Map<Long, Stream> openedStreams = new ConcurrentHashMap<>();
+    // TODO: Should clean the closed streams to avoid memory leak.
+    private final Map<Long, Stream> openStreams = new ConcurrentHashMap<>();
 
     public S3StreamStore(S3StreamConfig streamConfig, StoreMetadataService metadataService) {
         this.s3Config = configFrom(streamConfig);
@@ -96,7 +98,7 @@ public class S3StreamStore implements StreamStore {
     @Override
     public CompletableFuture<Void> close(List<Long> streamIds) {
         // TODO: Close Stream
-        return null;
+        return CompletableFuture.completedFuture(null);
     }
 
     @Override
@@ -143,8 +145,9 @@ public class S3StreamStore implements StreamStore {
      */
     private Stream openStream(long streamId) {
         // Open the specified stream if not opened yet.
-        // TODO: Build a real OpenStreamOptions
-        return openedStreams.computeIfAbsent(streamId, id -> streamClient.openStream(id, null).join());
+        // TODO: Reimplement the stream open logic.
+        OpenStreamOptions options = OpenStreamOptions.newBuilder().epoch(3).build();
+        return openStreams.computeIfAbsent(streamId, id -> streamClient.openStream(id, options).join());
     }
 
     private Config configFrom(S3StreamConfig streamConfig) {

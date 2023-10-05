@@ -25,6 +25,8 @@ import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.store.api.MessageStateMachine;
 import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.rocketmq.store.api.TopicQueue;
+import com.automq.rocketmq.store.exception.StoreErrorCode;
+import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.generated.ReceiptHandle;
 import com.automq.rocketmq.store.model.message.AckResult;
 import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
@@ -60,11 +62,13 @@ public class StreamTopicQueue extends TopicQueue {
 
     private final MessageStateMachine stateMachine;
 
-    private long dataStreamId;
+    private final long dataStreamId;
 
-    private long operationStreamId;
+    private final long operationStreamId;
 
-    private long snapshotStreamId;
+    private final long snapshotStreamId;
+
+    private final long epoch;
 
     private Map<Long/*consumerGroupId*/, Long/*retryStreamId*/> retryStreamIds;
 
@@ -76,7 +80,9 @@ public class StreamTopicQueue extends TopicQueue {
 
     private final AtomicReference<State> state;
 
-    public StreamTopicQueue(StoreConfig config, long topicId, int queueId,
+    public StreamTopicQueue(StoreConfig config,
+        long topicId, int queueId,
+        long epoch, long dataStreamId, long operationStreamId, long snapshotStreamId,
         StoreMetadataService metadataService, MessageStateMachine stateMachine, StreamStore streamStore,
         InflightService inflightService, SnapshotService snapshotService) {
         super(topicId, queueId);
@@ -88,25 +94,21 @@ public class StreamTopicQueue extends TopicQueue {
         this.inflightService = inflightService;
         this.snapshotService = snapshotService;
         this.state = new AtomicReference<>(State.INIT);
+        this.dataStreamId = dataStreamId;
+        this.operationStreamId = operationStreamId;
+        this.snapshotStreamId = snapshotStreamId;
+        this.epoch = epoch;
     }
 
     @Override
     public CompletableFuture<Void> open() {
         if (state.compareAndSet(State.INIT, State.OPENING)) {
             // open all streams and load snapshot
+            // TODO: when we open retry-streams?
             return CompletableFuture.allOf(
-                metadataService.dataStreamOf(topicId, queueId).thenCompose(streamMetadata -> {
-                    this.dataStreamId = streamMetadata.getStreamId();
-                    return streamStore.open(streamMetadata.getStreamId());
-                }),
-                metadataService.operationStreamOf(topicId, queueId).thenCompose(streamMetadata -> {
-                    this.operationStreamId = streamMetadata.getStreamId();
-                    return streamStore.open(streamMetadata.getStreamId());
-                }),
-                metadataService.snapshotStreamOf(topicId, queueId).thenCompose(streamMetadata -> {
-                    this.snapshotStreamId = streamMetadata.getStreamId();
-                    return streamStore.open(streamMetadata.getStreamId());
-                })
+                streamStore.open(dataStreamId),
+                streamStore.open(operationStreamId),
+                streamStore.open(snapshotStreamId)
             ).thenCompose(nil -> {
                 // recover from operation log
                 this.operationLogService = new StreamOperationLogService(
@@ -136,21 +138,26 @@ public class StreamTopicQueue extends TopicQueue {
     public CompletableFuture<Void> close() {
         if (state.compareAndSet(State.OPENED, State.CLOSING)) {
             return streamStore.close(Arrays.asList(dataStreamId, operationStreamId, snapshotStreamId))
-                .thenAccept(nil -> {
-                    state.set(State.CLOSED);
-                });
+                .thenCompose(nil -> stateMachine.clear())
+                .thenAccept(nil -> state.set(State.CLOSED));
         }
         return CompletableFuture.completedFuture(null);
     }
 
     @Override
     public CompletableFuture<PutResult> put(FlatMessage flatMessage) {
+        if (state.get() != State.OPENED) {
+            return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.TOPIC_QUEUE_NOT_OPENED, "Topic queue not opened"));
+        }
         return streamStore.append(dataStreamId, new SingleRecord(flatMessage.getByteBuffer()))
             .thenApply(appendResult -> new PutResult(PutResult.Status.PUT_OK, appendResult.baseOffset()));
     }
 
     @Override
     public CompletableFuture<PutResult> putRetry(long consumerGroupId, FlatMessage flatMessage) {
+        if (state.get() != State.OPENED) {
+            return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.TOPIC_QUEUE_NOT_OPENED, "Topic queue not opened"));
+        }
         CompletableFuture<Long> retryStreamIdCf = retryStreamId(consumerGroupId);
         return retryStreamIdCf.thenCompose(streamId -> {
             return streamStore.append(streamId, new SingleRecord(flatMessage.getByteBuffer()))
@@ -174,6 +181,9 @@ public class StreamTopicQueue extends TopicQueue {
     public CompletableFuture<PopResult> popNormal(long consumerGroup, Filter filter, int batchSize,
         long invisibleDuration) {
         // start from consume offset
+        if (state.get() != State.OPENED) {
+            return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.TOPIC_QUEUE_NOT_OPENED, "Topic queue not opened"));
+        }
         return stateMachine
             .consumeOffset(consumerGroup)
             .thenCompose(offset -> pop(consumerGroup, dataStreamId, offset,
@@ -247,6 +257,9 @@ public class StreamTopicQueue extends TopicQueue {
     @Override
     public CompletableFuture<PopResult> popFifo(long consumerGroup, Filter filter, int batchSize,
         long invisibleDuration) {
+        if (state.get() != State.OPENED) {
+            return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.TOPIC_QUEUE_NOT_OPENED, "Topic queue not opened"));
+        }
         // start from ack offset
         return stateMachine.ackOffset(consumerGroup).thenCompose(offset -> {
             return stateMachine.isLocked(consumerGroup, offset).thenCompose(isLocked -> {
@@ -262,6 +275,9 @@ public class StreamTopicQueue extends TopicQueue {
     @Override
     public CompletableFuture<PopResult> popRetry(long consumerGroupId, Filter filter, int batchSize,
         long invisibleDuration) {
+        if (state.get() != State.OPENED) {
+            return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.TOPIC_QUEUE_NOT_OPENED, "Topic queue not opened"));
+        }
         CompletableFuture<Long> retryStreamIdCf = retryStreamId(consumerGroupId);
         CompletableFuture<Long> retryOffsetCf = stateMachine.retryConsumeOffset(consumerGroupId);
         return retryStreamIdCf.thenCombine(retryOffsetCf, (streamId, startOffset) -> {
@@ -361,6 +377,9 @@ public class StreamTopicQueue extends TopicQueue {
 
     @Override
     public CompletableFuture<AckResult> ack(String receiptHandle) {
+        if (state.get() != State.OPENED) {
+            return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.TOPIC_QUEUE_NOT_OPENED, "Topic queue not opened"));
+        }
         ReceiptHandle handle = decodeReceiptHandle(receiptHandle);
         AckOperation operation = new AckOperation(handle.consumerGroupId(), handle.topicId(), handle.queueId(), handle.operationId(),
             System.nanoTime(), AckOperation.AckOperationType.ACK_NORMAL);
@@ -374,6 +393,9 @@ public class StreamTopicQueue extends TopicQueue {
 
     @Override
     public CompletableFuture<AckResult> ackTimeout(String receiptHandle) {
+        if (state.get() != State.OPENED) {
+            return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.TOPIC_QUEUE_NOT_OPENED, "Topic queue not opened"));
+        }
         ReceiptHandle handle = decodeReceiptHandle(receiptHandle);
         AckOperation operation = new AckOperation(handle.consumerGroupId(), handle.topicId(), handle.queueId(), handle.operationId(),
             System.nanoTime(), AckOperation.AckOperationType.ACK_TIMEOUT);
@@ -388,6 +410,9 @@ public class StreamTopicQueue extends TopicQueue {
     @Override
     public CompletableFuture<ChangeInvisibleDurationResult> changeInvisibleDuration(String receiptHandle,
         long invisibleDuration) {
+        if (state.get() != State.OPENED) {
+            return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.TOPIC_QUEUE_NOT_OPENED, "Topic queue not opened"));
+        }
         ReceiptHandle handle = decodeReceiptHandle(receiptHandle);
         ChangeInvisibleDurationOperation operation = new ChangeInvisibleDurationOperation(handle.consumerGroupId(), handle.topicId(), handle.queueId(), handle.operationId(), System.nanoTime(), invisibleDuration);
         return operationLogService.logChangeInvisibleDurationOperation(operation).thenApply(nil -> {
@@ -399,7 +424,7 @@ public class StreamTopicQueue extends TopicQueue {
 
     @Override
     public CompletableFuture<QueueOffsetRange> getOffsetRange() {
-        return null;
+        throw new UnsupportedOperationException();
     }
 
     @Override
@@ -410,6 +435,9 @@ public class StreamTopicQueue extends TopicQueue {
     @Override
     public CompletableFuture<PullResult> pullNormal(long consumerGroupId, Filter filter, long startOffset,
         int batchSize) {
+        if (state.get() != State.OPENED) {
+            return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.TOPIC_QUEUE_NOT_OPENED, "Topic queue not opened"));
+        }
         return pull(dataStreamId, consumerGroupId, filter, startOffset, batchSize);
     }
 
@@ -446,6 +474,9 @@ public class StreamTopicQueue extends TopicQueue {
     @Override
     public CompletableFuture<PullResult> pullRetry(long consumerGroupId, Filter filter, long startOffset,
         int batchSize) {
+        if (state.get() != State.OPENED) {
+            return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.TOPIC_QUEUE_NOT_OPENED, "Topic queue not opened"));
+        }
         CompletableFuture<Long> retryStreamIdCf = retryStreamId(consumerGroupId);
         return retryStreamIdCf.thenCompose(streamId -> {
             return pull(streamId, consumerGroupId, filter, startOffset, batchSize);
@@ -457,11 +488,23 @@ public class StreamTopicQueue extends TopicQueue {
         return stateMachine.consumeOffset(consumerGroupId);
     }
 
-    public enum State {
-        INIT,
-        OPENING,
-        OPENED,
-        CLOSING,
-        CLOSED
+    @Override
+    public CompletableFuture<Long> getAckOffset(long consumerGroupId) {
+        return stateMachine.ackOffset(consumerGroupId);
+    }
+
+    @Override
+    public CompletableFuture<Long> getRetryConsumeOffset(long consumerGroupId) {
+        return stateMachine.retryConsumeOffset(consumerGroupId);
+    }
+
+    @Override
+    public CompletableFuture<Long> getRetryAckOffset(long consumerGroupId) {
+        return stateMachine.retryAckOffset(consumerGroupId);
+    }
+
+    @Override
+    public CompletableFuture<State> getState() {
+        return CompletableFuture.completedFuture(state.get());
     }
 }

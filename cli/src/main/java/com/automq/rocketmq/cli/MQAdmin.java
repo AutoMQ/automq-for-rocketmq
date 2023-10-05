@@ -24,7 +24,8 @@ import picocli.CommandLine;
     version = "S3RocketMQ 1.0",
     description = "Command line tools for S3RocketMQ",
     subcommands = {
-        CreateTopic.class
+        CreateTopic.class,
+        CreateGroup.class
     }
 )
 public class MQAdmin implements Runnable {

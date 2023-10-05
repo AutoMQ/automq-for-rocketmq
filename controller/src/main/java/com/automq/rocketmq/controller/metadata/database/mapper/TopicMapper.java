@@ -35,4 +35,5 @@ public interface TopicMapper {
 
     int delete(Long id);
 
+    int update(Topic topic);
 }
