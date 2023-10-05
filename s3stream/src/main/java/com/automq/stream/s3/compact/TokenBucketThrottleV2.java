@@ -29,7 +29,6 @@ public class TokenBucketThrottleV2 {
 
     private final Queue<Pair<Long, CompletableFuture<Void>>> queue;
 
-
     private final ScheduledExecutorService executorService;
 
     public TokenBucketThrottleV2(long tokenSize) {
@@ -38,7 +37,7 @@ public class TokenBucketThrottleV2 {
         this.executorService = Executors.newSingleThreadScheduledExecutor(new DefaultThreadFactory("token-bucket-throttle"));
         this.executorService.scheduleWithFixedDelay(() -> {
             long remainingSize = tokenSize;
-            while(!queue.isEmpty() && remainingSize > 0) {
+            while (!queue.isEmpty() && remainingSize > 0) {
                 Pair<Long, CompletableFuture<Void>> pair = queue.peek();
                 if (pair.getLeft() <= remainingSize) {
                     pair.getRight().complete(null);
@@ -52,7 +51,7 @@ public class TokenBucketThrottleV2 {
 
     public void stop() {
         this.executorService.shutdown();
-        while(!queue.isEmpty()) {
+        while (!queue.isEmpty()) {
             Pair<Long, CompletableFuture<Void>> pair = queue.poll();
             pair.getRight().completeExceptionally(new InterruptedException("TokenBucketThrottle shutdown"));
         }
