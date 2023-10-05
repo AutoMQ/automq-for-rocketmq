@@ -760,6 +760,20 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
+    public CompletableFuture<Long> getConsumerOffset(long consumerGroupId, long topicId, int queueId) {
+        try (SqlSession session = getSessionFactory().openSession()) {
+            GroupProgressMapper groupProgressMapper = session.getMapper(GroupProgressMapper.class);
+            GroupProgress progress = groupProgressMapper.get(consumerGroupId, topicId, queueId);
+            if (Objects.isNull(progress)) {
+                return CompletableFuture.completedFuture(0L);
+            } else {
+                return CompletableFuture.completedFuture(progress.getQueueOffset());
+            }
+        }
+    }
+
+
+    @Override
     public CompletableFuture<Long> createGroup(String groupName, int maxRetry, GroupType type,
         long deadLetterTopicId) throws ControllerException {
         CompletableFuture<Long> future = new CompletableFuture<>();
@@ -818,6 +832,17 @@ public class DefaultMetadataStore implements MetadataStore {
                 List<Stream> streams = streamMapper.list(topicId, queueId, groupId).stream()
                     .filter(stream -> stream.getStreamRole() == streamRole).toList();
                 if (streams.isEmpty()) {
+                    if (streamRole == StreamRole.STREAM_ROLE_RETRY) {
+                        // TODO: create retry stream
+                        long streamId = createStream(streamMapper, topicId, queueId, streamRole, 0);
+                        return StreamMetadata.newBuilder()
+                            .setEpoch(0)
+                            .setStreamId(streamId)
+                            .setRangeId(0)
+                            .setState(StreamState.UNINITIALIZED)
+                            .setStartOffset(0)
+                            .build();
+                    }
                     ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE,
                         String.format("Stream for topic-id=%d, queue-id=%d, stream-role=%s is not found", topicId, queueId, streamRole.name()));
                     // TODO: make ControllerException unchecked
