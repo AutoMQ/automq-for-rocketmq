@@ -17,7 +17,7 @@
 
 package com.automq.stream.s3;
 
-import com.automq.stream.s3.compact.TokenBucketThrottle;
+import com.automq.stream.s3.compact.TokenBucketThrottleV2;
 import com.automq.stream.s3.operator.S3Operator;
 import com.automq.stream.s3.operator.Writer;
 import io.netty.buffer.ByteBuf;
@@ -43,7 +43,7 @@ public class StreamObjectCopier {
 
     private long size;
 
-    public StreamObjectCopier(long objectId, S3Operator s3Operator, TokenBucketThrottle readThrottle) {
+    public StreamObjectCopier(long objectId, S3Operator s3Operator, TokenBucketThrottleV2 readThrottle) {
         this.s3Operator = s3Operator;
         // TODO: use a better clusterName
         this.writer = s3Operator.writer(ObjectUtils.genKey(0, objectId), "[StreamObjectCopier objId=" + objectId + "]", readThrottle);
