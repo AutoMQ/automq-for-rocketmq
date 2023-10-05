@@ -407,7 +407,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testDeleteTopic_NotFound() throws IOException, ControllerException {
+    public void testDeleteTopic_NotFound() throws IOException {
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.nodeId()).thenReturn(1);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
@@ -1376,4 +1376,30 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             }
         }
     }
+
+
+    @Test
+    public void testConsumerOffset() throws IOException, ExecutionException, InterruptedException {
+        long groupId = 2, topicId = 1;
+        int queueId = 4;
+        ControllerConfig config = Mockito.mock(ControllerConfig.class);
+        Mockito.when(config.nodeId()).thenReturn(1);
+        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
+        try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            metadataStore.start();
+            Awaitility.await().with().atMost(10, TimeUnit.SECONDS).pollInterval(100, TimeUnit.MILLISECONDS)
+                .until(metadataStore::isLeader);
+            metadataStore.commitOffset(groupId, topicId, queueId, 1000);
+
+            Long offset = metadataStore.getConsumerOffset(groupId, topicId, queueId).get();
+            Assertions.assertEquals(1000, offset);
+
+            metadataStore.commitOffset(groupId, topicId, queueId, 2000);
+
+            offset = metadataStore.getConsumerOffset(groupId, topicId, queueId).get();
+            Assertions.assertEquals(2000, offset);
+        }
+    }
+
 }

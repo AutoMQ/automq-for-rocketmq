@@ -310,11 +310,11 @@ public class DefaultMetadataStore implements MetadataStore {
                             assignment.setDstNodeId(0);
                             assignmentMapper.create(assignment);
                             // Create data stream
-                            long streamId = createStream(streamMapper, topicId, n, StreamRole.STREAM_ROLE_DATA, 0);
+                            long streamId = createStream(streamMapper, topicId, n, null, StreamRole.STREAM_ROLE_DATA, 0);
                             LOGGER.debug("Create assignable data stream[stream-id={}] for topic-id={}, queue-id={}",
                                 streamId, topicId, n);
                             // Create ops stream
-                            streamId = createStream(streamMapper, topicId, n, StreamRole.STREAM_ROLE_OPS, 0);
+                            streamId = createStream(streamMapper, topicId, n, null, StreamRole.STREAM_ROLE_OPS, 0);
                             LOGGER.debug("Create assignable ops stream[stream-id={}] for topic-id={}, queue-id={}",
                                 streamId, topicId, n);
                         });
@@ -332,11 +332,11 @@ public class DefaultMetadataStore implements MetadataStore {
                             assignment.setDstNodeId(nodeId);
                             assignmentMapper.create(assignment);
                             // Create data stream
-                            long streamId = createStream(streamMapper, topicId, n, StreamRole.STREAM_ROLE_DATA, nodeId);
+                            long streamId = createStream(streamMapper, topicId, n, null, StreamRole.STREAM_ROLE_DATA, nodeId);
                             LOGGER.debug("Create data stream[stream-id={}] for topic-id={}, queue-id={}, assigned to node[node-id={}]",
                                 streamId, topicId, n, nodeId);
                             // Create ops stream
-                            streamId = createStream(streamMapper, topicId, n, StreamRole.STREAM_ROLE_OPS, nodeId);
+                            streamId = createStream(streamMapper, topicId, n, null, StreamRole.STREAM_ROLE_OPS, nodeId);
                             LOGGER.debug("Create ops stream[stream-id={}] for topic-id={}, queue-id={}, assigned to node[node-id={}]",
                                 streamId, topicId, n, nodeId);
                         });
@@ -369,12 +369,13 @@ public class DefaultMetadataStore implements MetadataStore {
         return future;
     }
 
-    private static long createStream(StreamMapper streamMapper, long topicId, int queueId,
+    private long createStream(StreamMapper streamMapper, long topicId, int queueId, Long groupId,
         StreamRole role, int nodeId) {
         Stream dataStream = new Stream();
         dataStream.setState(StreamState.UNINITIALIZED);
         dataStream.setTopicId(topicId);
         dataStream.setQueueId(queueId);
+        dataStream.setGroupId(groupId);
         dataStream.setStreamRole(role);
         dataStream.setSrcNodeId(nodeId);
         dataStream.setDstNodeId(nodeId);
@@ -834,7 +835,13 @@ public class DefaultMetadataStore implements MetadataStore {
                 if (streams.isEmpty()) {
                     if (streamRole == StreamRole.STREAM_ROLE_RETRY) {
                         // TODO: create retry stream
-                        long streamId = createStream(streamMapper, topicId, queueId, streamRole, 0);
+                        QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
+                        List<QueueAssignment> assignments = assignmentMapper
+                            .list(topicId, null, null, null, null)
+                            .stream().filter(assignment -> assignment.getStatus() != AssignmentStatus.ASSIGNMENT_STATUS_DELETED)
+                            .toList();
+                        int nodeId = assignments.isEmpty() ? 0 : assignments.get(0).getSrcNodeId();
+                        long streamId = createStream(streamMapper, topicId, queueId, groupId, streamRole, nodeId);
                         return StreamMetadata.newBuilder()
                             .setEpoch(0)
                             .setStreamId(streamId)
@@ -1679,17 +1686,8 @@ public class DefaultMetadataStore implements MetadataStore {
                     List<Stream> streams = streamMapper.list(topicId, queueId, groupId)
                         .stream().filter(stream -> stream.getStreamRole() == StreamRole.STREAM_ROLE_RETRY).toList();
                     if (streams.isEmpty()) {
-                        Stream stream = new Stream();
-                        stream.setTopicId(topicId);
-                        stream.setQueueId(queueId);
-                        stream.setGroupId(groupId);
-                        stream.setStreamRole(StreamRole.STREAM_ROLE_RETRY);
-                        stream.setState(StreamState.UNINITIALIZED);
-                        stream.setSrcNodeId(assignment.getSrcNodeId());
-                        stream.setDstNodeId(assignment.getDstNodeId());
-                        streamMapper.create(stream);
+                        streamId = createStream(streamMapper, topicId, queueId, groupId, StreamRole.STREAM_ROLE_RETRY, assignment.getSrcNodeId());
                         session.commit();
-                        streamId = stream.getId();
                     } else {
                         streamId = streams.get(0).getId();
                     }
