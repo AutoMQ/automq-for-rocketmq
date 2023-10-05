@@ -35,6 +35,7 @@ import apache.rocketmq.controller.v1.Topic;
 import apache.rocketmq.controller.v1.TrimStreamReply;
 import apache.rocketmq.controller.v1.TrimStreamRequest;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
+import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 
@@ -80,4 +81,6 @@ public interface ControllerClient extends Closeable {
     CompletableFuture<CommitStreamObjectReply> commitStreamObject(String target, CommitStreamObjectRequest request);
 
     CompletableFuture<CommitWALObjectReply> commitWALObject(String target, CommitWALObjectRequest request);
+
+    CompletableFuture<Topic> updateTopic(String target, UpdateTopicRequest request) throws ControllerException;
 }

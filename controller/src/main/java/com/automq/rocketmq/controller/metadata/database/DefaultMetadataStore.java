@@ -44,6 +44,7 @@ import apache.rocketmq.controller.v1.StreamState;
 import apache.rocketmq.controller.v1.SubStream;
 import apache.rocketmq.controller.v1.TopicStatus;
 import apache.rocketmq.controller.v1.TrimStreamRequest;
+import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.common.PrefixThreadFactory;
 import com.automq.rocketmq.common.system.S3Constants;
 import com.automq.rocketmq.controller.exception.ControllerException;
@@ -382,6 +383,62 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
+    public CompletableFuture<apache.rocketmq.controller.v1.Topic> updateTopic(long topicId, String topicName, List<MessageType> acceptMessageTypesList) throws ControllerException {
+        CompletableFuture<apache.rocketmq.controller.v1.Topic> future = new CompletableFuture<>();
+        for (; ; ) {
+            if (this.isLeader()) {
+                try (SqlSession session = getSessionFactory().openSession()) {
+                    if (!maintainLeadershipWithSharedLock(session)) {
+                        continue;
+                    }
+
+                    TopicMapper topicMapper = session.getMapper(TopicMapper.class);
+                    Topic topic = topicMapper.get(topicId, topicName);
+
+                    if (null == topic) {
+                        throw new ControllerException(Code.NOT_FOUND_VALUE,
+                            String.format("Topic not found for topic-id=%d, topic-name=%s", topicId, topicName));
+                    }
+
+                    topic.setAcceptMessageTypes(gson.toJson(acceptMessageTypesList));
+                    topicMapper.update(topic);
+
+                    apache.rocketmq.controller.v1.Topic uTopic = apache.rocketmq.controller.v1.Topic
+                        .newBuilder()
+                        .setTopicId(topic.getId())
+                        .setCount(topic.getQueueNum())
+                        .setName(topic.getName())
+                        .addAllAcceptMessageTypes(acceptMessageTypesList)
+                        .build();
+
+                    // Commit transaction
+                    session.commit();
+                    future.complete(uTopic);
+                }
+            } else {
+                UpdateTopicRequest request = UpdateTopicRequest.newBuilder()
+                    .setTopicId(topicId)
+                    .setName(topicName)
+                    .addAllAcceptMessageTypes(acceptMessageTypesList)
+                    .build();
+                try {
+                    controllerClient.updateTopic(this.leaderAddress(), request).whenComplete((topic, e) -> {
+                        if (null != e) {
+                            future.completeExceptionally(e);
+                        } else {
+                            future.complete(topic);
+                        }
+                    });
+                } catch (ControllerException e) {
+                    future.completeExceptionally(e);
+                }
+            }
+            break;
+        }
+        return future;
+    }
+
+    @Override
     public CompletableFuture<Void> deleteTopic(long topicId) throws ControllerException {
         CompletableFuture<Void> future = new CompletableFuture<>();
         for (; ; ) {
@@ -457,7 +514,9 @@ public class DefaultMetadataStore implements MetadataStore {
                     .newBuilder()
                     .setTopicId(topic.getId())
                     .setCount(topic.getQueueNum())
-                    .setName(topic.getName());
+                    .setName(topic.getName())
+                    .addAllAcceptMessageTypes(gson.fromJson(topic.getAcceptMessageTypes(), new TypeToken<List<MessageType>>() {
+                    }.getType()));
 
                 if (null != assignments) {
                     for (QueueAssignment assignment : assignments) {
@@ -517,6 +576,8 @@ public class DefaultMetadataStore implements MetadataStore {
                     .setTopicId(topic.getId())
                     .setName(topic.getName())
                     .setCount(topic.getQueueNum())
+                    .addAllAcceptMessageTypes(gson.fromJson(topic.getAcceptMessageTypes(), new TypeToken<List<MessageType>>() {
+                    }.getType()))
                     .build();
                 result.add(t);
             }

@@ -62,6 +62,7 @@ import apache.rocketmq.controller.v1.Status;
 import apache.rocketmq.controller.v1.Topic;
 import apache.rocketmq.controller.v1.TrimStreamReply;
 import apache.rocketmq.controller.v1.TrimStreamRequest;
+import apache.rocketmq.controller.v1.UpdateTopicReply;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
@@ -230,8 +231,35 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     }
 
     @Override
-    public void updateTopic(UpdateTopicRequest request, StreamObserver<Topic> responseObserver) {
-        super.updateTopic(request, responseObserver);
+    public void updateTopic(UpdateTopicRequest request, StreamObserver<UpdateTopicReply> responseObserver) {
+        try {
+            this.metadataStore.updateTopic(request.getTopicId(), request.getName(), request.getAcceptMessageTypesList()).whenComplete((res, e) -> {
+                if (null != e) {
+                    responseObserver.onError(e);
+                } else {
+                    UpdateTopicReply reply = UpdateTopicReply.newBuilder()
+                        .setStatus(
+                            Status.newBuilder()
+                                .setCode(Code.OK)
+                                .build()
+                            )
+                        .setTopic(res)
+                        .build();
+                    responseObserver.onNext(reply);
+                    responseObserver.onCompleted();
+                }
+            });
+        } catch (ControllerException e) {
+            if (e.getErrorCode() == Code.NOT_FOUND_VALUE) {
+                UpdateTopicReply reply = UpdateTopicReply.newBuilder()
+                    .setStatus(Status.newBuilder().setCode(Code.NOT_FOUND).build()
+                    ).build();
+                responseObserver.onNext(reply);
+                responseObserver.onCompleted();
+                return;
+            }
+            responseObserver.onError(e);
+        }
     }
 
     @Override

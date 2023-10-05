@@ -55,6 +55,8 @@ public interface MetadataStore extends Closeable {
 
     CompletableFuture<List<Topic>> listTopics();
 
+    CompletableFuture<Topic> updateTopic(long topicId, String topicName, List<MessageType> acceptMessageTypesList) throws ControllerException;
+
     /**
      * Check if current controller is playing leader role
      *

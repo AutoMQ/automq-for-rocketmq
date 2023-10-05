@@ -32,6 +32,7 @@ import apache.rocketmq.controller.v1.HeartbeatRequest;
 import apache.rocketmq.controller.v1.ListOpenStreamsRequest;
 import apache.rocketmq.controller.v1.ListTopicsReply;
 import apache.rocketmq.controller.v1.ListTopicsRequest;
+import apache.rocketmq.controller.v1.MessageType;
 import apache.rocketmq.controller.v1.NodeRegistrationReply;
 import apache.rocketmq.controller.v1.NodeRegistrationRequest;
 import apache.rocketmq.controller.v1.OpenStreamReply;
@@ -43,6 +44,8 @@ import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.StreamState;
 import apache.rocketmq.controller.v1.TopicStatus;
 import apache.rocketmq.controller.v1.TrimStreamRequest;
+import apache.rocketmq.controller.v1.UpdateTopicReply;
+import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.ControllerClient;
 import com.automq.rocketmq.controller.metadata.ControllerConfig;
@@ -235,7 +238,8 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 Topic topic = new Topic();
                 topic.setStatus(TopicStatus.TOPIC_STATUS_ACTIVE);
                 topic.setName("T" + i);
-                topic.setAcceptMessageTypes("[1, 2, 3]");
+                topic.setAcceptMessageTypes("[\"NORMAL\",\"DELAY\"]");
+                topic.setQueueNum(0);
                 topicMapper.create(topic);
             }
             session.commit();
@@ -265,6 +269,53 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                     Assertions.assertTrue(reply.getTopic().getName().startsWith("T"));
                     Assertions.assertEquals(Code.OK, reply.getStatus().getCode());
                 }
+                channel.shutdownNow();
+            }
+        }
+    }
+
+    @Test
+    public void testUpdateTopics() throws IOException {
+        long topicId;
+        try (SqlSession session = getSessionFactory().openSession()) {
+            TopicMapper topicMapper = session.getMapper(TopicMapper.class);
+            Topic topic = new Topic();
+            topic.setStatus(TopicStatus.TOPIC_STATUS_ACTIVE);
+            topic.setName("T" + 1);
+            topic.setAcceptMessageTypes("[\"NORMAL\",\"DELAY\"]");
+            topic.setQueueNum(0);
+            topicMapper.create(topic);
+            session.commit();
+            topicId = topic.getId();
+        }
+
+        ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
+        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
+        Mockito.when(controllerConfig.nodeId()).thenReturn(1);
+        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
+        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
+
+        List<MessageType> messageTypeList = new ArrayList<>();
+        messageTypeList.add(MessageType.NORMAL);
+        messageTypeList.add(MessageType.FIFO);
+        messageTypeList.add(MessageType.DELAY);
+
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
+            metadataStore.start();
+            Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
+                .atMost(10, TimeUnit.SECONDS)
+                .until(metadataStore::isLeader);
+
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore))) {
+                testServer.start();
+                int port = testServer.getPort();
+                ManagedChannel channel = Grpc.newChannelBuilderForAddress("localhost", port, InsecureChannelCredentials.create()).build();
+                ControllerServiceGrpc.ControllerServiceBlockingStub blockingStub = ControllerServiceGrpc.newBlockingStub(channel);
+                UpdateTopicReply reply = blockingStub.updateTopic(UpdateTopicRequest.newBuilder().setTopicId(topicId).addAllAcceptMessageTypes(messageTypeList).build());
+                Assertions.assertTrue(reply.getTopic().getName().startsWith("T"));
+                Assertions.assertEquals(Code.OK, reply.getStatus().getCode());
+                Assertions.assertEquals(messageTypeList, reply.getTopic().getAcceptMessageTypesList());
                 channel.shutdownNow();
             }
         }
