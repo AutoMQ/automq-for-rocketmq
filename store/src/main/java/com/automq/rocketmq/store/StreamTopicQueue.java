@@ -62,11 +62,13 @@ public class StreamTopicQueue extends TopicQueue {
 
     private final MessageStateMachine stateMachine;
 
-    private long dataStreamId;
+    private final long dataStreamId;
 
-    private long operationStreamId;
+    private final long operationStreamId;
 
-    private long snapshotStreamId;
+    private final long snapshotStreamId;
+
+    private final long epoch;
 
     private Map<Long/*consumerGroupId*/, Long/*retryStreamId*/> retryStreamIds;
 
@@ -78,7 +80,9 @@ public class StreamTopicQueue extends TopicQueue {
 
     private final AtomicReference<State> state;
 
-    public StreamTopicQueue(StoreConfig config, long topicId, int queueId,
+    public StreamTopicQueue(StoreConfig config,
+        long topicId, int queueId,
+        long epoch, long dataStreamId, long operationStreamId, long snapshotStreamId,
         StoreMetadataService metadataService, MessageStateMachine stateMachine, StreamStore streamStore,
         InflightService inflightService, SnapshotService snapshotService) {
         super(topicId, queueId);
@@ -90,25 +94,21 @@ public class StreamTopicQueue extends TopicQueue {
         this.inflightService = inflightService;
         this.snapshotService = snapshotService;
         this.state = new AtomicReference<>(State.INIT);
+        this.dataStreamId = dataStreamId;
+        this.operationStreamId = operationStreamId;
+        this.snapshotStreamId = snapshotStreamId;
+        this.epoch = epoch;
     }
 
     @Override
     public CompletableFuture<Void> open() {
         if (state.compareAndSet(State.INIT, State.OPENING)) {
             // open all streams and load snapshot
+            // TODO: when we open retry-streams?
             return CompletableFuture.allOf(
-                metadataService.dataStreamOf(topicId, queueId).thenCompose(streamMetadata -> {
-                    this.dataStreamId = streamMetadata.getStreamId();
-                    return streamStore.open(streamMetadata.getStreamId());
-                }),
-                metadataService.operationStreamOf(topicId, queueId).thenCompose(streamMetadata -> {
-                    this.operationStreamId = streamMetadata.getStreamId();
-                    return streamStore.open(streamMetadata.getStreamId());
-                }),
-                metadataService.snapshotStreamOf(topicId, queueId).thenCompose(streamMetadata -> {
-                    this.snapshotStreamId = streamMetadata.getStreamId();
-                    return streamStore.open(streamMetadata.getStreamId());
-                })
+                streamStore.open(dataStreamId),
+                streamStore.open(operationStreamId),
+                streamStore.open(snapshotStreamId)
             ).thenCompose(nil -> {
                 // recover from operation log
                 this.operationLogService = new StreamOperationLogService(
@@ -138,12 +138,8 @@ public class StreamTopicQueue extends TopicQueue {
     public CompletableFuture<Void> close() {
         if (state.compareAndSet(State.OPENED, State.CLOSING)) {
             return streamStore.close(Arrays.asList(dataStreamId, operationStreamId, snapshotStreamId))
-                .thenCompose(nil -> {
-                    // TODO: clear all states in kv
-                    return stateMachine.clear();
-                }).thenAccept(nil -> {
-                    state.set(State.CLOSED);
-                });
+                .thenCompose(nil -> stateMachine.clear())
+                .thenAccept(nil -> state.set(State.CLOSED));
         }
         return CompletableFuture.completedFuture(null);
     }
@@ -490,6 +486,21 @@ public class StreamTopicQueue extends TopicQueue {
     @Override
     public CompletableFuture<Long> getConsumeOffset(long consumerGroupId) {
         return stateMachine.consumeOffset(consumerGroupId);
+    }
+
+    @Override
+    public CompletableFuture<Long> getAckOffset(long consumerGroupId) {
+        return stateMachine.ackOffset(consumerGroupId);
+    }
+
+    @Override
+    public CompletableFuture<Long> getRetryConsumeOffset(long consumerGroupId) {
+        return stateMachine.retryConsumeOffset(consumerGroupId);
+    }
+
+    @Override
+    public CompletableFuture<Long> getRetryAckOffset(long consumerGroupId) {
+        return stateMachine.retryAckOffset(consumerGroupId);
     }
 
     @Override

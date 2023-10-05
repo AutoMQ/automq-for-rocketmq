@@ -22,7 +22,6 @@ import com.automq.rocketmq.common.config.StoreConfig;
 import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
-import com.automq.rocketmq.store.api.MessageStateMachine;
 import com.automq.rocketmq.store.api.MessageStore;
 import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.rocketmq.store.api.TopicQueue;
@@ -57,11 +56,10 @@ public class MessageStoreTest {
     private static KVService kvService;
     private static StoreMetadataService metadataService;
     private static StreamStore streamStore;
-    private static MessageStateMachine stateMachine;
     private static InflightService inflightService;
-    private static TopicQueue topicQueue;
     private static MessageStore messageStore;
     private static StoreConfig config;
+    private static TopicQueueManager topicQueueManager;
 
     @BeforeEach
     public void setUp() throws Exception {
@@ -70,29 +68,12 @@ public class MessageStoreTest {
         metadataService = new MockStoreMetadataService();
         streamStore = new MockStreamStore();
         inflightService = new InflightService();
-        SnapshotService snapshotService = new SnapshotService(streamStore, kvService);
         config = new StoreConfig();
-        stateMachine = new DefaultMessageStateMachine(TOPIC_ID, QUEUE_ID, kvService);
-        topicQueue = new StreamTopicQueue(config, TOPIC_ID, QUEUE_ID, metadataService, stateMachine, streamStore, inflightService, snapshotService);
-        TopicQueueManager topicQueueManager = new TopicQueueManager() {
-            @Override
-            public TopicQueue get(long topicId, int queueId) {
-                return topicQueue;
-            }
-
-            @Override
-            public void start() throws Exception {
-                topicQueue = new StreamTopicQueue(config, TOPIC_ID, QUEUE_ID, metadataService, stateMachine, streamStore, inflightService, snapshotService);
-                topicQueue.open().join();
-            }
-
-            @Override
-            public void shutdown() throws Exception {
-                topicQueue.close().join();
-            }
-        };
-        messageStore = new MessageStoreImpl(config, streamStore, metadataService, kvService, inflightService, topicQueueManager, snapshotService);
+        SnapshotService snapshotService = new SnapshotService(streamStore, kvService);
+        topicQueueManager = new DefaultTopicQueueManager(config, metadataService, streamStore, inflightService, snapshotService, kvService);
+        messageStore = new MessageStoreImpl(config, streamStore, metadataService, kvService, inflightService, snapshotService, topicQueueManager);
         messageStore.start();
+        topicQueueManager.onTopicQueueOpen(TOPIC_ID, QUEUE_ID, 0).join();
     }
 
     @AfterEach
@@ -287,17 +268,19 @@ public class MessageStoreTest {
         assertEquals(4, popResult.messageList().get(2).originalOffset());
         assertEquals(2, popResult.messageList().get(2).deliveryAttempts());
 
-        assertEquals(5, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(5, stateMachine.ackOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(3, stateMachine.retryConsumeOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(0, stateMachine.retryAckOffset(CONSUMER_GROUP_ID).join());
+        TopicQueue topicQueue = topicQueueManager.get(TOPIC_ID, QUEUE_ID);
+
+        assertEquals(5, topicQueue.getConsumeOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(5, topicQueue.getAckOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(3, topicQueue.getRetryConsumeOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(0, topicQueue.getRetryAckOffset(CONSUMER_GROUP_ID).join());
 
         // 7. ack msg_0, msg_3, msg_4
         messageStore.ack(popResult.messageList().get(0).receiptHandle().get()).join();
         messageStore.ack(popResult.messageList().get(1).receiptHandle().get()).join();
         messageStore.ack(popResult.messageList().get(2).receiptHandle().get()).join();
 
-        assertEquals(3, stateMachine.retryAckOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(3, topicQueue.getRetryAckOffset(CONSUMER_GROUP_ID).join());
     }
 
     @Test
@@ -341,8 +324,8 @@ public class MessageStoreTest {
         StreamMetadata snapshotStream = metadataService.snapshotStreamOf(TOPIC_ID, QUEUE_ID).join();
         assertEquals(0, streamStore.startOffset(snapshotStream.getStreamId()));
         assertEquals(1, streamStore.nextOffset(snapshotStream.getStreamId()));
-        // 7. shutdown and recover
-        topicQueue.close().join();
+        // 7. close and reopen
+        topicQueueManager.onTopicQueueClose(TOPIC_ID, QUEUE_ID, 0).join();
 
         // check if all tq related data is cleared
         byte[] tqPrefix = ByteBuffer.allocate(12)
@@ -352,8 +335,7 @@ public class MessageStoreTest {
         kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, tqPrefix, null, null, (key, value) -> {
             Assertions.fail();
         });
-        topicQueue = new StreamTopicQueue(config, TOPIC_ID, QUEUE_ID, metadataService, stateMachine, streamStore, inflightService, new SnapshotService(streamStore, kvService));
-        topicQueue.open().join();
+        topicQueueManager.onTopicQueueOpen(TOPIC_ID, QUEUE_ID, 1).join();
 
         // check if all ck have been recovered
         AtomicInteger ckNum = new AtomicInteger();
@@ -379,16 +361,18 @@ public class MessageStoreTest {
         assertEquals(4, popResult.messageList().get(2).originalOffset());
         assertEquals(2, popResult.messageList().get(2).deliveryAttempts());
 
-        assertEquals(5, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(5, stateMachine.ackOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(3, stateMachine.retryConsumeOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(0, stateMachine.retryAckOffset(CONSUMER_GROUP_ID).join());
+        TopicQueue topicQueue = topicQueueManager.get(TOPIC_ID, QUEUE_ID);
+
+        assertEquals(5, topicQueue.getConsumeOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(5, topicQueue.getAckOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(3, topicQueue.getRetryConsumeOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(0, topicQueue.getRetryAckOffset(CONSUMER_GROUP_ID).join());
 
         // 7. ack msg_0, msg_3, msg_4
         messageStore.ack(popResult.messageList().get(0).receiptHandle().get()).join();
         messageStore.ack(popResult.messageList().get(1).receiptHandle().get()).join();
         messageStore.ack(popResult.messageList().get(2).receiptHandle().get()).join();
 
-        assertEquals(3, stateMachine.retryAckOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(3, topicQueue.getRetryAckOffset(CONSUMER_GROUP_ID).join());
     }
 }

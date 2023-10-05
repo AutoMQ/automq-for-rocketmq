@@ -72,43 +72,43 @@ public class StreamOperationLogService implements OperationLogService {
         // 1. get snapshot
         long snapStartOffset = streamStore.startOffset(snapshotStreamId);
         snapshotEndOffset.set(streamStore.nextOffset(snapshotStreamId));
-        CompletableFuture<OperationSnapshot> snapshotFetch;
+        long startOffset = streamStore.startOffset(opStreamId);
+        opStartOffset.set(startOffset);
+        long endOffset = streamStore.nextOffset(opStreamId);
+        CompletableFuture<Long/*op replay start offset*/> snapshotFetch;
         long snapEndOffset = snapshotEndOffset.get();
         if (snapStartOffset == snapEndOffset) {
             // no snapshot
-            snapshotFetch = CompletableFuture.completedFuture(null);
+            snapshotFetch = CompletableFuture.completedFuture(startOffset);
         } else {
             snapshotFetch = streamStore.fetch(snapshotStreamId, snapEndOffset - 1, 1)
                 .thenApply(result -> {
                     return SerializeUtil.decodeOperationSnapshot(result.recordBatchList().get(0).rawPayload());
+                })
+                .thenApply(snapshot -> {
+                    try {
+                        loadSnapshot(snapshot);
+                    } catch (StoreException e) {
+                        throw new RuntimeException(e);
+                    }
+                    return snapshot.getSnapshotEndOffset() + 1;
                 });
         }
         // 2. get all operations
-        long startOffset = streamStore.startOffset(opStreamId);
-        long endOffset = streamStore.nextOffset(opStreamId);
-        opStartOffset.set(startOffset);
-        // TODO: batch fetch, fetch all at once may case some problems
-        return snapshotFetch.thenCombine(streamStore.fetch(opStreamId, startOffset, (int) (endOffset - startOffset)), (snapshot, result) -> {
-            // load snapshot first
-            if (snapshot != null) {
-                try {
-                    loadSnapshot(snapshot);
-                } catch (StoreException e) {
-                    throw new RuntimeException(e);
+        // TODO: batch fetch, fetch all at once may cause some problems
+        return snapshotFetch.thenCompose(offset -> streamStore.fetch(opStreamId, offset, (int) (endOffset - offset))
+            .thenAccept(result -> {
+                // load operations
+                for (RecordBatchWithContext batchWithContext : result.recordBatchList()) {
+                    // TODO: assume that a batch only contains one operation
+                    Operation operation = SerializeUtil.decodeOperation(batchWithContext.rawPayload());
+                    try {
+                        replay(batchWithContext.baseOffset(), operation);
+                    } catch (StoreException e) {
+                        throw new RuntimeException(e);
+                    }
                 }
-            }
-            // load operations
-            for (RecordBatchWithContext batchWithContext : result.recordBatchList()) {
-                // TODO: assume that a batch only contains one operation
-                Operation operation = SerializeUtil.decodeOperation(batchWithContext.rawPayload());
-                try {
-                    replay(batchWithContext.baseOffset(), operation);
-                } catch (StoreException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-            return null;
-        });
+            }));
     }
 
     @Override
@@ -157,7 +157,8 @@ public class StreamOperationLogService implements OperationLogService {
         switch (operation.getOperationType()) {
             case POP -> stateMachine.replayPopOperation(operationOffset, (PopOperation) operation);
             case ACK -> stateMachine.replayAckOperation(operationOffset, (AckOperation) operation);
-            case CHANGE_INVISIBLE_DURATION -> stateMachine.replayChangeInvisibleDurationOperation(operationOffset, (ChangeInvisibleDurationOperation) operation);
+            case CHANGE_INVISIBLE_DURATION ->
+                stateMachine.replayChangeInvisibleDurationOperation(operationOffset, (ChangeInvisibleDurationOperation) operation);
             default -> throw new IllegalStateException("Unexpected value: " + operation.getOperationType());
         }
     }
@@ -178,7 +179,6 @@ public class StreamOperationLogService implements OperationLogService {
             return result.baseOffset();
         });
     }
-
 
     @Override
     public CompletableFuture<Long> logChangeInvisibleDurationOperation(ChangeInvisibleDurationOperation operation) {
