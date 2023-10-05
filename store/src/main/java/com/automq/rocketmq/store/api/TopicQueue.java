@@ -81,6 +81,12 @@ public abstract class TopicQueue {
 
     public abstract CompletableFuture<Long> getConsumeOffset(long consumerGroupId);
 
+    public abstract CompletableFuture<Long> getAckOffset(long consumerGroupId);
+
+    public abstract CompletableFuture<Long> getRetryConsumeOffset(long consumerGroupId);
+
+    public abstract CompletableFuture<Long> getRetryAckOffset(long consumerGroupId);
+
     public abstract CompletableFuture<State> getState();
 
     public enum State {
