@@ -27,7 +27,7 @@ import org.apache.commons.lang3.tuple.Pair;
 public class TokenBucketThrottleV2 {
     private final long tokenSize;
 
-    private Queue<Pair<Long, CompletableFuture<Void>>> queue;
+    private final Queue<Pair<Long, CompletableFuture<Void>>> queue;
 
 
     private final ScheduledExecutorService executorService;
