@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.cli;
 
+import apache.rocketmq.controller.v1.CreateTopicRequest;
 import com.automq.rocketmq.controller.metadata.GrpcControllerClient;
 import java.util.concurrent.Callable;
 import picocli.CommandLine;
@@ -34,7 +35,12 @@ public class CreateTopic implements Callable<Void> {
     @Override
     public Void call() throws Exception {
         GrpcControllerClient client = new GrpcControllerClient();
-        Long topicId = client.createTopic(mqAdmin.endpoint, topicName, queueNums).join();
+        CreateTopicRequest request = CreateTopicRequest.newBuilder()
+            .setTopic(topicName)
+            .setCount(queueNums)
+            .build();
+
+        Long topicId = client.createTopic(mqAdmin.endpoint, request).join();
         System.out.println("Topic created: " + topicId);
         client.close();
         return null;
