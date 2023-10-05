@@ -55,6 +55,8 @@ import apache.rocketmq.controller.v1.ReassignMessageQueueRequest;
 import apache.rocketmq.controller.v1.Topic;
 import apache.rocketmq.controller.v1.TrimStreamReply;
 import apache.rocketmq.controller.v1.TrimStreamRequest;
+import apache.rocketmq.controller.v1.UpdateTopicReply;
+import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.google.common.base.Strings;
@@ -172,6 +174,32 @@ public class GrpcControllerClient implements ControllerClient {
                 LOGGER.error("Leader node failed to create topic on behalf", t);
             }
         }, MoreExecutors.directExecutor());
+        return future;
+    }
+
+    @Override
+    public CompletableFuture<Topic> updateTopic(String target, UpdateTopicRequest request) {
+        CompletableFuture<Topic> future = new CompletableFuture<>();
+        try {
+            Futures.addCallback(buildStubForTarget(target).updateTopic(request), new FutureCallback<>() {
+                @Override
+                public void onSuccess(UpdateTopicReply result) {
+                    if (result.getStatus().getCode() == Code.OK) {
+                        future.complete(result.getTopic());
+                    } else {
+                        future.completeExceptionally(
+                            new ControllerException(result.getStatus().getCodeValue(), result.getStatus().getMessage()));
+                    }
+                }
+
+                @Override
+                public void onFailure(@Nonnull Throwable t) {
+                    future.completeExceptionally(t);
+                }
+            }, MoreExecutors.directExecutor());
+        } catch (ControllerException e) {
+            future.completeExceptionally(e);
+        }
         return future;
     }
 

@@ -140,7 +140,7 @@ message UpdateTopicRequest {
   // Effective if non-zero
   int32 count = 4;
 
-  // Effective if non-zero
+  // Effective if non-empty
   repeated MessageType accept_message_types = 5;
 }
 
@@ -380,7 +380,7 @@ service ControllerService {
 
   rpc listAllTopics(ListTopicsRequest) returns (stream ListTopicsReply) {}
 
-  rpc updateTopic(UpdateTopicRequest) returns (Topic) {}
+  rpc updateTopic(UpdateTopicRequest) returns (UpdateTopicReply) {}
 
   rpc deleteTopic(DeleteTopicRequest) returns (DeleteTopicReply) {}
 

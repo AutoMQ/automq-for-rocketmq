@@ -70,7 +70,7 @@
         <if test="null != id">
             AND id = #{id}
         </if>
-        <if test="null != name">
+        <if test="null != name and '' != name">
            AND name = #{name}
         </if>
     </select>

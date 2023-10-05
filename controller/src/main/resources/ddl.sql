@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS topic
 (
     id          BIGINT       NOT NULL PRIMARY KEY AUTO_INCREMENT,
     name        VARCHAR(255) NOT NULL,
-    queue_num   INT          NOT NULL,
+    queue_num   INT          NOT NULL DEFAULT 0,
     status      TINYINT  DEFAULT 0,
     create_time DATETIME DEFAULT current_timestamp,
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

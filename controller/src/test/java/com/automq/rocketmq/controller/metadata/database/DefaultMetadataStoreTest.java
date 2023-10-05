@@ -272,6 +272,74 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
+    void testUpdateTopic() throws IOException, ControllerException, ExecutionException, InterruptedException {
+        String address = "localhost:1234";
+        int nodeId;
+        try (SqlSession session = getSessionFactory().openSession()) {
+            NodeMapper nodeMapper = session.getMapper(NodeMapper.class);
+            Node node = new Node();
+            node.setAddress(address);
+            node.setName("broker-test-name");
+            node.setInstanceId("i-leader-address");
+            nodeMapper.create(node);
+            nodeId = node.getId();
+            session.commit();
+        }
+
+        ControllerConfig config = Mockito.mock(ControllerConfig.class);
+        Mockito.when(config.nodeId()).thenReturn(nodeId);
+        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
+        Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
+        long topicId;
+        int queueNum = 4;
+        String topicName = "t1";
+        List<MessageType> messageTypes = new ArrayList<>()
+        {
+            {
+                add(MessageType.NORMAL);
+                add(MessageType.FIFO);
+                add(MessageType.TRANSACTION);
+            }
+        };
+        Gson gson = new Gson();
+        List<MessageType> updateMessageTypes = new ArrayList<>()
+        {
+            {
+                add(MessageType.NORMAL);
+                add(MessageType.TRANSACTION);
+            }
+        };
+
+        try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            metadataStore.start();
+            Awaitility.await().with().atMost(10, TimeUnit.SECONDS)
+                .pollInterval(100, TimeUnit.MILLISECONDS)
+                .until(metadataStore::isLeader);
+
+            topicId = metadataStore.createTopic(topicName, queueNum, messageTypes).get();
+
+            metadataStore.updateTopic(topicId, topicName, updateMessageTypes).get();
+        }
+
+        try (SqlSession session = getSessionFactory().openSession()) {
+            TopicMapper topicMapper = session.getMapper(TopicMapper.class);
+            List<Topic> topics = topicMapper.list(null, null);
+            topics.stream().filter(topic -> topic.getName().equals("t1")).forEach(topic -> Assertions.assertEquals(4, topic.getQueueNum()));
+
+            topics.stream().filter(topic -> topic.getName().equals("t1")).forEach(topic -> Assertions.assertEquals(gson.toJson(updateMessageTypes), topic.getAcceptMessageTypes()));
+
+            QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
+            List<QueueAssignment> assignments = assignmentMapper.list(topicId, null, null, null, null);
+            Assertions.assertEquals(4, assignments.size());
+
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+            List<Stream> streams = streamMapper.list(topicId, null, null);
+            Assertions.assertEquals(queueNum * 2, streams.size());
+        }
+    }
+
+    @Test
     public void testListAssignments() throws IOException, ExecutionException, InterruptedException {
         try (SqlSession session = getSessionFactory().openSession()) {
             QueueAssignmentMapper mapper = session.getMapper(QueueAssignmentMapper.class);
@@ -318,7 +386,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             topic.setStatus(TopicStatus.TOPIC_STATUS_ACTIVE);
             topic.setName("T");
             topic.setQueueNum(1);
-            topic.setAcceptMessageTypes("[1, 2, 3]");
+            topic.setAcceptMessageTypes("[\"NORMAL\",\"DELAY\"]");
             topicMapper.create(topic);
             topicId = topic.getId();
             session.commit();
@@ -355,13 +423,16 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     @Test
     public void testDescribeTopic() throws IOException, ExecutionException, InterruptedException, ControllerException {
         long topicId;
+        String messageType = "[\"NORMAL\",\"DELAY\"]";
+        Gson gson = new Gson();
         try (SqlSession session = getSessionFactory().openSession()) {
 
             TopicMapper topicMapper = session.getMapper(TopicMapper.class);
             Topic topic = new Topic();
             topic.setName("T1");
             topic.setStatus(TopicStatus.TOPIC_STATUS_ACTIVE);
-            topic.setAcceptMessageTypes("[1, 2, 3]");
+            topic.setQueueNum(0);
+            topic.setAcceptMessageTypes(messageType);
             topicMapper.create(topic);
             topicId = topic.getId();
 
@@ -396,11 +467,12 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Assertions.assertEquals("T1", topic.getName());
             Assertions.assertEquals(1, topic.getAssignmentsCount());
             Assertions.assertEquals(1, topic.getReassignmentsCount());
+            Assertions.assertEquals(messageType, gson.toJson(topic.getAcceptMessageTypesList()));
         }
     }
 
     @Test
-    public void testMarkMessageQueueAssignable() throws IOException, ControllerException, ExecutionException, InterruptedException {
+    public void testMarkMessageQueueAssignable() throws IOException, ExecutionException, InterruptedException {
         try (SqlSession session = getSessionFactory().openSession()) {
             QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
             QueueAssignment assignment = new QueueAssignment();
