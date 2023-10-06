@@ -82,6 +82,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
     @Test
     void testRegisterNode() throws IOException, ExecutionException, InterruptedException {
+        int nodeId;
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.nodeId()).thenReturn(1);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
@@ -97,6 +98,13 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             String instanceId = "i-register";
             Node node = metadataStore.registerBrokerNode(name, address, instanceId).get();
             Assertions.assertTrue(node.getId() > 0);
+            nodeId = node.getId();
+        }
+
+        try (SqlSession session = this.getSessionFactory().openSession()) {
+            NodeMapper nodeMapper = session.getMapper(NodeMapper.class);
+            nodeMapper.delete(nodeId);
+            session.commit();
         }
     }
 
@@ -412,6 +420,13 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
             metadataStore.deleteTopic(topicId).get();
         }
+
+        try (SqlSession session = this.getSessionFactory().openSession()) {
+            NodeMapper nodeMapper = session.getMapper(NodeMapper.class);
+            nodeMapper.delete(nodeId);
+            session.commit();
+        }
+
     }
 
     @Test
@@ -424,7 +439,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             metadataStore.start();
             Awaitility.await().with().atMost(10, TimeUnit.SECONDS).pollInterval(100, TimeUnit.MILLISECONDS)
                 .until(metadataStore::isLeader);
-            Assertions.assertThrows(ControllerException.class, () -> metadataStore.deleteTopic(1));
+            Assertions.assertThrows(ExecutionException.class, () -> metadataStore.deleteTopic(1).get());
         }
     }
 

@@ -92,6 +92,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
@@ -213,51 +214,46 @@ public class DefaultMetadataStore implements MetadataStore {
             return future;
         }
 
-        for (; ; ) {
-            if (this.isLeader()) {
-                try (SqlSession session = openSession()) {
-                    NodeMapper nodeMapper = session.getMapper(NodeMapper.class);
-                    Node node = nodeMapper.get(null, name, instanceId, null);
-                    if (null != node) {
-                        nodeMapper.increaseEpoch(node.getId());
-                        node.setEpoch(node.getEpoch() + 1);
-                    } else {
-                        LeaseMapper leaseMapper = session.getMapper(LeaseMapper.class);
-                        Lease lease = leaseMapper.currentWithShareLock();
-                        if (lease.getEpoch() != this.lease.getEpoch()) {
-                            // Refresh cached lease
-                            this.lease = lease;
-                            LOGGER.info("Node[{}] has yielded its leader role", this.config.nodeId());
-                            // Redirect register node to the new leader in the next iteration.
-                            continue;
-                        }
-                        // epoch of node default to 1 when created
-                        node = new Node();
-                        node.setName(name);
-                        node.setAddress(address);
-                        node.setInstanceId(instanceId);
-                        nodeMapper.create(node);
-                    }
-                    session.commit();
-                    future.complete(node);
-                }
-            } else {
-                try {
-                    controllerClient.registerBroker(this.leaderAddress(), name, address, instanceId)
-                        .whenComplete((res, e) -> {
-                            if (null != e) {
-                                future.completeExceptionally(e);
-                            } else {
-                                future.complete(res);
+        return CompletableFuture.supplyAsync(() -> {
+            for (; ; ) {
+                if (this.isLeader()) {
+                    try (SqlSession session = openSession()) {
+                        NodeMapper nodeMapper = session.getMapper(NodeMapper.class);
+                        Node node = nodeMapper.get(null, name, instanceId, null);
+                        if (null != node) {
+                            nodeMapper.increaseEpoch(node.getId());
+                            node.setEpoch(node.getEpoch() + 1);
+                        } else {
+                            LeaseMapper leaseMapper = session.getMapper(LeaseMapper.class);
+                            Lease lease = leaseMapper.currentWithShareLock();
+                            if (lease.getEpoch() != this.lease.getEpoch()) {
+                                // Refresh cached lease
+                                this.lease = lease;
+                                LOGGER.info("Node[{}] has yielded its leader role", this.config.nodeId());
+                                // Redirect register node to the new leader in the next iteration.
+                                continue;
                             }
-                        });
-                } catch (ControllerException e) {
-                    future.completeExceptionally(e);
+                            // epoch of node default to 1 when created
+                            node = new Node();
+                            node.setName(name);
+                            node.setAddress(address);
+                            node.setInstanceId(instanceId);
+                            nodeMapper.create(node);
+                        }
+                        session.commit();
+                        return node;
+                    }
+                } else {
+                    try {
+                        return controllerClient.registerBroker(this.leaderAddress(), name, address, instanceId).join();
+                    } catch (ControllerException e) {
+                        throw new CompletionException(e);
+                    }
                 }
             }
-            break;
-        }
-        return future;
+        }, this.asyncExecutorService).exceptionally(ex -> {
+            throw (RuntimeException) ex;
+        });
     }
 
     @Override
@@ -483,126 +479,124 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public CompletableFuture<Void> deleteTopic(long topicId) throws ControllerException {
-        CompletableFuture<Void> future = new CompletableFuture<>();
-        for (; ; ) {
-            if (this.isLeader()) {
-                Set<Integer> toNotify = new HashSet<>();
-                try (SqlSession session = getSessionFactory().openSession()) {
-                    if (!maintainLeadershipWithSharedLock(session)) {
-                        continue;
-                    }
-
-                    TopicMapper topicMapper = session.getMapper(TopicMapper.class);
-                    Topic topic = topicMapper.get(topicId, null);
-                    if (null == topic) {
-                        throw new ControllerException(Code.NOT_FOUND_VALUE, String.format("This is no topic with topic-id %d", topicId));
-                    }
-                    topicMapper.updateStatusById(topicId, TopicStatus.TOPIC_STATUS_DELETED);
-
-                    QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
-                    List<QueueAssignment> assignments = assignmentMapper.list(topicId, null, null, null, null);
-                    assignments.stream().filter(assignment -> assignment.getStatus() != AssignmentStatus.ASSIGNMENT_STATUS_DELETED)
-                        .forEach(assignment -> {
-                            switch (assignment.getStatus()) {
-                                case ASSIGNMENT_STATUS_ASSIGNED -> toNotify.add(assignment.getDstNodeId());
-                                case ASSIGNMENT_STATUS_YIELDING -> toNotify.add(assignment.getSrcNodeId());
-                                default -> {
-                                }
-                            }
-                            assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_DELETED);
-                            assignmentMapper.update(assignment);
-                        });
-                    StreamMapper streamMapper = session.getMapper(StreamMapper.class);
-                    streamMapper.updateStreamState(null, topicId, null, StreamState.DELETED);
-                    session.commit();
-                }
-                this.notifyOnResourceChange(toNotify);
-                future.complete(null);
-            } else {
-                try {
-                    controllerClient.deleteTopic(this.leaderAddress(), topicId).whenComplete((res, e) -> {
-                        if (null != e) {
-                            future.completeExceptionally(e);
-                        } else {
-                            future.complete(null);
+    public CompletableFuture<Void> deleteTopic(long topicId) {
+        return CompletableFuture.supplyAsync(() -> {
+            for (; ; ) {
+                if (this.isLeader()) {
+                    Set<Integer> toNotify = new HashSet<>();
+                    try (SqlSession session = getSessionFactory().openSession()) {
+                        if (!maintainLeadershipWithSharedLock(session)) {
+                            continue;
                         }
-                    });
-                } catch (ControllerException e) {
-                    future.completeExceptionally(e);
+
+                        TopicMapper topicMapper = session.getMapper(TopicMapper.class);
+                        Topic topic = topicMapper.get(topicId, null);
+                        if (null == topic) {
+                            ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE, String.format("This is no topic with topic-id %d", topicId));
+                            throw new RuntimeException(e);
+                        }
+                        topicMapper.updateStatusById(topicId, TopicStatus.TOPIC_STATUS_DELETED);
+
+                        QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
+                        List<QueueAssignment> assignments = assignmentMapper.list(topicId, null, null, null, null);
+                        assignments.stream().filter(assignment -> assignment.getStatus() != AssignmentStatus.ASSIGNMENT_STATUS_DELETED)
+                                .forEach(assignment -> {
+                                    switch (assignment.getStatus()) {
+                                        case ASSIGNMENT_STATUS_ASSIGNED -> toNotify.add(assignment.getDstNodeId());
+                                        case ASSIGNMENT_STATUS_YIELDING -> toNotify.add(assignment.getSrcNodeId());
+                                        default -> {
+                                        }
+                                    }
+                                    assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_DELETED);
+                                    assignmentMapper.update(assignment);
+                                });
+                        StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+                        streamMapper.updateStreamState(null, topicId, null, StreamState.DELETED);
+                        session.commit();
+                    }
+                    this.notifyOnResourceChange(toNotify);
+                    return null;
+                } else {
+                    try {
+                        return controllerClient.deleteTopic(this.leaderAddress(), topicId).join();
+                    } catch (ControllerException e) {
+                        throw new RuntimeException(e);
+                    }
                 }
             }
-            break;
-        }
-        return future;
+        }, asyncExecutorService).exceptionally(ex -> {
+            throw (RuntimeException) ex;
+        });
     }
 
     @Override
     public CompletableFuture<apache.rocketmq.controller.v1.Topic> describeTopic(Long topicId,
         String topicName) throws ControllerException {
-        CompletableFuture<apache.rocketmq.controller.v1.Topic> future = new CompletableFuture<>();
-        if (isLeader()) {
-            try (SqlSession session = getSessionFactory().openSession()) {
-                TopicMapper topicMapper = session.getMapper(TopicMapper.class);
-                Topic topic = topicMapper.get(topicId, topicName);
+        return CompletableFuture.supplyAsync(() -> {
+            if (this.isLeader()) {
+                try (SqlSession session = getSessionFactory().openSession()) {
+                    TopicMapper topicMapper = session.getMapper(TopicMapper.class);
+                    Topic topic = topicMapper.get(topicId, topicName);
 
-                if (null == topic) {
-                    throw new ControllerException(Code.NOT_FOUND_VALUE,
-                        String.format("Topic not found for topic-id=%d, topic-name=%s", topicId, topicName));
-                }
+                    if (null == topic) {
+                        ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE,
+                                String.format("Topic not found for topic-id=%d, topic-name=%s", topicId, topicName));
+                        throw new RuntimeException(e);
+                    }
 
-                QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
-                List<QueueAssignment> assignments = assignmentMapper.list(topic.getId(), null, null, null, null);
+                    QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
+                    List<QueueAssignment> assignments = assignmentMapper.list(topic.getId(), null, null, null, null);
 
-                apache.rocketmq.controller.v1.Topic.Builder topicBuilder = apache.rocketmq.controller.v1.Topic
-                    .newBuilder()
-                    .setTopicId(topic.getId())
-                    .setCount(topic.getQueueNum())
-                    .setName(topic.getName())
-                    .addAllAcceptMessageTypes(gson.fromJson(topic.getAcceptMessageTypes(), new TypeToken<List<MessageType>>() {
-                    }.getType()));
+                    apache.rocketmq.controller.v1.Topic.Builder topicBuilder = apache.rocketmq.controller.v1.Topic
+                            .newBuilder()
+                            .setTopicId(topic.getId())
+                            .setCount(topic.getQueueNum())
+                            .setName(topic.getName())
+                            .addAllAcceptMessageTypes(gson.fromJson(topic.getAcceptMessageTypes(), new TypeToken<List<MessageType>>() {
+                            }.getType()));
 
-                if (null != assignments) {
-                    for (QueueAssignment assignment : assignments) {
-                        switch (assignment.getStatus()) {
-                            case ASSIGNMENT_STATUS_DELETED -> {
-                            }
+                    if (null != assignments) {
+                        for (QueueAssignment assignment : assignments) {
+                            switch (assignment.getStatus()) {
+                                case ASSIGNMENT_STATUS_DELETED -> {
+                                }
 
-                            case ASSIGNMENT_STATUS_ASSIGNED -> {
-                                MessageQueueAssignment queueAssignment = MessageQueueAssignment.newBuilder()
-                                    .setQueue(MessageQueue.newBuilder()
-                                        .setTopicId(assignment.getTopicId())
-                                        .setQueueId(assignment.getQueueId()))
-                                    .setNodeId(assignment.getDstNodeId())
-                                    .build();
-                                topicBuilder.addAssignments(queueAssignment);
-                            }
+                                case ASSIGNMENT_STATUS_ASSIGNED -> {
+                                    MessageQueueAssignment queueAssignment = MessageQueueAssignment.newBuilder()
+                                            .setQueue(MessageQueue.newBuilder()
+                                                    .setTopicId(assignment.getTopicId())
+                                                    .setQueueId(assignment.getQueueId()))
+                                            .setNodeId(assignment.getDstNodeId())
+                                            .build();
+                                    topicBuilder.addAssignments(queueAssignment);
+                                }
 
-                            case ASSIGNMENT_STATUS_YIELDING -> {
-                                OngoingMessageQueueReassignment reassignment = OngoingMessageQueueReassignment.newBuilder()
-                                    .setQueue(MessageQueue.newBuilder()
-                                        .setTopicId(assignment.getTopicId())
-                                        .setQueueId(assignment.getQueueId())
-                                        .build())
-                                    .setSrcNodeId(assignment.getSrcNodeId())
-                                    .setDstNodeId(assignment.getDstNodeId())
-                                    .build();
-                                topicBuilder.addReassignments(reassignment);
+                                case ASSIGNMENT_STATUS_YIELDING -> {
+                                    OngoingMessageQueueReassignment reassignment = OngoingMessageQueueReassignment.newBuilder()
+                                            .setQueue(MessageQueue.newBuilder()
+                                                    .setTopicId(assignment.getTopicId())
+                                                    .setQueueId(assignment.getQueueId())
+                                                    .build())
+                                            .setSrcNodeId(assignment.getSrcNodeId())
+                                            .setDstNodeId(assignment.getDstNodeId())
+                                            .build();
+                                    topicBuilder.addReassignments(reassignment);
+                                }
                             }
                         }
                     }
+                    return topicBuilder.build();
                 }
-                future.complete(topicBuilder.build());
-                return future;
+            } else {
+                try {
+                    return this.controllerClient.describeTopic(leaderAddress(), topicId, topicName).join();
+                } catch (ControllerException e) {
+                    throw new RuntimeException(e);
+                }
             }
-        } else {
-            try {
-                return this.controllerClient.describeTopic(leaderAddress(), topicId, topicName);
-            } catch (ControllerException e) {
-                future.completeExceptionally(e);
-                return future;
-            }
-        }
+        }, asyncExecutorService).exceptionally(ex -> {
+            throw (RuntimeException) ex;
+        });
     }
 
     @Override
@@ -956,27 +950,27 @@ public class DefaultMetadataStore implements MetadataStore {
 
     @Override
     public CompletableFuture<ConsumerGroup> describeConsumerGroup(Long groupId, String groupName) {
-        CompletableFuture<ConsumerGroup> future = new CompletableFuture<>();
-        try (SqlSession session = getSessionFactory().openSession()) {
-            GroupMapper groupMapper = session.getMapper(GroupMapper.class);
-            List<Group> groups = groupMapper.list(groupId, groupName, null, null);
-            if (groups.isEmpty()) {
-                ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE,
-                    String.format("Group with group-id=%d is not found", groupId));
-                future.completeExceptionally(e);
-            } else {
-                Group group = groups.get(0);
-                ConsumerGroup cg = ConsumerGroup.newBuilder()
-                    .setGroupId(group.getId())
-                    .setName(group.getName())
-                    .setGroupType(group.getGroupType())
-                    .setMaxDeliveryAttempt(group.getMaxDeliveryAttempt())
-                    .setDeadLetterTopicId(group.getDeadLetterTopicId())
-                    .build();
-                future.complete(cg);
+        return CompletableFuture.supplyAsync(() -> {
+            try (SqlSession session = getSessionFactory().openSession()) {
+                GroupMapper groupMapper = session.getMapper(GroupMapper.class);
+                List<Group> groups = groupMapper.list(groupId, groupName, null, null);
+                if (groups.isEmpty()) {
+                    ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE,
+                            String.format("Group with group-id=%d is not found", groupId));
+                    throw  new RuntimeException(e);
+                } else {
+                    Group group = groups.get(0);
+                    ConsumerGroup cg = ConsumerGroup.newBuilder()
+                            .setGroupId(group.getId())
+                            .setName(group.getName())
+                            .setGroupType(group.getGroupType())
+                            .setMaxDeliveryAttempt(group.getMaxDeliveryAttempt())
+                            .setDeadLetterTopicId(group.getDeadLetterTopicId())
+                            .build();
+                    return cg;
+                }
             }
-        }
-        return future;
+        }, asyncExecutorService);
     }
 
     @Override

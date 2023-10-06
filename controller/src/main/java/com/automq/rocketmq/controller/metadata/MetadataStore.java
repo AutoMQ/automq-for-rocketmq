@@ -81,7 +81,7 @@ public interface MetadataStore extends Closeable {
     CompletableFuture<Long> createTopic(String topicName, int queueNum,
         List<MessageType> acceptMessageTypesList) throws ControllerException;
 
-    CompletableFuture<Void> deleteTopic(long topicId) throws ControllerException;
+    CompletableFuture<Void> deleteTopic(long topicId);
 
     CompletableFuture<Topic> describeTopic(Long topicId, String topicName) throws ControllerException;
 
