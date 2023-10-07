@@ -101,6 +101,8 @@ import java.util.stream.IntStream;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.slf4j.Logger;
@@ -123,7 +125,6 @@ public class DefaultMetadataStore implements MetadataStore {
     private final ScheduledExecutorService scheduledExecutorService;
 
     private final ExecutorService asyncExecutorService;
-
 
     /// The following fields are runtime specific
     private Lease lease;
@@ -153,7 +154,8 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public CompletableFuture<Node> registerBrokerNode(String name, String address, String instanceId) throws ControllerException {
+    public CompletableFuture<Node> registerBrokerNode(String name, String address,
+        String instanceId) throws ControllerException {
         CompletableFuture<Node> future = new CompletableFuture<>();
         if (Strings.isNullOrEmpty(name)) {
             throw new ControllerException(Code.BAD_REQUEST_VALUE, "Broker name is null or empty");
@@ -264,12 +266,40 @@ public class DefaultMetadataStore implements MetadataStore {
         return true;
     }
 
+    private void createQueues(IntStream range, long topicId, SqlSession session) {
+        QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
+        StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+        range.forEach(n -> {
+            QueueAssignment assignment = new QueueAssignment();
+            assignment.setTopicId(topicId);
+            assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNABLE);
+            assignment.setQueueId(n);
+            // On creation, both src and dst node_id are the same.
+            assignment.setSrcNodeId(0);
+            assignment.setDstNodeId(0);
+            assignmentMapper.create(assignment);
+            // Create data stream
+            long streamId = createStream(streamMapper, topicId, n, null, StreamRole.STREAM_ROLE_DATA, 0);
+            LOGGER.debug("Create assignable data stream[stream-id={}] for topic-id={}, queue-id={}",
+                streamId, topicId, n);
+            // Create ops stream
+            streamId = createStream(streamMapper, topicId, n, null, StreamRole.STREAM_ROLE_OPS, 0);
+            LOGGER.debug("Create assignable ops stream[stream-id={}] for topic-id={}, queue-id={}",
+                streamId, topicId, n);
+
+            // Create snapshot stream
+            streamId = createStream(streamMapper, topicId, n, null, StreamRole.STREAM_ROLE_SNAPSHOT, 0);
+            LOGGER.debug("Create assignable snapshot stream[stream-id={}] for topic-id={}, queue-id={}",
+                streamId, topicId, n);
+        });
+    }
+
     @Override
-    public CompletableFuture<Long> createTopic(String topicName, int queueNum, List<MessageType> acceptMessageTypesList) throws ControllerException {
+    public CompletableFuture<Long> createTopic(String topicName, int queueNum,
+        List<MessageType> acceptMessageTypesList) throws ControllerException {
         CompletableFuture<Long> future = new CompletableFuture<>();
         for (; ; ) {
             if (this.isLeader()) {
-                Set<Integer> toNotify = new HashSet<>();
                 try (SqlSession session = getSessionFactory().openSession()) {
                     if (!maintainLeadershipWithSharedLock(session)) {
                         continue;
@@ -286,64 +316,10 @@ public class DefaultMetadataStore implements MetadataStore {
                     topic.setStatus(TopicStatus.TOPIC_STATUS_ACTIVE);
                     topic.setAcceptMessageTypes(gson.toJson(acceptMessageTypesList));
                     topicMapper.create(topic);
-
-                    QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
-
-                    StreamMapper streamMapper = session.getMapper(StreamMapper.class);
-
                     long topicId = topic.getId();
-                    List<Integer> aliveNodeIds =
-                        this.nodes.values()
-                            .stream()
-                            .filter(brokerNode ->
-                                brokerNode.isAlive(config))
-                            .map(node -> node.getNode().getId())
-                            .toList();
-                    if (aliveNodeIds.isEmpty()) {
-                        IntStream.range(0, queueNum).forEach(n -> {
-                            QueueAssignment assignment = new QueueAssignment();
-                            assignment.setTopicId(topicId);
-                            assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNABLE);
-                            assignment.setQueueId(n);
-                            // On creation, both src and dst node_id are the same.
-                            assignment.setSrcNodeId(0);
-                            assignment.setDstNodeId(0);
-                            assignmentMapper.create(assignment);
-                            // Create data stream
-                            long streamId = createStream(streamMapper, topicId, n, null, StreamRole.STREAM_ROLE_DATA, 0);
-                            LOGGER.debug("Create assignable data stream[stream-id={}] for topic-id={}, queue-id={}",
-                                streamId, topicId, n);
-                            // Create ops stream
-                            streamId = createStream(streamMapper, topicId, n, null, StreamRole.STREAM_ROLE_OPS, 0);
-                            LOGGER.debug("Create assignable ops stream[stream-id={}] for topic-id={}, queue-id={}",
-                                streamId, topicId, n);
-                        });
-                    } else {
-                        IntStream.range(0, queueNum).forEach(n -> {
-                            int idx = n % aliveNodeIds.size();
-                            int nodeId = aliveNodeIds.get(idx);
-                            toNotify.add(nodeId);
-                            QueueAssignment assignment = new QueueAssignment();
-                            assignment.setTopicId(topicId);
-                            assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNED);
-                            assignment.setQueueId(n);
-                            // On creation, both src and dst node_id are the same.
-                            assignment.setSrcNodeId(nodeId);
-                            assignment.setDstNodeId(nodeId);
-                            assignmentMapper.create(assignment);
-                            // Create data stream
-                            long streamId = createStream(streamMapper, topicId, n, null, StreamRole.STREAM_ROLE_DATA, nodeId);
-                            LOGGER.debug("Create data stream[stream-id={}] for topic-id={}, queue-id={}, assigned to node[node-id={}]",
-                                streamId, topicId, n, nodeId);
-                            // Create ops stream
-                            streamId = createStream(streamMapper, topicId, n, null, StreamRole.STREAM_ROLE_OPS, nodeId);
-                            LOGGER.debug("Create ops stream[stream-id={}] for topic-id={}, queue-id={}, assigned to node[node-id={}]",
-                                streamId, topicId, n, nodeId);
-                        });
-                    }
+                    createQueues(IntStream.range(0, queueNum), topicId, session);
                     // Commit transaction
                     session.commit();
-                    this.notifyOnResourceChange(toNotify);
                     future.complete(topicId);
                 }
             } else {
@@ -384,7 +360,10 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public CompletableFuture<apache.rocketmq.controller.v1.Topic> updateTopic(long topicId, String topicName, List<MessageType> acceptMessageTypesList) throws ControllerException {
+    public CompletableFuture<apache.rocketmq.controller.v1.Topic> updateTopic(long topicId,
+        @Nullable String topicName,
+        @Nullable Integer queueNumber,
+        @Nonnull List<MessageType> acceptMessageTypesList) throws ControllerException {
         CompletableFuture<apache.rocketmq.controller.v1.Topic> future = new CompletableFuture<>();
         for (; ; ) {
             if (this.isLeader()) {
@@ -394,15 +373,43 @@ public class DefaultMetadataStore implements MetadataStore {
                     }
 
                     TopicMapper topicMapper = session.getMapper(TopicMapper.class);
-                    Topic topic = topicMapper.get(topicId, topicName);
+                    Topic topic = topicMapper.get(topicId, null);
 
                     if (null == topic) {
                         throw new ControllerException(Code.NOT_FOUND_VALUE,
                             String.format("Topic not found for topic-id=%d, topic-name=%s", topicId, topicName));
                     }
 
-                    topic.setAcceptMessageTypes(gson.toJson(acceptMessageTypesList));
-                    topicMapper.update(topic);
+                    boolean changed = false;
+
+                    // Update accepted message types
+                    if (!acceptMessageTypesList.isEmpty()) {
+                        String types = gson.toJson(acceptMessageTypesList);
+                        if (!types.equals(topic.getAcceptMessageTypes())) {
+                            topic.setAcceptMessageTypes(types);
+                            changed = true;
+                        }
+                    }
+
+                    // Update topic name
+                    if (!Strings.isNullOrEmpty(topicName) && !topic.getName().equals(topicName)) {
+                        topic.setName(topicName);
+                        changed = true;
+                    }
+
+                    // Update queue nums
+                    if (null != queueNumber && !queueNumber.equals(topic.getQueueNum())) {
+                        if (queueNumber > topic.getQueueNum()) {
+                            createQueues(IntStream.range(topic.getQueueNum(), queueNumber), topic.getId(), session);
+                        }
+                        changed = true;
+                    }
+
+                    if (changed) {
+                        topicMapper.update(topic);
+                        // Commit transaction
+                        session.commit();
+                    }
 
                     apache.rocketmq.controller.v1.Topic uTopic = apache.rocketmq.controller.v1.Topic
                         .newBuilder()
@@ -411,9 +418,6 @@ public class DefaultMetadataStore implements MetadataStore {
                         .setName(topic.getName())
                         .addAllAcceptMessageTypes(acceptMessageTypesList)
                         .build();
-
-                    // Commit transaction
-                    session.commit();
                     future.complete(uTopic);
                 }
             } else {
@@ -631,7 +635,8 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public CompletableFuture<Void> reassignMessageQueue(long topicId, int queueId, int dstNodeId) throws ControllerException {
+    public CompletableFuture<Void> reassignMessageQueue(long topicId, int queueId,
+        int dstNodeId) throws ControllerException {
         CompletableFuture<Void> future = new CompletableFuture<>();
         for (; ; ) {
             if (isLeader()) {
@@ -773,7 +778,6 @@ public class DefaultMetadataStore implements MetadataStore {
         }
     }
 
-
     @Override
     public CompletableFuture<Long> createGroup(String groupName, int maxRetry, GroupType type,
         long deadLetterTopicId) throws ControllerException {
@@ -894,7 +898,8 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public CompletableFuture<Void> trimStream(long streamId, long streamEpoch, long newStartOffset) throws ControllerException {
+    public CompletableFuture<Void> trimStream(long streamId, long streamEpoch,
+        long newStartOffset) throws ControllerException {
         CompletableFuture<Void> future = new CompletableFuture<>();
         for (; ; ) {
             if (this.isLeader()) {
@@ -1344,10 +1349,10 @@ public class DefaultMetadataStore implements MetadataStore {
                         // verify stream continuity
                         List<long[]> offsets = java.util.stream.Stream.concat(
                             streamObjects.stream()
-                                .map(s3StreamObject -> new long[]{s3StreamObject.getStreamId(), s3StreamObject.getStartOffset(), s3StreamObject.getEndOffset()}),
+                                .map(s3StreamObject -> new long[] {s3StreamObject.getStreamId(), s3StreamObject.getStartOffset(), s3StreamObject.getEndOffset()}),
                             walObject.getSubStreamsMap().entrySet()
                                 .stream()
-                                .map(obj -> new long[]{obj.getKey(), obj.getValue().getStartOffset(), obj.getValue().getEndOffset()})
+                                .map(obj -> new long[] {obj.getKey(), obj.getValue().getStartOffset(), obj.getValue().getEndOffset()})
                         ).toList();
 
                         if (!checkStreamAdvance(session, offsets)) {
@@ -1438,7 +1443,8 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public CompletableFuture<Void> commitStreamObject(apache.rocketmq.controller.v1.S3StreamObject streamObject, List<Long> compactedObjects) throws ControllerException {
+    public CompletableFuture<Void> commitStreamObject(apache.rocketmq.controller.v1.S3StreamObject streamObject,
+        List<Long> compactedObjects) throws ControllerException {
         CompletableFuture<Void> future = new CompletableFuture<>();
         for (; ; ) {
             if (isLeader()) {
@@ -1531,7 +1537,8 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public CompletableFuture<List<apache.rocketmq.controller.v1.S3WALObject>> listWALObjects(long streamId, long startOffset,
+    public CompletableFuture<List<apache.rocketmq.controller.v1.S3WALObject>> listWALObjects(long streamId,
+        long startOffset,
         long endOffset, int limit) {
         CompletableFuture<List<apache.rocketmq.controller.v1.S3WALObject>> future = new CompletableFuture<>();
         try (SqlSession session = this.sessionFactory.openSession()) {
@@ -1566,7 +1573,8 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public CompletableFuture<List<apache.rocketmq.controller.v1.S3StreamObject>> listStreamObjects(long streamId, long startOffset,
+    public CompletableFuture<List<apache.rocketmq.controller.v1.S3StreamObject>> listStreamObjects(long streamId,
+        long startOffset,
         long endOffset, int limit) {
         CompletableFuture<List<apache.rocketmq.controller.v1.S3StreamObject>> future = new CompletableFuture<>();
         try (SqlSession session = this.sessionFactory.openSession()) {
@@ -1653,7 +1661,8 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public CompletableFuture<Long> getOrCreateRetryStream(String groupName, long topicId, int queueId) throws ControllerException {
+    public CompletableFuture<Long> getOrCreateRetryStream(String groupName, long topicId,
+        int queueId) throws ControllerException {
         CompletableFuture<Long> future = new CompletableFuture<>();
         for (; ; ) {
             if (isLeader()) {

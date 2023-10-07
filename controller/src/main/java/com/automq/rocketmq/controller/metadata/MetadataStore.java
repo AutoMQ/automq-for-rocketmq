@@ -32,6 +32,8 @@ import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import java.io.Closeable;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 public interface MetadataStore extends Closeable {
 
@@ -55,7 +57,10 @@ public interface MetadataStore extends Closeable {
 
     CompletableFuture<List<Topic>> listTopics();
 
-    CompletableFuture<Topic> updateTopic(long topicId, String topicName, List<MessageType> acceptMessageTypesList) throws ControllerException;
+    CompletableFuture<Topic> updateTopic(long topicId,
+        @Nullable String topicName,
+        @Nullable Integer queueNumber,
+        @Nonnull List<MessageType> acceptMessageTypesList) throws ControllerException;
 
     /**
      * Check if current controller is playing leader role
