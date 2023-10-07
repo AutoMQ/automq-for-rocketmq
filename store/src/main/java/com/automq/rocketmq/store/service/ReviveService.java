@@ -45,6 +45,8 @@ public class ReviveService implements Runnable, Lifecycle {
     private final StoreMetadataService metadataService;
     private final InflightService inflightService;
     private final TopicQueueManager topicQueueManager;
+    // Indicate the timestamp that the revive service has reached.
+    private long reviveTimestamp = 0;
 
     public ReviveService(String checkPointNamespace, String timerTagNamespace, KVService kvService,
         StoreMetadataService metadataService, InflightService inflightService,
@@ -95,7 +97,8 @@ public class ReviveService implements Runnable, Lifecycle {
 
     protected void tryRevive() throws StoreException {
         byte[] start = ByteBuffer.allocate(8).putLong(0).array();
-        byte[] end = ByteBuffer.allocate(8).putLong(System.nanoTime() - 1).array();
+        long endTimestamp = System.nanoTime() - 1;
+        byte[] end = ByteBuffer.allocate(8).putLong(endTimestamp).array();
 
         // Iterate timer tag until now to find messages need to reconsume.
         kvService.iterate(timerTagNamespace, null, start, end, (key, value) -> {
@@ -150,5 +153,10 @@ public class ReviveService implements Runnable, Lifecycle {
                 System.out.println("delete timer tag failed in revive" + e);
             }
         });
+        this.reviveTimestamp = endTimestamp;
+    }
+
+    public long reviveTimestamp() {
+        return reviveTimestamp;
     }
 }

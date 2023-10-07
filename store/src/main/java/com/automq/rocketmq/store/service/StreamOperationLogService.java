@@ -34,10 +34,14 @@ import com.automq.stream.api.AppendResult;
 import com.automq.stream.api.RecordBatchWithContext;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class StreamOperationLogService implements OperationLogService {
+    public static final Logger LOGGER = LoggerFactory.getLogger(StreamOperationLogService.class);
     private final long topicId;
     private final int queueId;
     private final long opStreamId;
@@ -103,9 +107,10 @@ public class StreamOperationLogService implements OperationLogService {
                     // TODO: assume that a batch only contains one operation
                     Operation operation = SerializeUtil.decodeOperation(batchWithContext.rawPayload());
                     try {
+                        // TODO: operation may be null
                         replay(batchWithContext.baseOffset(), operation);
                     } catch (StoreException e) {
-                        throw new RuntimeException(e);
+                        throw new CompletionException(e);
                     }
                 }
             }));
@@ -115,18 +120,21 @@ public class StreamOperationLogService implements OperationLogService {
     public CompletableFuture<Long> logPopOperation(PopOperation operation) {
         CompletableFuture<AppendResult> append = streamStore.append(opStreamId, new SingleRecord(
             ByteBuffer.wrap(SerializeUtil.encodePopOperation(operation))));
-        return append.thenApply(result -> {
-            // TODO: think about append return order
-            try {
-                replay(result.baseOffset(), operation);
-            } catch (StoreException e) {
-                throw new RuntimeException(e);
-            }
-            if (result.baseOffset() - opStartOffset.get() + 1 >= storeConfig.operationSnapshotInterval()) {
-                notifySnapshot();
-            }
-            return result.baseOffset();
-        });
+        return doReplay(append, operation);
+    }
+
+    @Override
+    public CompletableFuture<Long> logAckOperation(AckOperation operation) {
+        CompletableFuture<AppendResult> append = streamStore.append(opStreamId, new SingleRecord(
+            ByteBuffer.wrap(SerializeUtil.encodeAckOperation(operation))));
+        return doReplay(append, operation);
+    }
+
+    @Override
+    public CompletableFuture<Long> logChangeInvisibleDurationOperation(ChangeInvisibleDurationOperation operation) {
+        CompletableFuture<AppendResult> append = streamStore.append(opStreamId, new SingleRecord(
+            ByteBuffer.wrap(SerializeUtil.encodeChangeInvisibleDurationOperation(operation))));
+        return doReplay(append, operation);
     }
 
     private void notifySnapshot() {
@@ -141,7 +149,7 @@ public class StreamOperationLogService implements OperationLogService {
                 this.takingSnapshot.set(false);
                 this.opStartOffset.set(newStartOffset);
             }).exceptionally(e -> {
-                // TODO: log it
+                LOGGER.error("take snapshot failed: {}", e.getMessage());
                 this.takingSnapshot.set(false);
                 return null;
             });
@@ -150,6 +158,21 @@ public class StreamOperationLogService implements OperationLogService {
 
     private void loadSnapshot(OperationSnapshot snapshot) throws StoreException {
         stateMachine.loadSnapshot(snapshot);
+    }
+
+    private CompletableFuture<Long> doReplay(CompletableFuture<AppendResult> appendCf, Operation operation) {
+        return appendCf.thenApply(result -> {
+            // TODO: think about append return order
+            try {
+                replay(result.baseOffset(), operation);
+            } catch (StoreException e) {
+                throw new CompletionException(e);
+            }
+            if (result.baseOffset() - opStartOffset.get() + 1 >= storeConfig.operationSnapshotInterval()) {
+                notifySnapshot();
+            }
+            return result.baseOffset();
+        });
     }
 
     private void replay(long operationOffset, Operation operation) throws StoreException {
@@ -161,39 +184,5 @@ public class StreamOperationLogService implements OperationLogService {
                 stateMachine.replayChangeInvisibleDurationOperation(operationOffset, (ChangeInvisibleDurationOperation) operation);
             default -> throw new IllegalStateException("Unexpected value: " + operation.getOperationType());
         }
-    }
-
-    @Override
-    public CompletableFuture<Long> logAckOperation(AckOperation operation) {
-        CompletableFuture<AppendResult> append = streamStore.append(opStreamId, new SingleRecord(
-            ByteBuffer.wrap(SerializeUtil.encodeAckOperation(operation))));
-        return append.thenApply(result -> {
-            try {
-                replay(result.baseOffset(), operation);
-            } catch (StoreException e) {
-                throw new RuntimeException(e);
-            }
-            if (result.baseOffset() - opStartOffset.get() + 1 >= storeConfig.operationSnapshotInterval()) {
-                notifySnapshot();
-            }
-            return result.baseOffset();
-        });
-    }
-
-    @Override
-    public CompletableFuture<Long> logChangeInvisibleDurationOperation(ChangeInvisibleDurationOperation operation) {
-        CompletableFuture<AppendResult> append = streamStore.append(opStreamId, new SingleRecord(
-            ByteBuffer.wrap(SerializeUtil.encodeChangeInvisibleDurationOperation(operation))));
-        return append.thenApply(result -> {
-            try {
-                replay(result.baseOffset(), operation);
-            } catch (StoreException e) {
-                throw new RuntimeException(e);
-            }
-            if (result.baseOffset() - opStartOffset.get() + 1 >= storeConfig.operationSnapshotInterval()) {
-                notifySnapshot();
-            }
-            return result.baseOffset();
-        });
     }
 }

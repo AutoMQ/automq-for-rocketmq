@@ -38,12 +38,12 @@ import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.util.SerializeUtil;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import static com.automq.rocketmq.store.mock.MockMessageUtil.buildMessage;
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -98,7 +98,8 @@ class ReviveServiceTest {
         FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
         topicQueue.put(message).join();
         // pop message
-        PopResult popResult = topicQueue.popNormal(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 1000 * 1000 * 1000).join();
+        int invisibleDuration = 1000 * 1000 * 1000;
+        PopResult popResult = topicQueue.popNormal(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
         assertEquals(1, popResult.messageList().size());
         // check ck exist
         ReceiptHandle handle = SerializeUtil.decodeReceiptHandle(popResult.messageList().get(0).receiptHandle().get());
@@ -110,12 +111,12 @@ class ReviveServiceTest {
         ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.operationId()));
         assertNotNull(ckValue);
         // after 1s revive can clear ck
-        try {
-            Thread.sleep(1000);
-        } catch (InterruptedException e) {
-            Assertions.assertNull(e);
-        }
-        reviveService.tryRevive();
+        long reviveTimestamp = System.nanoTime() + invisibleDuration;
+        await().until(() -> {
+            reviveService.tryRevive();
+            return reviveService.reviveTimestamp() >= reviveTimestamp;
+        });
+
         ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.operationId()));
         assertNull(ckValue);
 

@@ -60,7 +60,7 @@ public class MessageStoreImpl implements MessageStore {
 
     public MessageStoreImpl(StoreConfig config, StreamStore streamStore,
         StoreMetadataService metadataService, KVService kvService, InflightService inflightService,
-        SnapshotService snapshotService, TopicQueueManager topicQueueManager) {
+        SnapshotService snapshotService, TopicQueueManager topicQueueManager, ReviveService reviveService) {
         this.config = config;
         this.streamStore = streamStore;
         this.metadataService = metadataService;
@@ -68,7 +68,7 @@ public class MessageStoreImpl implements MessageStore {
         this.inflightService = inflightService;
         this.snapshotService = snapshotService;
         this.topicQueueManager = topicQueueManager;
-        this.reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, KV_NAMESPACE_TIMER_TAG, kvService, metadataService, inflightService, topicQueueManager);
+        this.reviveService = reviveService;
     }
 
     @Override
