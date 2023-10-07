@@ -17,14 +17,14 @@
 
 package com.automq.rocketmq.controller.metadata.database.tasks;
 
-import com.automq.rocketmq.controller.metadata.database.DefaultMetadataStore;
+import com.automq.rocketmq.controller.metadata.MetadataStore;
 import java.util.Date;
 
 public abstract class ScanTask extends ControllerTask {
 
     protected Date lastScanTime;
 
-    public ScanTask(DefaultMetadataStore metadataStore) {
+    public ScanTask(MetadataStore metadataStore) {
         super(metadataStore);
     }
 

@@ -34,12 +34,12 @@ public class LeaseTask extends ControllerTask {
     public void run() {
         LOGGER.info("LeaseTask starts");
         try {
-            try (SqlSession session = metadataStore.getSessionFactory().openSession(false)) {
+            try (SqlSession session = metadataStore.openSession()) {
                 LeaseMapper leaseMapper = session.getMapper(LeaseMapper.class);
                 Lease lease = leaseMapper.current();
                 this.metadataStore.setLease(lease);
                 if (!lease.expired()) {
-                    if (lease.getNodeId() == metadataStore.getConfig().nodeId()) {
+                    if (lease.getNodeId() == metadataStore.config().nodeId()) {
                         // Current node is lease leader.
                         Lease update = leaseMapper.currentWithWriteLock();
                         this.metadataStore.setLease(update);
@@ -51,7 +51,7 @@ public class LeaseTask extends ControllerTask {
                             return;
                         }
                         Calendar calendar = Calendar.getInstance();
-                        calendar.add(Calendar.SECOND, metadataStore.getConfig().leaseLifeSpanInSecs());
+                        calendar.add(Calendar.SECOND, metadataStore.config().leaseLifeSpanInSecs());
                         update.setExpirationTime(calendar.getTime());
                         int affectedRows = leaseMapper.update(update);
                         if (1 == affectedRows) {
@@ -71,9 +71,9 @@ public class LeaseTask extends ControllerTask {
                     Lease update = leaseMapper.currentWithWriteLock();
                     if (lease.getEpoch() == update.getEpoch() && lease.getNodeId() == update.getNodeId()) {
                         update.setEpoch(update.getEpoch() + 1);
-                        update.setNodeId(metadataStore.getConfig().nodeId());
+                        update.setNodeId(metadataStore.config().nodeId());
                         Calendar calendar = Calendar.getInstance();
-                        calendar.add(Calendar.SECOND, metadataStore.getConfig().leaseLifeSpanInSecs());
+                        calendar.add(Calendar.SECOND, metadataStore.config().leaseLifeSpanInSecs());
                         update.setExpirationTime(calendar.getTime());
                         leaseMapper.update(update);
                         this.metadataStore.setLease(update);

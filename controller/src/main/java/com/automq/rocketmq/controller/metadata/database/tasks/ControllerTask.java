@@ -17,16 +17,16 @@
 
 package com.automq.rocketmq.controller.metadata.database.tasks;
 
-import com.automq.rocketmq.controller.metadata.database.DefaultMetadataStore;
+import com.automq.rocketmq.controller.metadata.MetadataStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public abstract class ControllerTask implements Runnable {
     protected static final Logger LOGGER = LoggerFactory.getLogger(LeaseTask.class);
 
-    protected final DefaultMetadataStore metadataStore;
+    protected final MetadataStore metadataStore;
 
-    public ControllerTask(DefaultMetadataStore metadataStore) {
+    public ControllerTask(MetadataStore metadataStore) {
         this.metadataStore = metadataStore;
     }
 

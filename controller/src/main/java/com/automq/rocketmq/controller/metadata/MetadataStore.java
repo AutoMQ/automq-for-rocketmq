@@ -27,6 +27,7 @@ import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.MessageType;
 import com.automq.rocketmq.controller.exception.ControllerException;
+import com.automq.rocketmq.controller.metadata.database.dao.Lease;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import java.io.Closeable;
@@ -34,8 +35,19 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.ibatis.session.SqlSession;
 
 public interface MetadataStore extends Closeable {
+
+    ControllerConfig config();
+
+    SqlSession openSession();
+
+    void addBrokerNode(Node node);
+
+    void setLease(Lease lease);
+
+    void setRole(Role role);
 
     void start();
 

@@ -77,6 +77,7 @@ import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 import com.automq.rocketmq.controller.metadata.database.tasks.LeaseTask;
 import com.automq.rocketmq.controller.metadata.database.tasks.ScanNodeTask;
+import com.automq.rocketmq.controller.metadata.database.tasks.ScanYieldingQueueTask;
 import com.google.common.base.Strings;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -143,11 +144,22 @@ public class DefaultMetadataStore implements MetadataStore {
         this.asyncExecutorService = Executors.newFixedThreadPool(10, new PrefixThreadFactory("Controller-Async"));
     }
 
+    @Override
+    public ControllerConfig config() {
+        return config;
+    }
+
+    @Override
+    public SqlSession openSession() {
+        return sessionFactory.openSession(false);
+    }
+
     public void start() {
         LeaseTask leaseTask = new LeaseTask(this);
         leaseTask.run();
         this.scheduledExecutorService.scheduleAtFixedRate(leaseTask, 1, config.scanIntervalInSecs(), TimeUnit.SECONDS);
         this.scheduledExecutorService.scheduleWithFixedDelay(new ScanNodeTask(this), 1, config.scanIntervalInSecs(), TimeUnit.SECONDS);
+        this.scheduledExecutorService.scheduleWithFixedDelay(new ScanYieldingQueueTask(this), 1, config.scanIntervalInSecs(), TimeUnit.SECONDS);
         LOGGER.info("MetadataStore tasks scheduled");
     }
 
