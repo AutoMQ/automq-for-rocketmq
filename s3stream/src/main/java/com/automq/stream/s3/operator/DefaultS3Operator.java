@@ -20,7 +20,7 @@ package com.automq.stream.s3.operator;
 import com.automq.stream.metrics.Counter;
 import com.automq.stream.metrics.Timer;
 import com.automq.stream.s3.ByteBufAlloc;
-import com.automq.stream.s3.compact.TokenBucketThrottleV2;
+import com.automq.stream.s3.compact.AsyncTokenBucketThrottle;
 import com.automq.stream.utils.ThreadUtils;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
@@ -175,12 +175,12 @@ public class DefaultS3Operator implements S3Operator {
     }
 
     @Override
-    public Writer writer(String path, String logIdent, TokenBucketThrottleV2 readThrottle) {
+    public Writer writer(String path, String logIdent, AsyncTokenBucketThrottle readThrottle) {
         return new DefaultWriter(path, logIdent, readThrottle);
     }
 
     // used for test only.
-    Writer writer(String path, String logIdent, long minPartSize, TokenBucketThrottleV2 readThrottle) {
+    Writer writer(String path, String logIdent, long minPartSize, AsyncTokenBucketThrottle readThrottle) {
         return new DefaultWriter(path, logIdent, minPartSize, readThrottle);
     }
 
@@ -269,13 +269,13 @@ public class DefaultS3Operator implements S3Operator {
         private final long minPartSize;
         private ObjectPart objectPart = null;
         private final long start = System.nanoTime();
-        private final TokenBucketThrottleV2 readThrottle;
+        private final AsyncTokenBucketThrottle readThrottle;
 
-        public DefaultWriter(String path, String logIdent, TokenBucketThrottleV2 readThrottle) {
+        public DefaultWriter(String path, String logIdent, AsyncTokenBucketThrottle readThrottle) {
             this(path, logIdent, MIN_PART_SIZE, readThrottle);
         }
 
-        DefaultWriter(String path, String logIdent, long minPartSize, TokenBucketThrottleV2 readThrottle) {
+        DefaultWriter(String path, String logIdent, long minPartSize, AsyncTokenBucketThrottle readThrottle) {
             this.path = path;
             this.logIdent = logIdent;
             this.minPartSize = minPartSize;
@@ -459,9 +459,9 @@ public class DefaultS3Operator implements S3Operator {
             private CompletableFuture<Void> lastRangeReadCf = CompletableFuture.completedFuture(null);
             private final CompletableFuture<CompletedPart> partCf = new CompletableFuture<>();
             private long size;
-            private final TokenBucketThrottleV2 readThrottle;
+            private final AsyncTokenBucketThrottle readThrottle;
 
-            public ObjectPart(TokenBucketThrottleV2 readThrottle) {
+            public ObjectPart(AsyncTokenBucketThrottle readThrottle) {
                 this.readThrottle = readThrottle;
                 parts.add(partCf);
             }

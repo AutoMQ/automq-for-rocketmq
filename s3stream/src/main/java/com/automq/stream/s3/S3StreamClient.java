@@ -21,7 +21,7 @@ import com.automq.stream.api.CreateStreamOptions;
 import com.automq.stream.api.OpenStreamOptions;
 import com.automq.stream.api.Stream;
 import com.automq.stream.api.StreamClient;
-import com.automq.stream.s3.compact.TokenBucketThrottleV2;
+import com.automq.stream.s3.compact.AsyncTokenBucketThrottle;
 import com.automq.stream.s3.objects.ObjectManager;
 import com.automq.stream.s3.operator.S3Operator;
 import com.automq.stream.s3.streams.StreamManager;
@@ -54,7 +54,7 @@ public class S3StreamClient implements StreamClient {
     private final ObjectManager objectManager;
     private final S3Operator s3Operator;
     private final Config config;
-    private final TokenBucketThrottleV2 readThrottle;
+    private final AsyncTokenBucketThrottle readThrottle;
 
     public S3StreamClient(StreamManager streamManager, Storage storage, ObjectManager objectManager, S3Operator s3Operator, Config config) {
         this.streamManager = streamManager;
@@ -63,7 +63,7 @@ public class S3StreamClient implements StreamClient {
         this.objectManager = objectManager;
         this.s3Operator = s3Operator;
         this.config = config;
-        this.readThrottle = new TokenBucketThrottleV2(config.s3StreamObjectsCompactionNWInBandwidth());
+        this.readThrottle = new AsyncTokenBucketThrottle(config.s3StreamObjectsCompactionNWInBandwidth(), 1, "s3-stream-objects-compaction");
         startStreamObjectsCompactions();
     }
 

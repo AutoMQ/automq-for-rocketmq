@@ -17,7 +17,7 @@
 
 package com.automq.stream.s3;
 
-import com.automq.stream.s3.compact.TokenBucketThrottleV2;
+import com.automq.stream.s3.compact.AsyncTokenBucketThrottle;
 import com.automq.stream.s3.objects.CommitStreamObjectRequest;
 import com.automq.stream.s3.objects.ObjectManager;
 import com.automq.stream.s3.operator.S3Operator;
@@ -61,7 +61,7 @@ public class StreamObjectsCompactionTask {
     private final S3Operator s3Operator;
     private List<CompactionResult> compactionResults;
     private final String logIdent;
-    private final TokenBucketThrottleV2 readThrottle;
+    private final AsyncTokenBucketThrottle readThrottle;
 
     /**
      * Constructor of StreamObjectsCompactionTask.
@@ -75,7 +75,7 @@ public class StreamObjectsCompactionTask {
      */
     public StreamObjectsCompactionTask(ObjectManager objectManager, S3Operator s3Operator, S3Stream stream,
                                        long compactedStreamObjectMaxSizeInBytes, long eligibleStreamObjectLivingTimeInMs,
-        TokenBucketThrottleV2 readThrottle) {
+        AsyncTokenBucketThrottle readThrottle) {
         this(objectManager, s3Operator, stream, compactedStreamObjectMaxSizeInBytes, eligibleStreamObjectLivingTimeInMs, readThrottle, false);
     }
 
@@ -93,7 +93,7 @@ public class StreamObjectsCompactionTask {
      */
     public StreamObjectsCompactionTask(ObjectManager objectManager, S3Operator s3Operator, S3Stream stream,
                                        long compactedStreamObjectMaxSizeInBytes, long eligibleStreamObjectLivingTimeInMs,
-        TokenBucketThrottleV2 readThrottle, boolean s3ObjectLogEnabled) {
+        AsyncTokenBucketThrottle readThrottle, boolean s3ObjectLogEnabled) {
         this.objectManager = objectManager;
         this.s3Operator = s3Operator;
         this.stream = stream;
@@ -560,7 +560,7 @@ public class StreamObjectsCompactionTask {
         private long compactedStreamObjectMaxSizeInBytes;
         private long eligibleStreamObjectLivingTimeInMs;
         private boolean s3ObjectLogEnabled;
-        private TokenBucketThrottleV2 readThrottle;
+        private AsyncTokenBucketThrottle readThrottle;
 
         public Builder(ObjectManager objectManager, S3Operator s3Operator) {
             this.objectManager = objectManager;
@@ -591,7 +591,7 @@ public class StreamObjectsCompactionTask {
             return this;
         }
 
-        public Builder withReadThrottle(TokenBucketThrottleV2 readThrottle) {
+        public Builder withReadThrottle(AsyncTokenBucketThrottle readThrottle) {
             this.readThrottle = readThrottle;
             return this;
         }

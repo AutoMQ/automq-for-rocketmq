@@ -17,7 +17,7 @@
 
 package com.automq.stream.s3.operator;
 
-import com.automq.stream.s3.compact.TokenBucketThrottleV2;
+import com.automq.stream.s3.compact.AsyncTokenBucketThrottle;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.UnpooledByteBufAllocator;
@@ -60,7 +60,7 @@ public interface S3Operator {
      *                     It is used to throttle reading in copy-write.
      * @return {@link Writer}
      */
-    Writer writer(String path, String logIdent, TokenBucketThrottleV2 readThrottle);
+    Writer writer(String path, String logIdent, AsyncTokenBucketThrottle readThrottle);
 
     default Writer writer(String path, String logIdent) {
         return writer(path, logIdent, null);
