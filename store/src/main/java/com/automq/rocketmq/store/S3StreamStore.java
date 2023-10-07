@@ -70,7 +70,7 @@ public class S3StreamStore implements StreamStore {
         this.objectManager = new S3ObjectManager(metadataService);
 
         this.operator = new DefaultS3Operator(s3Config.s3Endpont(), s3Config.s3Region(), s3Config.s3Bucket(),
-            s3Config.s3AccessKey(), s3Config.s3SecretKey());
+            s3Config.s3ForcePathStyle(), s3Config.s3AccessKey(), s3Config.s3SecretKey());
         this.writeAheadLog = BlockWALService.builder(s3Config.s3WALPath(), s3Config.s3WALCapacity()).config(s3Config).build();
         this.blockCache = new DefaultS3BlockCache(s3Config.s3CacheSize(), objectManager, operator);
 
@@ -155,6 +155,7 @@ public class S3StreamStore implements StreamStore {
         config.s3Endpoint(streamConfig.s3Endpoint());
         config.s3Region(streamConfig.s3Region());
         config.s3Bucket(streamConfig.s3Bucket());
+        config.s3ForcePathStyle(streamConfig.s3ForcePathStyle());
         config.s3WALPath(streamConfig.s3WALPath());
         config.s3AccessKey(streamConfig.s3AccessKey());
         config.s3SecretKey(streamConfig.s3SecretKey());

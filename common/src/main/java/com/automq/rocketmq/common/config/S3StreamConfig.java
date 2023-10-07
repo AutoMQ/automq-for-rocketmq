@@ -21,6 +21,7 @@ public class S3StreamConfig {
     private String s3Endpoint;
     private String s3Region = "cn-hangzhou";
     private String s3Bucket;
+    private boolean s3ForcePathStyle;
     private String s3WALPath = "/tmp/s3stream_wal";
     private String s3AccessKey;
     private String s3SecretKey;
@@ -35,6 +36,10 @@ public class S3StreamConfig {
 
     public String s3Bucket() {
         return s3Bucket;
+    }
+
+    public boolean s3ForcePathStyle() {
+        return s3ForcePathStyle;
     }
 
     public String s3WALPath() {
