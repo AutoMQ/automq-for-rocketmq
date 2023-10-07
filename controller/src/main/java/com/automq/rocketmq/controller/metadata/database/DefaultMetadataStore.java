@@ -48,6 +48,7 @@ import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.common.PrefixThreadFactory;
 import com.automq.rocketmq.common.StoreHandle;
 import com.automq.rocketmq.common.system.S3Constants;
+import com.automq.rocketmq.common.util.Pair;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.BrokerNode;
 import com.automq.rocketmq.controller.metadata.ControllerClient;
@@ -1803,6 +1804,53 @@ public class DefaultMetadataStore implements MetadataStore {
             break;
         }
         return future;
+    }
+
+
+    @Override
+    public CompletableFuture<Pair<List<apache.rocketmq.controller.v1.S3StreamObject>, List<apache.rocketmq.controller.v1.S3WALObject>>> listObjects(long streamId, long startOffset, long endOffset, int limit) {
+        return CompletableFuture.supplyAsync(() -> {
+            try (SqlSession session = this.sessionFactory.openSession()) {
+                S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
+                S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
+                List<apache.rocketmq.controller.v1.S3StreamObject> s3StreamObjects = s3StreamObjectMapper.list(null, streamId, startOffset, endOffset, limit).stream()
+                    .map(streamObject -> apache.rocketmq.controller.v1.S3StreamObject.newBuilder()
+                        .setStreamId(streamObject.getStreamId())
+                        .setObjectSize(streamObject.getObjectSize())
+                        .setObjectId(streamObject.getObjectId())
+                        .setStartOffset(streamObject.getStartOffset())
+                        .setEndOffset(streamObject.getEndOffset())
+                        .setBaseDataTimestamp(streamObject.getBaseDataTimestamp())
+                        .setCommittedTimestamp(streamObject.getCommittedTimestamp())
+                        .build())
+                    .toList();
+
+                List<apache.rocketmq.controller.v1.S3WALObject> walObjects = s3WALObjectMapper.list(this.lease.getNodeId(), null).stream()
+                    .map(s3WALObject -> {
+                        TypeToken<Map<Long, SubStream>> typeToken = new TypeToken<>() {
+
+                        };
+                        Map<Long, SubStream> subStreams = gson.fromJson(new String(s3WALObject.getSubStreams().getBytes(StandardCharsets.UTF_8)), typeToken.getType());
+                        Map<Long, SubStream> streamsRecords = new HashMap<>();
+                        if (!Objects.isNull(subStreams) && subStreams.containsKey(streamId)) {
+                            SubStream subStream = subStreams.get(streamId);
+                            if (subStream.getStartOffset() <= startOffset && subStream.getEndOffset() > endOffset) {
+                                streamsRecords.put(streamId, subStream);
+                            }
+                        }
+                        if (!streamsRecords.isEmpty()) {
+                            return buildS3WALObject(s3WALObject, streamsRecords);
+                        }
+                        return null;
+
+                    })
+                    .filter(Objects::nonNull)
+                    .limit(limit)
+                    .toList();
+
+                return new Pair<>(s3StreamObjects, walObjects);
+            }
+        }, asyncExecutorService);
     }
 
     @Override

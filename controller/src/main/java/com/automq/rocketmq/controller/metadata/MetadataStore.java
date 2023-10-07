@@ -27,6 +27,7 @@ import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.MessageType;
 import com.automq.rocketmq.common.StoreHandle;
+import com.automq.rocketmq.common.util.Pair;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.database.dao.Lease;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
@@ -157,4 +158,6 @@ public interface MetadataStore extends Closeable {
     CompletableFuture<Long> getConsumerOffset(long consumerGroupId, long topicId, int queueId);
 
     String addressOfNode(int nodeId);
+
+    CompletableFuture<Pair<List<S3StreamObject>, List<S3WALObject>>> listObjects(long streamId, long startOffset, long endOffset, int limit);
 }

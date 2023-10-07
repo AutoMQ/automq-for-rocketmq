@@ -211,10 +211,6 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
     @Override
     public CompletableFuture<Pair<List<S3StreamObject>, List<S3WALObject>>> listObjects(long streamId, long startOffset,
         long endOffset, int limit) {
-        CompletableFuture<List<S3StreamObject>> streamObjectsFuture = metadataStore.listStreamObjects(streamId, startOffset, endOffset, limit);
-        CompletableFuture<List<S3WALObject>> walObjectsFuture = metadataStore.listWALObjects(streamId, startOffset, endOffset, limit);
-
-        return CompletableFuture.allOf(streamObjectsFuture, walObjectsFuture)
-            .thenApplyAsync(v -> new Pair<>(streamObjectsFuture.join(), walObjectsFuture.join()));
+        return metadataStore.listObjects(streamId, startOffset, endOffset, limit);
     }
 }
