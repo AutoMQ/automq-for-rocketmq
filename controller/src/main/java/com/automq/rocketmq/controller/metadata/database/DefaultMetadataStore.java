@@ -83,13 +83,13 @@ import com.automq.rocketmq.controller.metadata.database.tasks.ScanYieldingQueueT
 import com.google.common.base.Strings;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -1608,7 +1608,7 @@ public class DefaultMetadataStore implements MetadataStore {
         CompletableFuture<List<apache.rocketmq.controller.v1.S3WALObject>> future = new CompletableFuture<>();
         try (SqlSession session = this.sessionFactory.openSession()) {
             S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
-            List<apache.rocketmq.controller.v1.S3WALObject> walObjects = s3WALObjectMapper.list(this.lease.getNodeId(), null).stream()
+            List<apache.rocketmq.controller.v1.S3WALObject> walObjects = s3WALObjectMapper.list(this.config.nodeId(), null).stream()
                 .map(s3WALObject -> {
                     Map<Long, SubStream> subStreams = gson.fromJson(new String(s3WALObject.getSubStreams().getBytes(StandardCharsets.UTF_8)), new TypeToken<Map<Long, SubStream>>() {
 
@@ -1628,7 +1628,7 @@ public class DefaultMetadataStore implements MetadataStore {
         CompletableFuture<List<apache.rocketmq.controller.v1.S3WALObject>> future = new CompletableFuture<>();
         try (SqlSession session = this.sessionFactory.openSession()) {
             S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
-            List<com.automq.rocketmq.controller.metadata.database.dao.S3WALObject> s3WALObjects = s3WALObjectMapper.list(this.lease.getNodeId(), null);
+            List<com.automq.rocketmq.controller.metadata.database.dao.S3WALObject> s3WALObjects = s3WALObjectMapper.list(this.config.nodeId(), null);
 
             List<apache.rocketmq.controller.v1.S3WALObject> walObjects = s3WALObjects.stream()
                 .map(s3WALObject -> {
@@ -1639,7 +1639,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     Map<Long, SubStream> streamsRecords = new HashMap<>();
                     if (!Objects.isNull(subStreams) && subStreams.containsKey(streamId)) {
                         SubStream subStream = subStreams.get(streamId);
-                        if (subStream.getStartOffset() <= startOffset && subStream.getEndOffset() > endOffset) {
+                        if (subStream.getStartOffset() <= endOffset && subStream.getEndOffset() > startOffset) {
                             streamsRecords.put(streamId, subStream);
                         }
                     }
@@ -1813,7 +1813,8 @@ public class DefaultMetadataStore implements MetadataStore {
             try (SqlSession session = this.sessionFactory.openSession()) {
                 S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
                 S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
-                List<apache.rocketmq.controller.v1.S3StreamObject> s3StreamObjects = s3StreamObjectMapper.list(null, streamId, startOffset, endOffset, limit).stream()
+                List<apache.rocketmq.controller.v1.S3StreamObject> s3StreamObjects = s3StreamObjectMapper.list(null, streamId, startOffset, endOffset, limit)
+                    .parallelStream()
                     .map(streamObject -> apache.rocketmq.controller.v1.S3StreamObject.newBuilder()
                         .setStreamId(streamObject.getStreamId())
                         .setObjectSize(streamObject.getObjectSize())
@@ -1825,27 +1826,21 @@ public class DefaultMetadataStore implements MetadataStore {
                         .build())
                     .toList();
 
-                List<apache.rocketmq.controller.v1.S3WALObject> walObjects = s3WALObjectMapper.list(this.lease.getNodeId(), null).stream()
+                List<apache.rocketmq.controller.v1.S3WALObject> walObjects = s3WALObjectMapper.list(config.nodeId(), null)
+                    .parallelStream()
                     .map(s3WALObject -> {
                         TypeToken<Map<Long, SubStream>> typeToken = new TypeToken<>() {
-
                         };
                         Map<Long, SubStream> subStreams = gson.fromJson(new String(s3WALObject.getSubStreams().getBytes(StandardCharsets.UTF_8)), typeToken.getType());
                         Map<Long, SubStream> streamsRecords = new HashMap<>();
-                        if (!Objects.isNull(subStreams) && subStreams.containsKey(streamId)) {
-                            SubStream subStream = subStreams.get(streamId);
-                            if (subStream.getStartOffset() <= startOffset && subStream.getEndOffset() > endOffset) {
-                                streamsRecords.put(streamId, subStream);
-                            }
-                        }
-                        if (!streamsRecords.isEmpty()) {
-                            return buildS3WALObject(s3WALObject, streamsRecords);
-                        }
-                        return null;
-
+                        subStreams.entrySet().stream()
+                            .filter(entry -> !Objects.isNull(entry) && entry.getKey().equals(streamId))
+                            .filter(entry -> entry.getValue().getStartOffset() <= endOffset && entry.getValue().getEndOffset() > startOffset)
+                            .forEach(entry -> streamsRecords.put(entry.getKey(), entry.getValue()));
+                        return streamsRecords.isEmpty() ? null : buildS3WALObject(s3WALObject, streamsRecords);
                     })
                     .filter(Objects::nonNull)
-                    .limit(limit)
+                    .limit(limit - s3StreamObjects.size())
                     .toList();
 
                 return new Pair<>(s3StreamObjects, walObjects);

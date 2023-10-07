@@ -104,10 +104,10 @@
             AND stream_id = #{streamId}
         </if>
         <if test="null != startOffset">
-            AND start_offset &lt;= #{startOffset}
+            AND start_offset &lt;= #{endOffset}
         </if>
         <if test="null != endOffset">
-            AND end_offset &gt; #{endOffset}
+            AND end_offset &gt; #{startOffset}
         </if>
         ORDER BY id
         <if test="null != limit">
