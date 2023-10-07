@@ -267,7 +267,8 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
             List<Stream> streams = streamMapper.list(topicId, null, null);
-            Assertions.assertEquals(queueNum * 2, streams.size());
+            // By default, we create 3 streams for each message queue: data, ops, snapshot
+            Assertions.assertEquals(queueNum * 3, streams.size());
         }
     }
 
@@ -319,7 +320,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
             topicId = metadataStore.createTopic(topicName, queueNum, messageTypes).get();
 
-            metadataStore.updateTopic(topicId, topicName, updateMessageTypes).get();
+            metadataStore.updateTopic(topicId, topicName, null, updateMessageTypes).get();
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -335,7 +336,8 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
             List<Stream> streams = streamMapper.list(topicId, null, null);
-            Assertions.assertEquals(queueNum * 2, streams.size());
+            // By default, we create 3 streams for each message queue: data, ops, snapshot
+            Assertions.assertEquals(queueNum * 3, streams.size());
         }
     }
 
