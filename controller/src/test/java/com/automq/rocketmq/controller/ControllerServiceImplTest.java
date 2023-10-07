@@ -1501,7 +1501,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 testServer.start();
                 int port = testServer.getPort();
 
-                List<apache.rocketmq.controller.v1.S3StreamObject> s3StreamObjects = metadataStore.listStreamObjects(streamId, 222, 111, 2).get();
+                List<apache.rocketmq.controller.v1.S3StreamObject> s3StreamObjects = metadataStore.listStreamObjects(streamId, 111, 334, 2).get();
 
                 CommitWALObjectRequest request = CommitWALObjectRequest.newBuilder()
                     .setS3WalObject(walObject)
