@@ -78,10 +78,8 @@ public class TopicQueueTest {
         stateMachine = new DefaultMessageStateMachine(TOPIC_ID, QUEUE_ID, kvService);
         inflightService = new InflightService();
         SnapshotService snapshotService = new SnapshotService(streamStore, kvService);
-        topicQueue = new StreamTopicQueue(new StoreConfig(), TOPIC_ID, QUEUE_ID, EPOCH,
-            DATA_STREAM_ID, OP_STREAM_ID, SNAPSHOT_STREAM_ID,
-            metadataService, stateMachine,
-            streamStore, inflightService, snapshotService);
+        topicQueue = new StreamTopicQueue(new StoreConfig(), TOPIC_ID, QUEUE_ID,
+            metadataService, stateMachine, streamStore, inflightService, snapshotService);
         topicQueue.open().join();
     }
 

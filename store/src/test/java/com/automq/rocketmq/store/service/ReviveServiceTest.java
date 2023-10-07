@@ -36,6 +36,7 @@ import com.automq.rocketmq.store.model.message.PopResult;
 import com.automq.rocketmq.store.model.message.PullResult;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.util.SerializeUtil;
+import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -78,12 +79,10 @@ class ReviveServiceTest {
         stateMachine = new DefaultMessageStateMachine(TOPIC_ID, QUEUE_ID, kvService);
         inflightService = new InflightService();
         SnapshotService snapshotService = new SnapshotService(streamStore, kvService);
-        topicQueue = new StreamTopicQueue(new StoreConfig(), TOPIC_ID, QUEUE_ID, EPOCH,
-            DATA_STREAM_ID, OP_STREAM_ID, SNAPSHOT_STREAM_ID,
-            metadataService, stateMachine,
-            streamStore, inflightService, snapshotService);
+        topicQueue = new StreamTopicQueue(new StoreConfig(), TOPIC_ID, QUEUE_ID,
+            metadataService, stateMachine, streamStore, inflightService, snapshotService);
         TopicQueueManager manager = Mockito.mock(TopicQueueManager.class);
-        Mockito.when(manager.get(TOPIC_ID, QUEUE_ID)).thenReturn(topicQueue);
+        Mockito.when(manager.getOrCreate(TOPIC_ID, QUEUE_ID)).thenReturn(CompletableFuture.completedFuture(topicQueue));
         reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, KV_NAMESPACE_TIMER_TAG, kvService, metadataService, inflightService, manager);
         topicQueue.open().join();
     }

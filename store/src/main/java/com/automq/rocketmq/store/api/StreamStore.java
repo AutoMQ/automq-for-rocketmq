@@ -29,6 +29,16 @@ import java.util.concurrent.CompletableFuture;
  */
 public interface StreamStore extends Lifecycle {
     /**
+     * Open the specified stream if not opened yet.
+     * The stream should be opened before any operation.
+     *
+     * @param streamId stream id.
+     * @param epoch    epoch of the stream.
+     * @return the opened stream.
+     */
+    CompletableFuture<Void> open(long streamId, long epoch);
+
+    /**
      * Fetch records from stream store.
      *
      * @param streamId    the target stream id.
@@ -54,8 +64,6 @@ public interface StreamStore extends Lifecycle {
      * @return the future of close result.
      */
     CompletableFuture<Void> close(List<Long> streamIds);
-
-    CompletableFuture<Void> open(long streamId);
 
     CompletableFuture<Void> trim(long streamId, long newStartOffset);
 
