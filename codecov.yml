@@ -61,3 +61,11 @@ component_management:
       name: "RocketMQ Store"
       paths:
         - "store/"
+    - component_id: "stream"
+      name: "RocketMQ Stream"
+      paths:
+        - "s3stream/"
+    - component_id: "metadata"
+      name: "RocketMQ Metadata"
+      paths:
+        - "metadata/"
