@@ -20,7 +20,7 @@ package com.automq.rocketmq.store.model.metadata;
 import java.util.Objects;
 
 public class ConsumerGroupMetadata {
-    private long consumerGroupId;
+    private final long consumerGroupId;
     private long consumeOffset;
     private long ackOffset;
     private long retryConsumeOffset;
