@@ -23,7 +23,4 @@ import java.util.concurrent.CompletableFuture;
 
 public interface TopicQueueManager extends Lifecycle, StoreHandle {
     CompletableFuture<TopicQueue> getOrCreate(long topicId, int queueId);
-
-    CompletableFuture<Void> close(long topicId, int queueId);
-
 }

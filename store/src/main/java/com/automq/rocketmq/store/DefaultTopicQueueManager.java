@@ -117,17 +117,6 @@ public class DefaultTopicQueueManager implements TopicQueueManager {
             .thenApply(nil -> topicQueue);
     }
 
-    @Override
-    public CompletableFuture<Void> onTopicQueueClose(long topicId, int queueId, long epoch) {
-        TopicQueueId id = new TopicQueueId(topicId, queueId);
-        CompletableFuture<TopicQueue> createTopicQueueFuture = topicQueueMap.remove(id);
-        if (createTopicQueueFuture == null) {
-            return CompletableFuture.completedFuture(null);
-        }
-
-        return createTopicQueueFuture.thenCompose(TopicQueue::close);
-    }
-
     static class TopicQueueId {
         private final long topicId;
         private final int queueId;

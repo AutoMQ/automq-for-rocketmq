@@ -40,8 +40,7 @@ public interface MessageStore extends Lifecycle {
      * @return pop result, see {@link PopResult}
      */
     CompletableFuture<PopResult> pop(long consumerGroupId, long topicId, int queueId, Filter filter,
-        int batchSize,
-        boolean fifo, boolean retry, long invisibleDuration);
+        int batchSize, boolean fifo, boolean retry, long invisibleDuration);
 
 
     /**

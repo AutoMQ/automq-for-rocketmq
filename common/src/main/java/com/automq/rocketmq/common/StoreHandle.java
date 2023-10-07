@@ -20,5 +20,5 @@ package com.automq.rocketmq.common;
 import java.util.concurrent.CompletableFuture;
 
 public interface StoreHandle {
-    CompletableFuture<Void> onTopicQueueClose(long topicId, int queueId, long epoch);
+    CompletableFuture<Void> close(long topicId, int queueId);
 }

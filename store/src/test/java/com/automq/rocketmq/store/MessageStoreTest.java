@@ -324,7 +324,7 @@ public class MessageStoreTest {
         assertEquals(0, streamStore.startOffset(snapshotStream.getStreamId()));
         assertEquals(1, streamStore.nextOffset(snapshotStream.getStreamId()));
         // 7. close and reopen
-        topicQueueManager.onTopicQueueClose(TOPIC_ID, QUEUE_ID, 0).join();
+        topicQueueManager.close(TOPIC_ID, QUEUE_ID).join();
 
         // check if all tq related data is cleared
         byte[] tqPrefix = ByteBuffer.allocate(12)
