@@ -112,4 +112,6 @@ public interface MetadataStore extends Closeable {
     CompletableFuture<List<S3StreamObject>> listStreamObjects(long streamId, long startOffset, long endOffset, int limit);
 
     CompletableFuture<Long> getOrCreateRetryStream(String groupName, long topicId, int queueId) throws ControllerException;
+
+    CompletableFuture<Long> getConsumerOffset(long consumerGroupId, long topicId, int queueId);
 }

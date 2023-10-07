@@ -402,7 +402,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testReassign() throws IOException, ControllerException, ExecutionException, InterruptedException {
+    public void testReassign() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
         ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
         Mockito.when(controllerConfig.nodeId()).thenReturn(1);
@@ -451,7 +451,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testCreateRetryStream() throws IOException, ControllerException, ExecutionException, InterruptedException {
+    public void testCreateRetryStream() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
         ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
         Mockito.when(controllerConfig.nodeId()).thenReturn(1);

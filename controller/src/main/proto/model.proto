@@ -124,6 +124,7 @@ enum StreamRole {
   STREAM_ROLE_DATA = 1;
   STREAM_ROLE_OPS = 2;
   STREAM_ROLE_RETRY = 3;
+  STREAM_ROLE_SNAPSHOT = 4;
 }
 
 enum StreamState {
