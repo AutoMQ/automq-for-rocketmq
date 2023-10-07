@@ -162,7 +162,7 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
 
     @Override
     public CompletableFuture<List<StreamMetadata>> listOpenStreams() {
-        return metadataStore.listOpenStreams(node.getId(), node.getEpoch());
+        return metadataStore.listOpenStreams(node.getId());
     }
 
     @Override

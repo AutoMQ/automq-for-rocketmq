@@ -107,7 +107,7 @@ public interface MetadataStore extends Closeable {
 
     CompletableFuture<Void> closeStream(long streamId, long streamEpoch);
 
-    CompletableFuture<List<StreamMetadata>> listOpenStreams(int nodeId, long epoch);
+    CompletableFuture<List<StreamMetadata>> listOpenStreams(int nodeId);
 
     CompletableFuture<Long> prepareS3Objects(int count, int ttlInMinutes);
 

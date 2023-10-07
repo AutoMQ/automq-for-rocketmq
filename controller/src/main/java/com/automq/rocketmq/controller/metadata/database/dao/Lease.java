@@ -21,6 +21,9 @@ import java.util.Date;
 
 public class Lease {
     private int nodeId;
+    /**
+     * identify the number of leader changes times
+     */
     private int epoch;
     private Date expirationTime;
 

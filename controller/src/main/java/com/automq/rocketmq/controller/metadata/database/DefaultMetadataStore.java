@@ -187,6 +187,7 @@ public class DefaultMetadataStore implements MetadataStore {
                             // Redirect register node to the new leader in the next iteration.
                             continue;
                         }
+                        // epoch of node default to 1 when created
                         node = new Node();
                         node.setName(name);
                         node.setAddress(address);
@@ -354,6 +355,7 @@ public class DefaultMetadataStore implements MetadataStore {
 
     private long createStream(StreamMapper streamMapper, long topicId, int queueId, Long groupId,
         StreamRole role, int nodeId) {
+        // epoch and rangeId default to -1
         Stream dataStream = new Stream();
         dataStream.setState(StreamState.UNINITIALIZED);
         dataStream.setTopicId(topicId);
@@ -1058,7 +1060,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     }
                     StreamMapper streamMapper = session.getMapper(StreamMapper.class);
                     RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
-
+                    long nxtStreamEpoch = streamEpoch + 1;
                     // verify epoch match
                     Stream stream = streamMapper.getByStreamId(streamId);
                     if (null == stream) {
@@ -1077,7 +1079,7 @@ public class DefaultMetadataStore implements MetadataStore {
                         return future;
                     }
 
-                    if (stream.getEpoch() == streamEpoch) {
+                    if (stream.getEpoch() == nxtStreamEpoch) {
                         // broker may use the same epoch to open -> close -> open stream.
                         // verify broker
                         Range range = rangeMapper.get(stream.getRangeId(), streamId, null);
@@ -1107,9 +1109,10 @@ public class DefaultMetadataStore implements MetadataStore {
                                 StreamState.OPEN);
                             StreamMetadata metadata = StreamMetadata.newBuilder()
                                 .setStreamId(streamId)
-                                .setEpoch(streamEpoch)
+                                .setEpoch(stream.getEpoch())
                                 .setRangeId(stream.getRangeId())
                                 .setStartOffset(stream.getStartOffset())
+                                .setEndOffset(range.getEndOffset())
                                 .setState(StreamState.OPEN)
                                 .build();
                             future.complete(metadata);
@@ -1117,14 +1120,17 @@ public class DefaultMetadataStore implements MetadataStore {
                         }
                     }
 
+                    int rangeId = stream.getRangeId() + 1;
+                    Range prevRange = rangeMapper.get(rangeId - 1, streamId, null);
                     // Make open reentrant
                     if (stream.getState() == StreamState.OPEN) {
                         LOGGER.warn("Stream[stream-id={}] is already OPEN with epoch={}", streamId, stream.getEpoch());
                         StreamMetadata metadata = StreamMetadata.newBuilder()
                             .setStreamId(streamId)
-                            .setEpoch(streamEpoch)
+                            .setEpoch(nxtStreamEpoch)
                             .setRangeId(stream.getRangeId())
                             .setStartOffset(stream.getStartOffset())
+                            .setEndOffset(prevRange.getEndOffset())
                             .setState(StreamState.OPEN)
                             .build();
                         future.complete(metadata);
@@ -1132,9 +1138,8 @@ public class DefaultMetadataStore implements MetadataStore {
                     }
 
                     // now the request in valid, update the stream's epoch and create a new range for this broker
-                    int rangeId = stream.getRangeId() + 1;
                     // stream update record
-                    stream.setEpoch(streamEpoch);
+                    stream.setEpoch(nxtStreamEpoch);
                     stream.setRangeId(rangeId);
                     stream.setStartOffset(stream.getStartOffset());
                     stream.setState(StreamState.OPEN);
@@ -1143,16 +1148,15 @@ public class DefaultMetadataStore implements MetadataStore {
                     // default regard this range is the first range in stream, use 0 as start offset
                     long startOffset = 0;
                     if (rangeId > 0) {
-                        Range prevRange = rangeMapper.get(rangeId - 1, streamId, null);
                         startOffset = prevRange.getEndOffset();
                     }
                     // range create record
                     Range range = new Range();
                     range.setStreamId(streamId);
-                    range.setBrokerId(this.lease.getNodeId());
+                    range.setBrokerId(stream.getDstNodeId());
                     range.setStartOffset(startOffset);
                     range.setEndOffset(startOffset);
-                    range.setEpoch(streamEpoch);
+                    range.setEpoch(nxtStreamEpoch);
                     range.setRangeId(rangeId);
                     rangeMapper.create(range);
                     LOGGER.info("Node[node-id={}] opens stream [stream-id={}] with epoch={}",
@@ -1163,9 +1167,10 @@ public class DefaultMetadataStore implements MetadataStore {
 
                     StreamMetadata metadata = StreamMetadata.newBuilder()
                         .setStreamId(streamId)
-                        .setEpoch(streamEpoch)
+                        .setEpoch(nxtStreamEpoch)
                         .setRangeId(rangeId)
                         .setStartOffset(stream.getStartOffset())
+                        .setEndOffset(range.getEndOffset())
                         .setState(StreamState.OPEN)
                         .build();
                     future.complete(metadata);
@@ -1248,7 +1253,7 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public CompletableFuture<List<StreamMetadata>> listOpenStreams(int nodeId, long epoch) {
+    public CompletableFuture<List<StreamMetadata>> listOpenStreams(int nodeId) {
         CompletableFuture<List<StreamMetadata>> future = new CompletableFuture<>();
         for (; ; ) {
             if (isLeader()) {
@@ -1260,7 +1265,6 @@ public class DefaultMetadataStore implements MetadataStore {
                     RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
                     List<StreamMetadata> streams = streamMapper.listByNode(nodeId, StreamState.OPEN)
                         .stream()
-                        .filter(stream -> stream.getEpoch() <= epoch)
                         .map(stream -> {
                             int rangeId = stream.getRangeId();
                             Range range = rangeMapper.get(rangeId, stream.getId(), null);
@@ -1280,7 +1284,6 @@ public class DefaultMetadataStore implements MetadataStore {
             } else {
                 ListOpenStreamsRequest request = ListOpenStreamsRequest.newBuilder()
                     .setBrokerId(nodeId)
-                    .setBrokerEpoch(epoch)
                     .build();
                 try {
                     return controllerClient.listOpenStreams(leaderAddress(), request)
