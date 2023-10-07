@@ -1060,7 +1060,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     }
                     StreamMapper streamMapper = session.getMapper(StreamMapper.class);
                     RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
-                    long nxtStreamEpoch = streamEpoch + 1;
+                    long nextStreamEpoch = streamEpoch + 1;
                     // verify epoch match
                     Stream stream = streamMapper.getByStreamId(streamId);
                     if (null == stream) {
@@ -1079,7 +1079,7 @@ public class DefaultMetadataStore implements MetadataStore {
                         return future;
                     }
 
-                    if (stream.getEpoch() == nxtStreamEpoch) {
+                    if (stream.getEpoch() == nextStreamEpoch) {
                         // broker may use the same epoch to open -> close -> open stream.
                         // verify broker
                         Range range = rangeMapper.get(stream.getRangeId(), streamId, null);
@@ -1127,7 +1127,7 @@ public class DefaultMetadataStore implements MetadataStore {
                         LOGGER.warn("Stream[stream-id={}] is already OPEN with epoch={}", streamId, stream.getEpoch());
                         StreamMetadata metadata = StreamMetadata.newBuilder()
                             .setStreamId(streamId)
-                            .setEpoch(nxtStreamEpoch)
+                            .setEpoch(nextStreamEpoch)
                             .setRangeId(stream.getRangeId())
                             .setStartOffset(stream.getStartOffset())
                             .setEndOffset(prevRange.getEndOffset())
@@ -1136,27 +1136,27 @@ public class DefaultMetadataStore implements MetadataStore {
                         future.complete(metadata);
                         return future;
                     }
-
                     // now the request in valid, update the stream's epoch and create a new range for this broker
+
+                    // get new range's start offset
+                    // default regard this range is the first range in stream, use 0 as start offset
+                    // if stream is not uninitialized, use previous range's end offset as start offset
+                    long startOffset = stream.getState() == StreamState.UNINITIALIZED ? 0 : prevRange.getEndOffset();
+
                     // stream update record
-                    stream.setEpoch(nxtStreamEpoch);
+                    stream.setEpoch(nextStreamEpoch);
                     stream.setRangeId(rangeId);
                     stream.setStartOffset(stream.getStartOffset());
                     stream.setState(StreamState.OPEN);
                     streamMapper.update(stream);
-                    // get new range's start offset
-                    // default regard this range is the first range in stream, use 0 as start offset
-                    long startOffset = 0;
-                    if (rangeId > 0) {
-                        startOffset = prevRange.getEndOffset();
-                    }
+
                     // range create record
                     Range range = new Range();
                     range.setStreamId(streamId);
                     range.setBrokerId(stream.getDstNodeId());
                     range.setStartOffset(startOffset);
                     range.setEndOffset(startOffset);
-                    range.setEpoch(nxtStreamEpoch);
+                    range.setEpoch(nextStreamEpoch);
                     range.setRangeId(rangeId);
                     rangeMapper.create(range);
                     LOGGER.info("Node[node-id={}] opens stream [stream-id={}] with epoch={}",
@@ -1167,7 +1167,7 @@ public class DefaultMetadataStore implements MetadataStore {
 
                     StreamMetadata metadata = StreamMetadata.newBuilder()
                         .setStreamId(streamId)
-                        .setEpoch(nxtStreamEpoch)
+                        .setEpoch(nextStreamEpoch)
                         .setRangeId(rangeId)
                         .setStartOffset(stream.getStartOffset())
                         .setEndOffset(range.getEndOffset())

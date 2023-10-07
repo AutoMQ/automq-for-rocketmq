@@ -733,6 +733,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Assertions.assertNotNull(metadata);
             Assertions.assertEquals(streamId, metadata.getStreamId());
             Assertions.assertEquals(0, metadata.getStartOffset());
+            Assertions.assertEquals(0, metadata.getEndOffset());
             Assertions.assertEquals(targetStreamEpoch, metadata.getEpoch());
             Assertions.assertEquals(0, metadata.getRangeId());
             Assertions.assertEquals(StreamState.OPEN, metadata.getState());
@@ -812,6 +813,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Assertions.assertEquals(1234, metadata.getStartOffset());
             Assertions.assertEquals(targetStreamEpoch, metadata.getEpoch());
             Assertions.assertEquals(1, metadata.getRangeId());
+            Assertions.assertEquals(2345, metadata.getEndOffset());
             Assertions.assertEquals(StreamState.OPEN, metadata.getState());
 
             metadataStore.closeStream(metadata.getStreamId(), metadata.getEpoch());
