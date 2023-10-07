@@ -73,7 +73,6 @@ public class MessageStoreTest {
         topicQueueManager = new DefaultTopicQueueManager(config, metadataService, streamStore, inflightService, snapshotService, kvService);
         messageStore = new MessageStoreImpl(config, streamStore, metadataService, kvService, inflightService, snapshotService, topicQueueManager);
         messageStore.start();
-        topicQueueManager.onTopicQueueOpen(TOPIC_ID, QUEUE_ID, 0).join();
     }
 
     @AfterEach
@@ -268,7 +267,7 @@ public class MessageStoreTest {
         assertEquals(4, popResult.messageList().get(2).originalOffset());
         assertEquals(2, popResult.messageList().get(2).deliveryAttempts());
 
-        TopicQueue topicQueue = topicQueueManager.get(TOPIC_ID, QUEUE_ID);
+        TopicQueue topicQueue = topicQueueManager.getOrCreate(TOPIC_ID, QUEUE_ID).join();
 
         assertEquals(5, topicQueue.getConsumeOffset(CONSUMER_GROUP_ID).join());
         assertEquals(5, topicQueue.getAckOffset(CONSUMER_GROUP_ID).join());
@@ -325,23 +324,21 @@ public class MessageStoreTest {
         assertEquals(0, streamStore.startOffset(snapshotStream.getStreamId()));
         assertEquals(1, streamStore.nextOffset(snapshotStream.getStreamId()));
         // 7. close and reopen
-        topicQueueManager.onTopicQueueClose(TOPIC_ID, QUEUE_ID, 0).join();
+        topicQueueManager.close(TOPIC_ID, QUEUE_ID).join();
 
         // check if all tq related data is cleared
         byte[] tqPrefix = ByteBuffer.allocate(12)
             .putLong(TOPIC_ID)
             .putInt(QUEUE_ID)
             .array();
-        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, tqPrefix, null, null, (key, value) -> {
-            Assertions.fail();
-        });
-        topicQueueManager.onTopicQueueOpen(TOPIC_ID, QUEUE_ID, 1).join();
+        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, tqPrefix, null, null,
+            (key, value) -> Assertions.fail("check point should be cleared"));
 
         // check if all ck have been recovered
+        topicQueueManager.getOrCreate(TOPIC_ID, QUEUE_ID).join();
         AtomicInteger ckNum = new AtomicInteger();
-        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, tqPrefix, null, null, (key, value) -> {
-            ckNum.getAndIncrement();
-        });
+        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, tqPrefix, null, null,
+            (key, value) -> ckNum.getAndIncrement());
         assertEquals(3, ckNum.get());
 
         // 8. after 1100ms, pop again
@@ -361,7 +358,7 @@ public class MessageStoreTest {
         assertEquals(4, popResult.messageList().get(2).originalOffset());
         assertEquals(2, popResult.messageList().get(2).deliveryAttempts());
 
-        TopicQueue topicQueue = topicQueueManager.get(TOPIC_ID, QUEUE_ID);
+        TopicQueue topicQueue = topicQueueManager.getOrCreate(TOPIC_ID, QUEUE_ID).join();
 
         assertEquals(5, topicQueue.getConsumeOffset(CONSUMER_GROUP_ID).join());
         assertEquals(5, topicQueue.getAckOffset(CONSUMER_GROUP_ID).join());

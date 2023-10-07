@@ -115,7 +115,8 @@ public class ReviveService implements Runnable, Lifecycle {
                 }
                 CheckPoint checkPoint = SerializeUtil.decodeCheckPoint(ByteBuffer.wrap(ckValue));
                 PopOperation.PopOperationType operationType = PopOperation.PopOperationType.valueOf(checkPoint.popOperationType());
-                TopicQueue topicQueue = topicQueueManager.get(topicId, queueId);
+                TopicQueue topicQueue = topicQueueManager.getOrCreate(topicId, queueId).join();
+
                 // TODO: async
                 PullResult pullResult;
                 if (operationType == PopOperation.PopOperationType.POP_RETRY) {

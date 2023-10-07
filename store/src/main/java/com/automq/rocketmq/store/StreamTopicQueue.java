@@ -62,15 +62,13 @@ public class StreamTopicQueue extends TopicQueue {
 
     private final MessageStateMachine stateMachine;
 
-    private final long dataStreamId;
+    private long dataStreamId;
 
-    private final long operationStreamId;
+    private long operationStreamId;
 
-    private final long snapshotStreamId;
+    private long snapshotStreamId;
 
-    private final long epoch;
-
-    private Map<Long/*consumerGroupId*/, Long/*retryStreamId*/> retryStreamIds;
+    private final Map<Long/*consumerGroupId*/, Long/*retryStreamId*/> retryStreamIdMap;
 
     private final StreamStore streamStore;
     private final StoreConfig config;
@@ -80,9 +78,7 @@ public class StreamTopicQueue extends TopicQueue {
 
     private final AtomicReference<State> state;
 
-    public StreamTopicQueue(StoreConfig config,
-        long topicId, int queueId,
-        long epoch, long dataStreamId, long operationStreamId, long snapshotStreamId,
+    public StreamTopicQueue(StoreConfig config, long topicId, int queueId,
         StoreMetadataService metadataService, MessageStateMachine stateMachine, StreamStore streamStore,
         InflightService inflightService, SnapshotService snapshotService) {
         super(topicId, queueId);
@@ -90,25 +86,37 @@ public class StreamTopicQueue extends TopicQueue {
         this.metadataService = metadataService;
         this.stateMachine = stateMachine;
         this.streamStore = streamStore;
-        this.retryStreamIds = new ConcurrentHashMap<>();
+        this.retryStreamIdMap = new ConcurrentHashMap<>();
         this.inflightService = inflightService;
         this.snapshotService = snapshotService;
         this.state = new AtomicReference<>(State.INIT);
-        this.dataStreamId = dataStreamId;
-        this.operationStreamId = operationStreamId;
-        this.snapshotStreamId = snapshotStreamId;
-        this.epoch = epoch;
     }
 
     @Override
     public CompletableFuture<Void> open() {
         if (state.compareAndSet(State.INIT, State.OPENING)) {
             // open all streams and load snapshot
+            CompletableFuture<Void> openDataStreamFuture = metadataService.dataStreamOf(topicId, queueId)
+                .thenCompose(metadata -> {
+                    this.dataStreamId = metadata.getStreamId();
+                    return streamStore.open(metadata.getStreamId(), metadata.getEpoch());
+                });
+            CompletableFuture<Void> openOperationStreamFuture = metadataService.operationStreamOf(topicId, queueId)
+                .thenCompose(metadata -> {
+                    this.operationStreamId = metadata.getStreamId();
+                    return streamStore.open(metadata.getStreamId(), metadata.getEpoch());
+                });
+            CompletableFuture<Void> openSnapshotStreamFuture = metadataService.snapshotStreamOf(topicId, queueId)
+                .thenCompose(metadata -> {
+                    this.snapshotStreamId = metadata.getStreamId();
+                    return streamStore.open(metadata.getStreamId(), metadata.getEpoch());
+                });
+
             // TODO: when we open retry-streams?
             return CompletableFuture.allOf(
-                streamStore.open(dataStreamId),
-                streamStore.open(operationStreamId),
-                streamStore.open(snapshotStreamId)
+                openDataStreamFuture,
+                openOperationStreamFuture,
+                openSnapshotStreamFuture
             ).thenCompose(nil -> {
                 // recover from operation log
                 this.operationLogService = new StreamOperationLogService(
@@ -122,9 +130,7 @@ public class StreamTopicQueue extends TopicQueue {
                     this.snapshotService,
                     this.config
                 );
-                return recover().thenAccept(v -> {
-                    state.set(State.OPENED);
-                });
+                return recover().thenAccept(v -> state.set(State.OPENED));
             });
         }
         return CompletableFuture.completedFuture(null);
@@ -159,21 +165,22 @@ public class StreamTopicQueue extends TopicQueue {
             return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.TOPIC_QUEUE_NOT_OPENED, "Topic queue not opened"));
         }
         CompletableFuture<Long> retryStreamIdCf = retryStreamId(consumerGroupId);
-        return retryStreamIdCf.thenCompose(streamId -> {
-            return streamStore.append(streamId, new SingleRecord(flatMessage.getByteBuffer()))
-                .thenApply(appendResult -> new PutResult(PutResult.Status.PUT_OK, appendResult.baseOffset()));
-        });
+        return retryStreamIdCf.thenCompose(streamId ->
+            streamStore.append(streamId, new SingleRecord(flatMessage.getByteBuffer()))
+                .thenApply(appendResult -> new PutResult(PutResult.Status.PUT_OK, appendResult.baseOffset())));
     }
 
     private CompletableFuture<Long> retryStreamId(long consumerGroupId) {
-        if (!retryStreamIds.containsKey(consumerGroupId)) {
-            return metadataService.retryStreamOf(consumerGroupId, topicId, queueId).thenCompose(streamMetadata -> {
-                long retryStreamId = streamMetadata.getStreamId();
-                retryStreamIds.put(consumerGroupId, retryStreamId);
-                return streamStore.open(retryStreamId).thenApply(nil -> retryStreamId);
-            });
+        if (!retryStreamIdMap.containsKey(consumerGroupId)) {
+            return metadataService.retryStreamOf(consumerGroupId, topicId, queueId)
+                .thenCompose(streamMetadata -> {
+                    long retryStreamId = streamMetadata.getStreamId();
+                    retryStreamIdMap.put(consumerGroupId, retryStreamId);
+                    return streamStore.open(retryStreamId, streamMetadata.getEpoch())
+                        .thenApply(nil -> retryStreamId);
+                });
         } else {
-            return CompletableFuture.completedFuture(retryStreamIds.get(consumerGroupId));
+            return CompletableFuture.completedFuture(retryStreamIdMap.get(consumerGroupId));
         }
     }
 
@@ -259,15 +266,15 @@ public class StreamTopicQueue extends TopicQueue {
             return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.TOPIC_QUEUE_NOT_OPENED, "Topic queue not opened"));
         }
         // start from ack offset
-        return stateMachine.ackOffset(consumerGroup).thenCompose(offset -> {
-            return stateMachine.isLocked(consumerGroup, offset).thenCompose(isLocked -> {
-                if (isLocked) {
-                    return CompletableFuture.completedFuture(new PopResult(PopResult.Status.LOCKED, 0, Collections.emptyList()));
-                } else {
-                    return pop(consumerGroup, dataStreamId, offset, PopOperation.PopOperationType.POP_ORDER, filter, batchSize, invisibleDuration);
-                }
-            });
-        });
+        return stateMachine.ackOffset(consumerGroup).thenCompose(offset ->
+            stateMachine.isLocked(consumerGroup, offset)
+                .thenCompose(isLocked -> {
+                    if (isLocked) {
+                        return CompletableFuture.completedFuture(new PopResult(PopResult.Status.LOCKED, 0, Collections.emptyList()));
+                    } else {
+                        return pop(consumerGroup, dataStreamId, offset, PopOperation.PopOperationType.POP_ORDER, filter, batchSize, invisibleDuration);
+                    }
+                }));
     }
 
     @Override
@@ -383,9 +390,7 @@ public class StreamTopicQueue extends TopicQueue {
         return operationLogService.logAckOperation(operation).thenApply(nil -> {
             inflightService.decreaseInflightCount(handle.consumerGroupId(), handle.topicId(), handle.queueId(), 1);
             return new AckResult(AckResult.Status.SUCCESS);
-        }).exceptionally(throwable -> {
-            return new AckResult(AckResult.Status.ERROR);
-        });
+        }).exceptionally(throwable -> new AckResult(AckResult.Status.ERROR));
     }
 
     @Override
@@ -399,9 +404,7 @@ public class StreamTopicQueue extends TopicQueue {
         return operationLogService.logAckOperation(operation).thenApply(nil -> {
             inflightService.decreaseInflightCount(handle.consumerGroupId(), handle.topicId(), handle.queueId(), 1);
             return new AckResult(AckResult.Status.SUCCESS);
-        }).exceptionally(throwable -> {
-            return new AckResult(AckResult.Status.ERROR);
-        });
+        }).exceptionally(throwable -> new AckResult(AckResult.Status.ERROR));
     }
 
     @Override
@@ -412,11 +415,9 @@ public class StreamTopicQueue extends TopicQueue {
         }
         ReceiptHandle handle = decodeReceiptHandle(receiptHandle);
         ChangeInvisibleDurationOperation operation = new ChangeInvisibleDurationOperation(handle.consumerGroupId(), handle.topicId(), handle.queueId(), handle.operationId(), System.nanoTime(), invisibleDuration);
-        return operationLogService.logChangeInvisibleDurationOperation(operation).thenApply(nil -> {
-            return new ChangeInvisibleDurationResult(ChangeInvisibleDurationResult.Status.SUCCESS);
-        }).exceptionally(throwable -> {
-            return new ChangeInvisibleDurationResult(ChangeInvisibleDurationResult.Status.ERROR);
-        });
+        return operationLogService.logChangeInvisibleDurationOperation(operation).thenApply(nil ->
+                new ChangeInvisibleDurationResult(ChangeInvisibleDurationResult.Status.SUCCESS))
+            .exceptionally(throwable -> new ChangeInvisibleDurationResult(ChangeInvisibleDurationResult.Status.ERROR));
     }
 
     @Override
@@ -462,9 +463,7 @@ public class StreamTopicQueue extends TopicQueue {
                 status = PullResult.Status.FOUND;
             }
             return new PullResult(status, filterFetchResult.endOffset, filterFetchResult.startOffset, filterFetchResult.endOffset - 1, messageExtList);
-        }).exceptionally(throwable -> {
-            return new PullResult(PullResult.Status.OFFSET_ILLEGAL, -1, -1, -1, Collections.emptyList());
-        });
+        }).exceptionally(throwable -> new PullResult(PullResult.Status.OFFSET_ILLEGAL, -1, -1, -1, Collections.emptyList()));
 
     }
 
@@ -475,9 +474,7 @@ public class StreamTopicQueue extends TopicQueue {
             return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.TOPIC_QUEUE_NOT_OPENED, "Topic queue not opened"));
         }
         CompletableFuture<Long> retryStreamIdCf = retryStreamId(consumerGroupId);
-        return retryStreamIdCf.thenCompose(streamId -> {
-            return pull(streamId, consumerGroupId, filter, startOffset, batchSize);
-        });
+        return retryStreamIdCf.thenCompose(streamId -> pull(streamId, consumerGroupId, filter, startOffset, batchSize));
     }
 
     @Override

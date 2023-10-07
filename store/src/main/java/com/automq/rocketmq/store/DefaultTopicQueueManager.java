@@ -17,7 +17,6 @@
 
 package com.automq.rocketmq.store;
 
-import apache.rocketmq.controller.v1.StreamMetadata;
 import com.automq.rocketmq.common.config.StoreConfig;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.store.api.MessageStateMachine;
@@ -40,7 +39,7 @@ public class DefaultTopicQueueManager implements TopicQueueManager {
     private final InflightService inflightService;
     private final SnapshotService snapshotService;
     private final KVService kvService;
-    private final Map<TopicQueueId, TopicQueue> topicQueueMap;
+    private final Map<TopicQueueId, CompletableFuture<TopicQueue>> topicQueueMap;
 
     public DefaultTopicQueueManager(StoreConfig storeConfig, StoreMetadataService metadataService,
         StreamStore streamStore, InflightService inflightService, SnapshotService snapshotService,
@@ -65,47 +64,57 @@ public class DefaultTopicQueueManager implements TopicQueueManager {
     }
 
     @Override
-    public TopicQueue get(long topicId, int queueId) {
-        return topicQueueMap.get(new TopicQueueId(topicId, queueId));
+    public CompletableFuture<TopicQueue> getOrCreate(long topicId, int queueId) {
+        TopicQueueId key = new TopicQueueId(topicId, queueId);
+        CompletableFuture<TopicQueue> future = topicQueueMap.get(key);
+
+        if (future != null) {
+            return future;
+        }
+
+        // Prevent concurrent create.
+        synchronized (this) {
+            future = topicQueueMap.get(key);
+            if (future != null) {
+                return future;
+            }
+
+            // Create and open the topic queue.
+            future = createAndOpen(topicId, queueId);
+
+            // Put the future into the map to serve next request.
+            topicQueueMap.put(key, createAndOpen(topicId, queueId));
+            future.exceptionally(ex -> {
+                topicQueueMap.remove(key);
+                return null;
+            });
+            return future;
+        }
     }
 
     @Override
-    public CompletableFuture<Void> onTopicQueueOpen(long topicId, int queueId, long epoch) {
+    public CompletableFuture<Void> close(long topicId, int queueId) {
+        TopicQueueId key = new TopicQueueId(topicId, queueId);
+        CompletableFuture<TopicQueue> future = topicQueueMap.remove(key);
+        if (future != null) {
+            return future.thenCompose(TopicQueue::close);
+        }
+        return CompletableFuture.completedFuture(null);
+    }
+
+    public CompletableFuture<TopicQueue> createAndOpen(long topicId, int queueId) {
         TopicQueueId id = new TopicQueueId(topicId, queueId);
         if (topicQueueMap.containsKey(id)) {
             return CompletableFuture.completedFuture(null);
         }
-        CompletableFuture<StreamMetadata> dataStreamCf = metadataService.dataStreamOf(topicId, queueId);
-        CompletableFuture<StreamMetadata> opStreamCf = metadataService.operationStreamOf(topicId, queueId);
-        CompletableFuture<StreamMetadata> snapshotStreamCf = metadataService.snapshotStreamOf(topicId, queueId);
-        return CompletableFuture.allOf(
-            dataStreamCf, opStreamCf, snapshotStreamCf
-        ).thenApply(nil -> {
-            StreamMetadata dataStream = dataStreamCf.join();
-            StreamMetadata opStream = opStreamCf.join();
-            StreamMetadata snapshotStream = snapshotStreamCf.join();
 
-            MessageStateMachine stateMachine = new DefaultMessageStateMachine(topicId, queueId, kvService);
-            StreamTopicQueue queue = new StreamTopicQueue(storeConfig, topicId, queueId, epoch,
-                dataStream.getStreamId(), opStream.getStreamId(), snapshotStream.getStreamId(),
-                metadataService, stateMachine, streamStore, inflightService, snapshotService);
-            return queue;
-        }).thenCompose(queue -> {
-            return queue.open()
-                .thenAccept(nil -> {
-                    topicQueueMap.putIfAbsent(id, queue);
-                });
-        });
-    }
+        MessageStateMachine stateMachine = new DefaultMessageStateMachine(topicId, queueId, kvService);
+        TopicQueue topicQueue = new StreamTopicQueue(storeConfig, topicId, queueId,
+            metadataService, stateMachine, streamStore, inflightService, snapshotService);
 
-    @Override
-    public CompletableFuture<Void> onTopicQueueClose(long topicId, int queueId, long epoch) {
-        TopicQueueId id = new TopicQueueId(topicId, queueId);
-        TopicQueue queue = topicQueueMap.remove(id);
-        if (queue == null) {
-            return CompletableFuture.completedFuture(null);
-        }
-        return queue.close();
+        // TODO: handle exception when open topic queue failed.
+        return topicQueue.open()
+            .thenApply(nil -> topicQueue);
     }
 
     static class TopicQueueId {

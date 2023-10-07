@@ -22,8 +22,5 @@ import com.automq.rocketmq.common.util.Lifecycle;
 import java.util.concurrent.CompletableFuture;
 
 public interface TopicQueueManager extends Lifecycle, StoreHandle {
-    TopicQueue get(long topicId, int queueId);
-
-    CompletableFuture<Void> onTopicQueueOpen(long topicId, int queueId, long epoch);
-
+    CompletableFuture<TopicQueue> getOrCreate(long topicId, int queueId);
 }

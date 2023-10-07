@@ -30,10 +30,10 @@ import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
 import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PopResult;
 import com.automq.rocketmq.store.model.message.PutResult;
-import com.automq.rocketmq.store.service.SnapshotService;
-import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.service.InflightService;
 import com.automq.rocketmq.store.service.ReviveService;
+import com.automq.rocketmq.store.service.SnapshotService;
+import com.automq.rocketmq.store.service.api.KVService;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -99,20 +99,22 @@ public class MessageStoreImpl implements MessageStore {
         if (fifo && retry) {
             return CompletableFuture.failedFuture(new RuntimeException("Fifo and retry cannot be true at the same time"));
         }
-        TopicQueue topicQueue = topicQueueManager.get(topicId, queueId);
-        if (fifo) {
-            return topicQueue.popFifo(consumerGroupId, filter, batchSize, invisibleDuration);
-        }
-        if (retry) {
-            return topicQueue.popRetry(consumerGroupId, filter, batchSize, invisibleDuration);
-        }
-        return topicQueue.popNormal(consumerGroupId, filter, batchSize, invisibleDuration);
+        return topicQueueManager.getOrCreate(topicId, queueId)
+            .thenCompose(topicQueue -> {
+                if (fifo) {
+                    return topicQueue.popFifo(consumerGroupId, filter, batchSize, invisibleDuration);
+                }
+                if (retry) {
+                    return topicQueue.popRetry(consumerGroupId, filter, batchSize, invisibleDuration);
+                }
+                return topicQueue.popNormal(consumerGroupId, filter, batchSize, invisibleDuration);
+            });
     }
 
     @Override
     public CompletableFuture<PutResult> put(FlatMessage message) {
-        TopicQueue topicQueue = topicQueueManager.get(message.topicId(), message.queueId());
-        return topicQueue.open().thenCompose(v -> topicQueue.put(message));
+        return topicQueueManager.getOrCreate(message.topicId(), message.queueId())
+            .thenCompose(topicQueue -> topicQueue.put(message));
     }
 
     @Override
@@ -120,8 +122,8 @@ public class MessageStoreImpl implements MessageStore {
         // Write ack operation to operation log.
         // Operation id should be monotonically increasing for each queue
         ReceiptHandle handle = decodeReceiptHandle(receiptHandle);
-        TopicQueue topicQueue = topicQueueManager.get(handle.topicId(), handle.queueId());
-        return topicQueue.ack(receiptHandle);
+        return topicQueueManager.getOrCreate(handle.topicId(), handle.queueId())
+            .thenCompose(topicQueue -> topicQueue.ack(receiptHandle));
     }
 
     @Override
@@ -130,26 +132,25 @@ public class MessageStoreImpl implements MessageStore {
         // Write change invisible duration operation to operation log.
         // Operation id should be monotonically increasing for each queue
         ReceiptHandle handle = decodeReceiptHandle(receiptHandle);
-        TopicQueue topicQueue = topicQueueManager.get(handle.topicId(), handle.queueId());
-        return topicQueue.changeInvisibleDuration(receiptHandle, invisibleDuration);
+        return topicQueueManager.getOrCreate(handle.topicId(), handle.queueId())
+            .thenCompose(topicQueue -> topicQueue.changeInvisibleDuration(receiptHandle, invisibleDuration));
     }
 
     @Override
     public CompletableFuture<Void> closeQueue(long topicId, int queueId) {
-        TopicQueue topicQueue = topicQueueManager.get(topicId, queueId);
-        return topicQueue.close();
+        return topicQueueManager.close(topicId, queueId);
     }
 
     @Override
     public CompletableFuture<Integer> getInflightStats(long consumerGroupId, long topicId, int queueId) {
         // Get check point count of specified consumer, topic and queue.
-        TopicQueue topicQueue = topicQueueManager.get(topicId, queueId);
-        return topicQueue.getInflightStats(consumerGroupId);
+        return topicQueueManager.getOrCreate(topicId, queueId)
+            .thenCompose(topicQueue -> topicQueue.getInflightStats(consumerGroupId));
     }
 
     @Override
     public CompletableFuture<TopicQueue.QueueOffsetRange> getOffsetRange(long topicId, int queueId) {
-        TopicQueue topicQueue = topicQueueManager.get(topicId, queueId);
-        return topicQueue.getOffsetRange();
+        return topicQueueManager.getOrCreate(topicId, queueId)
+            .thenCompose(TopicQueue::getOffsetRange);
     }
 }
