@@ -76,7 +76,6 @@ import com.automq.rocketmq.controller.metadata.database.mapper.RangeMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 import com.automq.rocketmq.controller.metadata.database.tasks.LeaseTask;
-import com.automq.rocketmq.controller.metadata.database.tasks.ScanAssignableMessageQueuesTask;
 import com.automq.rocketmq.controller.metadata.database.tasks.ScanNodeTask;
 import com.google.common.base.Strings;
 import java.io.IOException;
@@ -149,7 +148,6 @@ public class DefaultMetadataStore implements MetadataStore {
         leaseTask.run();
         this.scheduledExecutorService.scheduleAtFixedRate(leaseTask, 1, config.scanIntervalInSecs(), TimeUnit.SECONDS);
         this.scheduledExecutorService.scheduleWithFixedDelay(new ScanNodeTask(this), 1, config.scanIntervalInSecs(), TimeUnit.SECONDS);
-        this.scheduledExecutorService.scheduleAtFixedRate(new ScanAssignableMessageQueuesTask(this), 1, config.scanIntervalInSecs(), TimeUnit.SECONDS);
         LOGGER.info("MetadataStore tasks scheduled");
     }
 
@@ -266,29 +264,38 @@ public class DefaultMetadataStore implements MetadataStore {
         return true;
     }
 
-    private void createQueues(IntStream range, long topicId, SqlSession session) {
+    private void createQueues(IntStream range, long topicId, SqlSession session) throws ControllerException {
         QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
         StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+
+        List<Node> aliveNodes = this.nodes.values().stream().filter(node -> node.isAlive(config)).map(BrokerNode::getNode)
+            .toList();
+        if (aliveNodes.isEmpty()) {
+            LOGGER.warn("0 of {} broker nodes is alive", nodes.size());
+            throw new ControllerException(Code.NODE_UNAVAILABLE_VALUE);
+        }
+
         range.forEach(n -> {
             QueueAssignment assignment = new QueueAssignment();
             assignment.setTopicId(topicId);
-            assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNABLE);
+            assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNED);
             assignment.setQueueId(n);
+            Node node = aliveNodes.get(n % aliveNodes.size());
             // On creation, both src and dst node_id are the same.
-            assignment.setSrcNodeId(0);
-            assignment.setDstNodeId(0);
+            assignment.setSrcNodeId(node.getId());
+            assignment.setDstNodeId(node.getId());
             assignmentMapper.create(assignment);
             // Create data stream
-            long streamId = createStream(streamMapper, topicId, n, null, StreamRole.STREAM_ROLE_DATA, 0);
+            long streamId = createStream(streamMapper, topicId, n, null, StreamRole.STREAM_ROLE_DATA, node.getId());
             LOGGER.debug("Create assignable data stream[stream-id={}] for topic-id={}, queue-id={}",
                 streamId, topicId, n);
             // Create ops stream
-            streamId = createStream(streamMapper, topicId, n, null, StreamRole.STREAM_ROLE_OPS, 0);
+            streamId = createStream(streamMapper, topicId, n, null, StreamRole.STREAM_ROLE_OPS, node.getId());
             LOGGER.debug("Create assignable ops stream[stream-id={}] for topic-id={}, queue-id={}",
                 streamId, topicId, n);
 
             // Create snapshot stream
-            streamId = createStream(streamMapper, topicId, n, null, StreamRole.STREAM_ROLE_SNAPSHOT, 0);
+            streamId = createStream(streamMapper, topicId, n, null, StreamRole.STREAM_ROLE_SNAPSHOT, node.getId());
             LOGGER.debug("Create assignable snapshot stream[stream-id={}] for topic-id={}, queue-id={}",
                 streamId, topicId, n);
         });
@@ -539,7 +546,7 @@ public class DefaultMetadataStore implements MetadataStore {
                                 topicBuilder.addAssignments(queueAssignment);
                             }
 
-                            case ASSIGNMENT_STATUS_YIELDING, ASSIGNMENT_STATUS_ASSIGNABLE -> {
+                            case ASSIGNMENT_STATUS_YIELDING -> {
                                 OngoingMessageQueueReassignment reassignment = OngoingMessageQueueReassignment.newBuilder()
                                     .setQueue(MessageQueue.newBuilder()
                                         .setTopicId(assignment.getTopicId())
@@ -606,6 +613,11 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
+    public boolean hasAliveBrokerNodes() {
+        return this.nodes.values().stream().anyMatch(node -> node.isAlive(config));
+    }
+
+    @Override
     public String leaderAddress() throws ControllerException {
         if (null == lease || lease.expired()) {
             LOGGER.error("No lease is populated yet or lease was expired");
@@ -614,7 +626,15 @@ public class DefaultMetadataStore implements MetadataStore {
 
         BrokerNode brokerNode = nodes.get(this.lease.getNodeId());
         if (null == brokerNode) {
-            LOGGER.error("Address for Broker with brokerId={} is missing", this.lease.getNodeId());
+            try (SqlSession session = getSessionFactory().openSession()) {
+                NodeMapper nodeMapper = session.getMapper(NodeMapper.class);
+                Node node = nodeMapper.get(this.lease.getNodeId(), null, null, null);
+                if (null != node) {
+                    addBrokerNode(node);
+                    return node.getAddress();
+                }
+            }
+            LOGGER.error("Address of broker[broker-id={}] is missing", this.lease.getNodeId());
             throw new ControllerException(Code.NOT_FOUND_VALUE,
                 String.format("Broker is unexpected missing with brokerId=%d", this.lease.getNodeId()));
         }
@@ -652,7 +672,7 @@ public class DefaultMetadataStore implements MetadataStore {
                         }
 
                         switch (assignment.getStatus()) {
-                            case ASSIGNMENT_STATUS_ASSIGNABLE, ASSIGNMENT_STATUS_YIELDING -> {
+                            case ASSIGNMENT_STATUS_YIELDING -> {
                                 assignment.setDstNodeId(dstNodeId);
                                 assignmentMapper.update(assignment);
                             }
@@ -700,9 +720,7 @@ public class DefaultMetadataStore implements MetadataStore {
                         if (assignment.getQueueId() != queueId) {
                             continue;
                         }
-
-                        assignment.setSrcNodeId(assignment.getDstNodeId());
-                        assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNABLE);
+                        assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNED);
                         assignmentMapper.update(assignment);
                         LOGGER.info("Mark queue[topic-id={}, queue-id={}] assignable", topicId, queueId);
                         break;
@@ -1301,7 +1319,7 @@ public class DefaultMetadataStore implements MetadataStore {
                         .toList();
 
                     session.commit();
-                    if (Objects.isNull(objectIds) || objectIds.isEmpty()) {
+                    if (objectIds.isEmpty()) {
                         LOGGER.error("S3Object creation failed, count[{}], ttl[{}]", count, ttlInMinutes);
                         ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE, String.format("S3Object creation failed, count[%d], ttl[%d]", count, ttlInMinutes));
                         future.completeExceptionally(e);
@@ -1739,7 +1757,7 @@ public class DefaultMetadataStore implements MetadataStore {
         return lease;
     }
 
-    public void addBroker(Node node) {
+    public void addBrokerNode(Node node) {
         this.nodes.put(node.getId(), new BrokerNode(node));
     }
 

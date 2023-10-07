@@ -31,6 +31,9 @@ enum Code {
 
   // Operation is fenced out as provided epoch is deprecated.
   FENCED = 1005;
+
+  // Broker nodes are unavailable
+  NODE_UNAVAILABLE = 1006;
 }
 
 message Status {
