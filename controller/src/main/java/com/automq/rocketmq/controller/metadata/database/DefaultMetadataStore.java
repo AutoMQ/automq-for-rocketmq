@@ -266,7 +266,7 @@ public class DefaultMetadataStore implements MetadataStore {
         return true;
     }
 
-    private void createNewQueues(IntStream range, long topicId, SqlSession session) {
+    private void createQueues(IntStream range, long topicId, SqlSession session) {
         QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
         StreamMapper streamMapper = session.getMapper(StreamMapper.class);
         range.forEach(n -> {
@@ -317,7 +317,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     topic.setAcceptMessageTypes(gson.toJson(acceptMessageTypesList));
                     topicMapper.create(topic);
                     long topicId = topic.getId();
-                    createNewQueues(IntStream.range(0, queueNum), topicId, session);
+                    createQueues(IntStream.range(0, queueNum), topicId, session);
                     // Commit transaction
                     session.commit();
                     future.complete(topicId);
@@ -400,7 +400,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     // Update queue nums
                     if (null != queueNumber && !queueNumber.equals(topic.getQueueNum())) {
                         if (queueNumber > topic.getQueueNum()) {
-                            createNewQueues(IntStream.range(topic.getQueueNum(), queueNumber), topic.getId(), session);
+                            createQueues(IntStream.range(topic.getQueueNum(), queueNumber), topic.getId(), session);
                         }
                         changed = true;
                     }
