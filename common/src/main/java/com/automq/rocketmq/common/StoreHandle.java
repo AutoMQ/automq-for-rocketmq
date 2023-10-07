@@ -15,42 +15,10 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.common.config;
+package com.automq.rocketmq.common;
 
-public class S3StreamConfig {
-    private String s3Endpoint;
-    private String s3Region = "cn-hangzhou";
-    private String s3Bucket;
-    private boolean s3ForcePathStyle;
-    private String s3WALPath = "/tmp/s3stream_wal";
-    private String s3AccessKey;
-    private String s3SecretKey;
+import java.util.concurrent.CompletableFuture;
 
-    public String s3Endpoint() {
-        return s3Endpoint;
-    }
-
-    public String s3Region() {
-        return s3Region;
-    }
-
-    public String s3Bucket() {
-        return s3Bucket;
-    }
-
-    public boolean s3ForcePathStyle() {
-        return s3ForcePathStyle;
-    }
-
-    public String s3WALPath() {
-        return s3WALPath;
-    }
-
-    public String s3AccessKey() {
-        return s3AccessKey;
-    }
-
-    public String s3SecretKey() {
-        return s3SecretKey;
-    }
+public interface StoreHandle {
+    CompletableFuture<Void> close(long topicId, int queueId);
 }

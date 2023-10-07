@@ -33,10 +33,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class SnapshotService implements Lifecycle, Runnable {
+    public static final Logger LOGGER = LoggerFactory.getLogger(SnapshotService.class);
 
     private final StreamStore streamStore;
     private final BlockingQueue<SnapshotTask> snapshotTaskQueue;
@@ -66,20 +71,12 @@ public class SnapshotService implements Lifecycle, Runnable {
         }
     }
 
-    public CompletableFuture<Long> addSnapshotTask(SnapshotTask task) {
-        CompletableFuture<Long> cf = new CompletableFuture<>();
-        task.setSuccessCf(cf);
-        snapshotTaskQueue.add(task);
-        return cf;
-    }
-
     @Override
     public void run() {
         while (!stopped) {
             try {
-                SnapshotTask snapshotTask = snapshotTaskQueue.poll();
+                SnapshotTask snapshotTask = snapshotTaskQueue.poll(100, TimeUnit.MILLISECONDS);
                 if (snapshotTask == null) {
-                    Thread.sleep(100);
                     continue;
                 }
                 takeSnapshot(snapshotTask)
@@ -88,12 +85,12 @@ public class SnapshotService implements Lifecycle, Runnable {
                         return null;
                     }).join();
             } catch (Exception e) {
-                // TODO: log it
+                LOGGER.warn("Failed to take snapshot", e);
             }
         }
     }
 
-    public CompletableFuture<Void> takeSnapshot(SnapshotTask task) {
+    CompletableFuture<Void> takeSnapshot(SnapshotTask task) {
         CompletableFuture<OperationSnapshot> snapshotFuture = task.snapshotSupplier.get();
         long topicId = task.topicId;
         int queueId = task.queueId;
@@ -118,11 +115,10 @@ public class SnapshotService implements Lifecycle, Runnable {
                 // release snapshot
                 kvService.releaseSnapshot(snapshot.getKvServiceSnapshotVersion());
             } catch (StoreException e) {
-                throw new RuntimeException(e);
+                throw new CompletionException(e);
             }
             snapshot.setCheckPoints(checkPointList);
-            byte[] snapshotData = SerializeUtil.encodeOperationSnapshot(snapshot);
-            return snapshotData;
+            return SerializeUtil.encodeOperationSnapshot(snapshot);
         });
         CompletableFuture<AppendResult> snapshotAppendCf = snapshotDataCf.thenCompose(snapshotData -> {
             // append snapshot to snapshot stream
@@ -135,6 +131,13 @@ public class SnapshotService implements Lifecycle, Runnable {
             // release snapshot
             return null;
         });
+    }
+
+    CompletableFuture<Long> addSnapshotTask(SnapshotTask task) {
+        CompletableFuture<Long> cf = new CompletableFuture<>();
+        task.setSuccessCf(cf);
+        snapshotTaskQueue.add(task);
+        return cf;
     }
 
     static class SnapshotTask {

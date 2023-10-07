@@ -312,7 +312,10 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 int port = testServer.getPort();
                 ManagedChannel channel = Grpc.newChannelBuilderForAddress("localhost", port, InsecureChannelCredentials.create()).build();
                 ControllerServiceGrpc.ControllerServiceBlockingStub blockingStub = ControllerServiceGrpc.newBlockingStub(channel);
-                UpdateTopicReply reply = blockingStub.updateTopic(UpdateTopicRequest.newBuilder().setTopicId(topicId).addAllAcceptMessageTypes(messageTypeList).build());
+                UpdateTopicReply reply = blockingStub.updateTopic(UpdateTopicRequest.newBuilder()
+                    .setTopicId(topicId)
+                    .addAllAcceptMessageTypes(messageTypeList)
+                    .build());
                 Assertions.assertTrue(reply.getTopic().getName().startsWith("T"));
                 Assertions.assertEquals(Code.OK, reply.getStatus().getCode());
                 Assertions.assertEquals(messageTypeList, reply.getTopic().getAcceptMessageTypesList());
@@ -402,7 +405,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testReassign() throws IOException, ControllerException, ExecutionException, InterruptedException {
+    public void testReassign() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
         ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
         Mockito.when(controllerConfig.nodeId()).thenReturn(1);
@@ -451,7 +454,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testCreateRetryStream() throws IOException, ControllerException, ExecutionException, InterruptedException {
+    public void testCreateRetryStream() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
         ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
         Mockito.when(controllerConfig.nodeId()).thenReturn(1);
@@ -1257,7 +1260,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
         }
     }
 
-
     @Test
     public void testListOpenStreams() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
@@ -1443,12 +1445,12 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .build();
 
             String expectSubStream = """
-            {
-              "1234567890": {
-                "streamId_": 1234567890,
-                "startOffset_": 0,
-                "endOffset_": 10
-              }}""";
+                {
+                  "1234567890": {
+                    "streamId_": 1234567890,
+                    "startOffset_": 0,
+                    "endOffset_": 10
+                  }}""";
 
             try (SqlSession session = this.getSessionFactory().openSession()) {
                 S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
@@ -1527,7 +1529,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                         Assertions.fail();
                     }
                 }
-
 
                 S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
                 for (long index = objectId; index < objectId + 2; index++) {

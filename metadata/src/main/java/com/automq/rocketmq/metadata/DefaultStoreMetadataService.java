@@ -28,6 +28,7 @@ import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.DefaultMetadataStore;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
+
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -109,7 +110,7 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
 
     @Override
     public CompletableFuture<StreamMetadata> snapshotStreamOf(long topicId, int queueId) {
-        throw new RuntimeException("Unsupported operation");
+        return metadataStore.getStream(topicId, queueId, null, StreamRole.STREAM_ROLE_SNAPSHOT);
     }
 
     @Override
@@ -119,7 +120,18 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
 
     @Override
     public CompletableFuture<List<StreamMetadata>> listStreamsManagedBy(long topicId, int queueId) {
-        return null;
+        CompletableFuture<StreamMetadata> operationStreamOf = operationStreamOf(topicId, queueId);
+        CompletableFuture<StreamMetadata> dataStreamOf = dataStreamOf(topicId, queueId);
+        CompletableFuture<StreamMetadata> retryStreamOf = metadataStore.getStream(topicId, queueId, null, StreamRole.STREAM_ROLE_RETRY);
+
+        return CompletableFuture.allOf(dataStreamOf, operationStreamOf, retryStreamOf)
+            .thenApplyAsync(v -> {
+                StreamMetadata dataStreamMetadata = dataStreamOf.join();
+                StreamMetadata operationStreamMetadata = operationStreamOf.join();
+                StreamMetadata retryStreamMetadata = retryStreamOf.join();
+
+                return List.of(dataStreamMetadata, operationStreamMetadata, retryStreamMetadata);
+            });
     }
 
     @Override
@@ -196,6 +208,7 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
         return metadataStore.listStreamObjects(streamId, startOffset, endOffset, limit);
     }
 
+    @Override
     public CompletableFuture<Pair<List<S3StreamObject>, List<S3WALObject>>> listObjects(long streamId, long startOffset,
         long endOffset, int limit) {
         CompletableFuture<List<S3StreamObject>> streamObjectsFuture = metadataStore.listStreamObjects(streamId, startOffset, endOffset, limit);

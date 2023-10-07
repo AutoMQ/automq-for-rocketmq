@@ -62,7 +62,7 @@ public class MockStreamStore implements StreamStore {
     }
 
     @Override
-    public CompletableFuture<Void> open(long streamId) {
+    public CompletableFuture<Void> open(long streamId, long epoch) {
         openStream(streamId);
         return CompletableFuture.completedFuture(null);
     }

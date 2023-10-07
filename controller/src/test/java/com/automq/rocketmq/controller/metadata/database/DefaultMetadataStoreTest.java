@@ -118,7 +118,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         }
     }
 
-
     /**
      * Dummy test, should be removed later
      */
@@ -239,8 +238,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         long topicId;
         int queueNum = 4;
         String topicName = "t1";
-        List<MessageType> messageTypes = new ArrayList<>()
-        {
+        List<MessageType> messageTypes = new ArrayList<>() {
             {
                 add(MessageType.NORMAL);
                 add(MessageType.FIFO);
@@ -252,6 +250,10 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Awaitility.await().with().atMost(10, TimeUnit.SECONDS)
                 .pollInterval(100, TimeUnit.MILLISECONDS)
                 .until(metadataStore::isLeader);
+
+            Awaitility.await().with().atMost(10, TimeUnit.SECONDS)
+                .pollInterval(100, TimeUnit.MILLISECONDS)
+                .until(metadataStore::hasAliveBrokerNodes);
 
             topicId = metadataStore.createTopic(topicName, queueNum, messageTypes).get();
         }
@@ -267,7 +269,8 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
             List<Stream> streams = streamMapper.list(topicId, null, null);
-            Assertions.assertEquals(queueNum * 2, streams.size());
+            // By default, we create 3 streams for each message queue: data, ops, snapshot
+            Assertions.assertEquals(queueNum * 3, streams.size());
         }
     }
 
@@ -294,8 +297,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         long topicId;
         int queueNum = 4;
         String topicName = "t1";
-        List<MessageType> messageTypes = new ArrayList<>()
-        {
+        List<MessageType> messageTypes = new ArrayList<>() {
             {
                 add(MessageType.NORMAL);
                 add(MessageType.FIFO);
@@ -303,8 +305,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             }
         };
         Gson gson = new Gson();
-        List<MessageType> updateMessageTypes = new ArrayList<>()
-        {
+        List<MessageType> updateMessageTypes = new ArrayList<>() {
             {
                 add(MessageType.NORMAL);
                 add(MessageType.TRANSACTION);
@@ -317,9 +318,13 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
                 .pollInterval(100, TimeUnit.MILLISECONDS)
                 .until(metadataStore::isLeader);
 
+            Awaitility.await().with().atMost(10, TimeUnit.SECONDS)
+                .pollInterval(100, TimeUnit.MILLISECONDS)
+                .until(metadataStore::hasAliveBrokerNodes);
+
             topicId = metadataStore.createTopic(topicName, queueNum, messageTypes).get();
 
-            metadataStore.updateTopic(topicId, topicName, updateMessageTypes).get();
+            metadataStore.updateTopic(topicId, topicName, null, updateMessageTypes).get();
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -335,7 +340,8 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
             List<Stream> streams = streamMapper.list(topicId, null, null);
-            Assertions.assertEquals(queueNum * 2, streams.size());
+            // By default, we create 3 streams for each message queue: data, ops, snapshot
+            Assertions.assertEquals(queueNum * 3, streams.size());
         }
     }
 
@@ -407,7 +413,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testDeleteTopic_NotFound() throws IOException, ControllerException {
+    public void testDeleteTopic_NotFound() throws IOException {
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.nodeId()).thenReturn(1);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
@@ -496,7 +502,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             List<QueueAssignment> assignments = metadataStore.listAssignments(2L, null, null, null).get();
             for (QueueAssignment assignment : assignments) {
                 if (assignment.getQueueId() == 1) {
-                    Assertions.assertEquals(AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNABLE, assignment.getStatus());
+                    Assertions.assertEquals(AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNED, assignment.getStatus());
                 }
             }
         }
@@ -1034,7 +1040,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             session.commit();
         }
 
-
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.nodeId()).thenReturn(nodeId);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
@@ -1095,7 +1100,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
             session.commit();
         }
-
 
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.nodeId()).thenReturn(nodeId);
@@ -1216,7 +1220,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             metadataStore.commitStreamObject(s3StreamObject, compactedObjects);
         }
 
-
         try (SqlSession session = getSessionFactory().openSession()) {
             S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
             for (long index = objectId; index < objectId + 2; index++) {
@@ -1226,7 +1229,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
                     Assertions.fail();
                 }
             }
-
 
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
             for (long index = objectId; index < objectId + 2; index++) {
@@ -1317,7 +1319,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             session.commit();
         }
 
-
         long time = System.currentTimeMillis();
         List<Long> compactedObjects = new ArrayList<>();
         compactedObjects.add(objectId + 2);
@@ -1333,7 +1334,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
             metadataStore.commitWalObject(walObject, s3StreamObjects, compactedObjects);
         }
-
 
         try (SqlSession session = getSessionFactory().openSession()) {
             S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
@@ -1352,7 +1352,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
                     Assertions.fail();
                 }
             }
-
 
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
             for (long index = objectId; index < objectId + 2; index++) {
@@ -1376,4 +1375,29 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             }
         }
     }
+
+    @Test
+    public void testConsumerOffset() throws IOException, ExecutionException, InterruptedException {
+        long groupId = 2, topicId = 1;
+        int queueId = 4;
+        ControllerConfig config = Mockito.mock(ControllerConfig.class);
+        Mockito.when(config.nodeId()).thenReturn(1);
+        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
+        try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            metadataStore.start();
+            Awaitility.await().with().atMost(10, TimeUnit.SECONDS).pollInterval(100, TimeUnit.MILLISECONDS)
+                .until(metadataStore::isLeader);
+            metadataStore.commitOffset(groupId, topicId, queueId, 1000);
+
+            Long offset = metadataStore.getConsumerOffset(groupId, topicId, queueId).get();
+            Assertions.assertEquals(1000, offset);
+
+            metadataStore.commitOffset(groupId, topicId, queueId, 2000);
+
+            offset = metadataStore.getConsumerOffset(groupId, topicId, queueId).get();
+            Assertions.assertEquals(2000, offset);
+        }
+    }
+
 }

@@ -32,6 +32,8 @@ import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import java.io.Closeable;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 public interface MetadataStore extends Closeable {
 
@@ -43,11 +45,13 @@ public interface MetadataStore extends Closeable {
      * @return broker epoch
      * @throws ControllerException If there is an I/O error.
      */
-    CompletableFuture<Node> registerBrokerNode(String name, String address, String instanceId) throws ControllerException;
+    CompletableFuture<Node> registerBrokerNode(String name, String address,
+        String instanceId) throws ControllerException;
 
     void keepAlive(int nodeId, long epoch, boolean goingAway);
 
-    CompletableFuture<Long> createTopic(String topicName, int queueNum, List<MessageType> acceptMessageTypesList) throws ControllerException;
+    CompletableFuture<Long> createTopic(String topicName, int queueNum,
+        List<MessageType> acceptMessageTypesList) throws ControllerException;
 
     CompletableFuture<Void> deleteTopic(long topicId) throws ControllerException;
 
@@ -55,7 +59,10 @@ public interface MetadataStore extends Closeable {
 
     CompletableFuture<List<Topic>> listTopics();
 
-    CompletableFuture<Topic> updateTopic(long topicId, String topicName, List<MessageType> acceptMessageTypesList) throws ControllerException;
+    CompletableFuture<Topic> updateTopic(long topicId,
+        @Nullable String topicName,
+        @Nullable Integer queueNumber,
+        @Nonnull List<MessageType> acceptMessageTypesList) throws ControllerException;
 
     /**
      * Check if current controller is playing leader role
@@ -64,6 +71,8 @@ public interface MetadataStore extends Closeable {
      * @throws ControllerException If there is any I/O error
      */
     boolean isLeader() throws ControllerException;
+
+    boolean hasAliveBrokerNodes();
 
     String leaderAddress() throws ControllerException;
 
@@ -85,7 +94,8 @@ public interface MetadataStore extends Closeable {
 
     CompletableFuture<Void> commitOffset(long groupId, long topicId, int queueId, long offset);
 
-    CompletableFuture<Long> createGroup(String groupName, int maxRetry, GroupType type, long dlq) throws ControllerException;
+    CompletableFuture<Long> createGroup(String groupName, int maxRetry, GroupType type,
+        long dlq) throws ControllerException;
 
     CompletableFuture<StreamMetadata> getStream(long topicId, int queueId, Long groupId, StreamRole streamRole);
 
@@ -101,15 +111,21 @@ public interface MetadataStore extends Closeable {
 
     CompletableFuture<Long> prepareS3Objects(int count, int ttlInMinutes);
 
-    CompletableFuture<Void> commitWalObject(S3WALObject walObject, List<S3StreamObject> streamObjects, List<Long> compactedObjects) throws ControllerException;
+    CompletableFuture<Void> commitWalObject(S3WALObject walObject, List<S3StreamObject> streamObjects,
+        List<Long> compactedObjects) throws ControllerException;
 
-    CompletableFuture<Void> commitStreamObject(S3StreamObject streamObject, List<Long> compactedObjects) throws ControllerException;
+    CompletableFuture<Void> commitStreamObject(S3StreamObject streamObject,
+        List<Long> compactedObjects) throws ControllerException;
 
     CompletableFuture<List<S3WALObject>> listWALObjects();
 
     CompletableFuture<List<S3WALObject>> listWALObjects(long streamId, long startOffset, long endOffset, int limit);
 
-    CompletableFuture<List<S3StreamObject>> listStreamObjects(long streamId, long startOffset, long endOffset, int limit);
+    CompletableFuture<List<S3StreamObject>> listStreamObjects(long streamId, long startOffset, long endOffset,
+        int limit);
 
-    CompletableFuture<Long> getOrCreateRetryStream(String groupName, long topicId, int queueId) throws ControllerException;
+    CompletableFuture<Long> getOrCreateRetryStream(String groupName, long topicId,
+        int queueId) throws ControllerException;
+
+    CompletableFuture<Long> getConsumerOffset(long consumerGroupId, long topicId, int queueId);
 }

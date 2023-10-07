@@ -52,4 +52,15 @@
         </if>
     </select>
 
+    <select id="get" resultType="GroupProgress">
+        SELECT group_id, topic_id, queue_id, queue_offset
+        FROM group_progress
+        WHERE 1 = 1
+        <if test="null != groupId and null != topicId and null != queueId">
+            AND group_id = #{groupId}
+            AND topic_id = #{topicId}
+            AND queue_id = #{queueId}
+        </if>
+    </select>
+
 </mapper>

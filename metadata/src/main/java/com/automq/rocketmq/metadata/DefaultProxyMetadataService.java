@@ -69,13 +69,13 @@ public class DefaultProxyMetadataService implements ProxyMetadataService {
 
     @Override
     public CompletableFuture<Long> consumerOffsetOf(long consumerGroupId, long topicId, int queueId) {
-        return null;
+        return metadataStore.getConsumerOffset(consumerGroupId, topicId, queueId);
     }
 
     @Override
     public CompletableFuture<Void> updateConsumerOffset(long consumerGroupId, long topicId, int queueId,
         long newOffset) {
-        return null;
+        return metadataStore.commitOffset(consumerGroupId, topicId, queueId, newOffset);
     }
 
     @Override

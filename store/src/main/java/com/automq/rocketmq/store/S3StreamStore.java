@@ -70,7 +70,7 @@ public class S3StreamStore implements StreamStore {
         this.objectManager = new S3ObjectManager(metadataService);
 
         this.operator = new DefaultS3Operator(s3Config.s3Endpont(), s3Config.s3Region(), s3Config.s3Bucket(),
-            s3Config.s3AccessKey(), s3Config.s3SecretKey());
+            s3Config.s3ForcePathStyle(), s3Config.s3AccessKey(), s3Config.s3SecretKey());
         this.writeAheadLog = BlockWALService.builder(s3Config.s3WALPath(), s3Config.s3WALCapacity()).config(s3Config).build();
         this.blockCache = new DefaultS3BlockCache(s3Config.s3CacheSize(), objectManager, operator);
 
@@ -85,13 +85,13 @@ public class S3StreamStore implements StreamStore {
 
     @Override
     public CompletableFuture<FetchResult> fetch(long streamId, long startOffset, int maxCount) {
-        Stream stream = openStream(streamId);
+        Stream stream = openStreams.get(streamId);
         return stream.fetch(startOffset, startOffset + maxCount, Integer.MAX_VALUE);
     }
 
     @Override
     public CompletableFuture<AppendResult> append(long streamId, RecordBatch recordBatch) {
-        Stream stream = openStream(streamId);
+        Stream stream = openStreams.get(streamId);
         return stream.append(recordBatch);
     }
 
@@ -103,21 +103,22 @@ public class S3StreamStore implements StreamStore {
 
     @Override
     public CompletableFuture<Void> trim(long streamId, long newStartOffset) {
-        Stream stream = openStream(streamId);
+        Stream stream = openStreams.get(streamId);
         return stream.trim(newStartOffset);
     }
 
     @Override
     public long startOffset(long streamId) {
-        Stream stream = openStream(streamId);
+        Stream stream = openStreams.get(streamId);
         return stream.startOffset();
     }
 
     @Override
     public long nextOffset(long streamId) {
-        Stream stream = openStream(streamId);
+        Stream stream = openStreams.get(streamId);
         return stream.nextOffset();
     }
+
     @Override
     public void start() throws Exception {
         this.storage.startup();
@@ -132,22 +133,22 @@ public class S3StreamStore implements StreamStore {
     }
 
     @Override
-    public CompletableFuture<Void> open(long streamId) {
-        openStream(streamId);
-        return CompletableFuture.completedFuture(null);
-    }
+    public CompletableFuture<Void> open(long streamId, long epoch) {
+        if (openStreams.containsKey(streamId)) {
+            return CompletableFuture.completedFuture(null);
+        }
 
-    /**
-     * Open the specified stream if not opened yet.
-     *
-     * @param streamId stream id.
-     * @return the opened stream.
-     */
-    private Stream openStream(long streamId) {
         // Open the specified stream if not opened yet.
-        // TODO: Reimplement the stream open logic.
-        OpenStreamOptions options = OpenStreamOptions.newBuilder().epoch(3).build();
-        return openStreams.computeIfAbsent(streamId, id -> streamClient.openStream(id, options).join());
+        OpenStreamOptions options = OpenStreamOptions.newBuilder().epoch(epoch).build();
+        return streamClient.openStream(streamId, options)
+            .thenAccept(stream -> openStreams.put(streamId, stream))
+            .whenComplete((stream, ex) -> {
+                if (ex != null) {
+                    LOGGER.error("Failed to open stream {}", streamId, ex);
+                } else {
+                    LOGGER.info("Stream {} opened", streamId);
+                }
+            });
     }
 
     private Config configFrom(S3StreamConfig streamConfig) {
@@ -155,6 +156,7 @@ public class S3StreamStore implements StreamStore {
         config.s3Endpoint(streamConfig.s3Endpoint());
         config.s3Region(streamConfig.s3Region());
         config.s3Bucket(streamConfig.s3Bucket());
+        config.s3ForcePathStyle(streamConfig.s3ForcePathStyle());
         config.s3WALPath(streamConfig.s3WALPath());
         config.s3AccessKey(streamConfig.s3AccessKey());
         config.s3SecretKey(streamConfig.s3SecretKey());
