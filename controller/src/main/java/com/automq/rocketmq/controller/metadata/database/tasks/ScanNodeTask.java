@@ -36,6 +36,9 @@ public class ScanNodeTask extends ScanTask {
             try (SqlSession session = this.metadataStore.getSessionFactory().openSession()) {
                 NodeMapper mapper = session.getMapper(NodeMapper.class);
                 List<Node> nodes = mapper.list(this.lastScanTime);
+                if (!nodes.isEmpty()) {
+                    LOGGER.debug("Found {} broker nodes", nodes.size());
+                }
                 updateBrokers(nodes);
             }
         } catch (Throwable e) {
@@ -47,7 +50,7 @@ public class ScanNodeTask extends ScanTask {
     private void updateBrokers(List<Node> nodes) {
         if (null != nodes) {
             for (Node node : nodes) {
-                this.metadataStore.addBroker(node);
+                this.metadataStore.addBrokerNode(node);
                 if (null == this.lastScanTime) {
                     this.lastScanTime = node.getUpdateTime();
                 } else if (node.getUpdateTime().after(this.lastScanTime)) {
