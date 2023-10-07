@@ -65,8 +65,8 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
     private final long topicId;
     private final int queueId;
     private Map<Long/*consumerGroup*/, ConsumerGroupMetadata> consumerGroupMetadataMap;
-    private Map<Long/*consumerGroup*/, AckCommitter> ackCommitterMap = new HashMap<>();
-    private Map<Long/*consumerGroup*/, AckCommitter> retryAckCommitterMap = new HashMap<>();
+    private final Map<Long/*consumerGroup*/, AckCommitter> ackCommitterMap = new HashMap<>();
+    private final Map<Long/*consumerGroup*/, AckCommitter> retryAckCommitterMap = new HashMap<>();
     private long currentOperationOffset = -1;
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
     private final Lock readLock = lock.readLock();
@@ -251,9 +251,7 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
 
     private AckCommitter getAckCommitter(long consumerGroupId, RoaringBitmap bitmap) {
         ConsumerGroupMetadata metadata = this.consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId));
-        return this.ackCommitterMap.computeIfAbsent(consumerGroupId, k -> new AckCommitter(consumerGroupId, metadata.getAckOffset(), offset -> {
-            metadata.setAckOffset(offset);
-        }, bitmap));
+        return this.ackCommitterMap.computeIfAbsent(consumerGroupId, k -> new AckCommitter(consumerGroupId, metadata.getAckOffset(), metadata::setAckOffset, bitmap));
     }
 
     private AckCommitter getRetryAckCommitter(long consumerGroupId) {
@@ -262,9 +260,7 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
 
     private AckCommitter getRetryAckCommitter(long consumerGroupId, RoaringBitmap bitmap) {
         ConsumerGroupMetadata metadata = this.consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId));
-        return this.retryAckCommitterMap.computeIfAbsent(consumerGroupId, k -> new AckCommitter(consumerGroupId, metadata.getRetryAckOffset(), offset -> {
-            metadata.setRetryAckOffset(offset);
-        }, bitmap));
+        return this.retryAckCommitterMap.computeIfAbsent(consumerGroupId, k -> new AckCommitter(consumerGroupId, metadata.getRetryAckOffset(), metadata::setRetryAckOffset, bitmap));
     }
 
     @Override
@@ -393,10 +389,9 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
         writeLock.lock();
         try {
             this.consumerGroupMetadataMap = snapshot.getConsumerGroupMetadataList().stream().collect(Collectors.toMap(
-                ConsumerGroupMetadata::getConsumerGroupId, metadataSnapshot -> {
-                    return new ConsumerGroupMetadata(metadataSnapshot.getConsumerGroupId(), metadataSnapshot.getConsumeOffset(), metadataSnapshot.getAckOffset(),
-                        metadataSnapshot.getRetryConsumeOffset(), metadataSnapshot.getRetryAckOffset());
-                }));
+                ConsumerGroupMetadata::getConsumerGroupId, metadataSnapshot ->
+                    new ConsumerGroupMetadata(metadataSnapshot.getConsumerGroupId(), metadataSnapshot.getConsumeOffset(), metadataSnapshot.getAckOffset(),
+                        metadataSnapshot.getRetryConsumeOffset(), metadataSnapshot.getRetryAckOffset())));
             snapshot.getConsumerGroupMetadataList().forEach(metadataSnapshot -> {
                 RoaringBitmap bitmap = new RoaringBitmap(new ImmutableRoaringBitmap(ByteBuffer.wrap(metadataSnapshot.getAckOffsetBitmapBuffer())));
                 getAckCommitter(metadataSnapshot.getConsumerGroupId(), bitmap);
@@ -524,7 +519,7 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
         }
     }
 
-    class AckCommitter {
+    static class AckCommitter {
         private final long consumerGroupId;
         private long ackOffset;
         private RoaringBitmap bitmap;

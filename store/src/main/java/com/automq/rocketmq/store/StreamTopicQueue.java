@@ -220,10 +220,11 @@ public class StreamTopicQueue extends TopicQueue {
                     consumerGroupId, topicId, queueId, messageExt.offset(), count, invisibleDuration, operationTimestamp,
                     false, operationType
                 );
-                appendOpCfs.add(operationLogService.logPopOperation(popOperation).thenApply(operationId -> {
-                    messageExt.setReceiptHandle(SerializeUtil.encodeReceiptHandle(consumerGroupId, topicId, queueId, operationId));
-                    return operationId;
-                }));
+                appendOpCfs.add(operationLogService.logPopOperation(popOperation)
+                    .thenApply(operationId -> {
+                        messageExt.setReceiptHandle(SerializeUtil.encodeReceiptHandle(consumerGroupId, topicId, queueId, operationId));
+                        return operationId;
+                    }));
             }
             // write special pop operation for the last message to update consume offset
             int count = (int) (fetchResult.endOffset - 1 - preOffset);
@@ -234,9 +235,8 @@ public class StreamTopicQueue extends TopicQueue {
                 );
                 appendOpCfs.add(operationLogService.logPopOperation(popOperation));
             }
-            return CompletableFuture.allOf(appendOpCfs.toArray(new CompletableFuture[0])).thenApply(nil -> {
-                return fetchResult;
-            });
+            return CompletableFuture.allOf(appendOpCfs.toArray(new CompletableFuture[0]))
+                .thenApply(nil -> fetchResult);
         });
 
         return fetchAndLogOpCf.thenApply(filterFetchResult -> {
@@ -249,9 +249,7 @@ public class StreamTopicQueue extends TopicQueue {
             }
             inflightService.increaseInflightCount(consumerGroupId, topicId, queueId, messageExtList.size());
             return new PopResult(status, operationTimestamp, messageExtList);
-        }).exceptionally(throwable -> {
-            return new PopResult(PopResult.Status.ERROR, operationTimestamp, Collections.emptyList());
-        });
+        }).exceptionally(throwable -> new PopResult(PopResult.Status.ERROR, operationTimestamp, Collections.emptyList()));
     }
 
     @Override
@@ -280,13 +278,12 @@ public class StreamTopicQueue extends TopicQueue {
         }
         CompletableFuture<Long> retryStreamIdCf = retryStreamId(consumerGroupId);
         CompletableFuture<Long> retryOffsetCf = stateMachine.retryConsumeOffset(consumerGroupId);
-        return retryStreamIdCf.thenCombine(retryOffsetCf, (streamId, startOffset) -> {
-            return new Pair<Long, Long>(streamId, startOffset);
-        }).thenCompose(pair -> {
-            Long retryStreamId = pair.left();
-            Long startOffset = pair.right();
-            return pop(consumerGroupId, retryStreamId, startOffset, PopOperation.PopOperationType.POP_RETRY, filter, batchSize, invisibleDuration);
-        });
+        return retryStreamIdCf.thenCombine(retryOffsetCf, Pair::new)
+            .thenCompose(pair -> {
+                Long retryStreamId = pair.left();
+                Long startOffset = pair.right();
+                return pop(consumerGroupId, retryStreamId, startOffset, PopOperation.PopOperationType.POP_RETRY, filter, batchSize, invisibleDuration);
+            });
     }
 
     private CompletableFuture<List<FlatMessageExt>> fetchMessages(long streamId, long offset, int batchSize) {
