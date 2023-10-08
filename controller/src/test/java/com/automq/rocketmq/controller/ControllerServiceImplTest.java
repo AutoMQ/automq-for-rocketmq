@@ -1616,6 +1616,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                     .setBrokerId(nodeId)
                     .build();
 
+                client.openStream(String.format("localhost:%d", port), request).get();
                 OpenStreamReply reply = client.openStream(String.format("localhost:%d", port), request).get();
                 StreamMetadata openStream = reply.getStreamMetadata();
                 Assertions.assertEquals(0, openStream.getStartOffset());
@@ -1623,6 +1624,12 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 Assertions.assertEquals(0, openStream.getRangeId());
                 Assertions.assertEquals(StreamState.OPEN, openStream.getState());
                 rangeId = openStream.getRangeId();
+
+                client.closeStream(String.format("localhost:%d", port), CloseStreamRequest.newBuilder()
+                    .setStreamId(streamId)
+                    .setStreamEpoch(streamEpoch + 1)
+                    .setBrokerId(nodeId)
+                    .build()).get();
 
                 client.closeStream(String.format("localhost:%d", port), CloseStreamRequest.newBuilder()
                     .setStreamId(streamId)
