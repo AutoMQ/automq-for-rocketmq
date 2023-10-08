@@ -27,13 +27,13 @@ import com.automq.rocketmq.common.util.Pair;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.metadata.api.ProxyMetadataService;
 import com.automq.rocketmq.proxy.model.VirtualQueue;
+import com.automq.rocketmq.proxy.util.FlatMessageUtil;
 import com.automq.rocketmq.proxy.util.ReceiptHandleUtil;
 import com.automq.rocketmq.store.api.MessageStore;
 import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PutResult;
 import com.automq.rocketmq.store.model.message.SQLFilter;
 import com.automq.rocketmq.store.model.message.TagFilter;
-import com.automq.rocketmq.proxy.util.FlatMessageUtil;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -291,19 +291,21 @@ public class MessageServiceImpl implements MessageService {
     @Override
     public CompletableFuture<Long> queryConsumerOffset(ProxyContext ctx, AddressableMessageQueue messageQueue,
         QueryConsumerOffsetRequestHeader requestHeader, long timeoutMillis) {
-        long consumeGroupId = metadataService.queryConsumerGroupId(requestHeader.getConsumerGroup());
-        long topicId = metadataService.queryTopicId(requestHeader.getTopic());
-        return CompletableFuture.completedFuture(metadataService.queryConsumerOffset(consumeGroupId, topicId, requestHeader.getQueueId()));
+        CompletableFuture<ConsumerGroup> consumeGroupFuture = metadataService.consumerGroupOf(requestHeader.getConsumerGroup());
+        CompletableFuture<Topic> topicFuture = metadataService.topicOf(requestHeader.getTopic());
+
+        return consumeGroupFuture.thenCombine(topicFuture, Pair::new)
+            .thenCompose(pair -> metadataService.consumerOffsetOf(pair.left().getGroupId(), pair.right().getTopicId(), requestHeader.getQueueId()));
     }
 
     @Override
     public CompletableFuture<Void> updateConsumerOffset(ProxyContext ctx, AddressableMessageQueue messageQueue,
         UpdateConsumerOffsetRequestHeader requestHeader, long timeoutMillis) {
-        long consumeGroupId = metadataService.queryConsumerGroupId(requestHeader.getConsumerGroup());
-        long topicId = metadataService.queryTopicId(requestHeader.getTopic());
+        CompletableFuture<ConsumerGroup> consumeGroupFuture = metadataService.consumerGroupOf(requestHeader.getConsumerGroup());
+        CompletableFuture<Topic> topicFuture = metadataService.topicOf(requestHeader.getTopic());
         // TODO: support retry topic.
-        metadataService.updateConsumerOffset(consumeGroupId, topicId, requestHeader.getQueueId(), requestHeader.getCommitOffset(), false);
-        return CompletableFuture.completedFuture(null);
+        return consumeGroupFuture.thenCombine(topicFuture, Pair::new)
+            .thenCompose(pair -> metadataService.updateConsumerOffset(pair.left().getGroupId(), pair.right().getTopicId(), requestHeader.getQueueId(), requestHeader.getCommitOffset()));
     }
 
     @Override

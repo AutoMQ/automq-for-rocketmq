@@ -22,9 +22,9 @@ import com.automq.rocketmq.metadata.api.ProxyMetadataService;
 import com.automq.rocketmq.proxy.mock.MockMessageStore;
 import com.automq.rocketmq.proxy.mock.MockProxyMetadataService;
 import com.automq.rocketmq.proxy.model.VirtualQueue;
+import com.automq.rocketmq.proxy.util.FlatMessageUtil;
 import com.automq.rocketmq.store.api.MessageStore;
 import com.automq.rocketmq.store.model.message.TagFilter;
-import com.automq.rocketmq.proxy.util.FlatMessageUtil;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.rocketmq.client.consumer.AckResult;
@@ -82,7 +82,6 @@ class MessageServiceImplTest {
         header.setTopic(topicName);
         header.setQueueId(0);
 
-
         AddressableMessageQueue messageQueue = new AddressableMessageQueue(new MessageQueue(topicName, virtualQueue.brokerName(), 0), null);
 
         List<SendResult> resultList = messageService.sendMessage(ProxyContext.create(), messageQueue, List.of(message), header, 0).join();
@@ -108,22 +107,25 @@ class MessageServiceImplTest {
         header.setTopic(topicName);
         header.setQueueId(0);
         header.setMaxMsgNums(32);
-        PopResult result = messageService.popMessage(ProxyContext.create(), null, header, 0L).join();
+
+        VirtualQueue virtualQueue = new VirtualQueue(2, 0);
+        AddressableMessageQueue messageQueue = new AddressableMessageQueue(new MessageQueue(topicName, virtualQueue.brokerName(), 0), null);
+
+        PopResult result = messageService.popMessage(ProxyContext.create(), messageQueue, header, 0L).join();
         assertEquals(PopStatus.NO_NEW_MSG, result.getPopStatus());
 
         header.setExpType(ExpressionType.TAG);
         header.setExp(TagFilter.SUB_ALL);
-        long consumerGroupId = metadataService.queryConsumerGroupId(groupName);
-        long topicId = metadataService.queryTopicId(topicName);
+        long consumerGroupId = metadataService.consumerGroupOf(groupName).join().getGroupId();
+        long topicId = metadataService.topicOf(topicName).join().getTopicId();
         messageStore.put(FlatMessageUtil.convertFrom(topicId, 0, "", new Message(topicName, "", new byte[] {})));
         messageStore.put(FlatMessageUtil.convertFrom(topicId, 0, "", new Message(topicName, "", new byte[] {})));
 
-
-        result = messageService.popMessage(ProxyContext.create(), null, header, 0L).join();
+        result = messageService.popMessage(ProxyContext.create(), messageQueue, header, 0L).join();
         assertEquals(PopStatus.FOUND, result.getPopStatus());
         assertEquals(2, result.getMsgFoundList().size());
         // All messages in queue 0 has been consumed
-        assertEquals(2, metadataService.queryConsumerOffset(consumerGroupId, topicId, 0));
+        assertEquals(2, metadataService.consumerOffsetOf(consumerGroupId, topicId, 0).join());
 
         // Pop all queues.
         header.setQueueId(-1);
@@ -135,11 +137,11 @@ class MessageServiceImplTest {
         messageStore.put(FlatMessageUtil.convertFrom(topicId, 4, "", new Message(topicName, "", new byte[] {})));
         messageStore.put(FlatMessageUtil.convertFrom(topicId, 4, "", new Message(topicName, "", new byte[] {})));
 
-        result = messageService.popMessage(ProxyContext.create(), null, header, 0L).join();
+        result = messageService.popMessage(ProxyContext.create(), messageQueue, header, 0L).join();
         assertEquals(PopStatus.FOUND, result.getPopStatus());
         assertEquals(4, result.getMsgFoundList().size());
         // Queue 1 should not be touched because it is not assigned.
-        assertEquals(0, metadataService.queryConsumerOffset(consumerGroupId, topicId, 1));
+        assertEquals(0, metadataService.consumerOffsetOf(consumerGroupId, topicId, 1).join());
 
         // The priorities of queues 2 and 4 are not fixed, so there are the following two results:
         // 1. pop one message from queue 2 and three messages from queue 4
@@ -153,12 +155,12 @@ class MessageServiceImplTest {
                 default -> fail("All messages should be popped from queue 2 or 4.");
             }
         }
-        assertEquals(messageFromQueue2, metadataService.queryConsumerOffset(consumerGroupId, topicId, 2));
-        assertEquals(messageFromQueue4, metadataService.queryConsumerOffset(consumerGroupId, topicId, 4));
+        assertEquals(messageFromQueue2, metadataService.consumerOffsetOf(consumerGroupId, topicId, 2).join());
+        assertEquals(messageFromQueue4, metadataService.consumerOffsetOf(consumerGroupId, topicId, 4).join());
 
         // Pop remaining messages.
         header.setMaxMsgNums(1);
-        result = messageService.popMessage(ProxyContext.create(), null, header, 0L).join();
+        result = messageService.popMessage(ProxyContext.create(), messageQueue, header, 0L).join();
         assertEquals(PopStatus.FOUND, result.getPopStatus());
         assertEquals(1, result.getMsgFoundList().size());
 
@@ -184,7 +186,7 @@ class MessageServiceImplTest {
         header.setMaxMsgNums(1);
         header.setOrder(true);
 
-        long topicId = metadataService.queryTopicId(topicName);
+        long topicId = metadataService.topicOf(topicName).join().getTopicId();
         messageStore.put(FlatMessageUtil.convertFrom(topicId, 0, "", new Message(topicName, "", new byte[] {})));
         messageStore.put(FlatMessageUtil.convertFrom(topicId, 0, "", new Message(topicName, "", new byte[] {})));
         messageStore.put(FlatMessageUtil.convertFrom(topicId, 0, "", new Message(topicName, "", new byte[] {})));
@@ -192,18 +194,22 @@ class MessageServiceImplTest {
         // Pop message with client id "client1".
         ProxyContext context = ProxyContext.create();
         context.setClientID("client1");
-        PopResult result = messageService.popMessage(context, null, header, 0L).join();
+
+        VirtualQueue virtualQueue = new VirtualQueue(2, 0);
+        AddressableMessageQueue messageQueue = new AddressableMessageQueue(new MessageQueue(topicName, virtualQueue.brokerName(), 0), null);
+
+        PopResult result = messageService.popMessage(context, messageQueue, header, 0L).join();
         assertEquals(PopStatus.FOUND, result.getPopStatus());
         assertEquals(1, result.getMsgFoundList().size());
 
         // Pop again with the same client id.
-        result = messageService.popMessage(context, null, header, 0L).join();
+        result = messageService.popMessage(context, messageQueue, header, 0L).join();
         assertEquals(PopStatus.FOUND, result.getPopStatus());
         assertEquals(1, result.getMsgFoundList().size());
 
         // Pop with client id "client2".
         context.setClientID("client2");
-        result = messageService.popMessage(context, null, header, 0L).join();
+        result = messageService.popMessage(context, messageQueue, header, 0L).join();
         assertEquals(PopStatus.NO_NEW_MSG, result.getPopStatus());
         assertEquals(0, result.getMsgFoundList().size());
 
@@ -218,7 +224,7 @@ class MessageServiceImplTest {
         context.setClientID("client2");
         await().atMost(3, TimeUnit.SECONDS)
             .until(() -> {
-                PopResult client2Result = messageService.popMessage(context, null, header, 0L).join();
+                PopResult client2Result = messageService.popMessage(context, messageQueue, header, 0L).join();
                 return client2Result.getPopStatus() == PopStatus.FOUND && client2Result.getMsgFoundList().size() == 1;
             });
     }

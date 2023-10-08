@@ -65,18 +65,20 @@ public class MockProxyMetadataService implements ProxyMetadataService {
 
     @Override
     public CompletableFuture<ConsumerGroup> consumerGroupOf(String groupName) {
-        return null;
+        long groupId = queryConsumerGroupId(groupName);
+        return CompletableFuture.completedFuture(ConsumerGroup.newBuilder().setName(groupName).setGroupId(groupId).build());
     }
 
     @Override
     public CompletableFuture<Long> consumerOffsetOf(long consumerGroupId, long topicId, int queueId) {
-        return null;
+        return CompletableFuture.completedFuture(queryConsumerOffset(consumerGroupId, topicId, queueId));
     }
 
     @Override
     public CompletableFuture<Void> updateConsumerOffset(long consumerGroupId, long topicId, int queueId,
         long newOffset) {
-        return null;
+        updateConsumerOffset(consumerGroupId, topicId, queueId, newOffset, false);
+        return CompletableFuture.completedFuture(null);
     }
 
     @Override
