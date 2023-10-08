@@ -1378,7 +1378,7 @@ public class DefaultMetadataStore implements MetadataStore {
                         future.completeExceptionally(e);
                         break;
                     }
-                    future.complete(objectIds.get(0));
+                    future.complete(Objects.isNull(objectIds) || objectIds.isEmpty() ? S3Constants.NOOP_OBJECT_ID : objectIds.get(0));
                 }
             } else {
                 PrepareS3ObjectsRequest request = PrepareS3ObjectsRequest.newBuilder()
@@ -1413,6 +1413,12 @@ public class DefaultMetadataStore implements MetadataStore {
                     S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
                     S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
                     long committedTs = System.currentTimeMillis();
+
+                    if (Objects.isNull(walObject) || walObject.getObjectId() == S3Constants.NOOP_OBJECT_ID) {
+                        LOGGER.error("S3WALObject[object-id={}] is null or objectId is unavailable", walObject.getObjectId());
+                        throw new ControllerException(Code.NOT_FOUND_VALUE, String.format("S3WALObject[object-id=%d] is null or objectId is unavailable", walObject.getObjectId()));
+                    }
+
                     int brokerId = walObject.getBrokerId();
                     long objectId = walObject.getObjectId();
 
@@ -1523,6 +1529,12 @@ public class DefaultMetadataStore implements MetadataStore {
                     if (!maintainLeadershipWithSharedLock(session)) {
                         continue;
                     }
+
+                    if (Objects.isNull(streamObject) || streamObject.getObjectId() == S3Constants.NOOP_OBJECT_ID) {
+                        LOGGER.error("S3StreamObject[object-id={}] is null or objectId is unavailable", streamObject.getObjectId());
+                        throw new ControllerException(Code.NOT_FOUND_VALUE, String.format("S3StreamObject[object-id=%d] is null or objectId is unavailable", streamObject.getObjectId()));
+                    }
+
                     long committedTs = System.currentTimeMillis();
                     S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
                     S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
@@ -1681,6 +1693,10 @@ public class DefaultMetadataStore implements MetadataStore {
     private boolean commitObject(Long objectId, SqlSession session, long committedTs) {
         S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
         S3Object s3Object = s3ObjectMapper.getById(objectId);
+        if (Objects.isNull(s3Object)) {
+            LOGGER.error("object[object-id={}] not exist", objectId);
+            return false;
+        }
         // verify the state
         if (s3Object.getState() == S3ObjectState.BOS_COMMITTED) {
             LOGGER.warn("object[object-id={}] already committed", objectId);
