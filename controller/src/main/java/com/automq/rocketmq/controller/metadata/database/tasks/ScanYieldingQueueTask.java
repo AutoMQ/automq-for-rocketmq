@@ -22,7 +22,6 @@ import com.automq.rocketmq.common.StoreHandle;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper;
-import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -35,15 +34,13 @@ import org.apache.ibatis.session.SqlSession;
 /**
  * This task will scan database incrementally to figure out queues that has been re-assigned to other nodes by leader
  * controller.
- *
+ * <p>
  * For each record found during the scan, the task will set up a state machine {@link NextState} and drive the state
  * machine to complete.
- *
- *
  */
 public class ScanYieldingQueueTask extends ScanTask {
 
-    private static enum NextState {
+    private enum NextState {
         /**
          * Next step is to close queue in the underlying store.
          */
@@ -86,31 +83,26 @@ public class ScanYieldingQueueTask extends ScanTask {
         }
 
         public void doNext() {
-            try (SqlSession session = metadataStore.openSession()) {
-                StreamMapper streamMapper = session.getMapper(StreamMapper.class);
-                StoreHandle storeHandle = metadataStore.getStoreHandle();
-                switch (next) {
-                    case STORE_CLOSE -> closeQueue(streamMapper, storeHandle,
-                        assignment.getTopicId(), assignment.getQueueId());
+            StoreHandle storeHandle = metadataStore.getStoreHandle();
+            switch (next) {
+                case STORE_CLOSE -> closeQueue(storeHandle,
+                    assignment.getTopicId(), assignment.getQueueId());
 
-                    case NOTIFY_LEADER -> ScanYieldingQueueTask.this.metadataStore
-                        .onQueueClosed(assignment.getTopicId(), assignment.getQueueId())
-                        .whenComplete((res, e) -> {
-                            if (null != e) {
-                                next = NextState.COMPLETED;
-                                doNext();
-                            }
-                        });
-                    case COMPLETED ->
-                        ScanYieldingQueueTask.this.doComplete(assignment.getTopicId(), assignment.getQueueId());
-                }
-                session.commit();
+                case NOTIFY_LEADER -> ScanYieldingQueueTask.this.metadataStore
+                    .onQueueClosed(assignment.getTopicId(), assignment.getQueueId())
+                    .whenComplete((res, e) -> {
+                        if (null != e) {
+                            next = NextState.COMPLETED;
+                            doNext();
+                        }
+                    });
+                case COMPLETED ->
+                    ScanYieldingQueueTask.this.doComplete(assignment.getTopicId(), assignment.getQueueId());
             }
         }
 
-        private void closeQueue(StreamMapper mapper, StoreHandle handle, long topicId, int queueId) {
-            long epoch = mapper.queueEpoch(topicId, queueId);
-            handle.onTopicQueueClose(topicId, queueId, epoch)
+        private void closeQueue(StoreHandle handle, long topicId, int queueId) {
+            handle.close(topicId, queueId)
                 .whenComplete((res, e) -> {
                     if (null != e) {
                         LOGGER.error("Failed to close queue[topic-id={}, queue-id={}]", topicId, queueId);
