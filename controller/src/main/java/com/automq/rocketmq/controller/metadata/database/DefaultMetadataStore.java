@@ -48,7 +48,6 @@ import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.common.PrefixThreadFactory;
 import com.automq.rocketmq.common.StoreHandle;
 import com.automq.rocketmq.common.system.S3Constants;
-import com.automq.rocketmq.common.util.Pair;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.BrokerNode;
 import com.automq.rocketmq.controller.metadata.ControllerClient;
@@ -80,6 +79,7 @@ import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 import com.automq.rocketmq.controller.metadata.database.tasks.LeaseTask;
 import com.automq.rocketmq.controller.metadata.database.tasks.ScanNodeTask;
 import com.automq.rocketmq.controller.metadata.database.tasks.ScanYieldingQueueTask;
+import com.automq.rocketmq.controller.metadata.database.tasks.SchedulerTask;
 import com.google.common.base.Strings;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -105,6 +105,8 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.slf4j.Logger;
@@ -178,6 +180,7 @@ public class DefaultMetadataStore implements MetadataStore {
         this.scheduledExecutorService.scheduleAtFixedRate(leaseTask, 1, config.scanIntervalInSecs(), TimeUnit.SECONDS);
         this.scheduledExecutorService.scheduleWithFixedDelay(new ScanNodeTask(this), 1, config.scanIntervalInSecs(), TimeUnit.SECONDS);
         this.scheduledExecutorService.scheduleWithFixedDelay(new ScanYieldingQueueTask(this), 1, config.scanIntervalInSecs(), TimeUnit.SECONDS);
+        this.scheduledExecutorService.scheduleWithFixedDelay(new SchedulerTask(this), 1, config.scanIntervalInSecs(), TimeUnit.SECONDS);
         LOGGER.info("MetadataStore tasks scheduled");
     }
 
@@ -253,38 +256,7 @@ public class DefaultMetadataStore implements MetadataStore {
         }
     }
 
-    //TODO: version to identify epoch
-    public boolean assignMessageQueues(List<QueueAssignment> assignments, SqlSession session) {
-        if (!maintainLeadershipWithSharedLock(session)) {
-            return false;
-        }
-
-        List<Integer> aliveNodeIds =
-            this.nodes.values()
-                .stream()
-                .filter(brokerNode -> brokerNode.isAlive(config))
-                .map(node -> node.getNode().getId())
-                .toList();
-        if (aliveNodeIds.isEmpty()) {
-            return false;
-        }
-
-        QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
-
-        Set<Integer> toNotify = new HashSet<>();
-
-        for (int i = 0; i < assignments.size(); i++) {
-            int idx = i % aliveNodeIds.size();
-            QueueAssignment assignment = assignments.get(i);
-            assignment.setDstNodeId(aliveNodeIds.get(idx));
-            toNotify.add(aliveNodeIds.get(idx));
-            assignmentMapper.update(assignment);
-        }
-        this.notifyOnResourceChange(toNotify);
-        return true;
-    }
-
-    private boolean maintainLeadershipWithSharedLock(SqlSession session) {
+    public boolean maintainLeadershipWithSharedLock(SqlSession session) {
         LeaseMapper leaseMapper = session.getMapper(LeaseMapper.class);
         Lease current = leaseMapper.currentWithShareLock();
         if (current.getEpoch() != this.lease.getEpoch()) {
@@ -886,13 +858,12 @@ public class DefaultMetadataStore implements MetadataStore {
                     .filter(stream -> stream.getStreamRole() == streamRole).toList();
                 if (streams.isEmpty()) {
                     if (streamRole == StreamRole.STREAM_ROLE_RETRY) {
-                        // TODO: create retry stream
                         QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
                         List<QueueAssignment> assignments = assignmentMapper
                             .list(topicId, null, null, null, null)
                             .stream().filter(assignment -> assignment.getStatus() != AssignmentStatus.ASSIGNMENT_STATUS_DELETED)
                             .toList();
-                        int nodeId = assignments.isEmpty() ? 0 : assignments.get(0).getSrcNodeId();
+                        int nodeId = assignments.isEmpty() ? 0 : assignments.get(0).getDstNodeId();
                         long streamId = createStream(streamMapper, topicId, queueId, groupId, streamRole, nodeId);
                         return StreamMetadata.newBuilder()
                             .setEpoch(0)
@@ -1083,7 +1054,7 @@ public class DefaultMetadataStore implements MetadataStore {
                                 s3ObjectMapper.delete(s3Object);
                             }
 
-                            // remove offset range about substream ...
+                            // remove offset range about sub-stream ...
                         });
                     session.commit();
                     LOGGER.info("Node[node-id={}] trim stream [stream-id={}] with epoch={} and newStartOffset={}",
@@ -1573,9 +1544,7 @@ public class DefaultMetadataStore implements MetadataStore {
 
                     // delete the compactedObjects of S3Stream
                     if (!Objects.isNull(compactedObjects) && !compactedObjects.isEmpty()) {
-                        compactedObjects.stream().forEach(id -> {
-                            s3StreamObjectMapper.delete(null, null, id);
-                        });
+                        compactedObjects.forEach(id -> s3StreamObjectMapper.delete(null, null, id));
                     }
                     LOGGER.info("S3StreamObject[object-id={}] commit success, compacted objects: {}", streamObject.getObjectId(), compactedObjects);
                     session.commit();
@@ -1719,7 +1688,7 @@ public class DefaultMetadataStore implements MetadataStore {
         StreamMapper streamMapper = session.getMapper(StreamMapper.class);
         RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
         for (long[] offset : offsets) {
-            long streamId = offset[0], startOffset = offset[1], endStart = offset[2];
+            long streamId = offset[0], startOffset = offset[1];
             // verify stream exist and open
             Stream stream = streamMapper.getByStreamId(streamId);
             if (stream.getState() != StreamState.OPEN) {
@@ -1775,7 +1744,7 @@ public class DefaultMetadataStore implements MetadataStore {
                             String.format("Group '%s' is not found", groupName));
                     }
 
-                    long groupId = groups.get(0).getId(), streamId = -1L;
+                    long groupId = groups.get(0).getId(), streamId;
                     StreamMapper streamMapper = session.getMapper(StreamMapper.class);
                     List<Stream> streams = streamMapper.list(topicId, queueId, groupId)
                         .stream().filter(stream -> stream.getStreamRole() == StreamRole.STREAM_ROLE_RETRY).toList();
@@ -1843,7 +1812,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     .limit(limit - s3StreamObjects.size())
                     .toList();
 
-                return new Pair<>(s3StreamObjects, walObjects);
+                return new ImmutablePair<>(s3StreamObjects, walObjects);
             }
         }, asyncExecutorService);
     }

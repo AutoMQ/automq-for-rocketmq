@@ -27,7 +27,6 @@ import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.MessageType;
 import com.automq.rocketmq.common.StoreHandle;
-import com.automq.rocketmq.common.util.Pair;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.database.dao.Lease;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
@@ -37,6 +36,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.ibatis.session.SqlSession;
 
 public interface MetadataStore extends Closeable {
@@ -160,4 +160,6 @@ public interface MetadataStore extends Closeable {
     String addressOfNode(int nodeId);
 
     CompletableFuture<Pair<List<S3StreamObject>, List<S3WALObject>>> listObjects(long streamId, long startOffset, long endOffset, int limit);
+
+    boolean maintainLeadershipWithSharedLock(SqlSession session);
 }
