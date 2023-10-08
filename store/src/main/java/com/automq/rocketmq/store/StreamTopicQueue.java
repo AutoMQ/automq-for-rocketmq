@@ -145,6 +145,7 @@ public class StreamTopicQueue extends TopicQueue {
         if (state.compareAndSet(State.OPENED, State.CLOSING)) {
             return streamStore.close(Arrays.asList(dataStreamId, operationStreamId, snapshotStreamId))
                 .thenCompose(nil -> stateMachine.clear())
+                .thenAccept(nil -> inflightService.clearInflightCount(topicId, queueId))
                 .thenAccept(nil -> state.set(State.CLOSED));
         }
         return CompletableFuture.completedFuture(null);

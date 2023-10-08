@@ -17,17 +17,17 @@
 
 package com.automq.rocketmq.store.service;
 
+import com.automq.rocketmq.store.model.message.TopicQueueId;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class InflightService {
-    private final ConcurrentMap<Long /* consumerGroupId */, ConcurrentMap<Long /* topicId */, ConcurrentMap<Integer /* queueId */, AtomicInteger>>> inflightMap = new ConcurrentHashMap<>();
+    private final ConcurrentMap<TopicQueueId /*topic-queue*/, ConcurrentMap<Long /*consumer-group*/, AtomicInteger>> inflightMap = new ConcurrentHashMap<>();
 
     private AtomicInteger getCounter(long consumerGroupId, long topicId, int queueId) {
-        return inflightMap.computeIfAbsent(consumerGroupId, v -> new ConcurrentHashMap<>())
-            .computeIfAbsent(topicId, v -> new ConcurrentHashMap<>())
-            .computeIfAbsent(queueId, v -> new AtomicInteger());
+        return inflightMap.computeIfAbsent(TopicQueueId.of(topicId, queueId), v -> new ConcurrentHashMap<>())
+            .computeIfAbsent(consumerGroupId, v -> new AtomicInteger());
     }
 
     public void increaseInflightCount(long consumerGroupId, long topicId, int queueId, int count) {
@@ -43,5 +43,9 @@ public class InflightService {
     public int getInflightCount(long consumerGroupId, long topicId, int queueId) {
         AtomicInteger counter = getCounter(consumerGroupId, topicId, queueId);
         return counter.get();
+    }
+
+    public void clearInflightCount(long topicId, int queueId) {
+        inflightMap.remove(TopicQueueId.of(topicId, queueId));
     }
 }

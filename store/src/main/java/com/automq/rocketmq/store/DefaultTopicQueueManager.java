@@ -23,11 +23,11 @@ import com.automq.rocketmq.store.api.MessageStateMachine;
 import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.rocketmq.store.api.TopicQueue;
 import com.automq.rocketmq.store.api.TopicQueueManager;
+import com.automq.rocketmq.store.model.message.TopicQueueId;
 import com.automq.rocketmq.store.service.InflightService;
 import com.automq.rocketmq.store.service.SnapshotService;
 import com.automq.rocketmq.store.service.api.KVService;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -117,28 +117,4 @@ public class DefaultTopicQueueManager implements TopicQueueManager {
             .thenApply(nil -> topicQueue);
     }
 
-    static class TopicQueueId {
-        private final long topicId;
-        private final int queueId;
-
-        public TopicQueueId(long topicId, int queueId) {
-            this.topicId = topicId;
-            this.queueId = queueId;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o)
-                return true;
-            if (o == null || getClass() != o.getClass())
-                return false;
-            TopicQueueId id = (TopicQueueId) o;
-            return topicId == id.topicId && queueId == id.queueId;
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(topicId, queueId);
-        }
-    }
 }
