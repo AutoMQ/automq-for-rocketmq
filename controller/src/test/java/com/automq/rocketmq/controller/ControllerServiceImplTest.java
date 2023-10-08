@@ -26,6 +26,7 @@ import apache.rocketmq.controller.v1.CommitWALObjectRequest;
 import apache.rocketmq.controller.v1.ControllerServiceGrpc;
 import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
+import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.GroupType;
 import apache.rocketmq.controller.v1.HeartbeatReply;
 import apache.rocketmq.controller.v1.HeartbeatRequest;
@@ -40,6 +41,7 @@ import apache.rocketmq.controller.v1.OpenStreamRequest;
 import apache.rocketmq.controller.v1.PrepareS3ObjectsReply;
 import apache.rocketmq.controller.v1.PrepareS3ObjectsRequest;
 import apache.rocketmq.controller.v1.S3ObjectState;
+import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.StreamState;
 import apache.rocketmq.controller.v1.TopicStatus;
@@ -1554,5 +1556,99 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             }
         }
 
+    }
+
+
+    @Test
+    public void testCreateTopic_OpenStream_CloseStream() throws IOException, ExecutionException, InterruptedException, ControllerException {
+        ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
+        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
+        Mockito.when(controllerConfig.nodeId()).thenReturn(1);
+        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
+        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
+
+        long streamId, streamEpoch;
+        int rangeId;
+        int nodeId = 1;
+
+        String topicName = "t1";
+        int queueNum = 4;
+        List<MessageType> messageTypeList = new ArrayList<>();
+        messageTypeList.add(MessageType.NORMAL);
+        messageTypeList.add(MessageType.FIFO);
+        messageTypeList.add(MessageType.DELAY);
+
+        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
+            metadataStore.start();
+            Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
+                .atMost(10, TimeUnit.SECONDS)
+                .until(metadataStore::isLeader);
+
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
+                 ControllerClient client = new GrpcControllerClient()
+            ) {
+                testServer.start();
+                int port = testServer.getPort();
+                String name = "broker-0";
+                String address = "localhost:1234";
+                String instanceId = "i-register";
+
+                Node node = new Node();
+                node.setName(name);
+                node.setAddress(address);
+                node.setInstanceId(instanceId);
+                node.setId(nodeId);
+                ((DefaultMetadataStore) metadataStore).addBrokerNode(node);
+
+                Long topicId = client.createTopic(String.format("localhost:%d", port), CreateTopicRequest.newBuilder()
+                    .setTopic(topicName)
+                    .setCount(queueNum)
+                    .addAllAcceptMessageTypes(messageTypeList)
+                    .build()).get();
+
+                StreamMetadata metadata = metadataStore.getStream(topicId, 0, null, StreamRole.STREAM_ROLE_DATA).get();
+                streamId = metadata.getStreamId();
+                streamEpoch = metadata.getEpoch();
+                OpenStreamRequest request = OpenStreamRequest.newBuilder()
+                    .setStreamId(metadata.getStreamId())
+                    .setStreamEpoch(metadata.getEpoch())
+                    .setBrokerId(nodeId)
+                    .build();
+
+                OpenStreamReply reply = client.openStream(String.format("localhost:%d", port), request).get();
+                StreamMetadata openStream = reply.getStreamMetadata();
+                Assertions.assertEquals(0, openStream.getStartOffset());
+                Assertions.assertEquals(streamEpoch + 1, openStream.getEpoch());
+                Assertions.assertEquals(0, openStream.getRangeId());
+                Assertions.assertEquals(StreamState.OPEN, openStream.getState());
+                rangeId = openStream.getRangeId();
+
+                client.closeStream(String.format("localhost:%d", port), CloseStreamRequest.newBuilder()
+                    .setStreamId(streamId)
+                    .setStreamEpoch(streamEpoch + 1)
+                    .setBrokerId(nodeId)
+                    .build()).get();
+            }
+        }
+        long targetStreamEpoch = streamEpoch + 1;
+        try (SqlSession session = getSessionFactory().openSession()) {
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+            RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
+
+            Stream stream = streamMapper.getByStreamId(streamId);
+            Assertions.assertEquals(streamId, stream.getId());
+            Assertions.assertEquals(0, stream.getStartOffset());
+            Assertions.assertEquals(targetStreamEpoch, stream.getEpoch());
+            Assertions.assertEquals(0, stream.getRangeId());
+            Assertions.assertEquals(StreamState.CLOSED, stream.getState());
+
+            Range range = rangeMapper.get(rangeId, streamId, null);
+            Assertions.assertEquals(0, range.getRangeId());
+            Assertions.assertEquals(streamId, range.getStreamId());
+            Assertions.assertEquals(targetStreamEpoch, range.getEpoch());
+            Assertions.assertEquals(0, range.getStartOffset());
+            Assertions.assertEquals(0, range.getEndOffset());
+        }
     }
 }
