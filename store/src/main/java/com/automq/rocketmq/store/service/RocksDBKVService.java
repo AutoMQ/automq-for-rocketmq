@@ -122,7 +122,8 @@ public class RocksDBKVService implements KVService {
     }
 
     @Override
-    public byte[] get(final String namespace, final byte[] key, final KVReadOptions kvReadOptions) throws StoreException {
+    public byte[] get(final String namespace, final byte[] key,
+        final KVReadOptions kvReadOptions) throws StoreException {
         if (stopped) {
             throw new StoreException(StoreErrorCode.KV_SERVICE_IS_NOT_RUNNING, "KV service is stopped.");
         }
@@ -156,7 +157,8 @@ public class RocksDBKVService implements KVService {
     }
 
     @Override
-    public void iterate(final String namespace, IteratorCallback callback, KVReadOptions kvReadOptions) throws StoreException {
+    public void iterate(final String namespace, IteratorCallback callback,
+        KVReadOptions kvReadOptions) throws StoreException {
         if (stopped) {
             throw new StoreException(StoreErrorCode.KV_SERVICE_IS_NOT_RUNNING, "KV service is stopped.");
         }
@@ -342,13 +344,11 @@ public class RocksDBKVService implements KVService {
             return;
         }
         stopped = true;
-        transformException(() -> rocksDB.flushWal(true),
-            "Failed to flush RocksDB.");
+        transformException(() -> rocksDB.flushWal(true), "Failed to flush RocksDB.");
         for (Map.Entry<String, ColumnFamilyHandle> entry : columnFamilyNameHandleMap.entrySet()) {
             entry.getValue().close();
         }
-        transformException(rocksDB::closeE,
-            "Failed to close RocksDB.");
+        transformException(rocksDB::closeE, "Failed to close RocksDB.");
         dbOptions.close();
         columnFamilyOptions.close();
     }

@@ -31,7 +31,6 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import org.apache.rocketmq.common.message.Message;
 import org.apache.rocketmq.common.message.MessageAccessor;
 import org.apache.rocketmq.common.message.MessageConst;
@@ -53,6 +52,10 @@ public class FlatMessageUtil {
         // We should split them into two parts.
         Map<String, String> properties = rmqMessage.getProperties();
 
+        for (String systemPropertyKey : MessageConst.STRING_HASH_SET) {
+            properties.remove(systemPropertyKey);
+        }
+
         SystemPropertiesT systemPropertiesT = splitSystemProperties(flatMessageT, properties);
         systemPropertiesT.setStoreTimestamp(System.currentTimeMillis());
         systemPropertiesT.setStoreHost(storeHost);
@@ -71,9 +74,6 @@ public class FlatMessageUtil {
         flatMessageT.setUserProperties(userProperties);
 
         FlatBufferBuilder builder = new FlatBufferBuilder();
-        // Enable force_defaults to enable inplace update for default values.
-        // Currently, we only need to update the default value of `deliveryAttempt`.
-        builder.forceDefaults(true);
 
         int root = FlatMessage.pack(builder, flatMessageT);
         builder.finish(root);
@@ -104,9 +104,15 @@ public class FlatMessageUtil {
 
         SystemProperties systemProperties = flatMessage.message().systemProperties();
         messageExt.setBornTimestamp(systemProperties.bornTimestamp());
-        messageExt.setBornHost(new InetSocketAddress(Objects.requireNonNull(systemProperties.bornHost()), 0));
+        String bornHost = systemProperties.bornHost();
+        if (bornHost != null) {
+            messageExt.setBornHost(new InetSocketAddress(bornHost, 0));
+        }
         messageExt.setStoreTimestamp(systemProperties.storeTimestamp());
-        messageExt.setStoreHost(new InetSocketAddress(Objects.requireNonNull(systemProperties.storeHost()), 0));
+        String storeHost = systemProperties.storeHost();
+        if (storeHost != null) {
+            messageExt.setStoreHost(new InetSocketAddress(storeHost, 0));
+        }
         messageExt.setMsgId(systemProperties.messageId());
 
         // Re-consume times is the number of delivery attempts minus 1.
@@ -167,7 +173,9 @@ public class FlatMessageUtil {
 
     private static void fillSystemProperties(MessageExt messageExt, FlatMessageExt flatMessage, long invisibleTime) {
         SystemProperties systemProperties = flatMessage.message().systemProperties();
-        MessageAccessor.putProperty(messageExt, MessageConst.PROPERTY_POP_CK, encodeReceiptHandle(flatMessage.receiptHandle().orElseThrow(), invisibleTime));
+        if (flatMessage.receiptHandle().isPresent()) {
+            MessageAccessor.putProperty(messageExt, MessageConst.PROPERTY_POP_CK, encodeReceiptHandle(flatMessage.receiptHandle().get(), invisibleTime));
+        }
         MessageAccessor.putProperty(messageExt, MessageConst.PROPERTY_TAGS, flatMessage.message().tag());
         MessageAccessor.putProperty(messageExt, MessageConst.PROPERTY_KEYS, flatMessage.message().keys());
         MessageAccessor.putProperty(messageExt, MessageConst.PROPERTY_SHARDING_KEY, flatMessage.message().messageGroup());
