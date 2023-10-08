@@ -1071,7 +1071,7 @@ public class DefaultMetadataStore implements MetadataStore {
                         return future;
                     }
 
-                    if (stream.getEpoch() > streamEpoch) {
+                    if (stream.getEpoch() > streamEpoch && !Objects.equals(stream.getSrcNodeId(), stream.getDstNodeId())) {
                         LOGGER.warn("stream {}'s epoch {} is larger than request epoch {}",
                             streamId, stream.getEpoch(), streamEpoch);
                         ControllerException e = new ControllerException(Code.FENCED_VALUE, "Epoch of stream is deprecated");
