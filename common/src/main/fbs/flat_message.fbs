@@ -39,10 +39,10 @@ table SystemProperties {
     // The host that born the message
     born_host: string;
     // The count of the message delivery attempt
-    delivery_attempts: int;
+    delivery_attempts: int = -1;
     // The trace context of the message
     trace_context: string;
     // The queue offset in the original queue
     // This field is only used in the retry message
-    original_queue_offset: long;
+    original_queue_offset: long = -1;
 }

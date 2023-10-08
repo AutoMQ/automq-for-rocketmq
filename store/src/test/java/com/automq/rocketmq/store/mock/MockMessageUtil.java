@@ -56,7 +56,6 @@ public class MockMessageUtil {
         flatMessageT.setSystemProperties(systemPropertiesT);
 
         FlatBufferBuilder builder = new FlatBufferBuilder(1024);
-        builder.forceDefaults(true);
         int root = FlatMessage.pack(builder, flatMessageT);
         builder.finish(root);
         return builder.dataBuffer();
