@@ -99,6 +99,11 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
     }
 
     @Override
+    public int getNodeId() {
+        return node.getId();
+    }
+
+    @Override
     public CompletableFuture<StreamMetadata> dataStreamOf(long topicId, int queueId) {
         return metadataStore.getStream(topicId, queueId, null, StreamRole.STREAM_ROLE_DATA);
     }
@@ -151,13 +156,13 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
     }
 
     @Override
-    public CompletableFuture<StreamMetadata> openStream(long streamId, long streamEpoch) {
-        return metadataStore.openStream(streamId, streamEpoch);
+    public CompletableFuture<StreamMetadata> openStream(long streamId, long streamEpoch, int nodeId) {
+        return metadataStore.openStream(streamId, streamEpoch, nodeId);
     }
 
     @Override
-    public CompletableFuture<Void> closeStream(long streamId, long streamEpoch) {
-        return metadataStore.closeStream(streamId, streamEpoch);
+    public CompletableFuture<Void> closeStream(long streamId, long streamEpoch, int nodeId) {
+        return metadataStore.closeStream(streamId, streamEpoch, nodeId);
     }
 
     @Override

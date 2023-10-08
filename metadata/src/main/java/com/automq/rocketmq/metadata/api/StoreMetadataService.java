@@ -94,18 +94,20 @@ public interface StoreMetadataService {
      *
      * @param streamId stream id.
      * @param streamEpoch stream epoch.
+     * @param nodeId node id.
      * @return {@link StreamMetadata}
      */
-    CompletableFuture<StreamMetadata> openStream(long streamId, long streamEpoch);
+    CompletableFuture<StreamMetadata> openStream(long streamId, long streamEpoch, int nodeId);
 
     /**
      * Mark the specified stream as closed.
      *
      * @param streamId stream id.
      * @param streamEpoch stream epoch.
+     * @param nodeId node id.
      * @return {@link CompletableFuture} of close operation.
      */
-    CompletableFuture<Void> closeStream(long streamId, long streamEpoch);
+    CompletableFuture<Void> closeStream(long streamId, long streamEpoch, int nodeId);
 
     /**
      * List the open streams of current server.
@@ -187,6 +189,12 @@ public interface StoreMetadataService {
      */
     CompletableFuture<Pair<List<S3StreamObject>, List<S3WALObject>>> listObjects(long streamId, long startOffset,
         long endOffset, int limit);
+
+    /**
+     * Get the nodeId of the current broker
+     * @return nodeId
+     */
+    int getNodeId();
 
     @Deprecated
     long getStreamId(long topicId, int queueId);

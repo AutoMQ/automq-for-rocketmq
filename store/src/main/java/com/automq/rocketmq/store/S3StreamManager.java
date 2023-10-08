@@ -47,7 +47,7 @@ public class S3StreamManager implements StreamManager {
 
     @Override
     public CompletableFuture<StreamMetadata> openStream(long streamId, long epoch) {
-        return metaService.openStream(streamId, epoch).thenApply(this::convertFrom);
+        return metaService.openStream(streamId, epoch, metaService.getNodeId()).thenApply(this::convertFrom);
     }
 
     @Override
@@ -57,7 +57,7 @@ public class S3StreamManager implements StreamManager {
 
     @Override
     public CompletableFuture<Void> closeStream(long streamId, long epoch) {
-        return metaService.closeStream(streamId, epoch).thenApply(v -> null);
+        return metaService.closeStream(streamId, epoch, metaService.getNodeId()).thenApply(v -> null);
     }
 
     @Override

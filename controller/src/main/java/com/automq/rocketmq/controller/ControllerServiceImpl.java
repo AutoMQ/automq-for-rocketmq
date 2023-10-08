@@ -439,7 +439,7 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
 
     @Override
     public void openStream(OpenStreamRequest request, StreamObserver<OpenStreamReply> responseObserver) {
-        metadataStore.openStream(request.getStreamId(), request.getStreamEpoch()).whenComplete((metadata, e) -> {
+        metadataStore.openStream(request.getStreamId(), request.getStreamEpoch(), request.getBrokerId()).whenComplete((metadata, e) -> {
             if (null != e) {
                 if (e instanceof ControllerException ex) {
                     OpenStreamReply reply = OpenStreamReply.newBuilder()
@@ -464,7 +464,7 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
 
     @Override
     public void closeStream(CloseStreamRequest request, StreamObserver<CloseStreamReply> responseObserver) {
-        metadataStore.closeStream(request.getStreamId(), request.getStreamEpoch()).whenComplete((res, e) -> {
+        metadataStore.closeStream(request.getStreamId(), request.getStreamEpoch(), request.getBrokerId()).whenComplete((res, e) -> {
             if (null != e) {
                 if (e instanceof ControllerException ex) {
                     CloseStreamReply reply = CloseStreamReply.newBuilder()
