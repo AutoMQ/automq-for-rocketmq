@@ -32,6 +32,7 @@ import com.automq.rocketmq.store.service.api.OperationLogService;
 import com.automq.rocketmq.store.util.SerializeUtil;
 import com.automq.stream.api.AppendResult;
 import com.automq.stream.api.RecordBatchWithContext;
+import com.automq.stream.utils.FutureUtil;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -149,7 +150,8 @@ public class StreamOperationLogService implements OperationLogService {
                 this.takingSnapshot.set(false);
                 this.opStartOffset.set(newStartOffset);
             }).exceptionally(e -> {
-                LOGGER.error("take snapshot failed: {}", e.getMessage());
+                Throwable cause = FutureUtil.cause(e);
+                LOGGER.error("take snapshot failed: {}", cause);
                 this.takingSnapshot.set(false);
                 return null;
             });
@@ -166,6 +168,7 @@ public class StreamOperationLogService implements OperationLogService {
             try {
                 replay(result.baseOffset(), operation);
             } catch (StoreException e) {
+                LOGGER.error("replay operation failed", e);
                 throw new CompletionException(e);
             }
             if (result.baseOffset() - opStartOffset.get() + 1 >= storeConfig.operationSnapshotInterval()) {

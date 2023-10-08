@@ -32,6 +32,15 @@ import java.util.Base64;
 import java.util.List;
 
 public class SerializeUtil {
+
+    // <topicId><queueId>
+    public static byte[] buildCheckPointPrefix(long topicId, int queueId) {
+        ByteBuffer buffer = ByteBuffer.allocate(12);
+        buffer.putLong(topicId);
+        buffer.putInt(queueId);
+        return buffer.array();
+    }
+
     // <topicId><queueId><operationId>
     public static byte[] buildCheckPointKey(long topicId, int queueId, long operationId) {
         ByteBuffer buffer = ByteBuffer.allocate(20);
