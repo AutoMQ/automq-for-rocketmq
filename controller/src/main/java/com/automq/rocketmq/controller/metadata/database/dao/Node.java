@@ -56,7 +56,7 @@ public class Node {
     private String address;
 
     /**
-     * Epoch of the current broker process. Each registration increase it by one.
+     * Epoch of the current broker process. Each registration increase it by one when it starts.
      */
     private long epoch;
 

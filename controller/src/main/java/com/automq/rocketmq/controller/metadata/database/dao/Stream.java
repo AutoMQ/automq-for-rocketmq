@@ -25,7 +25,9 @@ import java.util.Date;
 public class Stream {
 
     private long id;
-
+    /**
+     * Epoch of the current stream. Each registration increase it by one when open stream.
+     */
     private long epoch;
 
     private int rangeId;

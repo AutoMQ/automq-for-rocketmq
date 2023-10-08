@@ -515,7 +515,7 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     @Override
     public void listOpenStreams(ListOpenStreamsRequest request,
         StreamObserver<ListOpenStreamsReply> responseObserver) {
-        metadataStore.listOpenStreams(request.getBrokerId(), request.getBrokerEpoch())
+        metadataStore.listOpenStreams(request.getBrokerId())
             .whenComplete((metadataList, e) -> {
                 if (null != e) {
                     responseObserver.onError(e);
