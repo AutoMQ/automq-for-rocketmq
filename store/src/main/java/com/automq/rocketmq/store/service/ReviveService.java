@@ -22,6 +22,7 @@ import com.automq.rocketmq.common.util.Lifecycle;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.store.api.TopicQueue;
 import com.automq.rocketmq.store.api.TopicQueueManager;
+import com.automq.rocketmq.store.exception.StoreErrorCode;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.generated.CheckPoint;
 import com.automq.rocketmq.store.model.generated.ReceiptHandle;
@@ -30,10 +31,14 @@ import com.automq.rocketmq.store.model.message.PullResult;
 import com.automq.rocketmq.store.model.operation.PopOperation;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.util.SerializeUtil;
+import com.automq.stream.utils.FutureUtil;
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ReviveService implements Runnable, Lifecycle {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ReviveService.class);
     private Thread thread;
     private final AtomicBoolean started = new AtomicBoolean(false);
 
@@ -47,6 +52,7 @@ public class ReviveService implements Runnable, Lifecycle {
     private final TopicQueueManager topicQueueManager;
     // Indicate the timestamp that the revive service has reached.
     private long reviveTimestamp = 0;
+    private final String identity = "[ReviveService]";
 
     public ReviveService(String checkPointNamespace, String timerTagNamespace, KVService kvService,
         StoreMetadataService metadataService, InflightService inflightService,
@@ -72,7 +78,6 @@ public class ReviveService implements Runnable, Lifecycle {
         this.thread = new Thread(this, getServiceName());
         this.thread.setDaemon(true);
         this.thread.start();
-
     }
 
     @Override
@@ -87,10 +92,10 @@ public class ReviveService implements Runnable, Lifecycle {
             try {
                 tryRevive();
                 Thread.sleep(1000);
-            } catch (StoreException e) {
-                // TODO: log exception
-                e.printStackTrace();
             } catch (InterruptedException ignored) {
+            } catch (Exception e) {
+                Throwable cause = FutureUtil.cause(e);
+                LOGGER.error("{}: Failed to revive", identity, cause);
             }
         }
     }
@@ -113,8 +118,7 @@ public class ReviveService implements Runnable, Lifecycle {
             try {
                 byte[] ckValue = kvService.get(checkPointNamespace, ckKey);
                 if (ckValue == null) {
-                    System.out.println("not found check point in revive");
-                    return;
+                    throw new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "Not found check point");
                 }
                 CheckPoint checkPoint = SerializeUtil.decodeCheckPoint(ByteBuffer.wrap(ckValue));
                 PopOperation.PopOperationType operationType = PopOperation.PopOperationType.valueOf(checkPoint.popOperationType());
@@ -127,13 +131,10 @@ public class ReviveService implements Runnable, Lifecycle {
                 } else {
                     pullResult = topicQueue.pullNormal(consumerGroupId, Filter.DEFAULT_FILTER, checkPoint.messageOffset(), 1).join();
                 }
-                // TODO: log exception
                 assert pullResult.messageList().size() <= 1;
                 // Message has already been deleted.
                 if (pullResult.messageList().isEmpty()) {
-                    // TODO: log the probable bug.
-                    System.out.println("not found message in revive");
-                    return;
+                    throw new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "Not found need retry message");
                 }
                 // Build the retry message and append it to retry stream or dead letter stream.
                 FlatMessageExt messageExt = pullResult.messageList().get(0);
@@ -148,9 +149,9 @@ public class ReviveService implements Runnable, Lifecycle {
                 }
 
                 topicQueue.ackTimeout(SerializeUtil.encodeReceiptHandle(receiptHandle)).join();
-            } catch (StoreException e) {
-                // TODO: log exception
-                System.out.println("delete timer tag failed in revive" + e);
+            } catch (Exception e) {
+                Throwable cause = FutureUtil.cause(e);
+                LOGGER.error("{}: Failed to revive message", identity, cause);
             }
         });
         this.reviveTimestamp = endTimestamp;

@@ -55,6 +55,7 @@ public class StreamOperationLogService implements OperationLogService {
     private final AtomicLong snapshotEndOffset = new AtomicLong(-1);
     private final AtomicLong opStartOffset = new AtomicLong(-1);
     private final AtomicBoolean takingSnapshot = new AtomicBoolean(false);
+    private final String identity;
 
     public StreamOperationLogService(long topicId, int queueId,
         long opStreamId, long snapshotStreamId, StreamStore streamStore, StoreMetadataService metadataService,
@@ -68,6 +69,7 @@ public class StreamOperationLogService implements OperationLogService {
         this.stateMachine = stateMachine;
         this.snapshotService = snapshotService;
         this.storeConfig = storeConfig;
+        this.identity = "[StreamOperationLogService-" + topicId + "-" + queueId + "]";
     }
 
     @Override
@@ -151,7 +153,7 @@ public class StreamOperationLogService implements OperationLogService {
                 this.opStartOffset.set(newStartOffset);
             }).exceptionally(e -> {
                 Throwable cause = FutureUtil.cause(e);
-                LOGGER.error("take snapshot failed", cause);
+                LOGGER.error("{}: Take snapshot failed", identity, cause);
                 this.takingSnapshot.set(false);
                 return null;
             });
@@ -164,11 +166,10 @@ public class StreamOperationLogService implements OperationLogService {
 
     private CompletableFuture<Long> doReplay(CompletableFuture<AppendResult> appendCf, Operation operation) {
         return appendCf.thenApply(result -> {
-            // TODO: think about append return order
             try {
                 replay(result.baseOffset(), operation);
             } catch (StoreException e) {
-                LOGGER.error("replay operation failed", e);
+                LOGGER.error("{}: Replay operation:{} failed", identity, operation, e);
                 throw new CompletionException(e);
             }
             if (result.baseOffset() - opStartOffset.get() + 1 >= storeConfig.operationSnapshotInterval()) {

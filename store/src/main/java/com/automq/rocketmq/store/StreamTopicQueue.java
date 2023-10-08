@@ -57,25 +57,16 @@ import static com.automq.rocketmq.store.util.SerializeUtil.decodeReceiptHandle;
 public class StreamTopicQueue extends TopicQueue {
 
     private OperationLogService operationLogService;
-
     private final StoreMetadataService metadataService;
-
     private final MessageStateMachine stateMachine;
-
     private long dataStreamId;
-
     private long operationStreamId;
-
     private long snapshotStreamId;
-
     private final Map<Long/*consumerGroupId*/, Long/*retryStreamId*/> retryStreamIdMap;
-
     private final StreamStore streamStore;
     private final StoreConfig config;
-
     private final InflightService inflightService;
     private final SnapshotService snapshotService;
-
     private final AtomicReference<State> state;
 
     public StreamTopicQueue(StoreConfig config, long topicId, int queueId,
@@ -130,8 +121,8 @@ public class StreamTopicQueue extends TopicQueue {
                     this.snapshotService,
                     this.config
                 );
-                return recover().thenAccept(v -> state.set(State.OPENED));
-            });
+                return recover();
+            }).thenAccept(nil -> state.set(State.OPENED));
         }
         return CompletableFuture.completedFuture(null);
     }
@@ -456,7 +447,6 @@ public class StreamTopicQueue extends TopicQueue {
             fetchBatchSize, filter, fetchResult, 0, 0, operationTimestamp);
         return fetchCf.thenApply(filterFetchResult -> {
             List<FlatMessageExt> messageExtList = filterFetchResult.messageList;
-            // TODO: correct offset, ugly logic
             PullResult.Status status;
             if (messageExtList.isEmpty()) {
                 status = PullResult.Status.NO_MATCHED_MSG;
