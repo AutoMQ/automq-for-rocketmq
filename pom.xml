@@ -273,13 +273,14 @@
             </plugin>
         </plugins>
     </build>
-    <repositories>
-        <repository>
-            <id>snapshot</id>
+    <distributionManagement>
+        <snapshotRepository>
+            <id>oss.sonatype.org</id>
             <url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
-            <snapshots>
-                <enabled>true</enabled>
-            </snapshots>
+        </snapshotRepository>
+        <repository>
+            <id>oss.sonatype.org</id>
+            <url>https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/</url>
         </repository>
-    </repositories>
+    </distributionManagement>
 </project>
