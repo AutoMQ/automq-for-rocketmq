@@ -151,7 +151,7 @@ public class StreamOperationLogService implements OperationLogService {
                 this.opStartOffset.set(newStartOffset);
             }).exceptionally(e -> {
                 Throwable cause = FutureUtil.cause(e);
-                LOGGER.error("take snapshot failed: {}", cause);
+                LOGGER.error("take snapshot failed", cause);
                 this.takingSnapshot.set(false);
                 return null;
             });

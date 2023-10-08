@@ -155,4 +155,6 @@ public interface MetadataStore extends Closeable {
         int queueId) throws ControllerException;
 
     CompletableFuture<Long> getConsumerOffset(long consumerGroupId, long topicId, int queueId);
+
+    String addressOfNode(int nodeId);
 }

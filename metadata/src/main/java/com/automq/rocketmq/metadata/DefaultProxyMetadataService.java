@@ -58,8 +58,7 @@ public class DefaultProxyMetadataService implements ProxyMetadataService {
 
     @Override
     public CompletableFuture<String> addressOf(int nodeId) {
-        // TODO: Just for testing, return the address of current node
-        return CompletableFuture.completedFuture(node.getAddress());
+        return CompletableFuture.supplyAsync(() -> metadataStore.addressOfNode(nodeId));
     }
 
     @Override

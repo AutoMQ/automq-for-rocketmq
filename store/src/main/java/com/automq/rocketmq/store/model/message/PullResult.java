@@ -25,6 +25,6 @@ public record PullResult(Status status, long nextBeginOffset, long minOffset, lo
         FOUND,
         NO_NEW_MSG,
         NO_MATCHED_MSG,
-        OFFSET_ILLEGAL;
+        OFFSET_ILLEGAL
     }
 }
