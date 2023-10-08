@@ -729,7 +729,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             metadataStore.setLease(lease);
             metadataStore.setRole(Role.Leader);
 
-            StreamMetadata metadata = metadataStore.openStream(streamId, streamEpoch).get();
+            StreamMetadata metadata = metadataStore.openStream(streamId, streamEpoch, config.nodeId()).get();
             Assertions.assertNotNull(metadata);
             Assertions.assertEquals(streamId, metadata.getStreamId());
             Assertions.assertEquals(0, metadata.getStartOffset());
@@ -807,7 +807,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             metadataStore.setLease(lease);
             metadataStore.setRole(Role.Leader);
 
-            StreamMetadata metadata = metadataStore.openStream(streamId, streamEpoch).get();
+            StreamMetadata metadata = metadataStore.openStream(streamId, streamEpoch, config.nodeId()).get();
             Assertions.assertNotNull(metadata);
             Assertions.assertEquals(streamId, metadata.getStreamId());
             Assertions.assertEquals(1234, metadata.getStartOffset());
@@ -843,7 +843,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testOpenCloseStream_duplicate() throws IOException, ControllerException, ExecutionException, InterruptedException {
+    public void testOpenCloseStream_duplicate() throws IOException {
         long streamId, streamEpoch = 1;
         try (SqlSession session = this.getSessionFactory().openSession()) {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
@@ -899,8 +899,9 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             node.setId(1);
             metadataStore.addBrokerNode(node);
 
-            metadataStore.openStream(streamId, streamEpoch).join();
-            StreamMetadata metadata = metadataStore.openStream(streamId, streamEpoch).join();
+            metadataStore.openStream(streamId, streamEpoch, config.nodeId()).join();
+            metadataStore.openStream(streamId, streamEpoch, config.nodeId()).join();
+            StreamMetadata metadata = metadataStore.openStream(streamId, streamEpoch, config.nodeId()).join();
             Assertions.assertNotNull(metadata);
             Assertions.assertEquals(streamId, metadata.getStreamId());
             Assertions.assertEquals(1234, metadata.getStartOffset());
@@ -909,6 +910,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Assertions.assertEquals(2345, metadata.getEndOffset());
             Assertions.assertEquals(StreamState.OPEN, metadata.getState());
 
+            metadataStore.closeStream(metadata.getStreamId(), metadata.getEpoch()).join();
             metadataStore.closeStream(metadata.getStreamId(), metadata.getEpoch()).join();
         }
 
@@ -930,6 +932,106 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Assertions.assertEquals(2345, range.getStartOffset());
             Assertions.assertEquals(2345, range.getEndOffset());
 
+            streamMapper.delete(streamId);
+            session.commit();
+        }
+    }
+
+    @Test
+    public void testOpenCloseStream_switch() throws IOException {
+        long streamId, streamEpoch = 1;
+        try (SqlSession session = this.getSessionFactory().openSession()) {
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+            RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
+
+            Stream stream = new Stream();
+            stream.setRangeId(0);
+            stream.setState(StreamState.OPEN);
+            stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
+            stream.setEpoch(streamEpoch);
+            stream.setSrcNodeId(1);
+            stream.setDstNodeId(1);
+            stream.setStartOffset(1234);
+            streamMapper.create(stream);
+            streamId = stream.getId();
+
+            Range range = new Range();
+            range.setRangeId(0);
+            range.setStreamId(streamId);
+            range.setEpoch(streamEpoch);
+            range.setStartOffset(1234L);
+            range.setEndOffset(2345L);
+            range.setBrokerId(1);
+            rangeMapper.create(range);
+            session.commit();
+        }
+
+        long targetStreamEpoch = streamEpoch + 1;
+        ControllerConfig config = Mockito.mock(ControllerConfig.class);
+        Mockito.when(config.nodeId()).thenReturn(1);
+        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
+
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            Assertions.assertNull(metadataStore.getLease());
+            Lease lease = new Lease();
+            lease.setNodeId(config.nodeId());
+            metadataStore.setLease(lease);
+            metadataStore.setRole(Role.Leader);
+
+            metadataStore.start();
+            Awaitility.await().with().atMost(10, TimeUnit.SECONDS)
+                .pollInterval(100, TimeUnit.MILLISECONDS)
+                .until(metadataStore::isLeader);
+
+            String name = "broker-0";
+            String address = "localhost:1234";
+            String instanceId = "i-register";
+            Node node = new Node();
+            node.setName(name);
+            node.setAddress(address);
+            node.setInstanceId(instanceId);
+            node.setId(1);
+            metadataStore.addBrokerNode(node);
+
+            metadataStore.closeStream(streamId, streamEpoch).join();
+            metadataStore.closeStream(streamId, streamEpoch).join();
+
+            try (SqlSession session = getSessionFactory().openSession()) {
+                StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+                RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
+
+                Stream stream = streamMapper.getByStreamId(streamId);
+                Assertions.assertEquals(streamId, stream.getId());
+                Assertions.assertEquals(1234, stream.getStartOffset());
+                Assertions.assertEquals(streamEpoch, stream.getEpoch());
+                Assertions.assertEquals(0, stream.getRangeId());
+                Assertions.assertEquals(StreamState.CLOSED, stream.getState());
+
+                Range range = rangeMapper.get(stream.getRangeId(), streamId, null);
+                Assertions.assertEquals(0, range.getRangeId());
+                Assertions.assertEquals(streamId, range.getStreamId());
+                Assertions.assertEquals(streamEpoch, range.getEpoch());
+                Assertions.assertEquals(1234, range.getStartOffset());
+                Assertions.assertEquals(2345, range.getEndOffset());
+
+                session.commit();
+            }
+
+            metadataStore.openStream(streamId, streamEpoch, config.nodeId()).join();
+            metadataStore.openStream(streamId, streamEpoch, config.nodeId()).join();
+            StreamMetadata metadata = metadataStore.openStream(streamId, streamEpoch, config.nodeId()).join();
+            Assertions.assertNotNull(metadata);
+            Assertions.assertEquals(streamId, metadata.getStreamId());
+            Assertions.assertEquals(1234, metadata.getStartOffset());
+            Assertions.assertEquals(targetStreamEpoch, metadata.getEpoch());
+            Assertions.assertEquals(1, metadata.getRangeId());
+            Assertions.assertEquals(2345, metadata.getEndOffset());
+            Assertions.assertEquals(StreamState.OPEN, metadata.getState());
+        }
+
+        try (SqlSession session = getSessionFactory().openSession()) {
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
             streamMapper.delete(streamId);
             session.commit();
         }

@@ -867,9 +867,7 @@ public class DefaultMetadataStore implements MetadataStore {
                         int nodeId = assignments.isEmpty() ? 0 : assignments.get(0).getSrcNodeId();
                         long streamId = createStream(streamMapper, topicId, queueId, groupId, streamRole, nodeId);
                         return StreamMetadata.newBuilder()
-                            .setEpoch(0)
                             .setStreamId(streamId)
-                            .setRangeId(0)
                             .setState(StreamState.UNINITIALIZED)
                             .setStartOffset(0)
                             .build();
@@ -1050,7 +1048,7 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public CompletableFuture<StreamMetadata> openStream(long streamId, long streamEpoch) {
+    public CompletableFuture<StreamMetadata> openStream(long streamId, long streamEpoch, int nodeId) {
         CompletableFuture<StreamMetadata> future = new CompletableFuture<>();
         for (; ; ) {
             if (isLeader()) {
@@ -1067,6 +1065,14 @@ public class DefaultMetadataStore implements MetadataStore {
                         ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE,
                             String.format("Stream[stream-id=%d] is not found", streamId)
                         );
+                        future.completeExceptionally(e);
+                        return future;
+                    }
+
+                    if (nodeId != stream.getDstNodeId()) {
+                        LOGGER.warn("stream {}'s dst node {} is not match request node {}",
+                            streamId, stream.getDstNodeId(), nodeId);
+                        ControllerException e = new ControllerException(Code.ILLEGAL_STATE_VALUE, "Node is not match");
                         future.completeExceptionally(e);
                         return future;
                     }

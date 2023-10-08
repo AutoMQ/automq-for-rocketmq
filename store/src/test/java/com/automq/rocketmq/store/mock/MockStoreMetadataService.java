@@ -136,7 +136,7 @@ public class MockStoreMetadataService implements StoreMetadataService {
     }
 
     @Override
-    public CompletableFuture<StreamMetadata> openStream(long streamId, long streamEpoch) {
+    public CompletableFuture<StreamMetadata> openStream(long streamId, long streamEpoch, int nodeId) {
         return null;
     }
 
@@ -187,5 +187,10 @@ public class MockStoreMetadataService implements StoreMetadataService {
     public CompletableFuture<Pair<List<S3StreamObject>, List<S3WALObject>>> listObjects(long streamId, long startOffset,
         long endOffset, int limit) {
         return null;
+    }
+
+    @Override
+    public int getNodeId() {
+        return 0;
     }
 }

@@ -526,7 +526,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
         int queueId = 2;
         int srcNodeId = 1;
         int dstNodeId = 2;
-        long streamId;
+        long streamId, streamEpoch;
 
         try (SqlSession session = getSessionFactory().openSession()) {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
@@ -540,6 +540,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             stream.setDstNodeId(dstNodeId);
             streamMapper.create(stream);
             streamId = stream.getId();
+            streamEpoch = stream.getEpoch();
             session.commit();
         }
 
@@ -556,8 +557,8 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 int port = testServer.getPort();
                 OpenStreamRequest request = OpenStreamRequest.newBuilder()
                     .setStreamId(streamId)
-                    .setStreamEpoch(0)
-                    .setBrokerEpoch(1)
+                    .setStreamEpoch(streamEpoch)
+                    .setBrokerId(2)
                     .build();
                 client.openStream(String.format("localhost:%d", port), request).get();
             }
@@ -693,7 +694,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 OpenStreamRequest request = OpenStreamRequest.newBuilder()
                     .setStreamId(streamId)
                     .setStreamEpoch(0)
-                    .setBrokerEpoch(1)
+                    .setBrokerId(2)
                     .build();
                 OpenStreamReply reply = client.openStream(String.format("localhost:%d", port), request).get();
                 Assertions.assertEquals(Code.FENCED, reply.getStatus().getCode());
