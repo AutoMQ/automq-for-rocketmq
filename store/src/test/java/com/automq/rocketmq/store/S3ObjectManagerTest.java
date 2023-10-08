@@ -20,7 +20,6 @@ package com.automq.rocketmq.store;
 import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.SubStream;
-import com.automq.rocketmq.common.util.Pair;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.stream.s3.metadata.S3ObjectMetadata;
 import com.automq.stream.s3.metadata.S3ObjectType;
@@ -33,6 +32,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -160,7 +160,7 @@ class S3ObjectManagerTest {
                 return metadataService.listStreamObjects(streamId, startOffset, endOffset, limit).thenCombine(
                     metadataService.listWALObjects(streamId, startOffset, endOffset, limit),
                     (sObjects, wObjects) -> {
-                        return new Pair(sObjects, wObjects);
+                        return new ImmutablePair(sObjects, wObjects);
                     }
                 );
             });
@@ -240,9 +240,7 @@ class S3ObjectManagerTest {
                 int limit = ink.getArgument(3);
                 return metadataService.listStreamObjects(streamId, startOffset, endOffset, limit).thenCombine(
                     metadataService.listWALObjects(streamId, startOffset, endOffset, limit),
-                    (sObjects, wObjects) -> {
-                        return new Pair(sObjects, wObjects);
-                    }
+                    (sObjects, wObjects) -> new ImmutablePair(sObjects, wObjects)
                 );
             });
         objectManager.getObjects(1, 100, 500, 3).thenAccept(objects -> {

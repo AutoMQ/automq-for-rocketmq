@@ -20,7 +20,6 @@ package com.automq.rocketmq.store;
 import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.SubStream;
-import com.automq.rocketmq.common.util.Pair;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.stream.s3.metadata.S3ObjectMetadata;
 import com.automq.stream.s3.metadata.S3ObjectType;
@@ -39,6 +38,7 @@ import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -146,15 +146,15 @@ public class S3ObjectManager implements ObjectManager {
         // Retrieve S3ObjectMetadata from stream objects and wal objects
         return cf.thenApply(pair -> {
             // Sort the streamObjects in ascending order of startOffset
-            pair.left().sort((o1, o2) -> (int) (o1.getStartOffset() - o2.getStartOffset()));
-            Queue<S3ObjectMetadataWrapper> streamObjects = pair.left().stream().map(obj -> {
+            pair.getLeft().sort((o1, o2) -> (int) (o1.getStartOffset() - o2.getStartOffset()));
+            Queue<S3ObjectMetadataWrapper> streamObjects = pair.getLeft().stream().map(obj -> {
                 long start = obj.getStartOffset();
                 long end = obj.getEndOffset();
                 return new S3ObjectMetadataWrapper(convertFrom(obj), start, end);
             }).collect(Collectors.toCollection(LinkedList::new));
             // Sort the walObjects in ascending order of startOffset
-            pair.right().sort((o1, o2) -> (int) (o1.getSubStreamsMap().get(streamId).getStartOffset() - o2.getSubStreamsMap().get(streamId).getStartOffset()));
-            Queue<S3ObjectMetadataWrapper> walObjects = pair.right().stream().map(obj -> {
+            pair.getRight().sort((o1, o2) -> (int) (o1.getSubStreamsMap().get(streamId).getStartOffset() - o2.getSubStreamsMap().get(streamId).getStartOffset()));
+            Queue<S3ObjectMetadataWrapper> walObjects = pair.getRight().stream().map(obj -> {
                 long start = obj.getSubStreamsMap().get(streamId).getStartOffset();
                 long end = obj.getSubStreamsMap().get(streamId).getEndOffset();
                 return new S3ObjectMetadataWrapper(convertFrom(obj), start, end);

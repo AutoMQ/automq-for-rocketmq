@@ -22,10 +22,23 @@ public interface ControllerConfig {
 
     long epoch();
 
-    int scanIntervalInSecs();
+    default int scanIntervalInSecs() {
+        return 30;
+    }
 
-    int leaseLifeSpanInSecs();
+    default int leaseLifeSpanInSecs() {
+        return 60;
+    }
 
-    int nodeAliveIntervalInSecs();
+    default int nodeAliveIntervalInSecs() {
+        return 60;
+    }
+
+    /**
+     * @return Tolerance of workload unfairness among nodes in terms of stream number.
+     */
+    default int workloadTolerance() {
+        return 3;
+    }
 
 }

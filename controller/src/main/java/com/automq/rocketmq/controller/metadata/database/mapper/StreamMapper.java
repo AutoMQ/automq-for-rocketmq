@@ -47,4 +47,10 @@ public interface StreamMapper {
 
     long queueEpoch(@Param("topicId") long topicId,
         @Param("queueId") long queueId);
+
+
+    int planMove(@Param("topicId") long topicId,
+        @Param("queueId") int queueId,
+        @Param("srcNodeId") int src,
+        @Param("dstNodeId") int dst);
 }

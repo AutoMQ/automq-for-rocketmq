@@ -20,9 +20,9 @@ package com.automq.rocketmq.metadata.api;
 import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
-import com.automq.rocketmq.common.util.Pair;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import org.apache.commons.lang3.tuple.Pair;
 
 public interface StoreMetadataService {
     /**
