@@ -72,5 +72,10 @@
         </if>
     </select>
 
+    <select id="get" resultType="QueueAssignment">
+        SELECT topic_id, queue_id, src_node_id, dst_node_id, status, create_time, update_time
+        FROM queue_assignment
+        WHERE topic_id = #{topicId} AND queue_id = #{queueId}
+    </select>
 
 </mapper>

@@ -44,4 +44,7 @@ public interface StreamMapper {
     List<Stream> listByNode(@Param("nodeId") int nodeId, @Param("state") StreamState state);
 
     void update(Stream stream);
+
+    long queueEpoch(@Param("topicId") long topicId,
+        @Param("queueId") long queueId);
 }

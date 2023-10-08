@@ -331,8 +331,7 @@ public class GrpcControllerClient implements ControllerClient {
     }
 
     @Override
-    public CompletableFuture<Void> notifyMessageQueueAssignable(String target, long topicId,
-        int queueId) throws ControllerException {
+    public CompletableFuture<Void> notifyQueueClose(String target, long topicId, int queueId) throws ControllerException {
         CompletableFuture<Void> future = new CompletableFuture<>();
 
         NotifyMessageQueuesAssignableRequest request = NotifyMessageQueuesAssignableRequest.newBuilder()

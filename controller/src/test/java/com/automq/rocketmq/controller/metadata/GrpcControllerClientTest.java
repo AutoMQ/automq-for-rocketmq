@@ -272,7 +272,7 @@ class GrpcControllerClientTest {
             testServer.start();
             int port = testServer.getPort();
             Assertions.assertDoesNotThrow(() -> {
-                client.notifyMessageQueueAssignable(String.format("localhost:%d", port), topicId, queueId).get();
+                client.notifyQueueClose(String.format("localhost:%d", port), topicId, queueId).get();
             });
         }
     }

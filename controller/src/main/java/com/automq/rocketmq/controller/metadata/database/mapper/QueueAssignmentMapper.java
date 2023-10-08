@@ -27,6 +27,8 @@ public interface QueueAssignmentMapper {
 
     int create(QueueAssignment assignment);
 
+    QueueAssignment get(@Param("topicId") long topicId, @Param("queueId") int queueId);
+
     List<QueueAssignment> list(@Param("topicId") Long topicId,
         @Param("srcNodeId") Integer srcNodeId,
         @Param("dstNodeId") Integer dstNodeId,

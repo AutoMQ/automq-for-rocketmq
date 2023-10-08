@@ -57,8 +57,7 @@ public interface ControllerClient extends Closeable {
 
     CompletableFuture<Void> reassignMessageQueue(String target, long topicId, int queueId, int dstNodeId);
 
-    CompletableFuture<Void> notifyMessageQueueAssignable(String target, long topicId,
-        int queueId) throws ControllerException;
+    CompletableFuture<Void> notifyQueueClose(String target, long topicId, int queueId) throws ControllerException;
 
     CompletableFuture<CreateGroupReply> createGroup(String target, CreateGroupRequest request)
         throws ControllerException;
