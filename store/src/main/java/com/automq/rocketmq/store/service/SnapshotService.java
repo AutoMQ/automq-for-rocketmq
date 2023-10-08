@@ -28,6 +28,7 @@ import com.automq.rocketmq.store.model.stream.SingleRecord;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.util.SerializeUtil;
 import com.automq.stream.api.AppendResult;
+import com.automq.stream.utils.FutureUtil;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -81,11 +82,13 @@ public class SnapshotService implements Lifecycle, Runnable {
                 }
                 takeSnapshot(snapshotTask)
                     .exceptionally(e -> {
-                        snapshotTask.successCf.completeExceptionally(e);
+                        Throwable cause = FutureUtil.cause(e);
+                        snapshotTask.completeFailure(cause);
                         return null;
                     }).join();
             } catch (Exception e) {
-                LOGGER.warn("Failed to take snapshot", e);
+                Throwable cause = FutureUtil.cause(e);
+                LOGGER.warn("Failed to take snapshot", cause);
             }
         }
     }
@@ -102,20 +105,22 @@ public class SnapshotService implements Lifecycle, Runnable {
             readOptions.setSnapshotVersion(version);
 
             // get queue related checkpoints from kv service
-            byte[] tqPrefix = ByteBuffer.allocate(12)
-                .putLong(topicId)
-                .putInt(queueId)
-                .array();
+            byte[] tqPrefix = SerializeUtil.buildCheckPointPrefix(topicId, queueId);
             List<CheckPoint> checkPointList = new ArrayList<>();
             try {
                 kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, tqPrefix, null, null, (key, value) -> {
                     CheckPoint checkPoint = SerializeUtil.decodeCheckPoint(ByteBuffer.wrap(value));
                     checkPointList.add(checkPoint);
                 }, readOptions);
-                // release snapshot
-                kvService.releaseSnapshot(snapshot.getKvServiceSnapshotVersion());
             } catch (StoreException e) {
                 throw new CompletionException(e);
+            } finally {
+                // release snapshot
+                try {
+                    kvService.releaseSnapshot(snapshot.getKvServiceSnapshotVersion());
+                } catch (StoreException e) {
+                    LOGGER.error("release snapshot failed", e);
+                }
             }
             snapshot.setCheckPoints(checkPointList);
             return SerializeUtil.encodeOperationSnapshot(snapshot);
@@ -127,7 +132,7 @@ public class SnapshotService implements Lifecycle, Runnable {
         return snapshotAppendCf.thenCombine(snapshotFuture, (appendResult, snapshot) -> {
             // trim operation stream
             streamStore.trim(operationStreamId, snapshot.getSnapshotEndOffset() + 1);
-            task.successCf.complete(snapshot.getSnapshotEndOffset() + 1);
+            task.completeSuccess(snapshot.getSnapshotEndOffset() + 1);
             // release snapshot
             return null;
         });
@@ -135,7 +140,7 @@ public class SnapshotService implements Lifecycle, Runnable {
 
     CompletableFuture<Long> addSnapshotTask(SnapshotTask task) {
         CompletableFuture<Long> cf = new CompletableFuture<>();
-        task.setSuccessCf(cf);
+        task.setCf(cf);
         snapshotTaskQueue.add(task);
         return cf;
     }
@@ -147,7 +152,7 @@ public class SnapshotService implements Lifecycle, Runnable {
         private final long snapshotStreamId;
         private final Supplier<CompletableFuture<OperationSnapshot>> snapshotSupplier;
 
-        private CompletableFuture<Long> successCf;
+        private CompletableFuture<Long/*new start offset*/> cf;
 
         public SnapshotTask(long topicId, int queueId,
             long operationStreamId, long snapshotStreamId,
@@ -159,8 +164,17 @@ public class SnapshotService implements Lifecycle, Runnable {
             this.snapshotSupplier = snapshotSupplier;
         }
 
-        public void setSuccessCf(CompletableFuture<Long> successCf) {
-            this.successCf = successCf;
+        public void setCf(CompletableFuture<Long> cf) {
+            this.cf = cf;
+        }
+
+        public void completeFailure(Throwable cause) {
+            LOGGER.warn("[SnapshotTask]: take snapshot failed", cause);
+            this.cf.completeExceptionally(cause);
+        }
+
+        public void completeSuccess(long offset) {
+            this.cf.complete(offset);
         }
     }
 }
