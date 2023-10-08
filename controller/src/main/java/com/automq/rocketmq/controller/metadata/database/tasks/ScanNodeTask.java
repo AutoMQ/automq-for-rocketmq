@@ -17,7 +17,7 @@
 
 package com.automq.rocketmq.controller.metadata.database.tasks;
 
-import com.automq.rocketmq.controller.metadata.database.DefaultMetadataStore;
+import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
 import java.util.List;
@@ -25,7 +25,7 @@ import org.apache.ibatis.session.SqlSession;
 
 public class ScanNodeTask extends ScanTask {
 
-    public ScanNodeTask(DefaultMetadataStore metadataStore) {
+    public ScanNodeTask(MetadataStore metadataStore) {
         super(metadataStore);
     }
 
@@ -33,7 +33,7 @@ public class ScanNodeTask extends ScanTask {
     public void run() {
         LOGGER.info("ScanNodeTask starts");
         try {
-            try (SqlSession session = this.metadataStore.getSessionFactory().openSession()) {
+            try (SqlSession session = this.metadataStore.openSession()) {
                 NodeMapper mapper = session.getMapper(NodeMapper.class);
                 List<Node> nodes = mapper.list(this.lastScanTime);
                 if (!nodes.isEmpty()) {

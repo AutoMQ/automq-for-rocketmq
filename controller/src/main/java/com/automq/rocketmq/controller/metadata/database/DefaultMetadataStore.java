@@ -46,6 +46,7 @@ import apache.rocketmq.controller.v1.TopicStatus;
 import apache.rocketmq.controller.v1.TrimStreamRequest;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.common.PrefixThreadFactory;
+import com.automq.rocketmq.common.StoreHandle;
 import com.automq.rocketmq.common.system.S3Constants;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.BrokerNode;
@@ -77,6 +78,7 @@ import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 import com.automq.rocketmq.controller.metadata.database.tasks.LeaseTask;
 import com.automq.rocketmq.controller.metadata.database.tasks.ScanNodeTask;
+import com.automq.rocketmq.controller.metadata.database.tasks.ScanYieldingQueueTask;
 import com.google.common.base.Strings;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -130,6 +132,8 @@ public class DefaultMetadataStore implements MetadataStore {
 
     private final Gson gson;
 
+    private StoreHandle storeHandle;
+
     public DefaultMetadataStore(ControllerClient client, SqlSessionFactory sessionFactory, ControllerConfig config) {
         this.controllerClient = client;
         this.sessionFactory = sessionFactory;
@@ -143,11 +147,36 @@ public class DefaultMetadataStore implements MetadataStore {
         this.asyncExecutorService = Executors.newFixedThreadPool(10, new PrefixThreadFactory("Controller-Async"));
     }
 
+    @Override
+    public ControllerConfig config() {
+        return config;
+    }
+
+    @Override
+    public SqlSession openSession() {
+        return sessionFactory.openSession(false);
+    }
+
+    @Override
+    public ControllerClient controllerClient() {
+        return controllerClient;
+    }
+
+    public StoreHandle getStoreHandle() {
+        return storeHandle;
+    }
+
+    @Override
+    public void setStoreHandle(StoreHandle storeHandle) {
+        this.storeHandle = storeHandle;
+    }
+
     public void start() {
         LeaseTask leaseTask = new LeaseTask(this);
         leaseTask.run();
         this.scheduledExecutorService.scheduleAtFixedRate(leaseTask, 1, config.scanIntervalInSecs(), TimeUnit.SECONDS);
         this.scheduledExecutorService.scheduleWithFixedDelay(new ScanNodeTask(this), 1, config.scanIntervalInSecs(), TimeUnit.SECONDS);
+        this.scheduledExecutorService.scheduleWithFixedDelay(new ScanYieldingQueueTask(this), 1, config.scanIntervalInSecs(), TimeUnit.SECONDS);
         LOGGER.info("MetadataStore tasks scheduled");
     }
 
@@ -733,7 +762,7 @@ public class DefaultMetadataStore implements MetadataStore {
                 break;
             } else {
                 try {
-                    this.controllerClient.notifyMessageQueueAssignable(leaderAddress(), topicId, queueId).whenComplete((res, e) -> {
+                    this.controllerClient.notifyQueueClose(leaderAddress(), topicId, queueId).whenComplete((res, e) -> {
                         if (null != e) {
                             future.completeExceptionally(e);
                         } else {
@@ -890,6 +919,42 @@ public class DefaultMetadataStore implements MetadataStore {
                 }
             }
         }, asyncExecutorService);
+    }
+
+    @Override
+    public CompletableFuture<Void> onQueueClosed(long topicId, int queueId) {
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        for (; ; ) {
+            if (isLeader()) {
+                try (SqlSession session = openSession()) {
+                    if (!maintainLeadershipWithSharedLock(session)) {
+                        continue;
+                    }
+                    QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
+                    QueueAssignment assignment = assignmentMapper.get(topicId, queueId);
+                    assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNED);
+
+                    StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+                    streamMapper.updateStreamState(null, topicId, queueId, StreamState.CLOSED);
+                    session.commit();
+                    future.complete(null);
+                    return future;
+                }
+            } else {
+                try {
+                    controllerClient.notifyQueueClose(leaderAddress(), topicId, queueId)
+                        .whenComplete((res, e) -> {
+                            if (null != e) {
+                                future.completeExceptionally(e);
+                            }
+                            future.complete(null);
+                        });
+                } catch (ControllerException e) {
+                    future.completeExceptionally(e);
+                }
+                return future;
+            }
+        }
     }
 
     @Override

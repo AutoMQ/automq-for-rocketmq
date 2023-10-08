@@ -26,7 +26,9 @@ import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.MessageType;
+import com.automq.rocketmq.common.StoreHandle;
 import com.automq.rocketmq.controller.exception.ControllerException;
+import com.automq.rocketmq.controller.metadata.database.dao.Lease;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import java.io.Closeable;
@@ -34,8 +36,25 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.ibatis.session.SqlSession;
 
 public interface MetadataStore extends Closeable {
+
+    ControllerConfig config();
+
+    SqlSession openSession();
+
+    ControllerClient controllerClient();
+
+    void addBrokerNode(Node node);
+
+    void setLease(Lease lease);
+
+    void setRole(Role role);
+
+    StoreHandle getStoreHandle();
+
+    void setStoreHandle(StoreHandle storeHandle);
 
     void start();
 
@@ -98,6 +117,14 @@ public interface MetadataStore extends Closeable {
         long dlq) throws ControllerException;
 
     CompletableFuture<StreamMetadata> getStream(long topicId, int queueId, Long groupId, StreamRole streamRole);
+
+    /**
+     * Invoked when store has closed the queue.
+     *
+     * @param topicId Topic ID
+     * @param queueId Queue ID
+     */
+    CompletableFuture<Void> onQueueClosed(long topicId, int queueId);
 
     CompletableFuture<ConsumerGroup> describeConsumerGroup(Long groupId, String groupName);
 

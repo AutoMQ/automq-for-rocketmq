@@ -129,4 +129,10 @@
         </if>
     </select>
 
+    <select id="queueEpoch" resultType="long">
+        SELECT MAX(epoch)
+        FROM stream
+        WHERE topic_id = #{topicId} AND queue_id = #{queueId}
+    </select>
+
 </mapper>
