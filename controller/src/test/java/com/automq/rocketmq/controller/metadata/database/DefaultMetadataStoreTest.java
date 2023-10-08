@@ -1851,6 +1851,91 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
+    public void testCommitStreamObject_ObjectNotExist() throws IOException, ExecutionException, InterruptedException, ControllerException {
+        long streamId = 1;
+        int nodeId = 1;
+
+        ControllerConfig config = Mockito.mock(ControllerConfig.class);
+        Mockito.when(config.nodeId()).thenReturn(nodeId);
+        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
+        Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
+
+        S3StreamObject s3StreamObject = S3StreamObject.newBuilder()
+            .setObjectId(1)
+            .setStreamId(streamId)
+            .setObjectSize(111L)
+            .build();
+
+        try (SqlSession session = this.getSessionFactory().openSession()) {
+            S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
+            com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
+            object.setObjectId(2);
+            object.setStreamId(streamId);
+            object.setBaseDataTimestamp(1);
+            object.setStartOffset(0);
+            object.setEndOffset(2);
+            object.setObjectSize(2139);
+            s3StreamObjectMapper.create(object);
+        }
+
+        List<Long> compactedObjects = new ArrayList<>();
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            Assertions.assertNull(metadataStore.getLease());
+            Lease lease = new Lease();
+            lease.setNodeId(config.nodeId());
+            metadataStore.setLease(lease);
+            metadataStore.setRole(Role.Leader);
+
+
+            Assertions.assertThrows(ControllerException.class, () -> metadataStore.commitStreamObject(s3StreamObject, compactedObjects));
+        }
+
+    }
+
+    @Test
+    public void testCommitStreamObject_StreamNotExist() throws IOException, ExecutionException, InterruptedException, ControllerException {
+        long streamId = 1;
+        int nodeId = 1;
+
+        ControllerConfig config = Mockito.mock(ControllerConfig.class);
+        Mockito.when(config.nodeId()).thenReturn(nodeId);
+        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
+        Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
+
+        S3StreamObject s3StreamObject = S3StreamObject.newBuilder()
+            .setObjectId(-1)
+            .setStreamId(streamId)
+            .setObjectSize(111L)
+            .build();
+
+        try (SqlSession session = this.getSessionFactory().openSession()) {
+            S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
+            com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
+            object.setObjectId(2);
+            object.setStreamId(streamId);
+            object.setBaseDataTimestamp(1);
+            object.setStartOffset(0);
+            object.setEndOffset(2);
+            object.setObjectSize(2139);
+            s3StreamObjectMapper.create(object);
+        }
+
+        List<Long> compactedObjects = new ArrayList<>();
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            Assertions.assertNull(metadataStore.getLease());
+            Lease lease = new Lease();
+            lease.setNodeId(config.nodeId());
+            metadataStore.setLease(lease);
+            metadataStore.setRole(Role.Leader);
+
+            Assertions.assertThrows(ControllerException.class, () -> metadataStore.commitStreamObject(s3StreamObject, compactedObjects));
+        }
+
+    }
+
+    @Test
     public void testCommitWALObject() throws IOException, ExecutionException, InterruptedException, ControllerException {
         long objectId, streamId = 1;
         int nodeId = 1;
@@ -1980,6 +2065,95 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
                 Assertions.fail();
             }
         }
+    }
+
+
+    @Test
+    public void testCommitWALObject_ObjectNotExist() throws IOException, ExecutionException, InterruptedException, ControllerException {
+        long streamId = 1;
+        int nodeId = 1;
+
+        ControllerConfig config = Mockito.mock(ControllerConfig.class);
+        Mockito.when(config.nodeId()).thenReturn(nodeId);
+        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
+        Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
+
+        S3WALObject walObject = S3WALObject.newBuilder()
+            .setObjectId(3)
+            .setSequenceId(-1)
+            .setBrokerId(-1)
+            .build();
+
+        try (SqlSession session = this.getSessionFactory().openSession()) {
+            S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
+            com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
+            object.setObjectId(2);
+            object.setStreamId(streamId);
+            object.setBaseDataTimestamp(1);
+            object.setStartOffset(0);
+            object.setEndOffset(2);
+            object.setObjectSize(2139);
+            s3StreamObjectMapper.create(object);
+        }
+
+        List<Long> compactedObjects = new ArrayList<>();
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            Assertions.assertNull(metadataStore.getLease());
+            Lease lease = new Lease();
+            lease.setNodeId(config.nodeId());
+            metadataStore.setLease(lease);
+            metadataStore.setRole(Role.Leader);
+
+            List<S3StreamObject> s3StreamObjects = metadataStore.listStreamObjects(streamId, 0, 334, 2).get();
+
+            Assertions.assertThrows(ControllerException.class, () -> metadataStore.commitWalObject(walObject, s3StreamObjects, compactedObjects));
+        }
+
+    }
+
+    @Test
+    public void testCommitWALObject_WALNOTExist() throws IOException, ExecutionException, InterruptedException, ControllerException {
+        long streamId = 1;
+        int nodeId = 1;
+
+        ControllerConfig config = Mockito.mock(ControllerConfig.class);
+        Mockito.when(config.nodeId()).thenReturn(nodeId);
+        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
+        Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
+
+        S3WALObject walObject = S3WALObject.newBuilder()
+            .setObjectId(-1)
+            .setSequenceId(-1)
+            .setBrokerId(-1)
+            .build();
+
+        try (SqlSession session = this.getSessionFactory().openSession()) {
+            S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
+            com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
+            object.setObjectId(2);
+            object.setStreamId(streamId);
+            object.setBaseDataTimestamp(1);
+            object.setStartOffset(0);
+            object.setEndOffset(2);
+            object.setObjectSize(2139);
+            s3StreamObjectMapper.create(object);
+        }
+
+        List<Long> compactedObjects = new ArrayList<>();
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            Assertions.assertNull(metadataStore.getLease());
+            Lease lease = new Lease();
+            lease.setNodeId(config.nodeId());
+            metadataStore.setLease(lease);
+            metadataStore.setRole(Role.Leader);
+
+            List<S3StreamObject> s3StreamObjects = metadataStore.listStreamObjects(streamId, 0, 334, 2).get();
+
+            Assertions.assertThrows(ControllerException.class, () -> metadataStore.commitWalObject(walObject, s3StreamObjects, compactedObjects));
+        }
+
     }
 
     @Test
