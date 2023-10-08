@@ -712,9 +712,7 @@ public class DefaultMetadataStore implements MetadataStore {
                                 assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_YIELDING);
                                 assignmentMapper.update(assignment);
                             }
-                            case ASSIGNMENT_STATUS_DELETED -> {
-                                throw new ControllerException(Code.NOT_FOUND_VALUE, "Already deleted");
-                            }
+                            case ASSIGNMENT_STATUS_DELETED -> throw new ControllerException(Code.NOT_FOUND_VALUE, "Already deleted");
                         }
                         break;
                     }
@@ -1839,5 +1837,22 @@ public class DefaultMetadataStore implements MetadataStore {
 
     public ControllerConfig getConfig() {
         return config;
+    }
+
+    @Override
+    public String addressOfNode(int nodeId) {
+        BrokerNode node = this.nodes.get(nodeId);
+        if (null != node) {
+            return node.getNode().getAddress();
+        }
+
+        try (SqlSession session = openSession()) {
+            NodeMapper mapper = session.getMapper(NodeMapper.class);
+            Node n = mapper.get(nodeId, null, null, null);
+            if (null != n) {
+                return n.getAddress();
+            }
+        }
+        return null;
     }
 }

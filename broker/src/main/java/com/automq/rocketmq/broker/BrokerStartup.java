@@ -41,7 +41,7 @@ public class BrokerStartup {
         CommandLine commandLine = ServerUtil.parseCmdLine(
             "mqbroker", args, options, new DefaultParser());
         if (null == commandLine) {
-            LOGGER.error("Failed to parse command line, pelase use `-h` to check.");
+            LOGGER.error("Failed to parse command line, please use `-h` to check.");
             System.exit(-1);
         }
 
