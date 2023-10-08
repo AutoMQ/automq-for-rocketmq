@@ -22,10 +22,9 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
 
 class AsyncTokenBucketThrottleTest {
     private AsyncTokenBucketThrottle asyncTokenBucketThrottle;
@@ -45,7 +44,7 @@ class AsyncTokenBucketThrottleTest {
         asyncTokenBucketThrottle.throttle(100)
             .thenRun(() -> {
                 // should be satisfied immediately
-                assertTrue(System.currentTimeMillis() - startTimeStamp < 5);
+                Assertions.assertTrue(System.currentTimeMillis() - startTimeStamp < 5);
             }).get();
     }
 
@@ -61,7 +60,7 @@ class AsyncTokenBucketThrottleTest {
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
             .thenRun(() -> {
                 // should be satisfied within 3 seconds
-                assertTrue(System.currentTimeMillis() - startTimeStamp < 3000);
+                Assertions.assertTrue(System.currentTimeMillis() - startTimeStamp < 3000);
             }).get();
     }
 
@@ -73,7 +72,7 @@ class AsyncTokenBucketThrottleTest {
         asyncTokenBucketThrottle.throttle(200)
             .thenRun(() -> {
                 // should be satisfied within 2 seconds
-                assertTrue(System.currentTimeMillis() - startTimeStamp < 2000);
+                Assertions.assertTrue(System.currentTimeMillis() - startTimeStamp < 2000);
             }).get();
     }
 }
