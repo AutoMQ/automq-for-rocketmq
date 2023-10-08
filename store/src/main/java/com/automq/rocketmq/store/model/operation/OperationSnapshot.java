@@ -76,6 +76,13 @@ public class OperationSnapshot {
         return Objects.hash(snapshotEndOffset, checkPoints, kvServiceSnapshotVersion, consumerGroupMetadataList);
     }
 
+    @Override
+    public String toString() {
+        return "OperationSnapshot{" +
+            "snapshotEndOffset=" + snapshotEndOffset +
+            '}';
+    }
+
     public static class ConsumerGroupMetadataSnapshot extends ConsumerGroupMetadata {
         private final byte[] ackOffsetBitmapBuffer;
         private final byte[] retryAckOffsetBitmapBuffer;

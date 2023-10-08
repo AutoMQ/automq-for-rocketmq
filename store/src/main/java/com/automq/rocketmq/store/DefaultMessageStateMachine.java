@@ -31,6 +31,7 @@ import com.automq.rocketmq.store.model.operation.OperationSnapshot;
 import com.automq.rocketmq.store.model.operation.PopOperation;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.util.SerializeUtil;
+import com.automq.stream.utils.FutureUtil;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -46,6 +47,8 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static com.automq.rocketmq.store.MessageStoreImpl.KV_NAMESPACE_CHECK_POINT;
 import static com.automq.rocketmq.store.MessageStoreImpl.KV_NAMESPACE_FIFO_INDEX;
@@ -58,10 +61,7 @@ import static com.automq.rocketmq.store.util.SerializeUtil.buildReceiptHandle;
 import static com.automq.rocketmq.store.util.SerializeUtil.buildTimerTagKey;
 
 public class DefaultMessageStateMachine implements MessageStateMachine {
-
-    public static final long DEFAULT_SNAPSHOT_INTERVAL = 1000 * 1000; // unit: record
-
-    // TODO: concurrent protection
+    private static final Logger LOGGER = LoggerFactory.getLogger(DefaultMessageStateMachine.class);
     private final long topicId;
     private final int queueId;
     private Map<Long/*consumerGroup*/, ConsumerGroupMetadata> consumerGroupMetadataMap;
@@ -71,14 +71,15 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
     private final Lock readLock = lock.readLock();
     private final Lock writeLock = lock.writeLock();
-
     private final KVService kvService;
+    private final String identity;
 
     public DefaultMessageStateMachine(long topicId, int queueId, KVService kvService) {
         this.consumerGroupMetadataMap = new ConcurrentHashMap<>();
         this.kvService = kvService;
         this.topicId = topicId;
         this.queueId = queueId;
+        this.identity = new String("[DefaultStateMachine-" + topicId + "-" + queueId + "]");
     }
 
     @Override
@@ -96,8 +97,10 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
                 default:
                     throw new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "Unknown pop operation type");
             }
-        } catch (StoreException e) {
-            return CompletableFuture.failedFuture(e);
+        } catch (Exception e) {
+            Throwable cause = FutureUtil.cause(e);
+            LOGGER.error("{}: Replay pop operation failed", identity, cause);
+            return CompletableFuture.failedFuture(cause);
         } finally {
             writeLock.unlock();
         }
@@ -119,7 +122,6 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
             metadata.setConsumeOffset(offset + 1);
         }
         if (operation.isEndMark()) {
-            // TODO: handle this case with a separate operation type, now just handle it here
             // if this is a pop-last operation, it only needs to update consume offset and advance ack offset
             long baseOffset = offset - count + 1;
             for (int i = 0; i < count; i++) {
@@ -163,7 +165,6 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
             metadata.setRetryConsumeOffset(offset + 1);
         }
         if (operation.isEndMark()) {
-            // TODO: handle this case with a separate operation type, now just handle it here
             // if this is a pop-last operation, it only needs to update consume offset and advance ack offset
             long baseOffset = offset - count + 1;
             for (int i = 0; i < count; i++) {
@@ -208,7 +209,6 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
             metadata.setConsumeOffset(offset + 1);
         }
         if (operation.isEndMark()) {
-            // TODO: handle this case with a separate operation type, now just handle it here
             // if this is a pop-last operation, it only needs to update consume offset and advance ack offset
             long baseOffset = offset - count + 1;
             for (int i = 0; i < count; i++) {
@@ -251,7 +251,7 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
 
     private AckCommitter getAckCommitter(long consumerGroupId, RoaringBitmap bitmap) {
         ConsumerGroupMetadata metadata = this.consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId));
-        return this.ackCommitterMap.computeIfAbsent(consumerGroupId, k -> new AckCommitter(consumerGroupId, metadata.getAckOffset(), metadata::setAckOffset, bitmap));
+        return this.ackCommitterMap.computeIfAbsent(consumerGroupId, k -> new AckCommitter(metadata.getAckOffset(), metadata::setAckOffset, bitmap));
     }
 
     private AckCommitter getRetryAckCommitter(long consumerGroupId) {
@@ -260,7 +260,7 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
 
     private AckCommitter getRetryAckCommitter(long consumerGroupId, RoaringBitmap bitmap) {
         ConsumerGroupMetadata metadata = this.consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId));
-        return this.retryAckCommitterMap.computeIfAbsent(consumerGroupId, k -> new AckCommitter(consumerGroupId, metadata.getRetryAckOffset(), metadata::setRetryAckOffset, bitmap));
+        return this.retryAckCommitterMap.computeIfAbsent(consumerGroupId, k -> new AckCommitter(metadata.getRetryAckOffset(), metadata::setRetryAckOffset, bitmap));
     }
 
     @Override
@@ -310,6 +310,7 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
 
             kvService.batch(requestList.toArray(new BatchRequest[0]));
         } catch (StoreException e) {
+            LOGGER.error("{}: Replay ack operation failed", identity, e);
             return CompletableFuture.failedFuture(e);
         } finally {
             writeLock.unlock();
@@ -352,6 +353,7 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
                 buildReceiptHandle(checkPoint.consumerGroupId(), checkPoint.topicId(), checkPoint.queueId(), checkPoint.operationId()));
             kvService.batch(deleteLastTimerTagRequest, writeCheckPointRequest, writeTimerTagRequest);
         } catch (StoreException e) {
+            LOGGER.error("{}: Replay change invisible duration operation failed", identity, e);
             return CompletableFuture.failedFuture(e);
         } finally {
             writeLock.unlock();
@@ -377,7 +379,8 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
             OperationSnapshot snapshot = new OperationSnapshot(currentOperationOffset, snapshotVersion, metadataSnapshots);
             return CompletableFuture.completedFuture(snapshot);
         } catch (Exception e) {
-            // TODO: log
+            Throwable cause = FutureUtil.cause(e);
+            LOGGER.error("{}: Take snapshot failed", identity, cause);
             return CompletableFuture.failedFuture(e);
         } finally {
             readLock.unlock();
@@ -426,11 +429,13 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
                     }
                     kvService.batch(requestList.toArray(new BatchRequest[0]));
                 } catch (StoreException e) {
+                    LOGGER.error("{}: Recover from snapshot: {} failed", identity, snapshot, e);
                     throw new RuntimeException(e);
                 }
             });
         } catch (Exception e) {
-            // TODO: log it
+            Throwable cause = FutureUtil.cause(e);
+            LOGGER.error("{}: Load snapshot:{} failed", identity, snapshot, cause);
             return CompletableFuture.failedFuture(e);
         } finally {
             writeLock.unlock();
@@ -446,12 +451,8 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
             this.ackCommitterMap.clear();
             this.retryAckCommitterMap.clear();
             this.currentOperationOffset = -1;
-            // TODO: clear ck, timer tag, order index
             List<CheckPoint> checkPointList = new ArrayList<>();
-            byte[] tqPrefix = ByteBuffer.allocate(12)
-                .putLong(topicId)
-                .putInt(queueId)
-                .array();
+            byte[] tqPrefix = SerializeUtil.buildCheckPointPrefix(topicId, queueId);
             kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, tqPrefix, null, null, (key, value) -> {
                 CheckPoint checkPoint = SerializeUtil.decodeCheckPoint(ByteBuffer.wrap(value));
                 checkPointList.add(checkPoint);
@@ -480,6 +481,7 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
             kvService.batch(requestList.toArray(new BatchRequest[0]));
             return CompletableFuture.completedFuture(null);
         } catch (StoreException e) {
+            LOGGER.error("{}: Clear failed", identity, e);
             return CompletableFuture.failedFuture(e);
         } finally {
             writeLock.unlock();
@@ -520,18 +522,16 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
     }
 
     static class AckCommitter {
-        private final long consumerGroupId;
         private long ackOffset;
         private RoaringBitmap bitmap;
         private Consumer<Long> ackAdvanceFn;
         private long baseOffset;
 
-        public AckCommitter(long consumerGroupId, long ackOffset, Consumer<Long> ackAdvanceFn) {
-            this(consumerGroupId, ackOffset, ackAdvanceFn, new RoaringBitmap());
+        public AckCommitter(long ackOffset, Consumer<Long> ackAdvanceFn) {
+            this(ackOffset, ackAdvanceFn, new RoaringBitmap());
         }
 
-        public AckCommitter(long consumerGroupId, long ackOffset, Consumer<Long> ackAdvanceFn, RoaringBitmap bitmap) {
-            this.consumerGroupId = consumerGroupId;
+        public AckCommitter(long ackOffset, Consumer<Long> ackAdvanceFn, RoaringBitmap bitmap) {
             this.ackOffset = ackOffset;
             this.ackAdvanceFn = ackAdvanceFn;
             this.bitmap = bitmap;
