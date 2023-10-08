@@ -1,0 +1,27 @@
+name: Deploy Snapshot of S3Stream
+on:
+  push:
+    branches:
+      - 'main'
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Will start a Maven Central upload with current version"
+      - uses: actions/checkout@v2
+      - name: Set up Maven Central Repository
+        uses: actions/setup-java@v1
+        with:
+          java-version: 17
+          server-id: oss.sonatype.org
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
+          gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
+      - name: Publish package
+        working-directory: s3stream
+        run: mvn --batch-mode clean deploy -P central-deploy -DskipTests=true
+        env:
+          MAVEN_USERNAME: ${{ secrets.OSS_SONATYPE_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.OSS_SONATYPE_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
