@@ -1197,7 +1197,7 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public CompletableFuture<Void> closeStream(long streamId, long streamEpoch) {
+    public CompletableFuture<Void> closeStream(long streamId, long streamEpoch, int nodeId) {
         CompletableFuture<Void> future = new CompletableFuture<>();
         for (; ; ) {
             if (isLeader()) {
@@ -1212,6 +1212,15 @@ public class DefaultMetadataStore implements MetadataStore {
                     // Verify resource existence
                     if (null == stream) {
                         ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE, String.format("Stream[stream-id=%d] is not found", streamId));
+                        future.completeExceptionally(e);
+                        break;
+                    }
+
+                    // Verify node
+                    if (nodeId != stream.getDstNodeId()) {
+                        LOGGER.warn("stream {}'s dst node {} is not match request node {}",
+                            streamId, stream.getDstNodeId(), nodeId);
+                        ControllerException e = new ControllerException(Code.ILLEGAL_STATE_VALUE, "Node is not match");
                         future.completeExceptionally(e);
                         break;
                     }

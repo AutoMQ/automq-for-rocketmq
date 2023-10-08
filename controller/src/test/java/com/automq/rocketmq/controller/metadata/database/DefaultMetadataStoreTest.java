@@ -738,7 +738,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Assertions.assertEquals(0, metadata.getRangeId());
             Assertions.assertEquals(StreamState.OPEN, metadata.getState());
 
-            metadataStore.closeStream(metadata.getStreamId(), metadata.getEpoch());
+            metadataStore.closeStream(metadata.getStreamId(), metadata.getEpoch(), config.nodeId());
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -816,7 +816,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Assertions.assertEquals(2345, metadata.getEndOffset());
             Assertions.assertEquals(StreamState.OPEN, metadata.getState());
 
-            metadataStore.closeStream(metadata.getStreamId(), metadata.getEpoch());
+            metadataStore.closeStream(metadata.getStreamId(), metadata.getEpoch(), config.nodeId());
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -910,8 +910,8 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Assertions.assertEquals(2345, metadata.getEndOffset());
             Assertions.assertEquals(StreamState.OPEN, metadata.getState());
 
-            metadataStore.closeStream(metadata.getStreamId(), metadata.getEpoch()).join();
-            metadataStore.closeStream(metadata.getStreamId(), metadata.getEpoch()).join();
+            metadataStore.closeStream(metadata.getStreamId(), metadata.getEpoch(), config.nodeId()).join();
+            metadataStore.closeStream(metadata.getStreamId(), metadata.getEpoch(), config.nodeId()).join();
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -994,8 +994,8 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             node.setId(1);
             metadataStore.addBrokerNode(node);
 
-            metadataStore.closeStream(streamId, streamEpoch).join();
-            metadataStore.closeStream(streamId, streamEpoch).join();
+            metadataStore.closeStream(streamId, streamEpoch, config.nodeId()).join();
+            metadataStore.closeStream(streamId, streamEpoch, config.nodeId()).join();
 
             try (SqlSession session = getSessionFactory().openSession()) {
                 StreamMapper streamMapper = session.getMapper(StreamMapper.class);

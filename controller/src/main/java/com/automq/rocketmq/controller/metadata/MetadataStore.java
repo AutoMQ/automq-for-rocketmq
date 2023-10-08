@@ -105,7 +105,7 @@ public interface MetadataStore extends Closeable {
 
     CompletableFuture<StreamMetadata> openStream(long streamId, long streamEpoch, int nodeId);
 
-    CompletableFuture<Void> closeStream(long streamId, long streamEpoch);
+    CompletableFuture<Void> closeStream(long streamId, long streamEpoch, int nodeId);
 
     CompletableFuture<List<StreamMetadata>> listOpenStreams(int nodeId);
 

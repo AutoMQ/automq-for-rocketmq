@@ -141,7 +141,7 @@ public class MockStoreMetadataService implements StoreMetadataService {
     }
 
     @Override
-    public CompletableFuture<Void> closeStream(long streamId, long streamEpoch) {
+    public CompletableFuture<Void> closeStream(long streamId, long streamEpoch, int nodeId) {
         return null;
     }
 

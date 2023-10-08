@@ -94,6 +94,7 @@ public interface StoreMetadataService {
      *
      * @param streamId stream id.
      * @param streamEpoch stream epoch.
+     * @param nodeId node id.
      * @return {@link StreamMetadata}
      */
     CompletableFuture<StreamMetadata> openStream(long streamId, long streamEpoch, int nodeId);
@@ -103,9 +104,10 @@ public interface StoreMetadataService {
      *
      * @param streamId stream id.
      * @param streamEpoch stream epoch.
+     * @param nodeId node id.
      * @return {@link CompletableFuture} of close operation.
      */
-    CompletableFuture<Void> closeStream(long streamId, long streamEpoch);
+    CompletableFuture<Void> closeStream(long streamId, long streamEpoch, int nodeId);
 
     /**
      * List the open streams of current server.

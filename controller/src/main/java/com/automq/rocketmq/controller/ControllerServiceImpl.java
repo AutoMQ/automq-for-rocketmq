@@ -464,7 +464,7 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
 
     @Override
     public void closeStream(CloseStreamRequest request, StreamObserver<CloseStreamReply> responseObserver) {
-        metadataStore.closeStream(request.getStreamId(), request.getStreamEpoch()).whenComplete((res, e) -> {
+        metadataStore.closeStream(request.getStreamId(), request.getStreamEpoch(), request.getBrokerId()).whenComplete((res, e) -> {
             if (null != e) {
                 if (e instanceof ControllerException ex) {
                     CloseStreamReply reply = CloseStreamReply.newBuilder()
