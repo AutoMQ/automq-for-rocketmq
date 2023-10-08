@@ -30,7 +30,6 @@ import apache.rocketmq.controller.v1.StreamState;
 import apache.rocketmq.controller.v1.SubStream;
 import apache.rocketmq.controller.v1.TopicStatus;
 import apache.rocketmq.controller.v1.MessageType;
-import com.automq.rocketmq.common.util.Pair;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.ControllerClient;
 import com.automq.rocketmq.controller.metadata.ControllerConfig;
@@ -65,6 +64,7 @@ import java.util.concurrent.TimeUnit;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.ibatis.session.SqlSession;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Assertions;
@@ -781,9 +781,9 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             metadataStore.setLease(lease);
             Pair<List<S3StreamObject>, List<S3WALObject>> listPair = metadataStore.listObjects(streamId, startOffset, endOffset, limit).get();
 
-            Assertions.assertFalse(listPair.left().isEmpty());
-            Assertions.assertTrue(listPair.right().isEmpty());
-            S3StreamObject s3StreamObject = listPair.left().get(0);
+            Assertions.assertFalse(listPair.getLeft().isEmpty());
+            Assertions.assertTrue(listPair.getRight().isEmpty());
+            S3StreamObject s3StreamObject = listPair.getLeft().get(0);
             Assertions.assertEquals(122, s3StreamObject.getObjectId());
             Assertions.assertEquals(123, s3StreamObject.getObjectSize());
             Assertions.assertEquals(streamId, s3StreamObject.getStreamId());
@@ -880,10 +880,10 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             metadataStore.setLease(lease);
             Pair<List<S3StreamObject>, List<S3WALObject>> listPair = metadataStore.listObjects(streamId, startOffset, endOffset, limit).get();
 
-            Assertions.assertTrue(listPair.left().isEmpty());
-            Assertions.assertFalse(listPair.right().isEmpty());
+            Assertions.assertTrue(listPair.getLeft().isEmpty());
+            Assertions.assertFalse(listPair.getRight().isEmpty());
 
-            S3WALObject s3WALObject = listPair.right().get(0);
+            S3WALObject s3WALObject = listPair.getRight().get(0);
             Assertions.assertEquals(123, s3WALObject.getObjectId());
             Assertions.assertEquals(22, s3WALObject.getObjectSize());
             Assertions.assertEquals(1, s3WALObject.getBrokerId());
@@ -979,16 +979,16 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             metadataStore.setLease(lease);
             Pair<List<S3StreamObject>, List<S3WALObject>> listPair = metadataStore.listObjects(streamId, startOffset, endOffset, limit).get();
 
-            Assertions.assertFalse(listPair.left().isEmpty());
-            Assertions.assertFalse(listPair.right().isEmpty());
-            S3StreamObject s3StreamObject = listPair.left().get(0);
+            Assertions.assertFalse(listPair.getLeft().isEmpty());
+            Assertions.assertFalse(listPair.getRight().isEmpty());
+            S3StreamObject s3StreamObject = listPair.getLeft().get(0);
             Assertions.assertEquals(122, s3StreamObject.getObjectId());
             Assertions.assertEquals(123, s3StreamObject.getObjectSize());
             Assertions.assertEquals(streamId, s3StreamObject.getStreamId());
             Assertions.assertEquals(0, s3StreamObject.getStartOffset());
             Assertions.assertEquals(10, s3StreamObject.getEndOffset());
 
-            S3WALObject s3WALObject = listPair.right().get(0);
+            S3WALObject s3WALObject = listPair.getRight().get(0);
             Assertions.assertEquals(123, s3WALObject.getObjectId());
             Assertions.assertEquals(22, s3WALObject.getObjectSize());
             Assertions.assertEquals(1, s3WALObject.getBrokerId());
