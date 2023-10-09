@@ -24,7 +24,6 @@ import com.automq.rocketmq.common.util.Lifecycle;
 import com.automq.rocketmq.controller.ControllerServiceImpl;
 import com.automq.rocketmq.controller.MetadataStoreBuilder;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
-import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.metadata.DefaultProxyMetadataService;
 import com.automq.rocketmq.metadata.DefaultStoreMetadataService;
 import com.automq.rocketmq.metadata.api.ProxyMetadataService;
