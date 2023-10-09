@@ -98,7 +98,16 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
                             .build();
                         responseObserver.onNext(reply);
                         responseObserver.onCompleted();
-                    } else {
+                    } else if (e instanceof ControllerException ex) {
+                        NodeRegistrationReply reply = NodeRegistrationReply.newBuilder()
+                            .setStatus(Status.newBuilder()
+                                .setCode(Code.forNumber(ex.getErrorCode()))
+                                .setMessage(e.getMessage()).build())
+                            .build();
+                        responseObserver.onNext(reply);
+                        responseObserver.onCompleted();
+                    }
+                    else {
                         responseObserver.onError(e);
                     }
                 } else {
@@ -271,8 +280,8 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
             if (null != e) {
                 if (e.getCause() instanceof ControllerException ex) {
                     DeleteTopicReply reply = DeleteTopicReply.newBuilder()
-                            .setStatus(Status.newBuilder().setCode(Code.forNumber(ex.getErrorCode())).build()
-                            ).build();
+                        .setStatus(Status.newBuilder().setCode(Code.forNumber(ex.getErrorCode())).build()
+                        ).build();
                     responseObserver.onNext(reply);
                     responseObserver.onCompleted();
                     return;
@@ -280,8 +289,8 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
                 responseObserver.onError(e);
             } else {
                 DeleteTopicReply reply = DeleteTopicReply.newBuilder()
-                        .setStatus(Status.newBuilder().setCode(Code.OK).build()
-                        ).build();
+                    .setStatus(Status.newBuilder().setCode(Code.OK).build()
+                    ).build();
                 responseObserver.onNext(reply);
                 responseObserver.onCompleted();
             }

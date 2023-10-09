@@ -86,7 +86,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -189,7 +188,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                     Assertions.fail("Should have raised an exception");
                 }
             };
-            Assertions.assertThrows(CompletionException.class, () -> svc.registerNode(request, observer));
+            svc.registerNode(request, observer);
         }
     }
 

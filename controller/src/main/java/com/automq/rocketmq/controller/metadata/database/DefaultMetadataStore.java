@@ -195,16 +195,23 @@ public class DefaultMetadataStore implements MetadataStore {
 
     @Override
     public CompletableFuture<Node> registerBrokerNode(String name, String address, String instanceId) {
+        CompletableFuture<Node> future = new CompletableFuture<>();
         if (Strings.isNullOrEmpty(name)) {
-            throw new CompletionException(new ControllerException(Code.BAD_REQUEST_VALUE, "Broker name is null or empty"));
+            future.completeExceptionally(
+                new ControllerException(Code.BAD_REQUEST_VALUE, "Broker name is null or empty"));
+            return future;
         }
 
         if (Strings.isNullOrEmpty(address)) {
-            throw new CompletionException(new ControllerException(Code.BAD_REQUEST_VALUE, "Broker address is null or empty"));
+            future.completeExceptionally(
+                new ControllerException(Code.BAD_REQUEST_VALUE, "Broker address is null or empty"));
+            return future;
         }
 
         if (Strings.isNullOrEmpty(instanceId)) {
-            throw new CompletionException(new ControllerException(Code.BAD_REQUEST_VALUE, "Broker instance-id is null or empty"));
+            future.completeExceptionally(
+                new ControllerException(Code.BAD_REQUEST_VALUE, "Broker instance-id is null or empty"));
+            return future;
         }
 
         return CompletableFuture.supplyAsync(() -> {
@@ -332,7 +339,8 @@ public class DefaultMetadataStore implements MetadataStore {
 
                     TopicMapper topicMapper = session.getMapper(TopicMapper.class);
                     if (null != topicMapper.get(null, topicName)) {
-                        throw new CompletionException(new ControllerException(Code.DUPLICATED_VALUE, String.format("Topic %s was taken", topicName)));
+                        ControllerException e = new ControllerException(Code.DUPLICATED_VALUE, String.format("Topic %s was taken", topicName));
+                        future.completeExceptionally(e);
                     }
 
                     Topic topic = new Topic();
@@ -554,23 +562,23 @@ public class DefaultMetadataStore implements MetadataStore {
 
                                 case ASSIGNMENT_STATUS_ASSIGNED -> {
                                     MessageQueueAssignment queueAssignment = MessageQueueAssignment.newBuilder()
-                                            .setQueue(MessageQueue.newBuilder()
-                                                    .setTopicId(assignment.getTopicId())
-                                                    .setQueueId(assignment.getQueueId()))
-                                            .setNodeId(assignment.getDstNodeId())
-                                            .build();
+                                        .setQueue(MessageQueue.newBuilder()
+                                            .setTopicId(assignment.getTopicId())
+                                            .setQueueId(assignment.getQueueId()))
+                                        .setNodeId(assignment.getDstNodeId())
+                                        .build();
                                     topicBuilder.addAssignments(queueAssignment);
                                 }
 
                                 case ASSIGNMENT_STATUS_YIELDING -> {
                                     OngoingMessageQueueReassignment reassignment = OngoingMessageQueueReassignment.newBuilder()
-                                            .setQueue(MessageQueue.newBuilder()
-                                                    .setTopicId(assignment.getTopicId())
-                                                    .setQueueId(assignment.getQueueId())
-                                                    .build())
-                                            .setSrcNodeId(assignment.getSrcNodeId())
-                                            .setDstNodeId(assignment.getDstNodeId())
-                                            .build();
+                                        .setQueue(MessageQueue.newBuilder()
+                                            .setTopicId(assignment.getTopicId())
+                                            .setQueueId(assignment.getQueueId())
+                                            .build())
+                                        .setSrcNodeId(assignment.getSrcNodeId())
+                                        .setDstNodeId(assignment.getDstNodeId())
+                                        .build();
                                     topicBuilder.addReassignments(reassignment);
                                 }
                             }
@@ -696,7 +704,7 @@ public class DefaultMetadataStore implements MetadataStore {
                                 assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_YIELDING);
                                 assignmentMapper.update(assignment);
                             }
-                            case ASSIGNMENT_STATUS_DELETED -> throw new CompletionException(new ControllerException(Code.NOT_FOUND_VALUE, "Already deleted"));
+                            case ASSIGNMENT_STATUS_DELETED -> future.completeExceptionally(new ControllerException(Code.NOT_FOUND_VALUE, "Already deleted"));
                         }
                         break;
                     }
@@ -949,12 +957,12 @@ public class DefaultMetadataStore implements MetadataStore {
                 } else {
                     Group group = groups.get(0);
                     return ConsumerGroup.newBuilder()
-                            .setGroupId(group.getId())
-                            .setName(group.getName())
-                            .setGroupType(group.getGroupType())
-                            .setMaxDeliveryAttempt(group.getMaxDeliveryAttempt())
-                            .setDeadLetterTopicId(group.getDeadLetterTopicId())
-                            .build();
+                        .setGroupId(group.getId())
+                        .setName(group.getName())
+                        .setGroupType(group.getGroupType())
+                        .setMaxDeliveryAttempt(group.getMaxDeliveryAttempt())
+                        .setDeadLetterTopicId(group.getDeadLetterTopicId())
+                         .build();
                 }
             }
         }, asyncExecutorService);
@@ -979,7 +987,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     Stream stream = streamMapper.getByStreamId(streamId);
                     if (null == stream) {
                         ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE,
-                                String.format("Stream[stream-id=%d] is not found", streamId)
+                            String.format("Stream[stream-id=%d] is not found", streamId)
                         );
                         future.completeExceptionally(e);
                         return future;
@@ -1331,13 +1339,13 @@ public class DefaultMetadataStore implements MetadataStore {
                                 int rangeId = stream.getRangeId();
                                 Range range = rangeMapper.get(rangeId, stream.getId(), null);
                                 return StreamMetadata.newBuilder()
-                                        .setStreamId(stream.getId())
-                                        .setStartOffset(stream.getStartOffset())
-                                        .setEndOffset(null == range ? 0 : range.getEndOffset())
-                                        .setEpoch(stream.getEpoch())
-                                        .setState(stream.getState())
-                                        .setRangeId(stream.getRangeId())
-                                        .build();
+                                    .setStreamId(stream.getId())
+                                     .setStartOffset(stream.getStartOffset())
+                                    .setEndOffset(null == range ? 0 : range.getEndOffset())
+                                    .setEpoch(stream.getEpoch())
+                                    .setState(stream.getState())
+                                    .setRangeId(stream.getRangeId())
+                                    .build();
                             })
                             .toList();
                     future.complete(streams);
@@ -1345,11 +1353,11 @@ public class DefaultMetadataStore implements MetadataStore {
                 }
             } else {
                 ListOpenStreamsRequest request = ListOpenStreamsRequest.newBuilder()
-                        .setBrokerId(nodeId)
-                        .build();
+                    .setBrokerId(nodeId)
+                    .build();
                 try {
                     return controllerClient.listOpenStreams(leaderAddress(), request)
-                            .thenApply((ListOpenStreamsReply::getStreamMetadataList));
+                        .thenApply((ListOpenStreamsReply::getStreamMetadataList));
                 } catch (ControllerException e) {
                     future.completeExceptionally(e);
                 }

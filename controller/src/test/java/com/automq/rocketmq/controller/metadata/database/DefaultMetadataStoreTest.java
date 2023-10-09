@@ -122,9 +122,9 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             String name = "test-broker -0";
             String address = "localhost:1234";
             String instanceId = "i-register";
-            Assertions.assertThrows(CompletionException.class, () -> metadataStore.registerBrokerNode("", address, instanceId));
-            Assertions.assertThrows(CompletionException.class, () -> metadataStore.registerBrokerNode(name, null, instanceId));
-            Assertions.assertThrows(CompletionException.class, () -> metadataStore.registerBrokerNode(name, address, ""));
+            Assertions.assertThrows(CompletionException.class, () -> metadataStore.registerBrokerNode("", address, instanceId).join());
+            Assertions.assertThrows(CompletionException.class, () -> metadataStore.registerBrokerNode(name, null, instanceId).join());
+            Assertions.assertThrows(CompletionException.class, () -> metadataStore.registerBrokerNode(name, address, "").join());
         }
     }
 
