@@ -17,7 +17,6 @@
 
 package com.automq.rocketmq.broker;
 
-import com.automq.rocketmq.broker.manager.NodeRegistrar;
 import com.automq.rocketmq.broker.protocol.GrpcProtocolServer;
 import com.automq.rocketmq.common.config.BrokerConfig;
 import com.automq.rocketmq.common.util.Lifecycle;
@@ -45,7 +44,6 @@ public class BrokerController implements Lifecycle {
     private final StoreMetadataService storeMetadataService;
     private final ProxyMetadataService proxyMetadataService;
     private final MessagingProcessor messagingProcessor;
-    private final NodeRegistrar nodeRegistrar;
 
     public BrokerController(BrokerConfig brokerConfig) throws Exception {
         this.brokerConfig = brokerConfig;
@@ -54,13 +52,12 @@ public class BrokerController implements Lifecycle {
         ProxyConfiguration.intConfig(brokerConfig.proxy());
 
         metadataStore = MetadataStoreBuilder.build(brokerConfig);
-        nodeRegistrar = new NodeRegistrar(brokerConfig, metadataStore);
         // Start the node registrar first, so that the node is registered before the proxy starts.
         metadataStore.start();
-        nodeRegistrar.registerNode();
+        metadataStore.registerCurrentNode(brokerConfig.name(), brokerConfig.advertiseAddress(), brokerConfig.instanceId());
 
-        proxyMetadataService = new DefaultProxyMetadataService(metadataStore, nodeRegistrar.node());
-        storeMetadataService = new DefaultStoreMetadataService(metadataStore, nodeRegistrar.node());
+        proxyMetadataService = new DefaultProxyMetadataService(metadataStore);
+        storeMetadataService = new DefaultStoreMetadataService(metadataStore);
 
         messageStore = MessageStoreBuilder.build(brokerConfig.store(), brokerConfig.s3Stream(), storeMetadataService);
 
@@ -74,7 +71,6 @@ public class BrokerController implements Lifecycle {
 
     @Override
     public void start() throws Exception {
-        nodeRegistrar.start();
         messageStore.start();
         messagingProcessor.start();
         grpcServer.start();
@@ -86,6 +82,5 @@ public class BrokerController implements Lifecycle {
         messagingProcessor.shutdown();
         messageStore.shutdown();
         metadataStore.close();
-        nodeRegistrar.shutdown();
     }
 }

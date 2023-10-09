@@ -15,28 +15,26 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.common;
+package com.automq.rocketmq.controller.metadata.database.tasks;
 
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.atomic.AtomicInteger;
-import javax.annotation.Nonnull;
+import com.automq.rocketmq.controller.metadata.MetadataStore;
 
-public class PrefixThreadFactory implements ThreadFactory {
-    private final String prefix;
-
-    private final AtomicInteger index;
-
-    public PrefixThreadFactory(String prefix) {
-        this.prefix = prefix;
-        this.index = new AtomicInteger(0);
+public class KeepAliveTask extends ControllerTask {
+    public KeepAliveTask(MetadataStore metadataStore) {
+        super(metadataStore);
     }
 
     @Override
-    public Thread newThread(@Nonnull Runnable r) {
-        final String threadName = String.format("%s_%d", this.prefix, this.index.getAndIncrement());
-        Thread t = new Thread(r);
-        t.setName(threadName);
-        t.setDaemon(true);
-        return t;
+    public void run() {
+        LOGGER.debug("Keep-alive task starts");
+        try {
+            int nodeId = metadataStore.config().nodeId();
+            if (!metadataStore.isLeader()) {
+                metadataStore.keepAlive(nodeId, metadataStore.config().epoch(), false);
+            }
+        } catch (Throwable e) {
+            LOGGER.error("Unexpected exception raised while keeping node alive", e);
+        }
+        LOGGER.debug("Keep-alive completed");
     }
 }

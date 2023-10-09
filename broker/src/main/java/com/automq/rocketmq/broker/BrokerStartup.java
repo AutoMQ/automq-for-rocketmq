@@ -53,6 +53,7 @@ public class BrokerStartup {
                 try {
                     String configStr = Files.readString(Path.of(configFile), StandardCharsets.UTF_8);
                     brokerConfig = loadBrokerConfig(configStr);
+                    brokerConfig.validate();
                 } catch (IOException e) {
                     LOGGER.error("Failed to read config file {}", configFile, e);
                     System.exit(-1);

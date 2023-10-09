@@ -1,5 +1,6 @@
 name: DefaultBroker
 instanceId: "ec2-test"
+bindAddress: "0.0.0.0:8081"
 s3Stream:
   s3WALPath: "/tmp/s3rocketmq/wal"
   s3Endpoint: "http://127.0.0.1:4566"

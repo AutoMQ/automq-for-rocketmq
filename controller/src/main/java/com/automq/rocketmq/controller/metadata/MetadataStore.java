@@ -66,8 +66,15 @@ public interface MetadataStore extends Closeable {
      * @return broker epoch
      * @throws ControllerException If there is an I/O error.
      */
-    CompletableFuture<Node> registerBrokerNode(String name, String address,
-        String instanceId) throws ControllerException;
+    CompletableFuture<Node> registerBrokerNode(String name, String address, String instanceId);
+
+    /**
+     * Register broker into metadata store and return broker epoch
+     *
+     * @return broker epoch
+     * @throws ControllerException If there is an I/O error.
+     */
+    void registerCurrentNode(String name, String address, String instanceId) throws ControllerException;
 
     void keepAlive(int nodeId, long epoch, boolean goingAway);
 

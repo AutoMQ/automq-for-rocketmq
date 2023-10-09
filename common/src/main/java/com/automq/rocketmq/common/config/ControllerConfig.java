@@ -20,7 +20,11 @@ package com.automq.rocketmq.common.config;
 public interface ControllerConfig {
     int nodeId();
 
+    void setNodeId(int nodeId);
+
     long epoch();
+
+    void setEpoch(long epoch);
 
     default int scanIntervalInSecs() {
         return 30;
