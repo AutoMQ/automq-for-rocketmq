@@ -39,19 +39,28 @@ public class MockStreamStore implements StreamStore {
 
     @Override
     public CompletableFuture<FetchResult> fetch(long streamId, long startOffset, int maxCount) {
-        Stream stream = openStream(streamId);
+        if (!openedStreams.containsKey(streamId)) {
+            throw new IllegalStateException("Stream " + streamId + " is not opened.");
+        }
+        Stream stream = openedStreams.get(streamId);
         return stream.fetch(startOffset, startOffset + maxCount, Integer.MAX_VALUE);
     }
 
     @Override
     public CompletableFuture<AppendResult> append(long streamId, RecordBatch recordBatch) {
-        Stream stream = openStream(streamId);
+        if (!openedStreams.containsKey(streamId)) {
+            throw new IllegalStateException("Stream " + streamId + " is not opened.");
+        }
+        Stream stream = openedStreams.get(streamId);
         return stream.append(recordBatch);
     }
 
     @Override
     public CompletableFuture<Void> trim(long streamId, long newStartOffset) {
-        Stream stream = openStream(streamId);
+        if (!openedStreams.containsKey(streamId)) {
+            throw new IllegalStateException("Stream " + streamId + " is not opened.");
+        }
+        Stream stream = openedStreams.get(streamId);
         return stream.trim(newStartOffset);
     }
 
@@ -69,13 +78,19 @@ public class MockStreamStore implements StreamStore {
 
     @Override
     public long startOffset(long streamId) {
-        Stream stream = openStream(streamId);
+        if (!openedStreams.containsKey(streamId)) {
+            throw new IllegalStateException("Stream " + streamId + " is not opened.");
+        }
+        Stream stream = openedStreams.get(streamId);
         return stream.startOffset();
     }
 
     @Override
     public long nextOffset(long streamId) {
-        Stream stream = openStream(streamId);
+        if (!openedStreams.containsKey(streamId)) {
+            throw new IllegalStateException("Stream " + streamId + " is not opened.");
+        }
+        Stream stream = openedStreams.get(streamId);
         return stream.nextOffset();
     }
 
@@ -87,6 +102,9 @@ public class MockStreamStore implements StreamStore {
      */
     private Stream openStream(long streamId) {
         // Open the specified stream if not opened yet.
+        if (openedStreams.containsKey(streamId)) {
+            throw new IllegalStateException("Stream " + streamId + " already opened.");
+        }
         // TODO: Build a real OpenStreamOptions
         return openedStreams.computeIfAbsent(streamId, id -> streamClient.openStream(id, null).join());
     }
