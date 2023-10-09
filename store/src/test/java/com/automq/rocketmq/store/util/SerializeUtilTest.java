@@ -17,12 +17,10 @@
 
 package com.automq.rocketmq.store.util;
 
-import com.automq.rocketmq.store.model.generated.ChangeInvisibleDurationOperation;
 import com.automq.rocketmq.store.model.generated.CheckPoint;
-import com.automq.rocketmq.store.model.generated.Operation;
-import com.automq.rocketmq.store.model.generated.OperationLogItem;
 import com.automq.rocketmq.store.model.generated.ReceiptHandle;
 import com.automq.rocketmq.store.model.operation.AckOperation.AckOperationType;
+import com.automq.rocketmq.store.model.operation.ChangeInvisibleDurationOperation;
 import com.automq.rocketmq.store.model.operation.OperationSnapshot;
 import com.automq.rocketmq.store.model.operation.PopOperation.PopOperationType;
 import java.nio.ByteBuffer;
@@ -32,7 +30,6 @@ import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 public class SerializeUtilTest {
     public static final long TOPIC_ID = 0L;
@@ -135,19 +132,12 @@ public class SerializeUtilTest {
 
     @Test
     void encodeChangeInvisibleDurationOperation() {
-        byte[] bytes = SerializeUtil.encodeChangeInvisibleDurationOperation(new com.automq.rocketmq.store.model.operation.ChangeInvisibleDurationOperation(
+        ChangeInvisibleDurationOperation changeInvisibleDurationOperation = new ChangeInvisibleDurationOperation(
             TOPIC_ID, QUEUE_ID, OPERATION_STREAM_ID, SNAPSHOT_STREAM_ID, null, CONSUMER_GROUP_ID, OPERATION_ID, INVISIBLE_DURATION, OPERATION_TIMESTAMP
-        ));
-        OperationLogItem operationLogItem = OperationLogItem.getRootAsOperationLogItem(ByteBuffer.wrap(bytes));
-        assertEquals(Operation.ChangeInvisibleDurationOperation, operationLogItem.operationType());
-
-        ChangeInvisibleDurationOperation operation = (ChangeInvisibleDurationOperation) operationLogItem.operation(new ChangeInvisibleDurationOperation());
-        assertNotNull(operation);
-        assertEquals(TOPIC_ID, operation.receiptHandle().topicId());
-        assertEquals(QUEUE_ID, operation.receiptHandle().queueId());
-        assertEquals(OPERATION_ID, operation.receiptHandle().operationId());
-        assertEquals(INVISIBLE_DURATION, operation.invisibleDuration());
-        assertEquals(OPERATION_TIMESTAMP, operation.operationTimestamp());
+        );
+        byte[] bytes = SerializeUtil.encodeChangeInvisibleDurationOperation(changeInvisibleDurationOperation);
+        com.automq.rocketmq.store.model.operation.Operation decodedOperation = SerializeUtil.decodeOperation(ByteBuffer.wrap(bytes), null, OPERATION_STREAM_ID, SNAPSHOT_STREAM_ID);
+        assertEquals(changeInvisibleDurationOperation, decodedOperation);
     }
 
     @Test
