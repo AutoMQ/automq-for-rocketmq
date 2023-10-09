@@ -44,6 +44,7 @@ import org.slf4j.LoggerFactory;
 
 public class S3ObjectManager implements ObjectManager {
     private static final Logger LOGGER = LoggerFactory.getLogger(S3ObjectManager.class);
+    static final int MIN_OBJECT_TTL_MINUTES = 10;
     private final StoreMetadataService metaService;
 
     public S3ObjectManager(StoreMetadataService metaService) {
@@ -54,6 +55,7 @@ public class S3ObjectManager implements ObjectManager {
     public CompletableFuture<Long> prepareObject(int count, long ttl) {
         // Covert ttl from milliseconds to minutes
         int minutes = (int) TimeUnit.MILLISECONDS.toMinutes(ttl);
+        minutes = Math.max(minutes, MIN_OBJECT_TTL_MINUTES);
         return metaService.prepareS3Objects(count, minutes);
     }
 
