@@ -18,11 +18,11 @@
 package com.automq.rocketmq.store.util;
 
 import com.automq.rocketmq.store.api.MessageStateMachine;
-import com.automq.rocketmq.store.model.generated.ChangeInvisibleDurationOperation;
 import com.automq.rocketmq.store.model.generated.CheckPoint;
 import com.automq.rocketmq.store.model.generated.OperationLogItem;
 import com.automq.rocketmq.store.model.generated.ReceiptHandle;
 import com.automq.rocketmq.store.model.operation.AckOperation;
+import com.automq.rocketmq.store.model.operation.ChangeInvisibleDurationOperation;
 import com.automq.rocketmq.store.model.operation.Operation;
 import com.automq.rocketmq.store.model.operation.OperationSnapshot;
 import com.automq.rocketmq.store.model.operation.PopOperation;
@@ -127,20 +127,31 @@ public class SerializeUtil {
     public static Operation decodeOperation(ByteBuffer buffer,
         MessageStateMachine stateMachine, long operationStreamId, long snapshotStreamId) {
         OperationLogItem operationLogItem = OperationLogItem.getRootAsOperationLogItem(buffer);
-        if (operationLogItem.operationType() == com.automq.rocketmq.store.model.generated.Operation.PopOperation) {
-            com.automq.rocketmq.store.model.generated.PopOperation popOperation = (com.automq.rocketmq.store.model.generated.PopOperation) operationLogItem.operation(new com.automq.rocketmq.store.model.generated.PopOperation());
-            return new PopOperation(
-                popOperation.topicId(), popOperation.queueId(), operationStreamId, snapshotStreamId, stateMachine,
-                popOperation.consumerGroupId(), popOperation.offset(), popOperation.count(), popOperation.invisibleDuration(),
-                popOperation.operationTimestamp(), popOperation.endMark(), com.automq.rocketmq.store.model.operation.PopOperation.PopOperationType.values()[popOperation.type()]);
-        } else if (operationLogItem.operationType() == com.automq.rocketmq.store.model.generated.Operation.AckOperation) {
-            com.automq.rocketmq.store.model.generated.AckOperation ackOperation = (com.automq.rocketmq.store.model.generated.AckOperation) operationLogItem.operation(new com.automq.rocketmq.store.model.generated.AckOperation());
-            return new AckOperation(ackOperation.receiptHandle().topicId(), ackOperation.receiptHandle().queueId(),
-                operationStreamId, snapshotStreamId, stateMachine, ackOperation.receiptHandle().consumerGroupId(),
-                ackOperation.receiptHandle().operationId(), ackOperation.operationTimestamp(),
-                com.automq.rocketmq.store.model.operation.AckOperation.AckOperationType.values()[ackOperation.type()]);
+
+        switch (operationLogItem.operationType()) {
+            case com.automq.rocketmq.store.model.generated.Operation.PopOperation -> {
+                com.automq.rocketmq.store.model.generated.PopOperation popOperation = (com.automq.rocketmq.store.model.generated.PopOperation) operationLogItem.operation(new com.automq.rocketmq.store.model.generated.PopOperation());
+                return new PopOperation(
+                    popOperation.topicId(), popOperation.queueId(), operationStreamId, snapshotStreamId, stateMachine,
+                    popOperation.consumerGroupId(), popOperation.offset(), popOperation.count(), popOperation.invisibleDuration(),
+                    popOperation.operationTimestamp(), popOperation.endMark(), PopOperation.PopOperationType.values()[popOperation.type()]);
+            }
+            case com.automq.rocketmq.store.model.generated.Operation.AckOperation -> {
+                com.automq.rocketmq.store.model.generated.AckOperation ackOperation = (com.automq.rocketmq.store.model.generated.AckOperation) operationLogItem.operation(new com.automq.rocketmq.store.model.generated.AckOperation());
+                return new AckOperation(ackOperation.receiptHandle().topicId(), ackOperation.receiptHandle().queueId(),
+                    operationStreamId, snapshotStreamId, stateMachine, ackOperation.receiptHandle().consumerGroupId(),
+                    ackOperation.receiptHandle().operationId(), ackOperation.operationTimestamp(),
+                    AckOperation.AckOperationType.values()[ackOperation.type()]);
+            }
+            case com.automq.rocketmq.store.model.generated.Operation.ChangeInvisibleDurationOperation -> {
+                com.automq.rocketmq.store.model.generated.ChangeInvisibleDurationOperation changeInvisibleDurationOperation = (com.automq.rocketmq.store.model.generated.ChangeInvisibleDurationOperation) operationLogItem.operation(new com.automq.rocketmq.store.model.generated.ChangeInvisibleDurationOperation());
+                return new ChangeInvisibleDurationOperation(changeInvisibleDurationOperation.receiptHandle().topicId(), changeInvisibleDurationOperation.receiptHandle().queueId(),
+                    operationStreamId, snapshotStreamId, stateMachine, changeInvisibleDurationOperation.receiptHandle().consumerGroupId(),
+                    changeInvisibleDurationOperation.receiptHandle().operationId(), changeInvisibleDurationOperation.invisibleDuration(),
+                    changeInvisibleDurationOperation.operationTimestamp());
+            }
+            default -> throw new IllegalStateException("Unexpected value: " + operationLogItem.operationType());
         }
-        return null;
     }
 
     public static byte[] encodeOperationSnapshot(OperationSnapshot snapshot) {
@@ -205,11 +216,10 @@ public class SerializeUtil {
         return builder.sizedByteArray();
     }
 
-    public static byte[] encodeChangeInvisibleDurationOperation(
-        com.automq.rocketmq.store.model.operation.ChangeInvisibleDurationOperation durationOperation) {
+    public static byte[] encodeChangeInvisibleDurationOperation(ChangeInvisibleDurationOperation durationOperation) {
         FlatBufferBuilder builder = new FlatBufferBuilder();
         int receiptHandleId = ReceiptHandle.createReceiptHandle(builder, durationOperation.consumerGroupId(), durationOperation.topicId(), durationOperation.queueId(), durationOperation.operationId());
-        int operation = ChangeInvisibleDurationOperation.createChangeInvisibleDurationOperation(builder, receiptHandleId, durationOperation.invisibleDuration(), durationOperation.operationTimestamp());
+        int operation = com.automq.rocketmq.store.model.generated.ChangeInvisibleDurationOperation.createChangeInvisibleDurationOperation(builder, receiptHandleId, durationOperation.invisibleDuration(), durationOperation.operationTimestamp());
         int root = OperationLogItem.createOperationLogItem(builder, com.automq.rocketmq.store.model.generated.Operation.ChangeInvisibleDurationOperation, operation);
         builder.finish(root);
         return builder.sizedByteArray();
