@@ -41,6 +41,7 @@ import com.automq.rocketmq.controller.metadata.database.dao.Lease;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import com.automq.rocketmq.controller.metadata.database.dao.S3Object;
+import com.automq.rocketmq.controller.metadata.database.dao.S3WalObject;
 import com.automq.rocketmq.controller.metadata.database.dao.Stream;
 import com.automq.rocketmq.controller.metadata.database.dao.Range;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
@@ -50,7 +51,7 @@ import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMa
 import com.automq.rocketmq.controller.metadata.database.mapper.RangeMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.S3ObjectMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.S3StreamObjectMapper;
-import com.automq.rocketmq.controller.metadata.database.mapper.S3WALObjectMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.S3WalObjectMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 
@@ -596,8 +597,8 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
               }
             }""";
         try (SqlSession session = getSessionFactory().openSession()) {
-            S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
-            com.automq.rocketmq.controller.metadata.database.dao.S3WALObject s3WALObject = new com.automq.rocketmq.controller.metadata.database.dao.S3WALObject();
+            S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
+            S3WalObject s3WALObject = new S3WalObject();
             s3WALObject.setObjectId(123);
             s3WALObject.setBrokerId(1);
             s3WALObject.setObjectSize(22);
@@ -640,7 +641,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
-            S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
+            S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
             s3WALObjectMapper.delete(123L, 1, null);
             session.commit();
         }
@@ -673,8 +674,8 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
               }
             }""";
         try (SqlSession session = getSessionFactory().openSession()) {
-            S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
-            com.automq.rocketmq.controller.metadata.database.dao.S3WALObject s3WALObject = new com.automq.rocketmq.controller.metadata.database.dao.S3WALObject();
+            S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
+            S3WalObject s3WALObject = new S3WalObject();
             s3WALObject.setObjectId(123);
             s3WALObject.setBrokerId(1);
             s3WALObject.setObjectSize(22);
@@ -710,7 +711,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
-            S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
+            S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
             s3WALObjectMapper.delete(123L, 1, null);
             session.commit();
         }
@@ -748,10 +749,9 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
               }
             }""";
 
-
         try (SqlSession session = getSessionFactory().openSession()) {
-            S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
-            com.automq.rocketmq.controller.metadata.database.dao.S3WALObject s3WALObject = new com.automq.rocketmq.controller.metadata.database.dao.S3WALObject();
+            S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
+            S3WalObject s3WALObject = new S3WalObject();
             s3WALObject.setObjectId(123);
             s3WALObject.setBrokerId(1);
             s3WALObject.setObjectSize(22);
@@ -847,10 +847,9 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
               }
             }""";
 
-
         try (SqlSession session = getSessionFactory().openSession()) {
-            S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
-            com.automq.rocketmq.controller.metadata.database.dao.S3WALObject s3WALObject = new com.automq.rocketmq.controller.metadata.database.dao.S3WALObject();
+            S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
+            S3WalObject s3WALObject = new S3WalObject();
             s3WALObject.setObjectId(123);
             s3WALObject.setBrokerId(1);
             s3WALObject.setObjectSize(22);
@@ -908,7 +907,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
-            S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
+            S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
             s3WALObjectMapper.delete(123L, 1, null);
             session.commit();
         }
@@ -946,10 +945,9 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
               }
             }""";
 
-
         try (SqlSession session = getSessionFactory().openSession()) {
-            S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
-            com.automq.rocketmq.controller.metadata.database.dao.S3WALObject s3WALObject = new com.automq.rocketmq.controller.metadata.database.dao.S3WALObject();
+            S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
+            S3WalObject s3WALObject = new S3WalObject();
             s3WALObject.setObjectId(123);
             s3WALObject.setBrokerId(1);
             s3WALObject.setObjectSize(22);
@@ -1013,7 +1011,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
-            S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
+            S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
             s3WALObjectMapper.delete(123L, 1, null);
 
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
@@ -2005,8 +2003,8 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             object1.setEndOffset(333);
             s3StreamObjectMapper.create(object1);
 
-            S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
-            com.automq.rocketmq.controller.metadata.database.dao.S3WALObject s3WALObject = new com.automq.rocketmq.controller.metadata.database.dao.S3WALObject();
+            S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
+            S3WalObject s3WALObject = new S3WalObject();
             s3WALObject.setObjectId(objectId + 2);
             s3WALObject.setObjectSize(333);
             s3WALObject.setBaseDataTimestamp(3);
@@ -2014,13 +2012,13 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             s3WALObject.setSubStreams(expectSubStream.replace("1234567890", String.valueOf(streamId)));
             s3WALObjectMapper.create(s3WALObject);
 
-            com.automq.rocketmq.controller.metadata.database.dao.S3WALObject s3WALObject1 = new com.automq.rocketmq.controller.metadata.database.dao.S3WALObject();
-            s3WALObject1.setObjectId(objectId + 3);
-            s3WALObject1.setObjectSize(444);
-            s3WALObject1.setBaseDataTimestamp(4);
+            S3WalObject s3WalObject1 = new S3WalObject();
+            s3WalObject1.setObjectId(objectId + 3);
+            s3WalObject1.setObjectSize(444);
+            s3WalObject1.setBaseDataTimestamp(4);
             s3WALObject.setSequenceId(2);
-            s3WALObject1.setSubStreams(expectSubStream.replace("1234567890", String.valueOf(streamId)));
-            s3WALObjectMapper.create(s3WALObject1);
+            s3WalObject1.setSubStreams(expectSubStream.replace("1234567890", String.valueOf(streamId)));
+            s3WALObjectMapper.create(s3WalObject1);
 
             session.commit();
         }
@@ -2068,13 +2066,13 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             }
 
             long baseTime = time;
-            S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
+            S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
             for (long index = objectId + 2; index < objectId + 4; index++) {
-                com.automq.rocketmq.controller.metadata.database.dao.S3WALObject s3WALObject = s3WALObjectMapper.getByObjectId(index);
+                S3WalObject s3WALObject = s3WALObjectMapper.getByObjectId(index);
                 baseTime = Math.min(baseTime, s3WALObject.getBaseDataTimestamp());
             }
 
-            com.automq.rocketmq.controller.metadata.database.dao.S3WALObject object = s3WALObjectMapper.getByObjectId(objectId + 4);
+            S3WalObject object = s3WALObjectMapper.getByObjectId(objectId + 4);
             Assertions.assertEquals(baseTime, object.getBaseDataTimestamp());
             if (object.getCommittedTimestamp() - time > 5 * 60) {
                 Assertions.fail();
@@ -2082,9 +2080,8 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         }
     }
 
-
     @Test
-    public void testCommitWALObject_ObjectNotExist() throws IOException, ExecutionException, InterruptedException {
+    public void testCommitWalObject_ObjectNotExist() throws IOException, ExecutionException, InterruptedException {
         long streamId = 1;
         int nodeId = 1;
 
@@ -2128,9 +2125,10 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testCommitWALObject_WALNOTExist() throws IOException, ExecutionException, InterruptedException {
-        long streamId = 1;
+    public void testCommitWalObject_WalNotExist() throws IOException, ExecutionException, InterruptedException {
+        long streamId;
         int nodeId = 1;
+        long objectId;
 
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.nodeId()).thenReturn(nodeId);
@@ -2145,28 +2143,68 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             .build();
 
         try (SqlSession session = this.getSessionFactory().openSession()) {
+            RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+            Stream stream = new Stream();
+            stream.setState(StreamState.OPEN);
+            stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
+            stream.setTopicId(2);
+            stream.setRangeId(1);
+            stream.setEpoch(3);
+            streamMapper.create(stream);
+            streamId = stream.getId();
+            Range range = new Range();
+
+            range.setStreamId(streamId);
+            range.setRangeId(1);
+            range.setEpoch(3L);
+            range.setStartOffset(0L);
+            range.setEndOffset(0L);
+            range.setBrokerId(nodeId);
+            rangeMapper.create(range);
+
+            S3ObjectMapper objectMapper = session.getMapper(S3ObjectMapper.class);
+            S3Object s3Object = new S3Object();
+            s3Object.setState(S3ObjectState.BOS_PREPARED);
+            s3Object.setStreamId(streamId);
+            s3Object.setObjectSize(2139L);
+            s3Object.setPreparedTimestamp(System.currentTimeMillis());
+            s3Object.setExpiredTimestamp(System.currentTimeMillis() + TimeUnit.HOURS.toMillis(1));
+            objectMapper.create(s3Object);
+            objectId = s3Object.getId();
+
+
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
             com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
-            object.setObjectId(2);
+            object.setObjectId(objectId);
             object.setStreamId(streamId);
             object.setBaseDataTimestamp(1);
             object.setStartOffset(0);
             object.setEndOffset(2);
             object.setObjectSize(2139);
             s3StreamObjectMapper.create(object);
+            session.commit();
         }
 
         List<Long> compactedObjects = new ArrayList<>();
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            Assertions.assertNull(metadataStore.getLease());
-            Lease lease = new Lease();
-            lease.setNodeId(config.nodeId());
-            metadataStore.setLease(lease);
-            metadataStore.setRole(Role.Leader);
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config);
+             SqlSession session = getSessionFactory().openSession()) {
+            metadataStore.start();
+            Awaitility.await().with()
+                .pollInterval(100, TimeUnit.MILLISECONDS)
+                .atMost(10, TimeUnit.SECONDS)
+                .until(metadataStore::isLeader);
 
             List<S3StreamObject> s3StreamObjects = metadataStore.listStreamObjects(streamId, 0, 334, 2).get();
+            metadataStore.commitWalObject(walObject, s3StreamObjects, compactedObjects).get();
 
-            Assertions.assertThrows(CompletionException.class, () -> metadataStore.commitWalObject(walObject, s3StreamObjects, compactedObjects).join());
+            S3StreamObjectMapper mapper = session.getMapper(S3StreamObjectMapper.class);
+            com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = mapper.getByObjectId(objectId);
+            Assertions.assertTrue(object.getCommittedTimestamp() > 0);
+
+            S3ObjectMapper objectMapper = session.getMapper(S3ObjectMapper.class);
+            S3Object s3Object = objectMapper.getById(objectId);
+            Assertions.assertTrue(s3Object.getCommittedTimestamp() > 0);
         }
 
     }

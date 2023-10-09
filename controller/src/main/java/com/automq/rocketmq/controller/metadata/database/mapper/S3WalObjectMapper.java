@@ -17,23 +17,23 @@
 
 package com.automq.rocketmq.controller.metadata.database.mapper;
 
-import com.automq.rocketmq.controller.metadata.database.dao.S3WALObject;
+import com.automq.rocketmq.controller.metadata.database.dao.S3WalObject;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
-public interface S3WALObjectMapper {
+public interface S3WalObjectMapper {
 
-    int create(S3WALObject s3WALObject);
+    int create(S3WalObject s3WALObject);
 
-    S3WALObject getByObjectId(long objectId);
+    S3WalObject getByObjectId(long objectId);
 
     int delete(@Param("objectId") Long objectId,
         @Param("brokerId") Integer brokerId,
         @Param("sequenceId") Long sequenceId);
 
-    List<S3WALObject> list(@Param("brokerId") Integer brokerId,
+    List<S3WalObject> list(@Param("brokerId") Integer brokerId,
         @Param("sequenceId") Long sequenceId);
 
-    int commit(S3WALObject s3WALObject);
+    int commit(S3WalObject s3WALObject);
 }

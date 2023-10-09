@@ -174,12 +174,7 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
     @Override
     public CompletableFuture<Void> commitWalObject(S3WALObject walObject, List<S3StreamObject> streamObjects,
         List<Long> compactedObjects) {
-        try {
-            return metadataStore.commitWalObject(walObject, streamObjects, compactedObjects);
-        } catch (ControllerException e) {
-            LOGGER.error("Exception raised while commit Wal Object for {}, {}, {}", walObject, streamObjects, compactedObjects, e);
-            return null;
-        }
+        return metadataStore.commitWalObject(walObject, streamObjects, compactedObjects);
     }
 
     @Override

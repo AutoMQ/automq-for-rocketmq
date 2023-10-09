@@ -20,9 +20,9 @@
 <!DOCTYPE mapper
     PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.automq.rocketmq.controller.metadata.database.mapper.S3WALObjectMapper">
+<mapper namespace="com.automq.rocketmq.controller.metadata.database.mapper.S3WalObjectMapper">
 
-    <insert id="create" parameterType="S3WALObject">
+    <insert id="create" parameterType="S3WalObject">
         INSERT INTO
         s3walobject (object_id, object_size, broker_id, sequence_id, sub_streams, base_data_timestamp)
         VALUES (
@@ -50,7 +50,7 @@
          </if>
     </update>
 
-    <select id="getByObjectId" resultType="S3WALObject">
+    <select id="getByObjectId" resultType="S3WalObject">
         SELECT object_id, object_size, broker_id, sequence_id, sub_streams, base_data_timestamp, committed_timestamp
         FROM s3walobject
         WHERE object_id = #{objectId}
@@ -71,7 +71,7 @@
         </if>
     </delete>
 
-    <select id="list" resultType="S3WALObject">
+    <select id="list" resultType="S3WalObject">
         SELECT object_id, object_size, broker_id, sequence_id, sub_streams, base_data_timestamp, committed_timestamp
         FROM s3walobject
         WHERE 1 = 1

@@ -20,7 +20,7 @@ package com.automq.rocketmq.controller.metadata.database.dao;
 
 import java.util.Objects;
 
-public class S3WALObject {
+public class S3WalObject {
 
     long objectId;
 
@@ -96,7 +96,7 @@ public class S3WALObject {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        S3WALObject that = (S3WALObject) o;
+        S3WalObject that = (S3WalObject) o;
         return objectId == that.objectId && brokerId == that.brokerId && objectSize == that.objectSize && sequenceId == that.sequenceId && baseDataTimestamp == that.baseDataTimestamp && committedTimestamp == that.committedTimestamp && Objects.equals(subStreams, that.subStreams);
     }
 

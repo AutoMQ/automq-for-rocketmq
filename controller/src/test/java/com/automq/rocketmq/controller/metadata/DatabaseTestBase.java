@@ -26,7 +26,7 @@ import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMa
 import com.automq.rocketmq.controller.metadata.database.mapper.RangeMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.S3ObjectMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.S3StreamObjectMapper;
-import com.automq.rocketmq.controller.metadata.database.mapper.S3WALObjectMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.S3WalObjectMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 
@@ -77,7 +77,7 @@ public class DatabaseTestBase {
             session.getMapper(RangeMapper.class).delete(null, null);
             session.getMapper(S3ObjectMapper.class).deleteDangerous();
             session.getMapper(S3StreamObjectMapper.class).delete(null, null, null);
-            session.getMapper(S3WALObjectMapper.class).delete(null, null, null);
+            session.getMapper(S3WalObjectMapper.class).delete(null, null, null);
 
 
             LeaseMapper mapper = session.getMapper(LeaseMapper.class);
