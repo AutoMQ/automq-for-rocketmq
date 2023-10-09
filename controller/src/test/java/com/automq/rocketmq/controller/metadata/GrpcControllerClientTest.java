@@ -142,7 +142,7 @@ class GrpcControllerClientTest {
     }
 
     @Test
-    public void testCreateTopic_duplicate() throws ControllerException, IOException {
+    public void testCreateTopic_duplicate() throws IOException, ControllerException {
         String topicName = "t1";
         int queueNum = 4;
         List<MessageType> messageTypeList = new ArrayList<>();

@@ -122,9 +122,9 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             String name = "test-broker -0";
             String address = "localhost:1234";
             String instanceId = "i-register";
-            Assertions.assertThrows(ExecutionException.class, () -> metadataStore.registerBrokerNode("", address, instanceId).get());
-            Assertions.assertThrows(ExecutionException.class, () -> metadataStore.registerBrokerNode(name, null, instanceId).get());
-            Assertions.assertThrows(ExecutionException.class, () -> metadataStore.registerBrokerNode(name, address, "").get());
+            Assertions.assertThrows(CompletionException.class, () -> metadataStore.registerBrokerNode("", address, instanceId));
+            Assertions.assertThrows(CompletionException.class, () -> metadataStore.registerBrokerNode(name, null, instanceId));
+            Assertions.assertThrows(CompletionException.class, () -> metadataStore.registerBrokerNode(name, address, ""));
         }
     }
 
@@ -1903,7 +1903,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             metadataStore.setRole(Role.Leader);
 
 
-            Assertions.assertThrows(ControllerException.class, () -> metadataStore.commitStreamObject(s3StreamObject, compactedObjects));
+            Assertions.assertThrows(CompletionException.class, () -> metadataStore.commitStreamObject(s3StreamObject, compactedObjects).join());
         }
 
     }
@@ -1945,7 +1945,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             metadataStore.setLease(lease);
             metadataStore.setRole(Role.Leader);
 
-            Assertions.assertThrows(ControllerException.class, () -> metadataStore.commitStreamObject(s3StreamObject, compactedObjects));
+            Assertions.assertThrows(CompletionException.class, () -> metadataStore.commitStreamObject(s3StreamObject, compactedObjects).join());
         }
 
     }
@@ -2122,7 +2122,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
             List<S3StreamObject> s3StreamObjects = metadataStore.listStreamObjects(streamId, 0, 334, 2).get();
 
-            Assertions.assertThrows(ControllerException.class, () -> metadataStore.commitWalObject(walObject, s3StreamObjects, compactedObjects));
+            Assertions.assertThrows(CompletionException.class, () -> metadataStore.commitWalObject(walObject, s3StreamObjects, compactedObjects).join());
         }
 
     }
@@ -2166,7 +2166,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
             List<S3StreamObject> s3StreamObjects = metadataStore.listStreamObjects(streamId, 0, 334, 2).get();
 
-            Assertions.assertThrows(ControllerException.class, () -> metadataStore.commitWalObject(walObject, s3StreamObjects, compactedObjects));
+            Assertions.assertThrows(CompletionException.class, () -> metadataStore.commitWalObject(walObject, s3StreamObjects, compactedObjects).join());
         }
 
     }
