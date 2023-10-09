@@ -18,14 +18,12 @@
 package com.automq.rocketmq.store.service;
 
 import com.automq.rocketmq.common.config.StoreConfig;
-import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.store.api.MessageStateMachine;
 import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.operation.AckOperation;
 import com.automq.rocketmq.store.model.operation.ChangeInvisibleDurationOperation;
 import com.automq.rocketmq.store.model.operation.Operation;
-import com.automq.rocketmq.store.model.operation.OperationSnapshot;
 import com.automq.rocketmq.store.model.operation.PopOperation;
 import com.automq.rocketmq.store.model.stream.SingleRecord;
 import com.automq.rocketmq.store.service.api.OperationLogService;
@@ -43,45 +41,31 @@ import org.slf4j.LoggerFactory;
 
 public class StreamOperationLogService implements OperationLogService {
     public static final Logger LOGGER = LoggerFactory.getLogger(StreamOperationLogService.class);
-    private final long topicId;
-    private final int queueId;
-    private final long opStreamId;
-    private final long snapshotStreamId;
     private final StreamStore streamStore;
-    private final StoreMetadataService metadataService;
-    private final MessageStateMachine stateMachine;
     private final SnapshotService snapshotService;
     private final StoreConfig storeConfig;
     private final AtomicLong snapshotEndOffset = new AtomicLong(-1);
     private final AtomicLong opStartOffset = new AtomicLong(-1);
     private final AtomicBoolean takingSnapshot = new AtomicBoolean(false);
-    private final String identity;
 
-    public StreamOperationLogService(long topicId, int queueId,
-        long opStreamId, long snapshotStreamId, StreamStore streamStore, StoreMetadataService metadataService,
-        MessageStateMachine stateMachine, SnapshotService snapshotService, StoreConfig storeConfig) {
-        this.topicId = topicId;
-        this.queueId = queueId;
-        this.opStreamId = opStreamId;
-        this.snapshotStreamId = snapshotStreamId;
+    public StreamOperationLogService(StreamStore streamStore, SnapshotService snapshotService,
+        StoreConfig storeConfig) {
         this.streamStore = streamStore;
-        this.metadataService = metadataService;
-        this.stateMachine = stateMachine;
         this.snapshotService = snapshotService;
         this.storeConfig = storeConfig;
-        this.identity = "[StreamOperationLogService-" + topicId + "-" + queueId + "]";
     }
 
     @Override
-    public CompletableFuture<Void> start() {
+    public CompletableFuture<Void> recover(MessageStateMachine stateMachine, long operationStreamId,
+        long snapshotStreamId) {
         // TODO: clear all states of this queue before start
 
         // 1. get snapshot
         long snapStartOffset = streamStore.startOffset(snapshotStreamId);
         snapshotEndOffset.set(streamStore.nextOffset(snapshotStreamId));
-        long startOffset = streamStore.startOffset(opStreamId);
+        long startOffset = streamStore.startOffset(operationStreamId);
         opStartOffset.set(startOffset);
-        long endOffset = streamStore.nextOffset(opStreamId);
+        long endOffset = streamStore.nextOffset(operationStreamId);
         CompletableFuture<Long/*op replay start offset*/> snapshotFetch;
         long snapEndOffset = snapshotEndOffset.get();
         if (snapStartOffset == snapEndOffset) {
@@ -89,13 +73,12 @@ public class StreamOperationLogService implements OperationLogService {
             snapshotFetch = CompletableFuture.completedFuture(startOffset);
         } else {
             snapshotFetch = streamStore.fetch(snapshotStreamId, snapEndOffset - 1, 1)
-                .thenApply(result -> {
-                    return SerializeUtil.decodeOperationSnapshot(result.recordBatchList().get(0).rawPayload());
-                })
+                .thenApply(result -> SerializeUtil.decodeOperationSnapshot(result.recordBatchList().get(0).rawPayload()))
                 .thenApply(snapshot -> {
                     try {
-                        loadSnapshot(snapshot);
-                    } catch (StoreException e) {
+                        stateMachine.loadSnapshot(snapshot);
+                    } catch (Exception e) {
+                        // TODO: handle exception
                         throw new RuntimeException(e);
                     }
                     return snapshot.getSnapshotEndOffset() + 1;
@@ -103,12 +86,13 @@ public class StreamOperationLogService implements OperationLogService {
         }
         // 2. get all operations
         // TODO: batch fetch, fetch all at once may cause some problems
-        return snapshotFetch.thenCompose(offset -> streamStore.fetch(opStreamId, offset, (int) (endOffset - offset))
+        return snapshotFetch.thenCompose(offset -> streamStore.fetch(operationStreamId, offset, (int) (endOffset - offset))
             .thenAccept(result -> {
                 // load operations
                 for (RecordBatchWithContext batchWithContext : result.recordBatchList()) {
                     // TODO: assume that a batch only contains one operation
-                    Operation operation = SerializeUtil.decodeOperation(batchWithContext.rawPayload());
+                    Operation operation = SerializeUtil.decodeOperation(batchWithContext.rawPayload(), stateMachine,
+                        operationStreamId, snapshotStreamId);
                     try {
                         // TODO: operation may be null
                         replay(batchWithContext.baseOffset(), operation);
@@ -121,72 +105,63 @@ public class StreamOperationLogService implements OperationLogService {
 
     @Override
     public CompletableFuture<Long> logPopOperation(PopOperation operation) {
-        CompletableFuture<AppendResult> append = streamStore.append(opStreamId, new SingleRecord(
-            ByteBuffer.wrap(SerializeUtil.encodePopOperation(operation))));
-        return doReplay(append, operation);
+        return streamStore.append(operation.operationStreamId(),
+                new SingleRecord(ByteBuffer.wrap(SerializeUtil.encodePopOperation(operation))))
+            .thenApply(result -> doReplay(result, operation));
     }
 
     @Override
     public CompletableFuture<Long> logAckOperation(AckOperation operation) {
-        CompletableFuture<AppendResult> append = streamStore.append(opStreamId, new SingleRecord(
-            ByteBuffer.wrap(SerializeUtil.encodeAckOperation(operation))));
-        return doReplay(append, operation);
+        return streamStore.append(operation.operationStreamId(),
+                new SingleRecord(ByteBuffer.wrap(SerializeUtil.encodeAckOperation(operation))))
+            .thenApply(result -> doReplay(result, operation));
     }
 
     @Override
     public CompletableFuture<Long> logChangeInvisibleDurationOperation(ChangeInvisibleDurationOperation operation) {
-        CompletableFuture<AppendResult> append = streamStore.append(opStreamId, new SingleRecord(
-            ByteBuffer.wrap(SerializeUtil.encodeChangeInvisibleDurationOperation(operation))));
-        return doReplay(append, operation);
+        return streamStore.append(operation.operationStreamId(),
+                new SingleRecord(ByteBuffer.wrap(SerializeUtil.encodeChangeInvisibleDurationOperation(operation))))
+            .thenApply(result -> doReplay(result, operation));
     }
 
-    private void notifySnapshot() {
+    private void notifySnapshot(Operation operation) {
         if (this.takingSnapshot.compareAndSet(false, true)) {
             CompletableFuture<Long> taskCf = snapshotService.addSnapshotTask(new SnapshotService.SnapshotTask(
-                topicId,
-                queueId,
-                opStreamId,
-                snapshotStreamId,
-                stateMachine::takeSnapshot));
+                operation.topicId(), operation.queueId(), operation.operationStreamId(), operation.snapshotStreamId(),
+                () -> operation.stateMachine().takeSnapshot()));
             taskCf.thenAccept(newStartOffset -> {
                 this.takingSnapshot.set(false);
                 this.opStartOffset.set(newStartOffset);
             }).exceptionally(e -> {
                 Throwable cause = FutureUtil.cause(e);
-                LOGGER.error("{}: Take snapshot failed", identity, cause);
+                LOGGER.error("Topic {}, queue: {}: Take snapshot failed", operation.topicId(), operation.queueId(), cause);
                 this.takingSnapshot.set(false);
                 return null;
             });
         }
     }
 
-    private void loadSnapshot(OperationSnapshot snapshot) throws StoreException {
-        stateMachine.loadSnapshot(snapshot);
-    }
-
-    private CompletableFuture<Long> doReplay(CompletableFuture<AppendResult> appendCf, Operation operation) {
-        return appendCf.thenApply(result -> {
-            try {
-                replay(result.baseOffset(), operation);
-            } catch (StoreException e) {
-                LOGGER.error("{}: Replay operation:{} failed", identity, operation, e);
-                throw new CompletionException(e);
-            }
-            if (result.baseOffset() - opStartOffset.get() + 1 >= storeConfig.operationSnapshotInterval()) {
-                notifySnapshot();
-            }
-            return result.baseOffset();
-        });
+    private long doReplay(AppendResult result, Operation operation) {
+        try {
+            replay(result.baseOffset(), operation);
+        } catch (StoreException e) {
+            LOGGER.error("Topic {}, queue: {}: Replay operation:{} failed", operation.topicId(), operation.queueId(), operation, e);
+            throw new CompletionException(e);
+        }
+        if (result.baseOffset() - opStartOffset.get() + 1 >= storeConfig.operationSnapshotInterval()) {
+            notifySnapshot(operation);
+        }
+        return result.baseOffset();
     }
 
     private void replay(long operationOffset, Operation operation) throws StoreException {
         // TODO: optimize concurrent control
-        switch (operation.getOperationType()) {
-            case POP -> stateMachine.replayPopOperation(operationOffset, (PopOperation) operation);
-            case ACK -> stateMachine.replayAckOperation(operationOffset, (AckOperation) operation);
+        switch (operation.operationType()) {
+            case POP -> operation.stateMachine().replayPopOperation(operationOffset, (PopOperation) operation);
+            case ACK -> operation.stateMachine().replayAckOperation(operationOffset, (AckOperation) operation);
             case CHANGE_INVISIBLE_DURATION ->
-                stateMachine.replayChangeInvisibleDurationOperation(operationOffset, (ChangeInvisibleDurationOperation) operation);
-            default -> throw new IllegalStateException("Unexpected value: " + operation.getOperationType());
+                operation.stateMachine().replayChangeInvisibleDurationOperation(operationOffset, (ChangeInvisibleDurationOperation) operation);
+            default -> throw new IllegalStateException("Unexpected value: " + operation.operationType());
         }
     }
 }

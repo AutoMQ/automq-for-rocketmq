@@ -35,6 +35,7 @@ import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PopResult;
 import com.automq.rocketmq.store.model.message.PullResult;
 import com.automq.rocketmq.store.service.api.KVService;
+import com.automq.rocketmq.store.service.api.OperationLogService;
 import com.automq.rocketmq.store.util.SerializeUtil;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.AfterEach;
@@ -79,8 +80,9 @@ class ReviveServiceTest {
         stateMachine = new DefaultMessageStateMachine(TOPIC_ID, QUEUE_ID, kvService);
         inflightService = new InflightService();
         SnapshotService snapshotService = new SnapshotService(streamStore, kvService);
+        OperationLogService operationLogService = new StreamOperationLogService(streamStore, snapshotService, new StoreConfig());
         topicQueue = new StreamTopicQueue(new StoreConfig(), TOPIC_ID, QUEUE_ID,
-            metadataService, stateMachine, streamStore, inflightService, snapshotService);
+            metadataService, stateMachine, streamStore, operationLogService, inflightService);
         TopicQueueManager manager = Mockito.mock(TopicQueueManager.class);
         Mockito.when(manager.getOrCreate(TOPIC_ID, QUEUE_ID)).thenReturn(CompletableFuture.completedFuture(topicQueue));
         reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, KV_NAMESPACE_TIMER_TAG, kvService, metadataService, inflightService, manager);

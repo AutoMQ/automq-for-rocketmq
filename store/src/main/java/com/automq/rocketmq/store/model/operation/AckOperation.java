@@ -17,27 +17,31 @@
 
 package com.automq.rocketmq.store.model.operation;
 
+import com.automq.rocketmq.store.api.MessageStateMachine;
 import java.util.Objects;
 
-public class AckOperation implements Operation {
+public class AckOperation extends Operation {
     private final long consumerGroupId;
-    private final long topicId;
-    private final int queueId;
     private final long operationId;
     private final long operationTimestamp;
     private final AckOperationType ackOperationType;
 
-    public AckOperation(long consumerGroupId, long topicId, int queueId, long operationId, long operationTimestamp, AckOperationType ackOperationType) {
-        this.consumerGroupId = consumerGroupId;
+    public AckOperation(long topicId, int queueId, long operationStreamId, long snapshotStreamId,
+        MessageStateMachine messageStateMachine, long consumerGroupId, long operationId, long operationTimestamp,
+        AckOperationType ackOperationType) {
         this.topicId = topicId;
         this.queueId = queueId;
+        this.operationStreamId = operationStreamId;
+        this.snapshotStreamId = snapshotStreamId;
+        this.stateMachine = messageStateMachine;
+        this.consumerGroupId = consumerGroupId;
         this.operationId = operationId;
         this.operationTimestamp = operationTimestamp;
         this.ackOperationType = ackOperationType;
     }
 
     @Override
-    public OperationType getOperationType() {
+    public OperationType operationType() {
         return OperationType.ACK;
     }
 
@@ -46,27 +50,19 @@ public class AckOperation implements Operation {
         ACK_TIMEOUT
     }
 
-    public long getTopicId() {
-        return topicId;
-    }
-
-    public long getOperationTimestamp() {
+    public long operationTimestamp() {
         return operationTimestamp;
     }
 
-    public int getQueueId() {
-        return queueId;
-    }
-
-    public long getOperationId() {
+    public long operationId() {
         return operationId;
     }
 
-    public AckOperationType getAckOperationType() {
+    public AckOperationType ackOperationType() {
         return ackOperationType;
     }
 
-    public long getConsumerGroupId() {
+    public long consumerGroupId() {
         return consumerGroupId;
     }
 

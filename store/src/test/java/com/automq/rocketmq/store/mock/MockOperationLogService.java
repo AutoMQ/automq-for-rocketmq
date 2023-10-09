@@ -17,15 +17,19 @@
 
 package com.automq.rocketmq.store.mock;
 
+import com.automq.rocketmq.store.api.MessageStateMachine;
 import com.automq.rocketmq.store.model.operation.AckOperation;
 import com.automq.rocketmq.store.model.operation.ChangeInvisibleDurationOperation;
 import com.automq.rocketmq.store.model.operation.PopOperation;
 import com.automq.rocketmq.store.service.api.OperationLogService;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class MockOperationLogService implements OperationLogService {
     AtomicLong operationCount = new AtomicLong(0);
+
+    AtomicBoolean recoverFailed = new AtomicBoolean(false);
 
     @Override
     public CompletableFuture<Long> logPopOperation(PopOperation operation) {
@@ -43,7 +47,19 @@ public class MockOperationLogService implements OperationLogService {
     }
 
     @Override
-    public CompletableFuture<Void> start() {
-        return null;
+    public CompletableFuture<Void> recover(MessageStateMachine stateMachine, long operationStreamId,
+        long snapshotStreamId) {
+        if (recoverFailed.get()) {
+            return CompletableFuture.failedFuture(new RuntimeException("recover failed"));
+        }
+        return CompletableFuture.completedFuture(null);
+    }
+
+    public AtomicBoolean recoverFailed() {
+        return recoverFailed;
+    }
+
+    public void setRecoverFailed(boolean recoverFailed) {
+        this.recoverFailed.set(recoverFailed);
     }
 }

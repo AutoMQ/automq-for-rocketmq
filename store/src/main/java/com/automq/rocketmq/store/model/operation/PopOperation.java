@@ -17,13 +17,11 @@
 
 package com.automq.rocketmq.store.model.operation;
 
+import com.automq.rocketmq.store.api.MessageStateMachine;
 import java.util.Objects;
 
-public class PopOperation implements Operation {
-
+public class PopOperation extends Operation {
     private final long consumerGroupId;
-    private final long topicId;
-    private final int queueId;
     private final long offset;
     private final int count;
     private final long invisibleDuration;
@@ -31,11 +29,16 @@ public class PopOperation implements Operation {
     private final boolean endMark;
     private final PopOperationType popOperationType;
 
-    public PopOperation(long consumerGroupId, long topicId, int queueId, long offset, int count,
-        long invisibleDuration, long operationTimestamp, boolean endMark, PopOperationType popOperationType) {
-        this.consumerGroupId = consumerGroupId;
+    public PopOperation(long topicId, int queueId, long operationStreamId, long snapshotStreamId,
+        MessageStateMachine stateMachine, long consumerGroupId, long offset, int count, long invisibleDuration,
+        long operationTimestamp, boolean endMark,
+        PopOperationType popOperationType) {
         this.topicId = topicId;
         this.queueId = queueId;
+        this.operationStreamId = operationStreamId;
+        this.snapshotStreamId = snapshotStreamId;
+        this.stateMachine = stateMachine;
+        this.consumerGroupId = consumerGroupId;
         this.offset = offset;
         this.count = count;
         this.invisibleDuration = invisibleDuration;
@@ -44,40 +47,32 @@ public class PopOperation implements Operation {
         this.popOperationType = popOperationType;
     }
 
-    public long getConsumerGroupId() {
+    public long consumerGroupId() {
         return consumerGroupId;
     }
 
-    public long getTopicId() {
-        return topicId;
-    }
-
-    public int getQueueId() {
-        return queueId;
-    }
-
-    public long getOffset() {
+    public long offset() {
         return offset;
     }
 
-    public int getCount() {
+    public int count() {
         return count;
     }
 
-    public PopOperationType getPopOperationType() {
+    public PopOperationType popOperationType() {
         return popOperationType;
     }
 
-    public long getInvisibleDuration() {
+    public long invisibleDuration() {
         return invisibleDuration;
     }
 
-    public long getOperationTimestamp() {
+    public long operationTimestamp() {
         return operationTimestamp;
     }
 
     @Override
-    public OperationType getOperationType() {
+    public OperationType operationType() {
         return OperationType.POP;
     }
 

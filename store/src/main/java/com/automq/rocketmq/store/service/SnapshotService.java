@@ -154,8 +154,7 @@ public class SnapshotService implements Lifecycle, Runnable {
 
         private CompletableFuture<Long/*new start offset*/> cf;
 
-        public SnapshotTask(long topicId, int queueId,
-            long operationStreamId, long snapshotStreamId,
+        public SnapshotTask(long topicId, int queueId, long operationStreamId, long snapshotStreamId,
             Supplier<CompletableFuture<OperationSnapshot>> snapshotSupplier) {
             this.topicId = topicId;
             this.queueId = queueId;

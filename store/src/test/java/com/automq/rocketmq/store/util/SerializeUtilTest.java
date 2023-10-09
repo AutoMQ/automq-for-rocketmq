@@ -22,9 +22,9 @@ import com.automq.rocketmq.store.model.generated.CheckPoint;
 import com.automq.rocketmq.store.model.generated.Operation;
 import com.automq.rocketmq.store.model.generated.OperationLogItem;
 import com.automq.rocketmq.store.model.generated.ReceiptHandle;
+import com.automq.rocketmq.store.model.operation.AckOperation.AckOperationType;
 import com.automq.rocketmq.store.model.operation.OperationSnapshot;
 import com.automq.rocketmq.store.model.operation.PopOperation.PopOperationType;
-import com.automq.rocketmq.store.model.operation.AckOperation.AckOperationType;
 import java.nio.ByteBuffer;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -37,6 +37,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 public class SerializeUtilTest {
     public static final long TOPIC_ID = 0L;
     public static final int QUEUE_ID = 1;
+    public static final long OPERATION_STREAM_ID = 100L;
+    public static final long SNAPSHOT_STREAM_ID = 101L;
     public static final long OFFSET = 2L;
     public static final int COUNT = 1;
     public static final long OPERATION_ID = 3L;
@@ -112,27 +114,29 @@ public class SerializeUtilTest {
     @Test
     void encodePopOperation() {
         com.automq.rocketmq.store.model.operation.PopOperation popOperation = new com.automq.rocketmq.store.model.operation.PopOperation(
-            CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, OFFSET, BATCH_SIZE, INVISIBLE_DURATION, OPERATION_TIMESTAMP, IS_END_MARK, POP_OPERATION_TYPE
+            TOPIC_ID, QUEUE_ID, OPERATION_STREAM_ID, SNAPSHOT_STREAM_ID, null, CONSUMER_GROUP_ID, OFFSET,
+            BATCH_SIZE, INVISIBLE_DURATION, OPERATION_TIMESTAMP, IS_END_MARK, POP_OPERATION_TYPE
         );
         byte[] bytes = SerializeUtil.encodePopOperation(popOperation);
-        com.automq.rocketmq.store.model.operation.Operation decodedOperation = SerializeUtil.decodeOperation(ByteBuffer.wrap(bytes));
+        com.automq.rocketmq.store.model.operation.Operation decodedOperation = SerializeUtil.decodeOperation(ByteBuffer.wrap(bytes), null, OPERATION_STREAM_ID, SNAPSHOT_STREAM_ID);
         assertEquals(popOperation, decodedOperation);
     }
 
     @Test
     void encodeAckOperation() {
         com.automq.rocketmq.store.model.operation.AckOperation ackOperation = new com.automq.rocketmq.store.model.operation.AckOperation(
-            CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, OPERATION_ID, OPERATION_TIMESTAMP, ACK_OPERATION_TYPE
+            TOPIC_ID, QUEUE_ID, OPERATION_STREAM_ID, SNAPSHOT_STREAM_ID, null, CONSUMER_GROUP_ID,
+            OPERATION_ID, OPERATION_TIMESTAMP, ACK_OPERATION_TYPE
         );
         byte[] bytes = SerializeUtil.encodeAckOperation(ackOperation);
-        com.automq.rocketmq.store.model.operation.Operation decodedOperation = SerializeUtil.decodeOperation(ByteBuffer.wrap(bytes));
+        com.automq.rocketmq.store.model.operation.Operation decodedOperation = SerializeUtil.decodeOperation(ByteBuffer.wrap(bytes), null, OPERATION_STREAM_ID, SNAPSHOT_STREAM_ID);
         assertEquals(ackOperation, decodedOperation);
     }
 
     @Test
     void encodeChangeInvisibleDurationOperation() {
         byte[] bytes = SerializeUtil.encodeChangeInvisibleDurationOperation(new com.automq.rocketmq.store.model.operation.ChangeInvisibleDurationOperation(
-            CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, OPERATION_ID, INVISIBLE_DURATION, OPERATION_TIMESTAMP
+            TOPIC_ID, QUEUE_ID, OPERATION_STREAM_ID, SNAPSHOT_STREAM_ID, null, CONSUMER_GROUP_ID, OPERATION_ID, INVISIBLE_DURATION, OPERATION_TIMESTAMP
         ));
         OperationLogItem operationLogItem = OperationLogItem.getRootAsOperationLogItem(ByteBuffer.wrap(bytes));
         assertEquals(Operation.ChangeInvisibleDurationOperation, operationLogItem.operationType());
