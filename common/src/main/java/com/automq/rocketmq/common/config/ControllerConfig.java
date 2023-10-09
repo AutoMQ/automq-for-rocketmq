@@ -20,7 +20,16 @@ package com.automq.rocketmq.common.config;
 public interface ControllerConfig {
     int nodeId();
 
+    /**
+     * @return Node name
+     */
+    String name();
+
     void setNodeId(int nodeId);
+
+    String instanceId();
+
+    String advertiseAddress();
 
     long epoch();
 

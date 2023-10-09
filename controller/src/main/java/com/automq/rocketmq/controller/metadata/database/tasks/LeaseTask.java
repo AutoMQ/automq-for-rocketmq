@@ -19,8 +19,10 @@ package com.automq.rocketmq.controller.metadata.database.tasks;
 
 import com.automq.rocketmq.controller.metadata.Role;
 import com.automq.rocketmq.controller.metadata.database.DefaultMetadataStore;
+import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.mapper.LeaseMapper;
 import com.automq.rocketmq.controller.metadata.database.dao.Lease;
+import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
 import java.util.Calendar;
 import org.apache.ibatis.session.SqlSession;
 
@@ -35,6 +37,8 @@ public class LeaseTask extends ControllerTask {
         LOGGER.info("LeaseTask starts");
         try {
             try (SqlSession session = metadataStore.openSession()) {
+                tryCreateNode(session);
+
                 LeaseMapper leaseMapper = session.getMapper(LeaseMapper.class);
                 Lease lease = leaseMapper.current();
                 this.metadataStore.setLease(lease);
@@ -89,5 +93,24 @@ public class LeaseTask extends ControllerTask {
             LOGGER.error("Exception raised while running scheduled job", e);
         }
         LOGGER.info("LeaseTask completed");
+    }
+
+    private void tryCreateNode(SqlSession session) {
+        if (metadataStore.config().nodeId() > 0) {
+            return;
+        }
+
+        NodeMapper mapper = session.getMapper(NodeMapper.class);
+        Node node = new Node();
+        node.setName(metadataStore.config().name());
+        node.setInstanceId(metadataStore.config().instanceId());
+        node.setAddress(metadataStore.config().advertiseAddress());
+        try {
+            mapper.create(node);
+            session.commit();
+            LOGGER.info("Registered current node");
+            metadataStore.config().setNodeId(node.getId());
+        } catch (Exception ignore) {
+        }
     }
 }

@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS node
     hostname    VARCHAR(255),
     vpc_id      VARCHAR(255),
     address     VARCHAR(255) NOT NULL,
-    epoch       INT          NOT NULL DEFAULT 1,
+    epoch       INT          NOT NULL DEFAULT 0,
     create_time DATETIME              DEFAULT CURRENT_TIMESTAMP,
     update_time DATETIME              DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE INDEX idx_name(name),

@@ -10,6 +10,6 @@ s3Stream:
   s3AccessKey: "test"
   s3SecretKey: "test"
 db:
-  url: "jdbc:mysql://10.43.88.46:3306/s3rocketmq"
+  url: "jdbc:mysql://localhost:3306/metadata"
   userName: "root"
-  password: "root"
+  password: "password"
