@@ -35,9 +35,14 @@ import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
+import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,11 +54,34 @@ public class SnapshotService implements Lifecycle, Runnable {
     private Thread snapshotTaker;
     private final KVService kvService;
     private volatile boolean stopped = false;
+    private ConcurrentMap<Pair<Long, Integer>, SnapshotStatus> snapshotStatusMap = new ConcurrentHashMap<>();
 
     public SnapshotService(StreamStore streamStore, KVService kvService) {
         this.streamStore = streamStore;
         this.snapshotTaskQueue = new LinkedBlockingQueue<>(1024);
         this.kvService = kvService;
+    }
+
+    public static class SnapshotStatus {
+        private final AtomicLong snapshotEndOffset = new AtomicLong(-1);
+        private final AtomicLong operationStartOffset = new AtomicLong(-1);
+        private final AtomicBoolean takingSnapshot = new AtomicBoolean(false);
+
+        public AtomicLong snapshotEndOffset() {
+            return snapshotEndOffset;
+        }
+
+        public AtomicLong operationStartOffset() {
+            return operationStartOffset;
+        }
+
+        public AtomicBoolean takingSnapshot() {
+            return takingSnapshot;
+        }
+    }
+
+    public SnapshotStatus getSnapshotStatus(long topicId, int queueId) {
+        return snapshotStatusMap.computeIfAbsent(Pair.of(topicId, queueId), k -> new SnapshotStatus());
     }
 
     @Override

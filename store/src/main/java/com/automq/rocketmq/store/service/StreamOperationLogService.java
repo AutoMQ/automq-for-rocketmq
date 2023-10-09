@@ -34,8 +34,6 @@ import com.automq.stream.utils.FutureUtil;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,9 +42,6 @@ public class StreamOperationLogService implements OperationLogService {
     private final StreamStore streamStore;
     private final SnapshotService snapshotService;
     private final StoreConfig storeConfig;
-    private final AtomicLong snapshotEndOffset = new AtomicLong(-1);
-    private final AtomicLong opStartOffset = new AtomicLong(-1);
-    private final AtomicBoolean takingSnapshot = new AtomicBoolean(false);
 
     public StreamOperationLogService(StreamStore streamStore, SnapshotService snapshotService,
         StoreConfig storeConfig) {
@@ -61,13 +56,14 @@ public class StreamOperationLogService implements OperationLogService {
         // TODO: clear all states of this queue before start
 
         // 1. get snapshot
+        SnapshotService.SnapshotStatus snapshotStatus = snapshotService.getSnapshotStatus(stateMachine.topicId(), stateMachine.queueId());
         long snapStartOffset = streamStore.startOffset(snapshotStreamId);
-        snapshotEndOffset.set(streamStore.nextOffset(snapshotStreamId));
+        snapshotStatus.snapshotEndOffset().set(streamStore.nextOffset(snapshotStreamId));
         long startOffset = streamStore.startOffset(operationStreamId);
-        opStartOffset.set(startOffset);
+        snapshotStatus.operationStartOffset().set(startOffset);
         long endOffset = streamStore.nextOffset(operationStreamId);
         CompletableFuture<Long/*op replay start offset*/> snapshotFetch;
-        long snapEndOffset = snapshotEndOffset.get();
+        long snapEndOffset = snapshotStatus.snapshotEndOffset().get();
         if (snapStartOffset == snapEndOffset) {
             // no snapshot
             snapshotFetch = CompletableFuture.completedFuture(startOffset);
@@ -125,17 +121,19 @@ public class StreamOperationLogService implements OperationLogService {
     }
 
     private void notifySnapshot(Operation operation) {
-        if (this.takingSnapshot.compareAndSet(false, true)) {
+        MessageStateMachine stateMachine = operation.stateMachine();
+        SnapshotService.SnapshotStatus snapshotStatus = snapshotService.getSnapshotStatus(stateMachine.topicId(), stateMachine.queueId());
+        if (snapshotStatus.takingSnapshot().compareAndSet(false, true)) {
             CompletableFuture<Long> taskCf = snapshotService.addSnapshotTask(new SnapshotService.SnapshotTask(
                 operation.topicId(), operation.queueId(), operation.operationStreamId(), operation.snapshotStreamId(),
-                () -> operation.stateMachine().takeSnapshot()));
+                stateMachine::takeSnapshot));
             taskCf.thenAccept(newStartOffset -> {
-                this.takingSnapshot.set(false);
-                this.opStartOffset.set(newStartOffset);
+                snapshotStatus.takingSnapshot().set(false);
+                snapshotStatus.operationStartOffset().set(newStartOffset);
             }).exceptionally(e -> {
                 Throwable cause = FutureUtil.cause(e);
                 LOGGER.error("Topic {}, queue: {}: Take snapshot failed", operation.topicId(), operation.queueId(), cause);
-                this.takingSnapshot.set(false);
+                snapshotStatus.takingSnapshot().set(false);
                 return null;
             });
         }
@@ -148,7 +146,10 @@ public class StreamOperationLogService implements OperationLogService {
             LOGGER.error("Topic {}, queue: {}: Replay operation:{} failed", operation.topicId(), operation.queueId(), operation, e);
             throw new CompletionException(e);
         }
-        if (result.baseOffset() - opStartOffset.get() + 1 >= storeConfig.operationSnapshotInterval()) {
+
+        MessageStateMachine stateMachine = operation.stateMachine();
+        SnapshotService.SnapshotStatus snapshotStatus = snapshotService.getSnapshotStatus(stateMachine.topicId(), stateMachine.queueId());
+        if (result.baseOffset() - snapshotStatus.operationStartOffset().get() + 1 >= storeConfig.operationSnapshotInterval()) {
             notifySnapshot(operation);
         }
         return result.baseOffset();
