@@ -27,6 +27,8 @@ import apache.rocketmq.controller.v1.ControllerServiceGrpc;
 import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
+import apache.rocketmq.controller.v1.DeleteTopicReply;
+import apache.rocketmq.controller.v1.DeleteTopicRequest;
 import apache.rocketmq.controller.v1.GroupType;
 import apache.rocketmq.controller.v1.HeartbeatReply;
 import apache.rocketmq.controller.v1.HeartbeatRequest;
@@ -321,6 +323,42 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 Assertions.assertTrue(reply.getTopic().getName().startsWith("T"));
                 Assertions.assertEquals(Code.OK, reply.getStatus().getCode());
                 Assertions.assertEquals(messageTypeList, reply.getTopic().getAcceptMessageTypesList());
+                channel.shutdownNow();
+            }
+        }
+    }
+
+    @Test
+    public void testDeleteTopic_NotFound() throws IOException {
+        ControllerConfig config = Mockito.mock(ControllerConfig.class);
+        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(config.nodeId()).thenReturn(1);
+        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
+
+        ControllerClient client = Mockito.mock(ControllerClient.class);
+        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
+        Mockito.when(controllerConfig.nodeId()).thenReturn(1);
+        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
+        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
+
+
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            metadataStore.start();
+            Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
+                    .atMost(10, TimeUnit.SECONDS)
+                    .until(metadataStore::isLeader);
+
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore))) {
+                testServer.start();
+                int port = testServer.getPort();
+                ManagedChannel channel = Grpc.newChannelBuilderForAddress("localhost", port, InsecureChannelCredentials.create()).build();
+                ControllerServiceGrpc.ControllerServiceBlockingStub blockingStub = ControllerServiceGrpc.newBlockingStub(channel);
+                DeleteTopicRequest request = DeleteTopicRequest.newBuilder()
+                        .setTopicId(1)
+                        .build();
+                DeleteTopicReply reply = blockingStub.deleteTopic(request);
+                Assertions.assertEquals(404, reply.getStatus().getCode().getNumber());
                 channel.shutdownNow();
             }
         }

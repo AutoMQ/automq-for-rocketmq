@@ -85,11 +85,12 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     }
 
     @Override
-    public void registerNode(NodeRegistrationRequest request, StreamObserver<NodeRegistrationReply> responseObserver) {
-        metadataStore.registerBrokerNode(request.getBrokerName(), request.getAddress(), request.getInstanceId())
-            .whenComplete((res, e) -> {
+    public void registerNode(NodeRegistrationRequest request,
+        StreamObserver<NodeRegistrationReply> responseObserver) {
+        metadataStore.registerBrokerNode(request.getBrokerName(), request.getAddress(),
+            request.getInstanceId()).whenComplete((res, e) -> {
                 if (null != e) {
-                    if (e instanceof ControllerException ex) {
+                    if (e.getCause() instanceof ControllerException ex) {
                         NodeRegistrationReply reply = NodeRegistrationReply.newBuilder()
                             .setStatus(Status.newBuilder()
                                 .setCode(Code.forNumber(ex.getErrorCode()))
@@ -97,7 +98,16 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
                             .build();
                         responseObserver.onNext(reply);
                         responseObserver.onCompleted();
-                    } else {
+                    } else if (e instanceof ControllerException ex) {
+                        NodeRegistrationReply reply = NodeRegistrationReply.newBuilder()
+                            .setStatus(Status.newBuilder()
+                                .setCode(Code.forNumber(ex.getErrorCode()))
+                                .setMessage(e.getMessage()).build())
+                            .build();
+                        responseObserver.onNext(reply);
+                        responseObserver.onCompleted();
+                    }
+                    else {
                         responseObserver.onError(e);
                     }
                 } else {
@@ -151,7 +161,7 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
                     CreateTopicReply reply = CreateTopicReply.newBuilder()
                         .setStatus(Status.newBuilder().setCode(Code.OK).build())
                         .setTopicId(topicId)
-                        .build();
+                         .build();
                     responseObserver.onNext(reply);
                     responseObserver.onCompleted();
                 }
@@ -174,27 +184,30 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
 
     @Override
     public void describeTopic(DescribeTopicRequest request, StreamObserver<DescribeTopicReply> responseObserver) {
-        try {
-            metadataStore.describeTopic(request.getTopicId(), request.getTopicName()).whenCompleteAsync((topic, e) -> {
-                if (null != e) {
-                    responseObserver.onError(e);
+        metadataStore.describeTopic(request.getTopicId(), request.getTopicName()).whenCompleteAsync((topic, e) -> {
+            if (null != e) {
+                if (e.getCause() instanceof ControllerException ex) {
+                    DescribeTopicReply reply = DescribeTopicReply.newBuilder()
+                        .setStatus(Status.newBuilder()
+                            .setCode(Code.forNumber(ex.getErrorCode()))
+                            .setMessage(e.getMessage()).build())
+                        .build();
+                    responseObserver.onNext(reply);
+                    responseObserver.onCompleted();
                     return;
                 }
 
-                DescribeTopicReply reply = DescribeTopicReply.newBuilder()
-                    .setTopic(topic)
-                    .setStatus(Status.newBuilder().setCode(Code.OK).build())
-                    .build();
-                responseObserver.onNext(reply);
-                responseObserver.onCompleted();
-            });
-        } catch (ControllerException e) {
+                responseObserver.onError(e);
+                return;
+            }
+
             DescribeTopicReply reply = DescribeTopicReply.newBuilder()
-                .setStatus(Status.newBuilder()
-                    .setCode(Code.forNumber(e.getErrorCode())).setMessage(e.getMessage()).build()).build();
+                .setTopic(topic)
+                .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                .build();
             responseObserver.onNext(reply);
             responseObserver.onCompleted();
-        }
+        });
     }
 
     @Override
@@ -263,29 +276,25 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
 
     @Override
     public void deleteTopic(DeleteTopicRequest request, StreamObserver<DeleteTopicReply> responseObserver) {
-        try {
-            this.metadataStore.deleteTopic(request.getTopicId()).whenComplete((res, e) -> {
-                if (null != e) {
-                    responseObserver.onError(e);
-                } else {
+        this.metadataStore.deleteTopic(request.getTopicId()).whenComplete((res, e) -> {
+            if (null != e) {
+                if (e.getCause() instanceof ControllerException ex) {
                     DeleteTopicReply reply = DeleteTopicReply.newBuilder()
-                        .setStatus(Status.newBuilder().setCode(Code.OK).build()
+                        .setStatus(Status.newBuilder().setCode(Code.forNumber(ex.getErrorCode())).build()
                         ).build();
                     responseObserver.onNext(reply);
                     responseObserver.onCompleted();
+                    return;
                 }
-            });
-        } catch (ControllerException e) {
-            if (e.getErrorCode() == Code.NOT_FOUND_VALUE) {
+                responseObserver.onError(e);
+            } else {
                 DeleteTopicReply reply = DeleteTopicReply.newBuilder()
-                    .setStatus(Status.newBuilder().setCode(Code.NOT_FOUND).build()
+                    .setStatus(Status.newBuilder().setCode(Code.OK).build()
                     ).build();
                 responseObserver.onNext(reply);
                 responseObserver.onCompleted();
-                return;
             }
-            responseObserver.onError(e);
-        }
+        });
     }
 
     @Override
