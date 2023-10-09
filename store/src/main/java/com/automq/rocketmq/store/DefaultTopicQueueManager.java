@@ -30,8 +30,11 @@ import com.automq.rocketmq.store.service.api.OperationLogService;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class DefaultTopicQueueManager implements TopicQueueManager {
+    protected static final Logger LOGGER = LoggerFactory.getLogger(DefaultTopicQueueManager.class);
 
     private final StoreConfig storeConfig;
     private final StreamStore streamStore;
@@ -87,8 +90,9 @@ public class DefaultTopicQueueManager implements TopicQueueManager {
             future = createAndOpen(topicId, queueId);
 
             // Put the future into the map to serve next request.
-            topicQueueMap.put(key, createAndOpen(topicId, queueId));
+            topicQueueMap.put(key, future);
             future.exceptionally(ex -> {
+                LOGGER.error("Create topic: {} queue: {} failed.", topicId, queueId, ex);
                 topicQueueMap.remove(key);
                 return null;
             });
@@ -98,6 +102,7 @@ public class DefaultTopicQueueManager implements TopicQueueManager {
 
     @Override
     public CompletableFuture<Void> close(long topicId, int queueId) {
+        LOGGER.info("Close topic: {} queue: {}", topicId, queueId);
         TopicQueueId key = new TopicQueueId(topicId, queueId);
         CompletableFuture<TopicQueue> future = topicQueueMap.remove(key);
         if (future != null) {
@@ -117,6 +122,7 @@ public class DefaultTopicQueueManager implements TopicQueueManager {
             metadataService, stateMachine, streamStore, operationLogService, inflightService);
 
         // TODO: handle exception when open topic queue failed.
+        LOGGER.info("Create and open topic: {} queue: {}", topicId, queueId);
         return topicQueue.open()
             .thenApply(nil -> topicQueue);
     }

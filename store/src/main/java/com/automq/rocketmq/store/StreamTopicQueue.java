@@ -42,12 +42,11 @@ import com.automq.rocketmq.store.service.InflightService;
 import com.automq.rocketmq.store.service.api.OperationLogService;
 import com.automq.rocketmq.store.util.SerializeUtil;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static com.automq.rocketmq.store.util.SerializeUtil.decodeReceiptHandle;
@@ -58,7 +57,7 @@ public class StreamTopicQueue extends TopicQueue {
     private long dataStreamId;
     private long operationStreamId;
     private long snapshotStreamId;
-    private final Map<Long/*consumerGroupId*/, Long/*retryStreamId*/> retryStreamIdMap;
+    private final ConcurrentMap<Long/*consumerGroupId*/, CompletableFuture<Long>/*retryStreamId*/> retryStreamIdMap;
     private final StreamStore streamStore;
     private final StoreConfig config;
     private final OperationLogService operationLogService;
@@ -111,7 +110,19 @@ public class StreamTopicQueue extends TopicQueue {
     @Override
     public CompletableFuture<Void> close() {
         if (state.compareAndSet(State.OPENED, State.CLOSING)) {
-            return streamStore.close(Arrays.asList(dataStreamId, operationStreamId, snapshotStreamId))
+            List<Long> retryStreamIdList = retryStreamIdMap.values()
+                .stream()
+                .map(CompletableFuture::join)
+                .toList();
+            retryStreamIdMap.clear();
+
+            List<Long> streamIdList = new ArrayList<>();
+            streamIdList.add(dataStreamId);
+            streamIdList.add(operationStreamId);
+            streamIdList.add(snapshotStreamId);
+            streamIdList.addAll(retryStreamIdList);
+
+            return streamStore.close(streamIdList)
                 .thenCompose(nil -> stateMachine.clear())
                 .thenAccept(nil -> inflightService.clearInflightCount(topicId, queueId))
                 .thenAccept(nil -> state.set(State.CLOSED));
@@ -141,16 +152,25 @@ public class StreamTopicQueue extends TopicQueue {
 
     private CompletableFuture<Long> retryStreamId(long consumerGroupId) {
         if (!retryStreamIdMap.containsKey(consumerGroupId)) {
-            return metadataService.retryStreamOf(consumerGroupId, topicId, queueId)
-                .thenCompose(streamMetadata -> {
-                    long retryStreamId = streamMetadata.getStreamId();
-                    retryStreamIdMap.put(consumerGroupId, retryStreamId);
-                    return streamStore.open(retryStreamId, streamMetadata.getEpoch())
-                        .thenApply(nil -> retryStreamId);
+            synchronized (this) {
+                if (retryStreamIdMap.containsKey(consumerGroupId)) {
+                    return retryStreamIdMap.get(consumerGroupId);
+                }
+
+                CompletableFuture<Long> future = metadataService.retryStreamOf(consumerGroupId, topicId, queueId)
+                    .thenCompose(streamMetadata ->
+                        streamStore.open(streamMetadata.getStreamId(), streamMetadata.getEpoch())
+                            .thenApply(nil -> streamMetadata.getStreamId()));
+
+                retryStreamIdMap.put(consumerGroupId, future);
+                future.exceptionally(ex -> {
+                    retryStreamIdMap.remove(consumerGroupId);
+                    return null;
                 });
-        } else {
-            return CompletableFuture.completedFuture(retryStreamIdMap.get(consumerGroupId));
+                return future;
+            }
         }
+        return retryStreamIdMap.get(consumerGroupId);
     }
 
     @Override
