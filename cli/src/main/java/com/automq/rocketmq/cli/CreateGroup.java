@@ -19,14 +19,11 @@ package com.automq.rocketmq.cli;
 
 import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
+import apache.rocketmq.controller.v1.GroupType;
 import com.automq.rocketmq.controller.metadata.GrpcControllerClient;
 import java.util.concurrent.Callable;
 import picocli.CommandLine;
 
-enum GroupType {
-    FIFO,
-    STANDARD
-}
 @CommandLine.Command(name = "createGroup", mixinStandardHelpOptions = true)
 public class CreateGroup implements Callable<Void>  {
     @CommandLine.ParentCommand
@@ -42,22 +39,10 @@ public class CreateGroup implements Callable<Void>  {
     @Override
     public Void call() throws Exception {
         GrpcControllerClient client = new GrpcControllerClient();
-        apache.rocketmq.controller.v1.GroupType gType = null;
-        switch (groupType) {
-            case FIFO:
-                gType = apache.rocketmq.controller.v1.GroupType.GROUP_TYPE_FIFO;
-                break;
-            case STANDARD:
-                gType = apache.rocketmq.controller.v1.GroupType.GROUP_TYPE_STANDARD;
-                break;
-            default:
-                throw new IllegalArgumentException("Invalid group type: " + groupType);
-        }
-
         CreateGroupRequest request = CreateGroupRequest.newBuilder()
             .setName(groupName)
             .setMaxRetryAttempt(maxRetryAttempt)
-            .setGroupType(gType)
+            .setGroupType(groupType)
             .build();
 
         CreateGroupReply groupReply = client.createGroup(mqAdmin.endpoint, request).join();
