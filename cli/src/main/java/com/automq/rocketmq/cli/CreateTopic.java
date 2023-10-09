@@ -18,6 +18,7 @@
 package com.automq.rocketmq.cli;
 
 import apache.rocketmq.controller.v1.CreateTopicRequest;
+import apache.rocketmq.controller.v1.MessageType;
 import com.automq.rocketmq.controller.metadata.GrpcControllerClient;
 import java.util.concurrent.Callable;
 import picocli.CommandLine;
@@ -29,6 +30,9 @@ public class CreateTopic implements Callable<Void> {
     @CommandLine.Option(names = {"-q", "--queueNums"}, description = "Queue number", required = true)
     int queueNums;
 
+    @CommandLine.Option(names = {"-m", "--messageType"}, description = "Message type", required = true)
+    MessageType messageType;
+
     @CommandLine.ParentCommand
     MQAdmin mqAdmin;
 
@@ -38,6 +42,7 @@ public class CreateTopic implements Callable<Void> {
         CreateTopicRequest request = CreateTopicRequest.newBuilder()
             .setTopic(topicName)
             .setCount(queueNums)
+            .addAcceptMessageTypes(messageType)
             .build();
 
         Long topicId = client.createTopic(mqAdmin.endpoint, request).join();
