@@ -28,11 +28,11 @@ public class BrokerConfig implements ControllerConfig {
     private String instanceId;
 
     private String address = NetworkUtil.getLocalAddress();
-    private ProxyConfig proxy;
-    private StoreConfig store;
-    private S3StreamConfig s3Stream;
+    private final ProxyConfig proxy;
+    private final StoreConfig store;
+    private final S3StreamConfig s3Stream;
 
-    private DatabaseConfig db;
+    private final DatabaseConfig db;
 
     public BrokerConfig() {
         this.proxy = new ProxyConfig();
