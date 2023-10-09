@@ -79,7 +79,17 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
         this.kvService = kvService;
         this.topicId = topicId;
         this.queueId = queueId;
-        this.identity = new String("[DefaultStateMachine-" + topicId + "-" + queueId + "]");
+        this.identity = "[DefaultStateMachine-" + topicId + "-" + queueId + "]";
+    }
+
+    @Override
+    public long topicId() {
+        return topicId;
+    }
+
+    @Override
+    public int queueId() {
+        return queueId;
     }
 
     @Override

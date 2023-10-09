@@ -24,6 +24,9 @@ import com.automq.rocketmq.store.model.operation.PopOperation;
 import java.util.concurrent.CompletableFuture;
 
 public interface MessageStateMachine {
+    long topicId();
+
+    int queueId();
 
     CompletableFuture<Void> replayPopOperation(long operationOffset, PopOperation operation);
 
