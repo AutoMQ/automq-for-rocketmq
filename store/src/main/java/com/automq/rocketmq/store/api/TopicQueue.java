@@ -37,12 +37,12 @@ public abstract class TopicQueue {
         this.queueId = queueId;
     }
 
-    public int getQueueId() {
-        return queueId;
+    public long topicId() {
+        return topicId;
     }
 
-    public long getTopicId() {
-        return topicId;
+    public int queueId() {
+        return queueId;
     }
 
     public abstract CompletableFuture<Void> open();

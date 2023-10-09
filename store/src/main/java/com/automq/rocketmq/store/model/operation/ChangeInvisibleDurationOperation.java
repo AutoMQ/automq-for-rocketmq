@@ -17,47 +17,42 @@
 
 package com.automq.rocketmq.store.model.operation;
 
+import com.automq.rocketmq.store.api.MessageStateMachine;
 import java.util.Objects;
 
-public class ChangeInvisibleDurationOperation implements Operation {
-
+public class ChangeInvisibleDurationOperation extends Operation {
     private final long consumerGroupId;
-    private final long topicId;
-    private final int queueId;
     private final long operationId;
     private final long invisibleDuration;
     private final long operationTimestamp;
 
-    public ChangeInvisibleDurationOperation(long consumerGroupId, long topicId, int queueId, long operationId, long invisibleDuration, long operationTimestamp) {
-        this.consumerGroupId = consumerGroupId;
+    public ChangeInvisibleDurationOperation(long topicId, int queueId, long operationStreamId, long snapshotStreamId,
+        MessageStateMachine messageStateMachine, long consumerGroupId, long operationId, long invisibleDuration,
+        long operationTimestamp) {
         this.topicId = topicId;
         this.queueId = queueId;
+        this.operationStreamId = operationStreamId;
+        this.snapshotStreamId = snapshotStreamId;
+        this.stateMachine = messageStateMachine;
+        this.consumerGroupId = consumerGroupId;
         this.operationId = operationId;
         this.invisibleDuration = invisibleDuration;
         this.operationTimestamp = operationTimestamp;
     }
 
-    public long getConsumerGroupId() {
+    public long consumerGroupId() {
         return consumerGroupId;
     }
 
-    public long getTopicId() {
-        return topicId;
-    }
-
-    public int getQueueId() {
-        return queueId;
-    }
-
-    public long getOperationId() {
+    public long operationId() {
         return operationId;
     }
 
-    public long getInvisibleDuration() {
+    public long invisibleDuration() {
         return invisibleDuration;
     }
 
-    public long getOperationTimestamp() {
+    public long operationTimestamp() {
         return operationTimestamp;
     }
 
@@ -77,7 +72,7 @@ public class ChangeInvisibleDurationOperation implements Operation {
     }
 
     @Override
-    public OperationType getOperationType() {
+    public OperationType operationType() {
         return OperationType.CHANGE_INVISIBLE_DURATION;
     }
 }

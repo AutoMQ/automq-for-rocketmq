@@ -87,7 +87,7 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
         writeLock.lock();
         try {
             this.currentOperationOffset = operationOffset;
-            switch (operation.getPopOperationType()) {
+            switch (operation.popOperationType()) {
                 case POP_NORMAL:
                     return replayPopNormalOperation(operationOffset, operation);
                 case POP_ORDER:
@@ -108,14 +108,14 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
 
     private CompletableFuture<Void> replayPopNormalOperation(long operationOffset,
         PopOperation operation) throws StoreException {
-        long topicId = operation.getTopicId();
-        int queueId = operation.getQueueId();
-        long offset = operation.getOffset();
-        long consumerGroupId = operation.getConsumerGroupId();
+        long topicId = operation.topicId();
+        int queueId = operation.queueId();
+        long offset = operation.offset();
+        long consumerGroupId = operation.consumerGroupId();
         long operationId = operationOffset;
-        long operationTimestamp = operation.getOperationTimestamp();
-        long nextVisibleTimestamp = operation.getOperationTimestamp() + operation.getInvisibleDuration();
-        int count = operation.getCount();
+        long operationTimestamp = operation.operationTimestamp();
+        long nextVisibleTimestamp = operation.operationTimestamp() + operation.invisibleDuration();
+        int count = operation.count();
         // update consume offset, data or retry stream
         ConsumerGroupMetadata metadata = this.consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId));
         if (metadata.getConsumeOffset() < offset + 1) {
@@ -137,7 +137,7 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
             buildCheckPointKey(topicId, queueId, operationId),
             buildCheckPointValue(topicId, queueId, offset,
                 count,
-                consumerGroupId, operationId, operation.getPopOperationType(), operationTimestamp, nextVisibleTimestamp));
+                consumerGroupId, operationId, operation.popOperationType(), operationTimestamp, nextVisibleTimestamp));
         requestList.add(writeCheckPointRequest);
 
         BatchWriteRequest writeTimerTagRequest = new BatchWriteRequest(KV_NAMESPACE_TIMER_TAG,
@@ -151,14 +151,14 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
 
     private CompletableFuture<Void> replayPopRetryOperation(long operationOffset,
         PopOperation operation) throws StoreException {
-        long topicId = operation.getTopicId();
-        int queueId = operation.getQueueId();
-        long offset = operation.getOffset();
-        long consumerGroupId = operation.getConsumerGroupId();
+        long topicId = operation.topicId();
+        int queueId = operation.queueId();
+        long offset = operation.offset();
+        long consumerGroupId = operation.consumerGroupId();
         long operationId = operationOffset;
-        long operationTimestamp = operation.getOperationTimestamp();
-        long nextVisibleTimestamp = operation.getOperationTimestamp() + operation.getInvisibleDuration();
-        int count = operation.getCount();
+        long operationTimestamp = operation.operationTimestamp();
+        long nextVisibleTimestamp = operation.operationTimestamp() + operation.invisibleDuration();
+        int count = operation.count();
         // update consume offset, data or retry stream
         ConsumerGroupMetadata metadata = this.consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId));
         if (metadata.getRetryConsumeOffset() < offset + 1) {
@@ -180,7 +180,7 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
             buildCheckPointKey(topicId, queueId, operationId),
             buildCheckPointValue(topicId, queueId, offset,
                 count,
-                consumerGroupId, operationId, operation.getPopOperationType(), operationTimestamp, nextVisibleTimestamp));
+                consumerGroupId, operationId, operation.popOperationType(), operationTimestamp, nextVisibleTimestamp));
         requestList.add(writeCheckPointRequest);
 
         BatchWriteRequest writeTimerTagRequest = new BatchWriteRequest(KV_NAMESPACE_TIMER_TAG,
@@ -194,15 +194,15 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
 
     private CompletableFuture<Void> replayPopFifoOperation(long operationOffset,
         PopOperation operation) throws StoreException {
-        long topicId = operation.getTopicId();
-        int queueId = operation.getQueueId();
-        long offset = operation.getOffset();
-        long consumerGroupId = operation.getConsumerGroupId();
+        long topicId = operation.topicId();
+        int queueId = operation.queueId();
+        long offset = operation.offset();
+        long consumerGroupId = operation.consumerGroupId();
         long operationId = operationOffset;
-        long operationTimestamp = operation.getOperationTimestamp();
-        long nextVisibleTimestamp = operation.getOperationTimestamp() + operation.getInvisibleDuration();
+        long operationTimestamp = operation.operationTimestamp();
+        long nextVisibleTimestamp = operation.operationTimestamp() + operation.invisibleDuration();
 
-        int count = operation.getCount();
+        int count = operation.count();
         // update consume offset
         ConsumerGroupMetadata metadata = this.consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId));
         if (metadata.getConsumeOffset() < offset + 1) {
@@ -224,7 +224,7 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
             buildCheckPointKey(topicId, queueId, operationId),
             buildCheckPointValue(topicId, queueId, offset,
                 count,
-                consumerGroupId, operationId, operation.getPopOperationType(), operationTimestamp, nextVisibleTimestamp));
+                consumerGroupId, operationId, operation.popOperationType(), operationTimestamp, nextVisibleTimestamp));
         requestList.add(writeCheckPointRequest);
 
         BatchWriteRequest writeTimerTagRequest = new BatchWriteRequest(KV_NAMESPACE_TIMER_TAG,
@@ -265,10 +265,10 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
 
     @Override
     public CompletableFuture<Void> replayAckOperation(long operationOffset, AckOperation operation) {
-        long topicId = operation.getTopicId();
-        int queueId = operation.getQueueId();
-        long operationId = operation.getOperationId();
-        AckOperation.AckOperationType type = operation.getAckOperationType();
+        long topicId = operation.topicId();
+        int queueId = operation.queueId();
+        long operationId = operation.operationId();
+        AckOperation.AckOperationType type = operation.ackOperationType();
         writeLock.lock();
         try {
             currentOperationOffset = operationOffset;
@@ -321,11 +321,11 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
     @Override
     public CompletableFuture<Void> replayChangeInvisibleDurationOperation(long operationOffset,
         ChangeInvisibleDurationOperation operation) {
-        long invisibleDuration = operation.getInvisibleDuration();
-        long operationTimestamp = operation.getOperationTimestamp();
-        long topic = operation.getTopicId();
-        int queue = operation.getQueueId();
-        long operationId = operation.getOperationId();
+        long invisibleDuration = operation.invisibleDuration();
+        long operationTimestamp = operation.operationTimestamp();
+        long topic = operation.topicId();
+        int queue = operation.queueId();
+        long operationId = operation.operationId();
         long nextInvisibleTimestamp = operationTimestamp + invisibleDuration;
         writeLock.lock();
         try {

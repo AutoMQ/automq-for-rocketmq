@@ -36,7 +36,9 @@ import com.automq.rocketmq.store.model.message.TagFilter;
 import com.automq.rocketmq.store.service.InflightService;
 import com.automq.rocketmq.store.service.RocksDBKVService;
 import com.automq.rocketmq.store.service.SnapshotService;
+import com.automq.rocketmq.store.service.StreamOperationLogService;
 import com.automq.rocketmq.store.service.api.KVService;
+import com.automq.rocketmq.store.service.api.OperationLogService;
 import com.automq.rocketmq.store.util.SerializeUtil;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -53,7 +55,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class TopicQueueTest {
-
     private static final String PATH = "/tmp/ros/topic_queue_test/";
     private static final long TOPIC_ID = 1313;
     private static final int QUEUE_ID = 13;
@@ -78,8 +79,9 @@ public class TopicQueueTest {
         stateMachine = new DefaultMessageStateMachine(TOPIC_ID, QUEUE_ID, kvService);
         inflightService = new InflightService();
         SnapshotService snapshotService = new SnapshotService(streamStore, kvService);
+        OperationLogService operationLogService = new StreamOperationLogService(streamStore, snapshotService, new StoreConfig());
         topicQueue = new StreamTopicQueue(new StoreConfig(), TOPIC_ID, QUEUE_ID,
-            metadataService, stateMachine, streamStore, inflightService, snapshotService);
+            metadataService, stateMachine, streamStore, operationLogService, inflightService);
         topicQueue.open().join();
     }
 

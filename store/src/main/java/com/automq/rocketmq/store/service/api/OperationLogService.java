@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.store.service.api;
 
+import com.automq.rocketmq.store.api.MessageStateMachine;
 import com.automq.rocketmq.store.model.operation.AckOperation;
 import com.automq.rocketmq.store.model.operation.ChangeInvisibleDurationOperation;
 import com.automq.rocketmq.store.model.operation.PopOperation;
@@ -47,6 +48,11 @@ public interface OperationLogService {
      */
     CompletableFuture<Long> logChangeInvisibleDurationOperation(ChangeInvisibleDurationOperation operation);
 
-    CompletableFuture<Void> start();
-
+    /**
+     * Recover.
+     * Each queue has its own operation log.
+     *
+     * @return monotonic serial number
+     */
+    CompletableFuture<Void> recover(MessageStateMachine stateMachine, long operationStreamId, long snapshotStreamId);
 }

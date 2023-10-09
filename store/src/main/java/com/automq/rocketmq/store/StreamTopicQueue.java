@@ -39,8 +39,6 @@ import com.automq.rocketmq.store.model.operation.ChangeInvisibleDurationOperatio
 import com.automq.rocketmq.store.model.operation.PopOperation;
 import com.automq.rocketmq.store.model.stream.SingleRecord;
 import com.automq.rocketmq.store.service.InflightService;
-import com.automq.rocketmq.store.service.SnapshotService;
-import com.automq.rocketmq.store.service.StreamOperationLogService;
 import com.automq.rocketmq.store.service.api.OperationLogService;
 import com.automq.rocketmq.store.util.SerializeUtil;
 import java.util.ArrayList;
@@ -66,20 +64,19 @@ public class StreamTopicQueue extends TopicQueue {
     private final StreamStore streamStore;
     private final StoreConfig config;
     private final InflightService inflightService;
-    private final SnapshotService snapshotService;
     private final AtomicReference<State> state;
 
     public StreamTopicQueue(StoreConfig config, long topicId, int queueId,
         StoreMetadataService metadataService, MessageStateMachine stateMachine, StreamStore streamStore,
-        InflightService inflightService, SnapshotService snapshotService) {
+        OperationLogService operationLogService, InflightService inflightService) {
         super(topicId, queueId);
         this.config = config;
         this.metadataService = metadataService;
         this.stateMachine = stateMachine;
         this.streamStore = streamStore;
         this.retryStreamIdMap = new ConcurrentHashMap<>();
+        this.operationLogService = operationLogService;
         this.inflightService = inflightService;
-        this.snapshotService = snapshotService;
         this.state = new AtomicReference<>(State.INIT);
     }
 
@@ -104,31 +101,12 @@ public class StreamTopicQueue extends TopicQueue {
                 });
 
             // TODO: when we open retry-streams?
-            return CompletableFuture.allOf(
-                openDataStreamFuture,
-                openOperationStreamFuture,
-                openSnapshotStreamFuture
-            ).thenCompose(nil -> {
+            return CompletableFuture.allOf(openDataStreamFuture, openOperationStreamFuture, openSnapshotStreamFuture)
                 // recover from operation log
-                this.operationLogService = new StreamOperationLogService(
-                    this.topicId,
-                    this.queueId,
-                    this.operationStreamId,
-                    this.snapshotStreamId,
-                    this.streamStore,
-                    this.metadataService,
-                    this.stateMachine,
-                    this.snapshotService,
-                    this.config
-                );
-                return recover();
-            }).thenAccept(nil -> state.set(State.OPENED));
+                .thenCompose(nil -> operationLogService.recover(stateMachine, operationStreamId, snapshotStreamId))
+                .thenAccept(nil -> state.set(State.OPENED));
         }
         return CompletableFuture.completedFuture(null);
-    }
-
-    private CompletableFuture<Void> recover() {
-        return this.operationLogService.start();
     }
 
     @Override
@@ -215,10 +193,9 @@ public class StreamTopicQueue extends TopicQueue {
             for (FlatMessageExt messageExt : messageExtList) {
                 int count = (int) (messageExt.offset() - preOffset);
                 preOffset = messageExt.offset();
-                PopOperation popOperation = new PopOperation(
-                    consumerGroupId, topicId, queueId, messageExt.offset(), count, invisibleDuration, operationTimestamp,
-                    false, operationType
-                );
+                PopOperation popOperation = new PopOperation(topicId, queueId, operationStreamId, snapshotStreamId,
+                    stateMachine, consumerGroupId, messageExt.offset(), count, invisibleDuration, operationTimestamp,
+                    false, operationType);
                 appendOpCfs.add(operationLogService.logPopOperation(popOperation)
                     .thenApply(operationId -> {
                         messageExt.setReceiptHandle(SerializeUtil.encodeReceiptHandle(consumerGroupId, topicId, queueId, operationId));
@@ -228,10 +205,9 @@ public class StreamTopicQueue extends TopicQueue {
             // write special pop operation for the last message to update consume offset
             int count = (int) (fetchResult.endOffset - 1 - preOffset);
             if (count > 0) {
-                PopOperation popOperation = new PopOperation(
-                    consumerGroupId, topicId, queueId, fetchResult.endOffset - 1, count, invisibleDuration,
-                    operationTimestamp, true, operationType
-                );
+                PopOperation popOperation = new PopOperation(topicId, queueId, operationStreamId, snapshotStreamId,
+                    stateMachine, consumerGroupId, fetchResult.endOffset - 1, count, invisibleDuration,
+                    operationTimestamp, true, operationType);
                 appendOpCfs.add(operationLogService.logPopOperation(popOperation));
             }
             return CompletableFuture.allOf(appendOpCfs.toArray(new CompletableFuture[0]))
@@ -377,8 +353,9 @@ public class StreamTopicQueue extends TopicQueue {
             return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.TOPIC_QUEUE_NOT_OPENED, "Topic queue not opened"));
         }
         ReceiptHandle handle = decodeReceiptHandle(receiptHandle);
-        AckOperation operation = new AckOperation(handle.consumerGroupId(), handle.topicId(), handle.queueId(), handle.operationId(),
-            System.nanoTime(), AckOperation.AckOperationType.ACK_NORMAL);
+        AckOperation operation = new AckOperation(handle.topicId(), handle.queueId(), operationStreamId,
+            snapshotStreamId, stateMachine, handle.consumerGroupId(), handle.operationId(), System.nanoTime(),
+            AckOperation.AckOperationType.ACK_NORMAL);
         return operationLogService.logAckOperation(operation).thenApply(nil -> {
             inflightService.decreaseInflightCount(handle.consumerGroupId(), handle.topicId(), handle.queueId(), 1);
             return new AckResult(AckResult.Status.SUCCESS);
@@ -391,8 +368,9 @@ public class StreamTopicQueue extends TopicQueue {
             return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.TOPIC_QUEUE_NOT_OPENED, "Topic queue not opened"));
         }
         ReceiptHandle handle = decodeReceiptHandle(receiptHandle);
-        AckOperation operation = new AckOperation(handle.consumerGroupId(), handle.topicId(), handle.queueId(), handle.operationId(),
-            System.nanoTime(), AckOperation.AckOperationType.ACK_TIMEOUT);
+        AckOperation operation = new AckOperation(handle.topicId(), handle.queueId(), operationStreamId,
+            snapshotStreamId, stateMachine, handle.consumerGroupId(), handle.operationId(), System.nanoTime(),
+            AckOperation.AckOperationType.ACK_TIMEOUT);
         return operationLogService.logAckOperation(operation).thenApply(nil -> {
             inflightService.decreaseInflightCount(handle.consumerGroupId(), handle.topicId(), handle.queueId(), 1);
             return new AckResult(AckResult.Status.SUCCESS);
@@ -406,7 +384,9 @@ public class StreamTopicQueue extends TopicQueue {
             return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.TOPIC_QUEUE_NOT_OPENED, "Topic queue not opened"));
         }
         ReceiptHandle handle = decodeReceiptHandle(receiptHandle);
-        ChangeInvisibleDurationOperation operation = new ChangeInvisibleDurationOperation(handle.consumerGroupId(), handle.topicId(), handle.queueId(), handle.operationId(), System.nanoTime(), invisibleDuration);
+        ChangeInvisibleDurationOperation operation = new ChangeInvisibleDurationOperation(handle.topicId(),
+            handle.queueId(), operationStreamId, snapshotStreamId, stateMachine, handle.consumerGroupId(),
+            handle.operationId(), System.nanoTime(), invisibleDuration);
         return operationLogService.logChangeInvisibleDurationOperation(operation).thenApply(nil ->
                 new ChangeInvisibleDurationResult(ChangeInvisibleDurationResult.Status.SUCCESS))
             .exceptionally(throwable -> new ChangeInvisibleDurationResult(ChangeInvisibleDurationResult.Status.ERROR));

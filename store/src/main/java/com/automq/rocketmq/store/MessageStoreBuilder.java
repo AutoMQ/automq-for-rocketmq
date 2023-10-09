@@ -28,7 +28,9 @@ import com.automq.rocketmq.store.service.InflightService;
 import com.automq.rocketmq.store.service.ReviveService;
 import com.automq.rocketmq.store.service.RocksDBKVService;
 import com.automq.rocketmq.store.service.SnapshotService;
+import com.automq.rocketmq.store.service.StreamOperationLogService;
 import com.automq.rocketmq.store.service.api.KVService;
+import com.automq.rocketmq.store.service.api.OperationLogService;
 
 import static com.automq.rocketmq.store.MessageStoreImpl.KV_NAMESPACE_CHECK_POINT;
 import static com.automq.rocketmq.store.MessageStoreImpl.KV_NAMESPACE_TIMER_TAG;
@@ -40,8 +42,9 @@ public class MessageStoreBuilder {
         KVService kvService = new RocksDBKVService(storeConfig.kvPath());
         InflightService inflightService = new InflightService();
         SnapshotService snapshotService = new SnapshotService(streamStore, kvService);
-        TopicQueueManager topicQueueManager = new DefaultTopicQueueManager(storeConfig, metadataService, streamStore,
-            inflightService, snapshotService, kvService);
+        OperationLogService operationLogService = new StreamOperationLogService(streamStore, snapshotService, storeConfig);
+        TopicQueueManager topicQueueManager = new DefaultTopicQueueManager(storeConfig, streamStore, kvService,
+            metadataService, operationLogService, inflightService);
         ReviveService reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, KV_NAMESPACE_TIMER_TAG, kvService, metadataService, inflightService, topicQueueManager);
 
         return new MessageStoreImpl(storeConfig, streamStore, metadataService, kvService, inflightService, snapshotService, topicQueueManager, reviveService);

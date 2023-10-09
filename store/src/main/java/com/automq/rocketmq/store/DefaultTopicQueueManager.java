@@ -25,8 +25,8 @@ import com.automq.rocketmq.store.api.TopicQueue;
 import com.automq.rocketmq.store.api.TopicQueueManager;
 import com.automq.rocketmq.store.model.message.TopicQueueId;
 import com.automq.rocketmq.store.service.InflightService;
-import com.automq.rocketmq.store.service.SnapshotService;
 import com.automq.rocketmq.store.service.api.KVService;
+import com.automq.rocketmq.store.service.api.OperationLogService;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -34,23 +34,23 @@ import java.util.concurrent.ConcurrentHashMap;
 public class DefaultTopicQueueManager implements TopicQueueManager {
 
     private final StoreConfig storeConfig;
-    private final StoreMetadataService metadataService;
     private final StreamStore streamStore;
-    private final InflightService inflightService;
-    private final SnapshotService snapshotService;
     private final KVService kvService;
+    private final StoreMetadataService metadataService;
+    private final OperationLogService operationLogService;
+    private final InflightService inflightService;
     private final Map<TopicQueueId, CompletableFuture<TopicQueue>> topicQueueMap;
 
-    public DefaultTopicQueueManager(StoreConfig storeConfig, StoreMetadataService metadataService,
-        StreamStore streamStore, InflightService inflightService, SnapshotService snapshotService,
-        KVService kvService) {
+    public DefaultTopicQueueManager(StoreConfig storeConfig, StreamStore streamStore,
+        KVService kvService, StoreMetadataService metadataService, OperationLogService operationLogService,
+        InflightService inflightService) {
         this.storeConfig = storeConfig;
-        this.metadataService = metadataService;
         this.streamStore = streamStore;
-        this.inflightService = inflightService;
-        this.snapshotService = snapshotService;
-        this.topicQueueMap = new ConcurrentHashMap<>();
         this.kvService = kvService;
+        this.metadataService = metadataService;
+        this.operationLogService = operationLogService;
+        this.inflightService = inflightService;
+        this.topicQueueMap = new ConcurrentHashMap<>();
     }
 
     @Override
@@ -61,6 +61,10 @@ public class DefaultTopicQueueManager implements TopicQueueManager {
     @Override
     public void shutdown() throws Exception {
 
+    }
+
+    public int size() {
+        return topicQueueMap.size();
     }
 
     @Override
@@ -110,7 +114,7 @@ public class DefaultTopicQueueManager implements TopicQueueManager {
 
         MessageStateMachine stateMachine = new DefaultMessageStateMachine(topicId, queueId, kvService);
         TopicQueue topicQueue = new StreamTopicQueue(storeConfig, topicId, queueId,
-            metadataService, stateMachine, streamStore, inflightService, snapshotService);
+            metadataService, stateMachine, streamStore, operationLogService, inflightService);
 
         // TODO: handle exception when open topic queue failed.
         return topicQueue.open()

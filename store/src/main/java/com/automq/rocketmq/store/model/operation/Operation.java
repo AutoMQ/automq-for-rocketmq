@@ -17,14 +17,41 @@
 
 package com.automq.rocketmq.store.model.operation;
 
-public interface Operation {
+import com.automq.rocketmq.store.api.MessageStateMachine;
 
-    OperationType getOperationType();
+public abstract class Operation {
+    protected long topicId;
+    protected int queueId;
+    protected long operationStreamId;
+    protected long snapshotStreamId;
+    protected MessageStateMachine stateMachine;
 
-    enum OperationType {
+    public abstract OperationType operationType();
+
+    public enum OperationType {
         POP,
         ACK,
         CHANGE_INVISIBLE_DURATION,
         SNAPSHOT
+    }
+
+    public long topicId() {
+        return topicId;
+    }
+
+    public int queueId() {
+        return queueId;
+    }
+
+    public long operationStreamId() {
+        return operationStreamId;
+    }
+
+    public long snapshotStreamId() {
+        return snapshotStreamId;
+    }
+
+    public MessageStateMachine stateMachine() {
+        return stateMachine;
     }
 }
