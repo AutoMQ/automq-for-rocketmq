@@ -21,7 +21,6 @@ import com.automq.rocketmq.common.config.ControllerConfig;
 import com.automq.rocketmq.controller.metadata.GrpcControllerClient;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.DefaultMetadataStore;
-import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
@@ -33,36 +32,9 @@ public class MetadataStoreBuilder {
     public static ControllerServiceImpl build(MetadataStore metadataStore) {
         return new ControllerServiceImpl(metadataStore);
     }
-    public static MetadataStore build(ControllerConfig config, Node node) throws IOException {
-        SqlSessionFactory sessionFactory = getSessionFactory(config.dbUrl(), config.dbUser(), config.dbPassword());
-
-        // TODO: Should unify the config interface.
-        return new DefaultMetadataStore(new GrpcControllerClient(), sessionFactory, new com.automq.rocketmq.controller.metadata.ControllerConfig() {
-            @Override
-            public int nodeId() {
-                return node.getId();
-            }
-
-            @Override
-            public long epoch() {
-                return node.getEpoch();
-            }
-
-            @Override
-            public int scanIntervalInSecs() {
-                return config.scanIntervalInSecs();
-            }
-
-            @Override
-            public int leaseLifeSpanInSecs() {
-                return config.leaseLifeSpanInSecs();
-            }
-
-            @Override
-            public int nodeAliveIntervalInSecs() {
-                return config.nodeAliveIntervalInSecs();
-            }
-        });
+    public static MetadataStore build(ControllerConfig config) throws IOException {
+        SqlSessionFactory sessionFactory = getSessionFactory(config.dbUrl(), config.dbUserName(), config.dbPassword());
+        return new DefaultMetadataStore(new GrpcControllerClient(), sessionFactory, config);
     }
 
     private static SqlSessionFactory getSessionFactory(String dbUrl, String dbUser, String dbPassword) throws IOException {
@@ -72,7 +44,7 @@ public class MetadataStoreBuilder {
         Properties properties = new Properties();
         properties.put("userName", dbUser);
         properties.put("password", dbPassword);
-        properties.put("jdbcUrl", dbUrl + "?TC_REUSABLE=true");
+        properties.put("jdbcUrl", dbUrl);
         return new SqlSessionFactoryBuilder().build(inputStream, properties);
     }
 }

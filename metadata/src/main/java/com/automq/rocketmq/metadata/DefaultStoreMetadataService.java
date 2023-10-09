@@ -25,7 +25,6 @@ import apache.rocketmq.controller.v1.StreamRole;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.DefaultMetadataStore;
-import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
 
 import java.util.List;
@@ -41,11 +40,8 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
 
     private final MetadataStore metadataStore;
 
-    private final Node node;
-
-    public DefaultStoreMetadataService(MetadataStore metadataStore, Node node) {
+    public DefaultStoreMetadataService(MetadataStore metadataStore) {
         this.metadataStore = metadataStore;
-        this.node = node;
     }
 
     @Override
@@ -100,7 +96,7 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
 
     @Override
     public int getNodeId() {
-        return node.getId();
+        return metadataStore.config().nodeId();
     }
 
     @Override
@@ -167,7 +163,7 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
 
     @Override
     public CompletableFuture<List<StreamMetadata>> listOpenStreams() {
-        return metadataStore.listOpenStreams(node.getId());
+        return metadataStore.listOpenStreams(metadataStore.config().nodeId());
     }
 
     @Override

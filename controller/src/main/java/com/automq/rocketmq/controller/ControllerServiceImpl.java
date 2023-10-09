@@ -85,36 +85,31 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     }
 
     @Override
-    public void registerNode(NodeRegistrationRequest request,
-        StreamObserver<NodeRegistrationReply> responseObserver) {
-        try {
-            metadataStore.registerBrokerNode(request.getBrokerName(), request.getAddress(),
-                request.getInstanceId()).whenComplete((res, e) -> {
-                    if (null != e) {
-                        if (e instanceof ControllerException ex) {
-                            NodeRegistrationReply reply = NodeRegistrationReply.newBuilder()
-                                .setStatus(Status.newBuilder()
-                                    .setCode(Code.forNumber(ex.getErrorCode()))
-                                    .setMessage(e.getMessage()).build())
-                                .build();
-                            responseObserver.onNext(reply);
-                            responseObserver.onCompleted();
-                        } else {
-                            responseObserver.onError(e);
-                        }
-                    } else {
+    public void registerNode(NodeRegistrationRequest request, StreamObserver<NodeRegistrationReply> responseObserver) {
+        metadataStore.registerBrokerNode(request.getBrokerName(), request.getAddress(), request.getInstanceId())
+            .whenComplete((res, e) -> {
+                if (null != e) {
+                    if (e instanceof ControllerException ex) {
                         NodeRegistrationReply reply = NodeRegistrationReply.newBuilder()
-                            .setStatus(Status.newBuilder().setCode(Code.OK).build())
-                            .setId(res.getId())
-                            .setEpoch(res.getEpoch())
+                            .setStatus(Status.newBuilder()
+                                .setCode(Code.forNumber(ex.getErrorCode()))
+                                .setMessage(e.getMessage()).build())
                             .build();
                         responseObserver.onNext(reply);
                         responseObserver.onCompleted();
+                    } else {
+                        responseObserver.onError(e);
                     }
-                });
-        } catch (ControllerException e) {
-            responseObserver.onError(e);
-        }
+                } else {
+                    NodeRegistrationReply reply = NodeRegistrationReply.newBuilder()
+                        .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                        .setId(res.getId())
+                        .setEpoch(res.getEpoch())
+                        .build();
+                    responseObserver.onNext(reply);
+                    responseObserver.onCompleted();
+                }
+            });
     }
 
     @Override

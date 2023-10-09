@@ -27,6 +27,7 @@ import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.MessageType;
 import com.automq.rocketmq.common.StoreHandle;
+import com.automq.rocketmq.common.config.ControllerConfig;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.database.dao.Lease;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
@@ -65,8 +66,15 @@ public interface MetadataStore extends Closeable {
      * @return broker epoch
      * @throws ControllerException If there is an I/O error.
      */
-    CompletableFuture<Node> registerBrokerNode(String name, String address,
-        String instanceId) throws ControllerException;
+    CompletableFuture<Node> registerBrokerNode(String name, String address, String instanceId);
+
+    /**
+     * Register broker into metadata store and return broker epoch
+     *
+     * @return broker epoch
+     * @throws ControllerException If there is an I/O error.
+     */
+    void registerCurrentNode(String name, String address, String instanceId) throws ControllerException;
 
     void keepAlive(int nodeId, long epoch, boolean goingAway);
 

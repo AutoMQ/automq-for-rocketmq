@@ -22,7 +22,6 @@ import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
-import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.metadata.api.ProxyMetadataService;
 import java.util.List;
 import java.util.Set;
@@ -30,11 +29,9 @@ import java.util.concurrent.CompletableFuture;
 
 public class DefaultProxyMetadataService implements ProxyMetadataService {
     private final MetadataStore metadataStore;
-    private final Node node;
 
-    public DefaultProxyMetadataService(MetadataStore metadataStore, Node node) {
+    public DefaultProxyMetadataService(MetadataStore metadataStore) {
         this.metadataStore = metadataStore;
-        this.node = node;
     }
 
     @Override
@@ -50,7 +47,9 @@ public class DefaultProxyMetadataService implements ProxyMetadataService {
     public CompletableFuture<List<MessageQueueAssignment>> queueAssignmentsOf(String topicName) {
         try {
             return metadataStore.describeTopic(null, topicName)
-                .thenApply(topic -> topic.getAssignmentsList().stream().filter(assignment -> assignment.getNodeId() == node.getId()).toList());
+                .thenApply(topic -> topic.getAssignmentsList()
+                    .stream()
+                    .filter(assignment -> assignment.getNodeId() == metadataStore.config().nodeId()).toList());
         } catch (ControllerException e) {
             return CompletableFuture.failedFuture(e);
         }

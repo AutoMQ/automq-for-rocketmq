@@ -38,7 +38,7 @@ import org.mockito.Mockito;
 class GrpcControllerClientTest {
 
     @Test
-    public void testRegisterBroker() throws IOException, ControllerException, ExecutionException, InterruptedException {
+    public void testRegisterBroker() throws IOException, ExecutionException, InterruptedException {
         String name = "broker-name";
         String address = "localhost:1234";
         String instanceId = "i-ctrl";
@@ -64,17 +64,17 @@ class GrpcControllerClientTest {
     }
 
     @Test
-    public void testRegisterBroker_badTarget() throws IOException, ControllerException {
+    public void testRegisterBroker_badTarget() throws IOException {
         String name = "broker-name";
         String address = "localhost:1234";
         String instanceId = "i-ctrl";
-        MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
         Node node = new Node();
         node.setId(1);
         node.setEpoch(1);
-        Mockito.when(metadataStore.registerBrokerNode(ArgumentMatchers.anyString(), ArgumentMatchers.anyString(),
-            ArgumentMatchers.anyString())).thenReturn(CompletableFuture.completedFuture(node));
-        try (ControllerClient client = new GrpcControllerClient()) {
+        try (ControllerClient client = new GrpcControllerClient();
+             MetadataStore metadataStore = Mockito.mock(MetadataStore.class)) {
+            Mockito.when(metadataStore.registerBrokerNode(ArgumentMatchers.anyString(), ArgumentMatchers.anyString(),
+                ArgumentMatchers.anyString())).thenReturn(CompletableFuture.completedFuture(node));
             Assertions.assertThrows(ExecutionException.class,
                 () -> client.registerBroker(null, name, address, instanceId).get());
 
@@ -82,16 +82,14 @@ class GrpcControllerClientTest {
     }
 
     @Test
-    public void testRegisterBroker_leaderFailure() throws IOException, ControllerException {
+    public void testRegisterBroker_leaderFailure() throws IOException {
         String name = "broker-name";
         String address = "localhost:1234";
         String instanceId = "i-ctrl";
         MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
-        Node node = new Node();
-        node.setId(1);
-        node.setEpoch(1);
         Mockito.when(metadataStore.registerBrokerNode(ArgumentMatchers.anyString(), ArgumentMatchers.anyString(),
-            ArgumentMatchers.anyString())).thenThrow(new ControllerException(Code.MOCK_FAILURE_VALUE));
+                ArgumentMatchers.anyString()))
+            .thenReturn(CompletableFuture.failedFuture(new ControllerException(Code.MOCK_FAILURE_VALUE, "Mock error message")));
         ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
         try (ControllerTestServer testServer = new ControllerTestServer(0, svc);
              ControllerClient client = new GrpcControllerClient()

@@ -51,7 +51,7 @@ import com.automq.rocketmq.common.system.S3Constants;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.BrokerNode;
 import com.automq.rocketmq.controller.metadata.ControllerClient;
-import com.automq.rocketmq.controller.metadata.ControllerConfig;
+import com.automq.rocketmq.common.config.ControllerConfig;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.Role;
 import com.automq.rocketmq.controller.metadata.database.dao.Group;
@@ -76,6 +76,7 @@ import com.automq.rocketmq.controller.metadata.database.mapper.S3WALObjectMapper
 import com.automq.rocketmq.controller.metadata.database.mapper.RangeMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
+import com.automq.rocketmq.controller.metadata.database.tasks.KeepAliveTask;
 import com.automq.rocketmq.controller.metadata.database.tasks.LeaseTask;
 import com.automq.rocketmq.controller.metadata.database.tasks.ScanNodeTask;
 import com.automq.rocketmq.controller.metadata.database.tasks.ScanYieldingQueueTask;
@@ -93,6 +94,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -177,36 +179,45 @@ public class DefaultMetadataStore implements MetadataStore {
     public void start() {
         LeaseTask leaseTask = new LeaseTask(this);
         leaseTask.run();
-        this.scheduledExecutorService.scheduleAtFixedRate(leaseTask, 1, config.scanIntervalInSecs(), TimeUnit.SECONDS);
-        this.scheduledExecutorService.scheduleWithFixedDelay(new ScanNodeTask(this), 1, config.scanIntervalInSecs(), TimeUnit.SECONDS);
-        this.scheduledExecutorService.scheduleWithFixedDelay(new ScanYieldingQueueTask(this), 1, config.scanIntervalInSecs(), TimeUnit.SECONDS);
-        this.scheduledExecutorService.scheduleWithFixedDelay(new SchedulerTask(this), 1, config.scanIntervalInSecs(), TimeUnit.SECONDS);
+        this.scheduledExecutorService.scheduleAtFixedRate(leaseTask, 1,
+            config.scanIntervalInSecs(), TimeUnit.SECONDS);
+        this.scheduledExecutorService.scheduleWithFixedDelay(new ScanNodeTask(this), 1,
+            config.scanIntervalInSecs(), TimeUnit.SECONDS);
+        this.scheduledExecutorService.scheduleWithFixedDelay(new ScanYieldingQueueTask(this), 1,
+            config.scanIntervalInSecs(), TimeUnit.SECONDS);
+        this.scheduledExecutorService.scheduleWithFixedDelay(new SchedulerTask(this), 1,
+            config.scanIntervalInSecs(), TimeUnit.SECONDS);
+        this.scheduledExecutorService.scheduleAtFixedRate(new KeepAliveTask(this), 3,
+            Math.max(config().nodeAliveIntervalInSecs() / 2, 10), TimeUnit.SECONDS);
         LOGGER.info("MetadataStore tasks scheduled");
     }
 
     @Override
-    public CompletableFuture<Node> registerBrokerNode(String name, String address,
-        String instanceId) throws ControllerException {
+    public CompletableFuture<Node> registerBrokerNode(String name, String address, String instanceId) {
         CompletableFuture<Node> future = new CompletableFuture<>();
         if (Strings.isNullOrEmpty(name)) {
-            throw new ControllerException(Code.BAD_REQUEST_VALUE, "Broker name is null or empty");
+            future.completeExceptionally(
+                new ControllerException(Code.BAD_REQUEST_VALUE, "Broker name is null or empty"));
+            return future;
         }
 
         if (Strings.isNullOrEmpty(address)) {
-            throw new ControllerException(Code.BAD_REQUEST_VALUE, "Broker address is null or empty");
-
+            future.completeExceptionally(
+                new ControllerException(Code.BAD_REQUEST_VALUE, "Broker address is null or empty"));
+            return future;
         }
 
         if (Strings.isNullOrEmpty(instanceId)) {
-            throw new ControllerException(Code.BAD_REQUEST_VALUE, "Broker instance-id is null or empty");
-
+            future.completeExceptionally(
+                new ControllerException(Code.BAD_REQUEST_VALUE, "Broker instance-id is null or empty"));
+            return future;
         }
 
         for (; ; ) {
             if (this.isLeader()) {
-                try (SqlSession session = this.sessionFactory.openSession(false)) {
+                try (SqlSession session = openSession()) {
                     NodeMapper nodeMapper = session.getMapper(NodeMapper.class);
-                    Node node = nodeMapper.get(null, null, instanceId, null);
+                    Node node = nodeMapper.get(null, name, instanceId, null);
                     if (null != node) {
                         nodeMapper.increaseEpoch(node.getId());
                         node.setEpoch(node.getEpoch() + 1);
@@ -226,19 +237,20 @@ public class DefaultMetadataStore implements MetadataStore {
                         node.setAddress(address);
                         node.setInstanceId(instanceId);
                         nodeMapper.create(node);
-                        session.commit();
                     }
+                    session.commit();
                     future.complete(node);
                 }
             } else {
                 try {
-                    controllerClient.registerBroker(this.leaderAddress(), name, address, instanceId).whenComplete((res, e) -> {
-                        if (null != e) {
-                            future.completeExceptionally(e);
-                        } else {
-                            future.complete(res);
-                        }
-                    });
+                    controllerClient.registerBroker(this.leaderAddress(), name, address, instanceId)
+                        .whenComplete((res, e) -> {
+                            if (null != e) {
+                                future.completeExceptionally(e);
+                            } else {
+                                future.complete(res);
+                            }
+                        });
                 } catch (ControllerException e) {
                     future.completeExceptionally(e);
                 }
@@ -246,6 +258,22 @@ public class DefaultMetadataStore implements MetadataStore {
             break;
         }
         return future;
+    }
+
+    @Override
+    public void registerCurrentNode(String name, String address, String instanceId) throws ControllerException {
+        try {
+            Node node = registerBrokerNode(name, address, instanceId).get();
+            config.setNodeId(node.getId());
+            config.setEpoch(node.getEpoch());
+        } catch (InterruptedException e) {
+            throw new ControllerException(Code.INTERRUPTED_VALUE, e);
+        } catch (ExecutionException e) {
+            if (e.getCause() instanceof ControllerException) {
+                throw (ControllerException) e.getCause();
+            }
+            throw new ControllerException(Code.INTERNAL_VALUE, e);
+        }
     }
 
     @Override
@@ -685,7 +713,8 @@ public class DefaultMetadataStore implements MetadataStore {
                                 assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_YIELDING);
                                 assignmentMapper.update(assignment);
                             }
-                            case ASSIGNMENT_STATUS_DELETED -> throw new ControllerException(Code.NOT_FOUND_VALUE, "Already deleted");
+                            case ASSIGNMENT_STATUS_DELETED ->
+                                throw new ControllerException(Code.NOT_FOUND_VALUE, "Already deleted");
                         }
                         break;
                     }
@@ -1378,7 +1407,7 @@ public class DefaultMetadataStore implements MetadataStore {
                         future.completeExceptionally(e);
                         break;
                     }
-                    future.complete(Objects.isNull(objectIds) || objectIds.isEmpty() ? S3Constants.NOOP_OBJECT_ID : objectIds.get(0));
+                    future.complete(objectIds.get(0));
                 }
             } else {
                 PrepareS3ObjectsRequest request = PrepareS3ObjectsRequest.newBuilder()
@@ -1806,9 +1835,9 @@ public class DefaultMetadataStore implements MetadataStore {
         return future;
     }
 
-
     @Override
-    public CompletableFuture<Pair<List<apache.rocketmq.controller.v1.S3StreamObject>, List<apache.rocketmq.controller.v1.S3WALObject>>> listObjects(long streamId, long startOffset, long endOffset, int limit) {
+    public CompletableFuture<Pair<List<apache.rocketmq.controller.v1.S3StreamObject>, List<apache.rocketmq.controller.v1.S3WALObject>>> listObjects(
+        long streamId, long startOffset, long endOffset, int limit) {
         return CompletableFuture.supplyAsync(() -> {
             try (SqlSession session = this.sessionFactory.openSession()) {
                 S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);

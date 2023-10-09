@@ -35,7 +35,10 @@ CREATE TABLE IF NOT EXISTS node
     address     VARCHAR(255) NOT NULL,
     epoch       INT          NOT NULL DEFAULT 1,
     create_time DATETIME              DEFAULT CURRENT_TIMESTAMP,
-    update_time DATETIME              DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    update_time DATETIME              DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE INDEX idx_name(name),
+    UNIQUE INDEX idx_host_name(hostname),
+    UNIQUE INDEX idx_address(address)
 );
 
 CREATE TABLE IF NOT EXISTS topic

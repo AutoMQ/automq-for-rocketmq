@@ -17,14 +17,12 @@
 
 package com.automq.rocketmq.broker;
 
-import com.automq.rocketmq.broker.manager.NodeRegistrar;
 import com.automq.rocketmq.broker.protocol.GrpcProtocolServer;
 import com.automq.rocketmq.common.config.BrokerConfig;
 import com.automq.rocketmq.common.util.Lifecycle;
 import com.automq.rocketmq.controller.ControllerServiceImpl;
 import com.automq.rocketmq.controller.MetadataStoreBuilder;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
-import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.metadata.DefaultProxyMetadataService;
 import com.automq.rocketmq.metadata.DefaultStoreMetadataService;
 import com.automq.rocketmq.metadata.api.ProxyMetadataService;
@@ -46,7 +44,6 @@ public class BrokerController implements Lifecycle {
     private final StoreMetadataService storeMetadataService;
     private final ProxyMetadataService proxyMetadataService;
     private final MessagingProcessor messagingProcessor;
-    private final NodeRegistrar nodeRegistrar;
 
     public BrokerController(BrokerConfig brokerConfig) throws Exception {
         this.brokerConfig = brokerConfig;
@@ -54,17 +51,13 @@ public class BrokerController implements Lifecycle {
         // Init the proxy configuration.
         ProxyConfiguration.intConfig(brokerConfig.proxy());
 
-        Node fakeNode = new Node();
-        fakeNode.setEpoch(0);
-        fakeNode.setId(1);
-        metadataStore = MetadataStoreBuilder.build(brokerConfig.controller(), fakeNode);
-        nodeRegistrar = new NodeRegistrar(brokerConfig, metadataStore);
+        metadataStore = MetadataStoreBuilder.build(brokerConfig);
         // Start the node registrar first, so that the node is registered before the proxy starts.
         metadataStore.start();
-        nodeRegistrar.registerNode();
+        metadataStore.registerCurrentNode(brokerConfig.name(), brokerConfig.advertiseAddress(), brokerConfig.instanceId());
 
-        proxyMetadataService = new DefaultProxyMetadataService(metadataStore, nodeRegistrar.node());
-        storeMetadataService = new DefaultStoreMetadataService(metadataStore, nodeRegistrar.node());
+        proxyMetadataService = new DefaultProxyMetadataService(metadataStore);
+        storeMetadataService = new DefaultStoreMetadataService(metadataStore);
 
         messageStore = MessageStoreBuilder.build(brokerConfig.store(), brokerConfig.s3Stream(), storeMetadataService);
 
@@ -78,7 +71,6 @@ public class BrokerController implements Lifecycle {
 
     @Override
     public void start() throws Exception {
-        nodeRegistrar.start();
         messageStore.start();
         messagingProcessor.start();
         grpcServer.start();
@@ -90,6 +82,5 @@ public class BrokerController implements Lifecycle {
         messagingProcessor.shutdown();
         messageStore.shutdown();
         metadataStore.close();
-        nodeRegistrar.shutdown();
     }
 }

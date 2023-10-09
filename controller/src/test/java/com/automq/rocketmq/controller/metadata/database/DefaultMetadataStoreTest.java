@@ -32,7 +32,7 @@ import apache.rocketmq.controller.v1.TopicStatus;
 import apache.rocketmq.controller.v1.MessageType;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.ControllerClient;
-import com.automq.rocketmq.controller.metadata.ControllerConfig;
+import com.automq.rocketmq.common.config.ControllerConfig;
 import com.automq.rocketmq.controller.metadata.DatabaseTestBase;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.Role;
@@ -81,7 +81,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    void testRegisterNode() throws IOException, ExecutionException, InterruptedException, ControllerException {
+    void testRegisterNode() throws IOException, ExecutionException, InterruptedException {
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.nodeId()).thenReturn(1);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
@@ -101,7 +101,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    void testRegisterBroker_badArguments() throws IOException, ControllerException {
+    void testRegisterBroker_badArguments() throws IOException {
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.nodeId()).thenReturn(1);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
@@ -114,9 +114,9 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             String name = "test-broker -0";
             String address = "localhost:1234";
             String instanceId = "i-register";
-            Assertions.assertThrows(ControllerException.class, () -> metadataStore.registerBrokerNode("", address, instanceId));
-            Assertions.assertThrows(ControllerException.class, () -> metadataStore.registerBrokerNode(name, null, instanceId));
-            Assertions.assertThrows(ControllerException.class, () -> metadataStore.registerBrokerNode(name, address, ""));
+            Assertions.assertThrows(ExecutionException.class, () -> metadataStore.registerBrokerNode("", address, instanceId).get());
+            Assertions.assertThrows(ExecutionException.class, () -> metadataStore.registerBrokerNode(name, null, instanceId).get());
+            Assertions.assertThrows(ExecutionException.class, () -> metadataStore.registerBrokerNode(name, address, "").get());
         }
     }
 
@@ -1851,7 +1851,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testCommitStreamObject_ObjectNotExist() throws IOException, ExecutionException, InterruptedException, ControllerException {
+    public void testCommitStreamObject_ObjectNotExist() throws IOException {
         long streamId = 1;
         int nodeId = 1;
 
@@ -1894,7 +1894,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testCommitStreamObject_StreamNotExist() throws IOException, ExecutionException, InterruptedException, ControllerException {
+    public void testCommitStreamObject_StreamNotExist() throws IOException {
         long streamId = 1;
         int nodeId = 1;
 
@@ -2069,7 +2069,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
 
     @Test
-    public void testCommitWALObject_ObjectNotExist() throws IOException, ExecutionException, InterruptedException, ControllerException {
+    public void testCommitWALObject_ObjectNotExist() throws IOException, ExecutionException, InterruptedException {
         long streamId = 1;
         int nodeId = 1;
 
@@ -2113,7 +2113,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testCommitWALObject_WALNOTExist() throws IOException, ExecutionException, InterruptedException, ControllerException {
+    public void testCommitWALObject_WALNOTExist() throws IOException, ExecutionException, InterruptedException {
         long streamId = 1;
         int nodeId = 1;
 
