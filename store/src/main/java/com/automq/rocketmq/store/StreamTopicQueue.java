@@ -53,8 +53,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import static com.automq.rocketmq.store.util.SerializeUtil.decodeReceiptHandle;
 
 public class StreamTopicQueue extends TopicQueue {
-
-    private OperationLogService operationLogService;
     private final StoreMetadataService metadataService;
     private final MessageStateMachine stateMachine;
     private long dataStreamId;
@@ -63,6 +61,7 @@ public class StreamTopicQueue extends TopicQueue {
     private final Map<Long/*consumerGroupId*/, Long/*retryStreamId*/> retryStreamIdMap;
     private final StreamStore streamStore;
     private final StoreConfig config;
+    private final OperationLogService operationLogService;
     private final InflightService inflightService;
     private final AtomicReference<State> state;
 
