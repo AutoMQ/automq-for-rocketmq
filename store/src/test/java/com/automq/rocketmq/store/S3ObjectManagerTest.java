@@ -74,8 +74,11 @@ class S3ObjectManagerTest {
         // 2 Minutes retention
         CompletableFuture<Long> preparedObject = objectManager.prepareObject(10, 1000 * 60 * 2);
         assertEquals(100L, preparedObject.join());
+        verify(metadataService).prepareS3Objects(10, Math.max(2, S3ObjectManager.MIN_OBJECT_TTL_MINUTES));
 
-        verify(metadataService).prepareS3Objects(10, 2);
+        preparedObject = objectManager.prepareObject(10, 1000 * 60 * 40);
+        assertEquals(100L, preparedObject.join());
+        verify(metadataService).prepareS3Objects(10, Math.max(40, S3ObjectManager.MIN_OBJECT_TTL_MINUTES));
     }
 
     @Test
