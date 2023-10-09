@@ -559,28 +559,18 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     @Override
     public void commitWALObject(CommitWALObjectRequest
         request, StreamObserver<CommitWALObjectReply> responseObserver) {
-        try {
-            metadataStore.commitWalObject(request.getS3WalObject(), request.getS3StreamObjectsList(), request.getCompactedObjectIdsList())
-                .whenComplete((res, e) -> {
-                    if (null != e) {
-                        responseObserver.onError(e);
-                    } else {
-                        CommitWALObjectReply reply = CommitWALObjectReply.newBuilder()
-                            .setStatus(Status.newBuilder().setCode(Code.OK).build())
-                            .build();
-                        responseObserver.onNext(reply);
-                        responseObserver.onCompleted();
-                    }
-                });
-        } catch (ControllerException e) {
-            CommitWALObjectReply reply = CommitWALObjectReply.newBuilder()
-                .setStatus(Status.newBuilder()
-                    .setCode(Code.forNumber(e.getErrorCode()))
-                    .setMessage(e.getMessage()).build())
-                .build();
-            responseObserver.onNext(reply);
-            responseObserver.onCompleted();
-        }
+        metadataStore.commitWalObject(request.getS3WalObject(), request.getS3StreamObjectsList(), request.getCompactedObjectIdsList())
+            .whenComplete((res, e) -> {
+                if (null != e) {
+                    responseObserver.onError(e);
+                } else {
+                    CommitWALObjectReply reply = CommitWALObjectReply.newBuilder()
+                        .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                        .build();
+                    responseObserver.onNext(reply);
+                    responseObserver.onCompleted();
+                }
+            });
     }
 
     @SuppressWarnings("checkstyle:Indentation")

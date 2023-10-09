@@ -148,7 +148,7 @@ public interface MetadataStore extends Closeable {
     CompletableFuture<Long> prepareS3Objects(int count, int ttlInMinutes);
 
     CompletableFuture<Void> commitWalObject(S3WALObject walObject, List<S3StreamObject> streamObjects,
-        List<Long> compactedObjects) throws ControllerException;
+        List<Long> compactedObjects);
 
     CompletableFuture<Void> commitStreamObject(S3StreamObject streamObject,
         List<Long> compactedObjects) throws ControllerException;

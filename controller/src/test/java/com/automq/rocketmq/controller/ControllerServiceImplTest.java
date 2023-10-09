@@ -64,7 +64,7 @@ import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import com.automq.rocketmq.controller.metadata.database.dao.Range;
 import com.automq.rocketmq.controller.metadata.database.dao.S3Object;
 import com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject;
-import com.automq.rocketmq.controller.metadata.database.dao.S3WALObject;
+import com.automq.rocketmq.controller.metadata.database.dao.S3WalObject;
 import com.automq.rocketmq.controller.metadata.database.dao.Stream;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
 import com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper;
@@ -74,7 +74,7 @@ import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMa
 import com.automq.rocketmq.controller.metadata.database.mapper.RangeMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.S3ObjectMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.S3StreamObjectMapper;
-import com.automq.rocketmq.controller.metadata.database.mapper.S3WALObjectMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.S3WalObjectMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 import io.grpc.Grpc;
@@ -1127,8 +1127,8 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
             String replacedJson = expectSubStream.replace("1234567890", streamId + "");
 
-            S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
-            S3WALObject s3WALObject = new S3WALObject();
+            S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
+            S3WalObject s3WALObject = new S3WalObject();
             s3WALObject.setObjectId(objectId);
             s3WALObject.setObjectSize(500);
             s3WALObject.setSequenceId(111);
@@ -1170,8 +1170,8 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             Assertions.assertEquals(newStartOffset, ranges.get(0).getStartOffset());
             Assertions.assertEquals(100, ranges.get(0).getEndOffset());
 
-            S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
-            S3WALObject object = s3WALObjectMapper.getByObjectId(objectId);
+            S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
+            S3WalObject object = s3WALObjectMapper.getByObjectId(objectId);
             Assertions.assertEquals(500, object.getObjectSize());
             Assertions.assertEquals(111, object.getSequenceId());
 
@@ -1511,8 +1511,8 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 object1.setEndOffset(333);
                 s3StreamObjectMapper.create(object1);
 
-                S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
-                com.automq.rocketmq.controller.metadata.database.dao.S3WALObject s3WALObject = new com.automq.rocketmq.controller.metadata.database.dao.S3WALObject();
+                S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
+                S3WalObject s3WALObject = new S3WalObject();
                 s3WALObject.setObjectId(objectId + 2);
                 s3WALObject.setObjectSize(333);
                 s3WALObject.setBaseDataTimestamp(3);
@@ -1520,13 +1520,13 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 s3WALObject.setSubStreams(expectSubStream.replace("1234567890", String.valueOf(streamId)));
                 s3WALObjectMapper.create(s3WALObject);
 
-                com.automq.rocketmq.controller.metadata.database.dao.S3WALObject s3WALObject1 = new com.automq.rocketmq.controller.metadata.database.dao.S3WALObject();
-                s3WALObject1.setObjectId(objectId + 3);
-                s3WALObject1.setObjectSize(444);
-                s3WALObject1.setBaseDataTimestamp(4);
+                S3WalObject s3WalObject1 = new S3WalObject();
+                s3WalObject1.setObjectId(objectId + 3);
+                s3WalObject1.setObjectSize(444);
+                s3WalObject1.setBaseDataTimestamp(4);
                 s3WALObject.setSequenceId(2);
-                s3WALObject1.setSubStreams(expectSubStream.replace("1234567890", String.valueOf(streamId)));
-                s3WALObjectMapper.create(s3WALObject1);
+                s3WalObject1.setSubStreams(expectSubStream.replace("1234567890", String.valueOf(streamId)));
+                s3WALObjectMapper.create(s3WalObject1);
 
                 session.commit();
             }
@@ -1580,13 +1580,13 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 }
 
                 long baseTime = time;
-                S3WALObjectMapper s3WALObjectMapper = session.getMapper(S3WALObjectMapper.class);
+                S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
                 for (long index = objectId + 2; index < objectId + 4; index++) {
-                    com.automq.rocketmq.controller.metadata.database.dao.S3WALObject s3WALObject = s3WALObjectMapper.getByObjectId(index);
+                    S3WalObject s3WALObject = s3WALObjectMapper.getByObjectId(index);
                     baseTime = Math.min(baseTime, s3WALObject.getBaseDataTimestamp());
                 }
 
-                com.automq.rocketmq.controller.metadata.database.dao.S3WALObject object = s3WALObjectMapper.getByObjectId(objectId + 4);
+                S3WalObject object = s3WALObjectMapper.getByObjectId(objectId + 4);
                 Assertions.assertEquals(baseTime, object.getBaseDataTimestamp());
                 if (object.getCommittedTimestamp() - time > 5 * 60) {
                     Assertions.fail();

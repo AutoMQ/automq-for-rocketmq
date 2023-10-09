@@ -132,12 +132,15 @@ public interface StoreMetadataService {
      * <p>
      * This operation will be triggered in upload or compaction process.
      *
+     * TODO: Describe all expected valid use cases.
+     *
      * @param walObject the new WAL object.
      * @param streamObjects the stream objects that split from the compaction process.
      * @param compactedObjects the compacted objects that should be deleted.
      * @return {@link CompletableFuture} of commit operation.
      */
-    CompletableFuture<Void> commitWalObject(S3WALObject walObject, List<S3StreamObject> streamObjects, List<Long> compactedObjects);
+    CompletableFuture<Void> commitWalObject(S3WALObject walObject, List<S3StreamObject> streamObjects,
+        List<Long> compactedObjects);
 
     /**
      * Commit a compacted S3 stream object.

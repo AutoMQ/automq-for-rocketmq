@@ -61,9 +61,6 @@
         UPDATE s3streamobject
         SET committed_timestamp = #{committedTimestamp}
         WHERE 1 = 1
-        <if test="null != id">
-            AND id = #{id}
-        </if>
         <if test="null != objectId">
             AND object_id = #{objectId}
         </if>
