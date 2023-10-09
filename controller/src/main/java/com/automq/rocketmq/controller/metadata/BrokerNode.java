@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.controller.metadata;
 
+import com.automq.rocketmq.common.config.ControllerConfig;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import java.util.concurrent.TimeUnit;
 

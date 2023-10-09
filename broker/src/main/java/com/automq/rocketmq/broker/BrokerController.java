@@ -54,10 +54,7 @@ public class BrokerController implements Lifecycle {
         // Init the proxy configuration.
         ProxyConfiguration.intConfig(brokerConfig.proxy());
 
-        Node fakeNode = new Node();
-        fakeNode.setEpoch(0);
-        fakeNode.setId(1);
-        metadataStore = MetadataStoreBuilder.build(brokerConfig.controller(), fakeNode);
+        metadataStore = MetadataStoreBuilder.build(brokerConfig);
         nodeRegistrar = new NodeRegistrar(brokerConfig, metadataStore);
         // Start the node registrar first, so that the node is registered before the proxy starts.
         metadataStore.start();

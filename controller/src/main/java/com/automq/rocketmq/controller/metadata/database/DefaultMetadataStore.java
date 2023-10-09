@@ -51,7 +51,7 @@ import com.automq.rocketmq.common.system.S3Constants;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.BrokerNode;
 import com.automq.rocketmq.controller.metadata.ControllerClient;
-import com.automq.rocketmq.controller.metadata.ControllerConfig;
+import com.automq.rocketmq.common.config.ControllerConfig;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.Role;
 import com.automq.rocketmq.controller.metadata.database.dao.Group;
@@ -1378,7 +1378,7 @@ public class DefaultMetadataStore implements MetadataStore {
                         future.completeExceptionally(e);
                         break;
                     }
-                    future.complete(Objects.isNull(objectIds) || objectIds.isEmpty() ? S3Constants.NOOP_OBJECT_ID : objectIds.get(0));
+                    future.complete(objectIds.get(0));
                 }
             } else {
                 PrepareS3ObjectsRequest request = PrepareS3ObjectsRequest.newBuilder()

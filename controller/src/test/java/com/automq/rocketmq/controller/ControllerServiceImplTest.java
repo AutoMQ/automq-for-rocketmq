@@ -50,7 +50,7 @@ import apache.rocketmq.controller.v1.UpdateTopicReply;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.ControllerClient;
-import com.automq.rocketmq.controller.metadata.ControllerConfig;
+import com.automq.rocketmq.common.config.ControllerConfig;
 import com.automq.rocketmq.controller.metadata.DatabaseTestBase;
 import com.automq.rocketmq.controller.metadata.GrpcControllerClient;
 import com.automq.rocketmq.controller.metadata.MetadataStore;

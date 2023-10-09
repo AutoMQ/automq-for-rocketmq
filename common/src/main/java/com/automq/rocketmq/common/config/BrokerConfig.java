@@ -19,18 +19,52 @@ package com.automq.rocketmq.common.config;
 
 import org.apache.rocketmq.common.utils.NetworkUtil;
 
-public class BrokerConfig {
+public class BrokerConfig implements ControllerConfig {
     private String name;
+
     /**
      * If the broker is running on an EC2 instance, this is the instance-id.
      */
     private String instanceId;
-    int nodeId;
+
     private String address = NetworkUtil.getLocalAddress();
     private ProxyConfig proxy;
     private StoreConfig store;
     private S3StreamConfig s3Stream;
-    private ControllerConfig controller;
+
+    private DatabaseConfig db;
+
+    public BrokerConfig() {
+        this.proxy = new ProxyConfig();
+        this.store = new StoreConfig();
+        this.s3Stream = new S3StreamConfig();
+        this.db = new DatabaseConfig();
+    }
+
+    @Override
+    public int nodeId() {
+        return 0;
+    }
+
+    @Override
+    public long epoch() {
+        return 0;
+    }
+
+    @Override
+    public String dbUrl() {
+        return this.db.getUrl();
+    }
+
+    @Override
+    public String dbUserName() {
+        return this.db.getUserName();
+    }
+
+    @Override
+    public String dbPassword() {
+        return this.db.getPassword();
+    }
 
     public ProxyConfig proxy() {
         return proxy;
@@ -44,8 +78,8 @@ public class BrokerConfig {
         return s3Stream;
     }
 
-    public ControllerConfig controller() {
-        return controller;
+    public DatabaseConfig getDb() {
+        return db;
     }
 
     public String name() {
@@ -60,14 +94,11 @@ public class BrokerConfig {
         return address;
     }
 
-    public int nodeId() {
-        return nodeId;
+    public void setName(String name) {
+        this.name = name;
     }
 
-    public BrokerConfig() {
-        this.proxy = new ProxyConfig();
-        this.store = new StoreConfig();
-        this.s3Stream = new S3StreamConfig();
-        this.controller = new ControllerConfig();
+    public void setAddress(String address) {
+        this.address = address;
     }
 }

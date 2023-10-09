@@ -15,30 +15,34 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.metadata;
+package com.automq.rocketmq.common.config;
 
-public interface ControllerConfig {
-    int nodeId();
+public class DatabaseConfig {
+    private String url;
+    private String userName;
+    private String password;
 
-    long epoch();
-
-    default int scanIntervalInSecs() {
-        return 30;
+    public String getUrl() {
+        return url;
     }
 
-    default int leaseLifeSpanInSecs() {
-        return 60;
+    public void setUrl(String url) {
+        this.url = url;
     }
 
-    default int nodeAliveIntervalInSecs() {
-        return 60;
+    public String getUserName() {
+        return userName;
     }
 
-    /**
-     * @return Tolerance of workload unfairness among nodes in terms of stream number.
-     */
-    default int workloadTolerance() {
-        return 3;
+    public void setUserName(String userName) {
+        this.userName = userName;
     }
 
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
 }

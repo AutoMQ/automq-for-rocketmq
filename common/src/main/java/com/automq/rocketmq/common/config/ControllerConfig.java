@@ -17,37 +17,34 @@
 
 package com.automq.rocketmq.common.config;
 
-public class ControllerConfig {
-    private int nodeAliveIntervalInSecs = 30;
-    private int leaseLifeSpanInSecs = 30;
-    private int scanIntervalInSecs = 10;
+public interface ControllerConfig {
+    int nodeId();
 
-    // Database related configs
-    private String dbUrl;
-    private String dbUser;
-    private String dbPassword;
+    long epoch();
 
-    public int nodeAliveIntervalInSecs() {
-        return nodeAliveIntervalInSecs;
+    default int scanIntervalInSecs() {
+        return 30;
     }
 
-    public int leaseLifeSpanInSecs() {
-        return leaseLifeSpanInSecs;
+    default int leaseLifeSpanInSecs() {
+        return 60;
     }
 
-    public int scanIntervalInSecs() {
-        return scanIntervalInSecs;
+    default int nodeAliveIntervalInSecs() {
+        return 60;
     }
 
-    public String dbUrl() {
-        return dbUrl;
+    /**
+     * @return Tolerance of workload unfairness among nodes in terms of stream number.
+     */
+    default int workloadTolerance() {
+        return 3;
     }
 
-    public String dbUser() {
-        return dbUser;
-    }
+    String dbUrl();
 
-    public String dbPassword() {
-        return dbPassword;
-    }
+    String dbUserName();
+
+    String dbPassword();
+
 }
