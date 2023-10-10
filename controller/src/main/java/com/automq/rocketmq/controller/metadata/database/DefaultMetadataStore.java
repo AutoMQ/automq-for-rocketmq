@@ -1753,7 +1753,7 @@ public class DefaultMetadataStore implements MetadataStore {
         StreamMapper streamMapper = session.getMapper(StreamMapper.class);
         RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
         for (long[] offset : offsets) {
-            long streamId = offset[0], startOffset = offset[1];
+            long streamId = offset[0], startOffset = offset[1], endOffset = offset[2];
             // verify the stream exists and is open
             Stream stream = streamMapper.getByStreamId(streamId);
             if (stream.getState() != StreamState.OPEN) {
@@ -1774,6 +1774,9 @@ public class DefaultMetadataStore implements MetadataStore {
                     streamId, range.getRangeId(), range.getEndOffset(), startOffset);
                 return false;
             }
+
+            range.setEndOffset(endOffset);
+            rangeMapper.update(range);
         }
         return true;
     }
