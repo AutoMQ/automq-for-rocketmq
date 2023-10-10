@@ -115,8 +115,8 @@ class MessageServiceImplTest {
         header.setExp(TagFilter.SUB_ALL);
         long consumerGroupId = metadataService.consumerGroupOf(groupName).join().getGroupId();
         long topicId = metadataService.topicOf(topicName).join().getTopicId();
-        messageStore.put(FlatMessageUtil.convertFrom(topicId, 0, "", new Message(topicName, "", new byte[] {})));
-        messageStore.put(FlatMessageUtil.convertFrom(topicId, 0, "", new Message(topicName, "", new byte[] {})));
+        messageStore.put(FlatMessageUtil.convertTo(topicId, 0, "", new Message(topicName, "", new byte[] {})));
+        messageStore.put(FlatMessageUtil.convertTo(topicId, 0, "", new Message(topicName, "", new byte[] {})));
 
         result = messageService.popMessage(ProxyContext.create(), messageQueue, header, 0L).join();
         assertEquals(PopStatus.FOUND, result.getPopStatus());
@@ -141,9 +141,9 @@ class MessageServiceImplTest {
         header.setOrder(true);
 
         long topicId = metadataService.topicOf(topicName).join().getTopicId();
-        messageStore.put(FlatMessageUtil.convertFrom(topicId, 0, "", new Message(topicName, "", new byte[] {})));
-        messageStore.put(FlatMessageUtil.convertFrom(topicId, 0, "", new Message(topicName, "", new byte[] {})));
-        messageStore.put(FlatMessageUtil.convertFrom(topicId, 0, "", new Message(topicName, "", new byte[] {})));
+        messageStore.put(FlatMessageUtil.convertTo(topicId, 0, "", new Message(topicName, "", new byte[] {})));
+        messageStore.put(FlatMessageUtil.convertTo(topicId, 0, "", new Message(topicName, "", new byte[] {})));
+        messageStore.put(FlatMessageUtil.convertTo(topicId, 0, "", new Message(topicName, "", new byte[] {})));
 
         // Pop message with client id "client1".
         ProxyContext context = ProxyContext.create();

@@ -86,12 +86,18 @@ public class S3StreamStore implements StreamStore {
     @Override
     public CompletableFuture<FetchResult> fetch(long streamId, long startOffset, int maxCount) {
         Stream stream = openStreams.get(streamId);
+        if (stream == null) {
+            throw new IllegalStateException("Stream " + streamId + " is not opened.");
+        }
         return stream.fetch(startOffset, startOffset + maxCount, Integer.MAX_VALUE);
     }
 
     @Override
     public CompletableFuture<AppendResult> append(long streamId, RecordBatch recordBatch) {
         Stream stream = openStreams.get(streamId);
+        if (stream == null) {
+            throw new IllegalStateException("Stream " + streamId + " is not opened.");
+        }
         return stream.append(recordBatch);
     }
 
@@ -104,18 +110,36 @@ public class S3StreamStore implements StreamStore {
     @Override
     public CompletableFuture<Void> trim(long streamId, long newStartOffset) {
         Stream stream = openStreams.get(streamId);
+        if (stream == null) {
+            throw new IllegalStateException("Stream " + streamId + " is not opened.");
+        }
         return stream.trim(newStartOffset);
     }
 
     @Override
     public long startOffset(long streamId) {
         Stream stream = openStreams.get(streamId);
+        if (stream == null) {
+            throw new IllegalStateException("Stream " + streamId + " is not opened.");
+        }
         return stream.startOffset();
+    }
+
+    @Override
+    public long confirmOffset(long streamId) {
+        Stream stream = openStreams.get(streamId);
+        if (stream == null) {
+            throw new IllegalStateException("Stream " + streamId + " is not opened.");
+        }
+        return stream.confirmOffset();
     }
 
     @Override
     public long nextOffset(long streamId) {
         Stream stream = openStreams.get(streamId);
+        if (stream == null) {
+            throw new IllegalStateException("Stream " + streamId + " is not opened.");
+        }
         return stream.nextOffset();
     }
 

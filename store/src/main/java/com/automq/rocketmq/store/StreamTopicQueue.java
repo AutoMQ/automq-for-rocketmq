@@ -281,6 +281,20 @@ public class StreamTopicQueue extends TopicQueue {
     }
 
     private CompletableFuture<List<FlatMessageExt>> fetchMessages(long streamId, long offset, int batchSize) {
+        long startOffset = streamStore.startOffset(streamId);
+        if (offset < startOffset) {
+            offset = startOffset;
+        }
+
+        long confirmOffset = streamStore.confirmOffset(streamId);
+        if (offset >= confirmOffset) {
+            return CompletableFuture.failedFuture(new IllegalArgumentException("Offset " + offset + " is out of range [" + startOffset + ", " + confirmOffset + ")"));
+        }
+
+        if (offset + batchSize > confirmOffset) {
+            batchSize = (int) (confirmOffset - offset);
+        }
+
         return streamStore.fetch(streamId, offset, batchSize)
             .thenApply(fetchResult -> {
                 // TODO: Assume message count is always 1 in each batch for now.
