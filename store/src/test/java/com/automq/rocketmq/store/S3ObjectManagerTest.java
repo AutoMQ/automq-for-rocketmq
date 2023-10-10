@@ -224,7 +224,7 @@ class S3ObjectManagerTest {
         walObjects.add(builder.build());
 
         when(metadataService.listWALObjects(anyLong(), anyLong(), anyLong(), anyInt()))
-            .thenReturn(CompletableFuture.completedFuture(walObjects));
+            .thenReturn(CompletableFuture.completedFuture(List.copyOf(walObjects)));
 
         // Build StreamObject
         S3StreamObject.Builder soBuilder = S3StreamObject.newBuilder();
@@ -234,7 +234,7 @@ class S3ObjectManagerTest {
         soBuilder.setObjectId(3);
         List<S3StreamObject> streamObjects = new ArrayList<>(Collections.singletonList(soBuilder.build()));
         when(metadataService.listStreamObjects(anyLong(), anyLong(), anyLong(), anyInt()))
-            .thenReturn(CompletableFuture.completedFuture(streamObjects));
+            .thenReturn(CompletableFuture.completedFuture(List.copyOf(streamObjects)));
         when(metadataService.listObjects(anyLong(), anyLong(), anyLong(), anyInt()))
             .thenAnswer(ink -> {
                 long streamId = ink.getArgument(0);
