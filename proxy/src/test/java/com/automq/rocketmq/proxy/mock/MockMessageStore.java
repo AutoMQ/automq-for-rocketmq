@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.commons.lang3.tuple.Pair;
 
 public class MockMessageStore implements MessageStore {
     private final HashMap<Long, AtomicLong> offsetMap = new HashMap<>();
@@ -42,19 +43,19 @@ public class MockMessageStore implements MessageStore {
     private final Map<Long, List<FlatMessageExt>> messageMap = new HashMap<>();
     private final InflightService inflightService = new InflightService();
 
-    private long consumeOffset = 0;
+    private final Map<Pair<Long, Integer>, Long> consumerOffsetMap = new HashMap<>();
 
     public MockMessageStore() {
         receiptHandleSet.add("FAAAAAAAAAAMABwABAAAAAwAFAAMAAAAAgAAAAAAAAACAAAAAAAAAAMAAAAAAAAA");
     }
 
     @Override
-    public void start() throws Exception {
+    public void start() {
 
     }
 
     @Override
-    public void shutdown() throws Exception {
+    public void shutdown() {
 
     }
 
@@ -66,6 +67,7 @@ public class MockMessageStore implements MessageStore {
         }
 
         List<FlatMessageExt> messageList = messageMap.computeIfAbsent(topicId + queueId, v -> new ArrayList<>());
+        long consumeOffset = consumerOffsetMap.computeIfAbsent(Pair.of(topicId, queueId), v -> 0L);
         int start = consumeOffset > messageList.size() ? -1 : (int) consumeOffset;
         int end = consumeOffset + batchSize >= messageList.size() ? messageList.size() : (int) consumeOffset + batchSize;
 
@@ -76,7 +78,7 @@ public class MockMessageStore implements MessageStore {
         } else {
             status = PopResult.Status.FOUND;
             messageList = messageList.subList(start, end);
-            consumeOffset = end;
+            consumerOffsetMap.put(Pair.of(topicId, queueId), consumeOffset + messageList.size());
             inflightService.increaseInflightCount(consumerGroupId, topicId, queueId, messageList.size());
         }
         return CompletableFuture.completedFuture(new PopResult(status, 0L, messageList));
@@ -134,5 +136,10 @@ public class MockMessageStore implements MessageStore {
         }
         long endOffset = offsetMap.computeIfAbsent(topicId + queueId, v -> new AtomicLong()).get();
         return CompletableFuture.completedFuture(new TopicQueue.QueueOffsetRange(startOffset, endOffset));
+    }
+
+    @Override
+    public CompletableFuture<Long> getConsumeOffset(long consumerGroupId, long topicId, int queueId) {
+        return CompletableFuture.completedFuture(consumerOffsetMap.getOrDefault(Pair.of(topicId, queueId), 0L));
     }
 }
