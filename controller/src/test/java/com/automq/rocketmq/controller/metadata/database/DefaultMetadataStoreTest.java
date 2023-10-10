@@ -55,9 +55,11 @@ import com.automq.rocketmq.controller.metadata.database.mapper.S3WalObjectMapper
 import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletionException;
@@ -2173,16 +2175,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             objectMapper.create(s3Object);
             objectId = s3Object.getId();
 
-
-            S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
-            com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
-            object.setObjectId(objectId);
-            object.setStreamId(streamId);
-            object.setBaseDataTimestamp(1);
-            object.setStartOffset(0);
-            object.setEndOffset(2);
-            object.setObjectSize(2139);
-            s3StreamObjectMapper.create(object);
             session.commit();
         }
 
@@ -2195,7 +2187,17 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
                 .atMost(10, TimeUnit.SECONDS)
                 .until(metadataStore::isLeader);
 
-            List<S3StreamObject> s3StreamObjects = metadataStore.listStreamObjects(streamId, 0, 334, 2).get();
+            S3StreamObject streamObject = S3StreamObject.newBuilder()
+                .setObjectId(objectId)
+                .setStreamId(streamId)
+                .setBaseDataTimestamp(1)
+                .setStartOffset(0)
+                .setEndOffset(2)
+                .setObjectSize(2139)
+                .build();
+
+            List<S3StreamObject> s3StreamObjects = new ArrayList<>();
+            s3StreamObjects.add(streamObject);
             metadataStore.commitWalObject(walObject, s3StreamObjects, compactedObjects).get();
 
             S3StreamObjectMapper mapper = session.getMapper(S3StreamObjectMapper.class);

@@ -884,7 +884,7 @@ public class DefaultMetadataStore implements MetadataStore {
                         QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
                         List<QueueAssignment> assignments = assignmentMapper
                             .list(topicId, null, null, null, null)
-                            .stream().filter(assignment -> assignment.getStatus() != AssignmentStatus.ASSIGNMENT_STATUS_DELETED)
+                            .stream().filter(assignment -> assignment.getQueueId() == queueId)
                             .toList();
                         int nodeId = assignments.isEmpty() ? 0 : assignments.get(0).getDstNodeId();
                         long streamId = createStream(streamMapper, topicId, queueId, groupId, streamRole, nodeId);
@@ -1515,9 +1515,13 @@ public class DefaultMetadataStore implements MetadataStore {
                         // create stream object records
                         streamObjects.forEach(s3StreamObject -> {
                             S3StreamObject object = new S3StreamObject();
-                            object.setObjectId(s3StreamObject.getObjectId());
                             object.setStreamId(s3StreamObject.getStreamId());
+                            object.setObjectId(s3StreamObject.getObjectId());
                             object.setCommittedTimestamp(committedTs);
+                            object.setStartOffset(s3StreamObject.getStartOffset());
+                            object.setBaseDataTimestamp(s3StreamObject.getBaseDataTimestamp());
+                            object.setEndOffset(s3StreamObject.getEndOffset());
+                            object.setObjectSize(s3StreamObject.getObjectSize());
                             s3StreamObjectMapper.commit(object);
                         });
                     }
