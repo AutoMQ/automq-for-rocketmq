@@ -932,23 +932,48 @@ public class DefaultMetadataStore implements MetadataStore {
                         int nodeId = assignment.getDstNodeId();
                         long streamId = createStream(streamMapper, topicId, queueId, groupId, streamRole, nodeId);
                         session.commit();
+
+                        Stream stream = streamMapper.getByStreamId(streamId);
                         return StreamMetadata.newBuilder()
                             .setStreamId(streamId)
-                            .setState(StreamState.UNINITIALIZED)
-                            .setStartOffset(0)
+                            .setEpoch(stream.getEpoch())
+                            .setRangeId(stream.getRangeId())
+                            .setStartOffset(stream.getStartOffset())
+                            // Stream is uninitialized, its end offset is definitely 0.
+                            .setEndOffset(0)
+                            .setState(stream.getState())
                             .build();
                     }
+
+                    // For other types of streams, creation is explicit.
                     ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE,
                         String.format("Stream for topic-id=%d, queue-id=%d, stream-role=%s is not found", topicId, queueId, streamRole.name()));
                     throw new CompletionException(e);
                 } else {
                     Stream stream = streams.get(0);
+                    long endOffset = 0;
+                    switch (stream.getState()) {
+                        case UNINITIALIZED -> {}
+                        case DELETED -> {
+                            ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE,
+                                String.format("Stream for topic-id=%d, queue-id=%d, stream-role=%s has been deleted",
+                                    topicId, queueId, streamRole.name()));
+                            throw new CompletionException(e);
+                        }
+                        case CLOSING, OPEN, CLOSED -> {
+                            RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
+                            Range range = rangeMapper.get(stream.getRangeId(), stream.getId(), null);
+                            assert null != range;
+                            endOffset = range.getEndOffset();
+                        }
+                    }
                     return StreamMetadata.newBuilder()
-                        .setEpoch(stream.getEpoch())
                         .setStreamId(stream.getId())
+                        .setEpoch(stream.getEpoch())
                         .setRangeId(stream.getRangeId())
-                        .setState(stream.getState())
                         .setStartOffset(stream.getStartOffset())
+                        .setEndOffset(endOffset)
+                        .setState(stream.getState())
                         .build();
                 }
             }
