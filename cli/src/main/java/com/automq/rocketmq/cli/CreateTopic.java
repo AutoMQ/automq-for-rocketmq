@@ -27,10 +27,10 @@ import picocli.CommandLine;
 public class CreateTopic implements Callable<Void> {
     @CommandLine.Option(names = {"-t", "--topicName"}, description = "Topic name", required = true)
     String topicName;
-    @CommandLine.Option(names = {"-q", "--queueNums"}, description = "Queue number", required = true)
+    @CommandLine.Option(names = {"-q", "--queueNums"}, description = "Queue number", defaultValue = "1")
     int queueNums;
 
-    @CommandLine.Option(names = {"-m", "--messageType"}, description = "Message type", required = true)
+    @CommandLine.Option(names = {"-m", "--messageType"}, description = "Message type", defaultValue = "NORMAL")
     MessageType messageType;
 
     @CommandLine.ParentCommand
