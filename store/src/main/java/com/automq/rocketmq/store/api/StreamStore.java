@@ -73,6 +73,11 @@ public interface StreamStore extends Lifecycle {
     long startOffset(long streamId);
 
     /**
+     * Get stream confirm record offset.
+     */
+    long confirmOffset(long streamId);
+
+    /**
      * Get stream next record offset.
      */
     long nextOffset(long streamId);
