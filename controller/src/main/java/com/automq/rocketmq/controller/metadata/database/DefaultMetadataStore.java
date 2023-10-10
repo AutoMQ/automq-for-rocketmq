@@ -660,7 +660,7 @@ public class DefaultMetadataStore implements MetadataStore {
             }
             LOGGER.error("Address of broker[broker-id={}] is missing", this.lease.getNodeId());
             throw new ControllerException(Code.NOT_FOUND_VALUE,
-                String.format("Broker is unexpected missing with brokerId=%d", this.lease.getNodeId()));
+                String.format("Node[node-id=%d] is missing", this.lease.getNodeId()));
         }
 
         return brokerNode.getNode().getAddress();

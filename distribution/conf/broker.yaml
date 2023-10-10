@@ -3,12 +3,12 @@ instanceId: "ec2-test"
 bindAddress: "0.0.0.0:8081"
 s3Stream:
   s3WALPath: "/tmp/s3rocketmq/wal"
-  s3Endpoint: "http://127.0.0.1:4566"
-  s3Bucket: "s3rocketmq"
+  s3Endpoint: "http://minio.hellocorp.test"
+  s3Bucket: "lzh"
   s3Region: "us-east-1"
   s3ForcePathStyle: true
-  s3AccessKey: "test"
-  s3SecretKey: "test"
+  s3AccessKey: "JNhA3rXi3OGVr8xsy4iO"
+  s3SecretKey: "wwpWcJL2KpKEGhWcCh7mdBFnmkAkcj4bVMlJpoz5"
 db:
   url: "jdbc:mysql://localhost:3306/metadata"
   userName: "root"
