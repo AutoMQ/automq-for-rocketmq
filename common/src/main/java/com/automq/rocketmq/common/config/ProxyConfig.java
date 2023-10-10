@@ -17,10 +17,27 @@
 
 package com.automq.rocketmq.common.config;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.time.Duration;
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ProxyConfig extends BaseConfig {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ProxyConfig.class);
+
     private String name;
+
+    private static String localHostName;
+
+    static {
+        try {
+            localHostName = InetAddress.getLocalHost().getHostName();
+        } catch (UnknownHostException e) {
+            LOGGER.error("Failed to obtain the host name", e);
+        }
+    }
 
     // The proportion of messages that are popped from the retry queue first,
     // default is 20, available value from 0 to 100.
@@ -46,6 +63,13 @@ public class ProxyConfig extends BaseConfig {
 
     public String name() {
         return name;
+    }
+
+    public String localHostName() {
+        if (StringUtils.isBlank(localHostName)) {
+            return name();
+        }
+        return localHostName;
     }
 
     public int retryPriorityPercentage() {
