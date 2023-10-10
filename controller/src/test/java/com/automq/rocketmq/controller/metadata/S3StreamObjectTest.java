@@ -39,11 +39,11 @@ public class S3StreamObjectTest extends DatabaseTestBase {
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
 
             S3StreamObject s3StreamObject = new S3StreamObject();
-            s3StreamObject.setObjectId(11);
-            s3StreamObject.setObjectSize(123);
-            s3StreamObject.setStreamId(111);
-            s3StreamObject.setStartOffset(1234);
-            s3StreamObject.setEndOffset(2345);
+            s3StreamObject.setObjectId(11L);
+            s3StreamObject.setObjectSize(123L);
+            s3StreamObject.setStreamId(111L);
+            s3StreamObject.setStartOffset(1234L);
+            s3StreamObject.setEndOffset(2345L);
 
             Calendar calendar = Calendar.getInstance();
             calendar.add(Calendar.SECOND, 30);
@@ -100,31 +100,22 @@ public class S3StreamObjectTest extends DatabaseTestBase {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
             S3StreamObject s3StreamObject = new S3StreamObject();
-            s3StreamObject.setObjectId(11);
-            s3StreamObject.setObjectSize(123);
-            s3StreamObject.setStreamId(111);
-            s3StreamObject.setStartOffset(1234);
-            s3StreamObject.setEndOffset(2345);
-
+            s3StreamObject.setObjectId(11L);
+            s3StreamObject.setObjectSize(123L);
+            s3StreamObject.setStreamId(111L);
+            s3StreamObject.setStartOffset(1234L);
+            s3StreamObject.setEndOffset(2345L);
 
             Calendar calendar = Calendar.getInstance();
             calendar.add(Calendar.SECOND, 30);
             long time = calendar.getTime().getTime();
 
             s3StreamObject.setCommittedTimestamp(time);
-
-            int affectedRows = s3StreamObjectMapper.create(s3StreamObject);
+            int affectedRows = s3StreamObjectMapper.commit(s3StreamObject);
             Assertions.assertEquals(1, affectedRows);
-
-            S3StreamObject s3StreamObject1 = s3StreamObjectMapper.getByStreamAndObject(s3StreamObject.getStreamId(), s3StreamObject.getObjectId());
-
-            s3StreamObject1.setCommittedTimestamp(time + 10 * 1000);
-
-            affectedRows = s3StreamObjectMapper.commit(s3StreamObject1);
 
             S3StreamObject s3StreamObject2 = s3StreamObjectMapper.getById(s3StreamObject.getId());
-            Assertions.assertEquals(1, affectedRows);
-            Assertions.assertEquals(s3StreamObject1, s3StreamObject2);
+            Assertions.assertEquals(s3StreamObject, s3StreamObject2);
 
             s3StreamObjectMapper.delete(null, s3StreamObject2.getStreamId(), s3StreamObject2.getObjectId());
             List<S3StreamObject> s3StreamObjects = s3StreamObjectMapper.list(s3StreamObject.getObjectId(), null, null, null, null);
