@@ -112,7 +112,7 @@ public class MessageServiceImpl implements MessageService {
                 return CompletableFuture.failedFuture(new MQBrokerException(ResponseCode.TOPIC_NOT_EXIST, "Topic not exist"));
             }
 
-            return store.put(FlatMessageUtil.convertFrom(topic.getTopicId(), virtualQueue.physicalQueueId(), config.localHostName(), message));
+            return store.put(FlatMessageUtil.convertTo(topic.getTopicId(), virtualQueue.physicalQueueId(), config.localHostName(), message));
         });
 
         return putFuture.thenApply(putResult -> {
@@ -226,7 +226,7 @@ public class MessageServiceImpl implements MessageService {
             } else {
                 status = PopStatus.FOUND;
             }
-            return new PopResult(status, FlatMessageUtil.convertFrom(messageList, requestHeader.getTopic(), requestHeader.getInvisibleTime()));
+            return new PopResult(status, FlatMessageUtil.convertTo(messageList, requestHeader.getTopic(), requestHeader.getInvisibleTime()));
         });
     }
 
