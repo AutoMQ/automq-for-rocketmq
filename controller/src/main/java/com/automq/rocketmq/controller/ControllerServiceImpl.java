@@ -29,8 +29,6 @@ import apache.rocketmq.controller.v1.CommitWALObjectRequest;
 import apache.rocketmq.controller.v1.ControllerServiceGrpc;
 import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
-import apache.rocketmq.controller.v1.CreateRetryStreamReply;
-import apache.rocketmq.controller.v1.CreateRetryStreamRequest;
 import apache.rocketmq.controller.v1.CreateTopicReply;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.DeleteTopicReply;
@@ -405,33 +403,6 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
                 });
         } catch (ControllerException e) {
             CreateGroupReply reply = CreateGroupReply.newBuilder()
-                .setStatus(Status.newBuilder()
-                    .setCode(Code.forNumber(e.getErrorCode()))
-                    .setMessage(e.getMessage()).build())
-                .build();
-            responseObserver.onNext(reply);
-            responseObserver.onCompleted();
-        }
-    }
-
-    @Override
-    public void createRetryStream(CreateRetryStreamRequest request,
-        StreamObserver<CreateRetryStreamReply> responseObserver) {
-        try {
-            metadataStore.getOrCreateRetryStream(request.getGroupName(), request.getQueue().getTopicId(), request.getQueue().getQueueId()).whenComplete((streamId, e) -> {
-                if (null != e) {
-                    responseObserver.onError(e);
-                } else {
-                    CreateRetryStreamReply reply = CreateRetryStreamReply.newBuilder()
-                        .setStatus(Status.newBuilder().setCode(Code.OK).build())
-                        .setStreamId(streamId)
-                        .build();
-                    responseObserver.onNext(reply);
-                    responseObserver.onCompleted();
-                }
-            });
-        } catch (ControllerException e) {
-            CreateRetryStreamReply reply = CreateRetryStreamReply.newBuilder()
                 .setStatus(Status.newBuilder()
                     .setCode(Code.forNumber(e.getErrorCode()))
                     .setMessage(e.getMessage()).build())

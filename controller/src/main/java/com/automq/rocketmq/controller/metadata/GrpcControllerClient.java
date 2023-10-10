@@ -27,8 +27,6 @@ import apache.rocketmq.controller.v1.CommitWALObjectReply;
 import apache.rocketmq.controller.v1.CommitWALObjectRequest;
 import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
-import apache.rocketmq.controller.v1.CreateRetryStreamReply;
-import apache.rocketmq.controller.v1.CreateRetryStreamRequest;
 import apache.rocketmq.controller.v1.CreateTopicReply;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.DeleteTopicReply;
@@ -378,41 +376,6 @@ public class GrpcControllerClient implements ControllerClient {
                 future.completeExceptionally(t);
             }
         }, MoreExecutors.directExecutor());
-        return future;
-    }
-
-    @Override
-    public CompletableFuture<Long> createRetryStream(String target, String groupName, long topicId,
-        int queueId) {
-        CompletableFuture<Long> future = new CompletableFuture<>();
-
-        CreateRetryStreamRequest request = CreateRetryStreamRequest.newBuilder()
-            .setGroupName(groupName)
-            .setQueue(MessageQueue.newBuilder()
-                .setTopicId(topicId).setQueueId(queueId).build())
-            .build();
-
-        try {
-            Futures.addCallback(buildStubForTarget(target).createRetryStream(request), new FutureCallback<>() {
-                @Override
-                public void onSuccess(CreateRetryStreamReply result) {
-                    if (result.getStatus().getCode() == Code.OK) {
-                        future.complete(result.getStreamId());
-                    } else {
-                        future.completeExceptionally(
-                            new ControllerException(result.getStatus().getCodeValue(), result.getStatus().getMessage()));
-                    }
-                }
-
-                @Override
-                public void onFailure(@Nonnull Throwable t) {
-                    future.completeExceptionally(t);
-                }
-            }, MoreExecutors.directExecutor());
-        } catch (ControllerException e) {
-            future.completeExceptionally(e);
-        }
-
         return future;
     }
 
