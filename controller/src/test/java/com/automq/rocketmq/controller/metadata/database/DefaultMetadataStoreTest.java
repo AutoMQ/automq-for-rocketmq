@@ -2205,6 +2205,10 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             S3ObjectMapper objectMapper = session.getMapper(S3ObjectMapper.class);
             S3Object s3Object = objectMapper.getById(objectId);
             Assertions.assertTrue(s3Object.getCommittedTimestamp() > 0);
+
+            RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
+            Range range = rangeMapper.get(1, streamId, null);
+            Assertions.assertEquals(2, range.getEndOffset());
         }
 
     }
