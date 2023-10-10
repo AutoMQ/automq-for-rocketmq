@@ -284,9 +284,10 @@ public class RocksDBKVService implements KVService {
         if (stopped) {
             throw new StoreException(StoreErrorCode.KV_SERVICE_IS_NOT_RUNNING, "KV service is stopped.");
         }
-
+        WriteOptions writeOptions = new WriteOptions()
+            .setDisableWAL(true);
         ColumnFamilyHandle handle = getOrCreateColumnFamily(namespace);
-        transformException(() -> rocksDB.put(handle, key, value),
+        transformException(() -> rocksDB.put(handle, writeOptions, key, value),
             "Failed to put value into RocksDB.");
     }
 
