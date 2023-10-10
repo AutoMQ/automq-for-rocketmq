@@ -26,7 +26,7 @@ public class S3WalObject {
 
     int brokerId;
 
-    int objectSize;
+    long objectSize;
 
     long sequenceId;
 
@@ -44,11 +44,11 @@ public class S3WalObject {
         this.objectId = objectId;
     }
 
-    public int getObjectSize() {
+    public long getObjectSize() {
         return objectSize;
     }
 
-    public void setObjectSize(int objectSize) {
+    public void setObjectSize(long objectSize) {
         this.objectSize = objectSize;
     }
 

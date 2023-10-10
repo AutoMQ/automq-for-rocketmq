@@ -1565,6 +1565,7 @@ public class DefaultMetadataStore implements MetadataStore {
                         // generate broker's wal object record
                         S3WalObject s3WALObject = new S3WalObject();
                         s3WALObject.setObjectId(objectId);
+                        s3WALObject.setObjectSize(walObject.getObjectSize());
                         s3WALObject.setBaseDataTimestamp(dataTs);
                         s3WALObject.setBrokerId(brokerId);
                         s3WALObject.setSequenceId(walObject.getSequenceId());
