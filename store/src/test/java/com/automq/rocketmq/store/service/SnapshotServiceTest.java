@@ -153,8 +153,15 @@ public class SnapshotServiceTest {
         latch1.await();
         CompletableFuture<SnapshotService.TakeSnapshotResult> taskCf1 = snapshotService.addSnapshotTask(task1);
         // 4. shutdown snapshot service
+        new Thread(() -> {
+            try {
+                snapshotService.shutdown();
+            } catch (Exception e) {
+                Assertions.fail(e);
+            }
+        }).start();
+        Thread.sleep(10);
         latch.countDown();
-        snapshotService.shutdown();
         CompletableFuture.allOf(taskCf0, taskCf1).join();
         // 5. inflight task should be completed
         SnapshotService.TakeSnapshotResult result = taskCf0.join();
