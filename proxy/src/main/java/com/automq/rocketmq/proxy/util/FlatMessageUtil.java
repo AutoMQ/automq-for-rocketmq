@@ -42,7 +42,7 @@ import static com.automq.rocketmq.proxy.util.ReceiptHandleUtil.encodeReceiptHand
  * An utility class to convert RocketMQ message models to {@link FlatMessage}, and vice versa.
  */
 public class FlatMessageUtil {
-    public static FlatMessage convertFrom(long topicId, int queueId, String storeHost, Message rmqMessage) {
+    public static FlatMessage convertTo(long topicId, int queueId, String storeHost, Message rmqMessage) {
         FlatMessageT flatMessageT = new FlatMessageT();
         flatMessageT.setTopicId(topicId);
         flatMessageT.setQueueId(queueId);
@@ -76,7 +76,7 @@ public class FlatMessageUtil {
         return FlatMessage.getRootAsFlatMessage(builder.dataBuffer());
     }
 
-    public static MessageExt convertFrom(FlatMessageExt flatMessage, String topicName, long invisibleTime) {
+    public static MessageExt convertTo(FlatMessageExt flatMessage, String topicName, long invisibleTime) {
         MessageExt messageExt = new MessageExt();
 
         VirtualQueue virtualQueue = new VirtualQueue(flatMessage.message().topicId(), flatMessage.message().queueId());
@@ -112,7 +112,7 @@ public class FlatMessageUtil {
         messageExt.setMsgId(systemProperties.messageId());
 
         // Re-consume times is the number of delivery attempts minus 1.
-        messageExt.setReconsumeTimes(systemProperties.deliveryAttempts());
+        messageExt.setReconsumeTimes(systemProperties.deliveryAttempts() - 1);
 
         KeyValue.Vector propertiesVector = flatMessage.message().userPropertiesVector();
         for (int i = 0; i < propertiesVector.length(); i++) {
@@ -125,9 +125,9 @@ public class FlatMessageUtil {
         return messageExt;
     }
 
-    public static List<MessageExt> convertFrom(List<FlatMessageExt> messageList, String topicName, long invisibleTime) {
+    public static List<MessageExt> convertTo(List<FlatMessageExt> messageList, String topicName, long invisibleTime) {
         return messageList.stream()
-            .map(messageExt -> convertFrom(messageExt, topicName, invisibleTime))
+            .map(messageExt -> convertTo(messageExt, topicName, invisibleTime))
             .toList();
     }
 
