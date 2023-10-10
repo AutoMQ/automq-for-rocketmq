@@ -1172,7 +1172,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     }
 
                     if (nodeId != stream.getDstNodeId()) {
-                        LOGGER.warn("dst-node-id of stream {} does not match. Expecting {}, actual request node {}",
+                        LOGGER.warn("dst-node-id of stream {} does not match. Expecting {}, actual open stream request node {}",
                             streamId, stream.getDstNodeId(), nodeId);
                         ControllerException e = new ControllerException(Code.ILLEGAL_STATE_VALUE, "Node is not match");
                         future.completeExceptionally(e);
