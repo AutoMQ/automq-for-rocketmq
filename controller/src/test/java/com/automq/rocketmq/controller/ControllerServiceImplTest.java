@@ -1507,7 +1507,8 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .until(metadataStore::isLeader);
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-                 ControllerClient client = new GrpcControllerClient()
+                 ControllerClient client = new GrpcControllerClient();
+                 SqlSession session = getSessionFactory().openSession()
             ) {
                 testServer.start();
                 int port = testServer.getPort();
@@ -1530,53 +1531,44 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
                 StreamMetadata metadata = metadataStore.getStream(topicId, 0, null, StreamRole.STREAM_ROLE_DATA).get();
                 streamId = metadata.getStreamId();
-                streamEpoch = metadata.getEpoch();
                 OpenStreamRequest request = OpenStreamRequest.newBuilder()
                     .setStreamId(metadata.getStreamId())
                     .setStreamEpoch(metadata.getEpoch())
                     .setBrokerId(nodeId)
                     .build();
 
-                client.openStream(String.format("localhost:%d", port), request).get();
                 OpenStreamReply reply = client.openStream(String.format("localhost:%d", port), request).get();
                 StreamMetadata openStream = reply.getStreamMetadata();
                 Assertions.assertEquals(0, openStream.getStartOffset());
-                Assertions.assertEquals(streamEpoch + 1, openStream.getEpoch());
+                Assertions.assertEquals(metadata.getEpoch() + 1, openStream.getEpoch());
                 Assertions.assertEquals(0, openStream.getRangeId());
                 Assertions.assertEquals(StreamState.OPEN, openStream.getState());
                 rangeId = openStream.getRangeId();
 
                 client.closeStream(String.format("localhost:%d", port), CloseStreamRequest.newBuilder()
                     .setStreamId(streamId)
-                    .setStreamEpoch(streamEpoch + 1)
+                    .setStreamEpoch(openStream.getEpoch())
                     .setBrokerId(nodeId)
                     .build()).get();
 
-                client.closeStream(String.format("localhost:%d", port), CloseStreamRequest.newBuilder()
-                    .setStreamId(streamId)
-                    .setStreamEpoch(streamEpoch + 1)
-                    .setBrokerId(nodeId)
-                    .build()).get();
+                // Verify
+                StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+                RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
+
+                Stream stream = streamMapper.getByStreamId(streamId);
+                Assertions.assertEquals(streamId, stream.getId());
+                Assertions.assertEquals(0, stream.getStartOffset());
+                Assertions.assertEquals(openStream.getEpoch(), stream.getEpoch());
+                Assertions.assertEquals(0, stream.getRangeId());
+                Assertions.assertEquals(StreamState.CLOSED, stream.getState());
+
+                Range range = rangeMapper.get(rangeId, streamId, null);
+                Assertions.assertEquals(0, range.getRangeId());
+                Assertions.assertEquals(streamId, range.getStreamId());
+                Assertions.assertEquals(openStream.getEpoch(), range.getEpoch());
+                Assertions.assertEquals(0, range.getStartOffset());
+                Assertions.assertEquals(0, range.getEndOffset());
             }
-        }
-        long targetStreamEpoch = streamEpoch + 1;
-        try (SqlSession session = getSessionFactory().openSession()) {
-            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
-            RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
-
-            Stream stream = streamMapper.getByStreamId(streamId);
-            Assertions.assertEquals(streamId, stream.getId());
-            Assertions.assertEquals(0, stream.getStartOffset());
-            Assertions.assertEquals(targetStreamEpoch, stream.getEpoch());
-            Assertions.assertEquals(0, stream.getRangeId());
-            Assertions.assertEquals(StreamState.CLOSED, stream.getState());
-
-            Range range = rangeMapper.get(rangeId, streamId, null);
-            Assertions.assertEquals(0, range.getRangeId());
-            Assertions.assertEquals(streamId, range.getStreamId());
-            Assertions.assertEquals(targetStreamEpoch, range.getEpoch());
-            Assertions.assertEquals(0, range.getStartOffset());
-            Assertions.assertEquals(0, range.getEndOffset());
         }
     }
 }

@@ -1221,8 +1221,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             node.setId(1);
             metadataStore.addBrokerNode(node);
 
-            metadataStore.openStream(streamId, streamEpoch, config.nodeId()).join();
-            metadataStore.openStream(streamId, streamEpoch, config.nodeId()).join();
             StreamMetadata metadata = metadataStore.openStream(streamId, streamEpoch, config.nodeId()).join();
             Assertions.assertNotNull(metadata);
             Assertions.assertEquals(streamId, metadata.getStreamId());
@@ -1232,7 +1230,9 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Assertions.assertEquals(2345, metadata.getEndOffset());
             Assertions.assertEquals(StreamState.OPEN, metadata.getState());
 
-            metadataStore.closeStream(metadata.getStreamId(), metadata.getEpoch(), config.nodeId()).join();
+            Assertions.assertThrows(CompletionException.class, () -> metadataStore.openStream(streamId, streamEpoch, config.nodeId()).join());
+            Assertions.assertDoesNotThrow(() -> metadataStore.openStream(streamId, streamEpoch + 1, config.nodeId()).join());
+
             metadataStore.closeStream(metadata.getStreamId(), metadata.getEpoch(), config.nodeId()).join();
         }
 
@@ -1317,8 +1317,9 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             node.setId(1);
             metadataStore.addBrokerNode(node);
 
-            metadataStore.openStream(streamId, streamEpoch, config.nodeId()).join();
+            // Should throw if node is wrong
             Assertions.assertThrows(CompletionException.class, () -> metadataStore.openStream(streamId, streamEpoch, nodeId + 1).join());
+
             StreamMetadata metadata = metadataStore.openStream(streamId, streamEpoch, config.nodeId()).join();
             Assertions.assertNotNull(metadata);
             Assertions.assertEquals(streamId, metadata.getStreamId());
@@ -1329,7 +1330,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Assertions.assertEquals(StreamState.OPEN, metadata.getState());
 
             metadataStore.closeStream(metadata.getStreamId(), metadata.getEpoch(), config.nodeId()).join();
-            Assertions.assertThrows(CompletionException.class, () -> metadataStore.closeStream(metadata.getStreamId(), metadata.getEpoch(), nodeId + 1).join());
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -1436,8 +1436,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
                 session.commit();
             }
 
-            metadataStore.openStream(streamId, streamEpoch, config.nodeId()).join();
-            metadataStore.openStream(streamId, streamEpoch, config.nodeId()).join();
             StreamMetadata metadata = metadataStore.openStream(streamId, streamEpoch, config.nodeId()).join();
             Assertions.assertNotNull(metadata);
             Assertions.assertEquals(streamId, metadata.getStreamId());
@@ -1902,7 +1900,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             lease.setNodeId(config.nodeId());
             metadataStore.setLease(lease);
             metadataStore.setRole(Role.Leader);
-
 
             Assertions.assertThrows(CompletionException.class, () -> metadataStore.commitStreamObject(s3StreamObject, compactedObjects).join());
         }
