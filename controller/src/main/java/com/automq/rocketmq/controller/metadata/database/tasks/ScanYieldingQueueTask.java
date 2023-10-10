@@ -128,7 +128,7 @@ public class ScanYieldingQueueTask extends ScanTask {
 
     @Override
     public void run() {
-        LOGGER.info("Start to scan yielding queues");
+        LOGGER.debug("Start to scan yielding queues");
 
         try (SqlSession session = metadataStore.openSession()) {
             QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
@@ -151,6 +151,6 @@ public class ScanYieldingQueueTask extends ScanTask {
             LOGGER.error("Unexpected error raised", e);
         }
 
-        LOGGER.info("Scan-yielding-queue completed");
+        LOGGER.debug("Scan-yielding-queue completed");
     }
 }

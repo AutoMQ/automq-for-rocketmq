@@ -884,9 +884,52 @@ public class DefaultMetadataStore implements MetadataStore {
                         QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
                         List<QueueAssignment> assignments = assignmentMapper
                             .list(topicId, null, null, null, null)
-                            .stream().filter(assignment -> assignment.getStatus() != AssignmentStatus.ASSIGNMENT_STATUS_DELETED)
+                            .stream().filter(assignment -> assignment.getQueueId() == queueId)
                             .toList();
-                        int nodeId = assignments.isEmpty() ? 0 : assignments.get(0).getDstNodeId();
+
+                        // Verify assignment and queue are OK
+                        if (assignments.isEmpty()) {
+                            String msg = String.format("Queue assignment for topic-id=%d queue-id=%d is not found",
+                                topicId, queueId);
+                            throw new CompletionException(new ControllerException(Code.NOT_FOUND_VALUE, msg));
+                        }
+
+                        if (assignments.size() != 1) {
+                            String msg = String.format("%d queue assignments for topic-id=%d queue-id=%d is found",
+                                assignments.size(), topicId, queueId);
+                            throw new CompletionException(new ControllerException(Code.ILLEGAL_STATE_VALUE, msg));
+                        }
+                        QueueAssignment assignment = assignments.get(0);
+                        switch (assignment.getStatus()) {
+                            case ASSIGNMENT_STATUS_YIELDING -> {
+                                String msg = String.format("Queue[topic-id=%d queue-id=%d] is under migration. " +
+                                    "Please create retry stream later", topicId, queueId);
+                                throw new CompletionException(new ControllerException(Code.ILLEGAL_STATE_VALUE, msg));
+                            }
+                            case ASSIGNMENT_STATUS_DELETED -> {
+                                String msg = String.format("Queue[topic-id=%d queue-id=%d] has been deleted",
+                                    topicId, queueId);
+                                throw new CompletionException(new ControllerException(Code.ILLEGAL_STATE_VALUE, msg));
+                            }
+                            case ASSIGNMENT_STATUS_ASSIGNED -> {
+                                // OK
+                            }
+                            default -> {
+                                String msg = String.format("Status of Queue[topic-id=%d queue-id=%d] is unsupported",
+                                    topicId, queueId);
+                                throw new CompletionException(new ControllerException(Code.INTERNAL_VALUE, msg));
+                            }
+                        }
+
+                        // Verify Group exists.
+                        GroupMapper groupMapper = session.getMapper(GroupMapper.class);
+                        List<Group> groups = groupMapper.list(groupId, null, GroupStatus.GROUP_STATUS_ACTIVE, null);
+                        if (groups.size() != 1) {
+                            String msg = String.format("Group[group-id=%d] is not found", groupId);
+                            throw new CompletionException(new ControllerException(Code.NOT_FOUND_VALUE, msg));
+                        }
+
+                        int nodeId = assignment.getDstNodeId();
                         long streamId = createStream(streamMapper, topicId, queueId, groupId, streamRole, nodeId);
                         session.commit();
                         return StreamMetadata.newBuilder()
@@ -1129,7 +1172,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     }
 
                     if (nodeId != stream.getDstNodeId()) {
-                        LOGGER.warn("stream {}'s dst node {} is not match request node {}",
+                        LOGGER.warn("dst-node-id of stream {} does not match. Expecting {}, actual request node {}",
                             streamId, stream.getDstNodeId(), nodeId);
                         ControllerException e = new ControllerException(Code.ILLEGAL_STATE_VALUE, "Node is not match");
                         future.completeExceptionally(e);
@@ -1249,7 +1292,8 @@ public class DefaultMetadataStore implements MetadataStore {
                     .setStreamEpoch(streamEpoch)
                     .build();
                 try {
-                    return this.controllerClient.openStream(this.leaderAddress(), request).thenApply(OpenStreamReply::getStreamMetadata);
+                    return this.controllerClient.openStream(this.leaderAddress(), request)
+                        .thenApply(OpenStreamReply::getStreamMetadata);
                 } catch (ControllerException e) {
                     future.completeExceptionally(e);
                 }
@@ -1272,14 +1316,15 @@ public class DefaultMetadataStore implements MetadataStore {
 
                     // Verify resource existence
                     if (null == stream) {
-                        ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE, String.format("Stream[stream-id=%d] is not found", streamId));
+                        ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE,
+                            String.format("Stream[stream-id=%d] is not found", streamId));
                         future.completeExceptionally(e);
                         break;
                     }
 
                     // Verify node
                     if (nodeId != stream.getDstNodeId()) {
-                        LOGGER.warn("stream {}'s dst node {} is not match request node {}",
+                        LOGGER.warn("dst-node-id of stream {} is {}, fencing close stream request from Node[node-id={}]",
                             streamId, stream.getDstNodeId(), nodeId);
                         ControllerException e = new ControllerException(Code.ILLEGAL_STATE_VALUE, "Node is not match");
                         future.completeExceptionally(e);
@@ -1515,9 +1560,13 @@ public class DefaultMetadataStore implements MetadataStore {
                         // create stream object records
                         streamObjects.forEach(s3StreamObject -> {
                             S3StreamObject object = new S3StreamObject();
-                            object.setObjectId(s3StreamObject.getObjectId());
                             object.setStreamId(s3StreamObject.getStreamId());
+                            object.setObjectId(s3StreamObject.getObjectId());
                             object.setCommittedTimestamp(committedTs);
+                            object.setStartOffset(s3StreamObject.getStartOffset());
+                            object.setBaseDataTimestamp(s3StreamObject.getBaseDataTimestamp());
+                            object.setEndOffset(s3StreamObject.getEndOffset());
+                            object.setObjectSize(s3StreamObject.getObjectSize());
                             s3StreamObjectMapper.commit(object);
                         });
                     }

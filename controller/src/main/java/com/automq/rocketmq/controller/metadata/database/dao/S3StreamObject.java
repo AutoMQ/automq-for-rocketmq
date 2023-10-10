@@ -22,67 +22,67 @@ import java.util.Objects;
 
 public class S3StreamObject {
 
-    long id;
+    private Long id;
 
-    long objectId;
+    private Long objectId;
 
-    long streamId;
+    private Long streamId;
 
-    long startOffset;
+    private Long startOffset;
 
-    long endOffset;
+    private Long endOffset;
 
-    long objectSize;
+    private Long objectSize;
 
-    long baseDataTimestamp;
+    private long baseDataTimestamp;
 
-    long committedTimestamp;
+    private long committedTimestamp;
 
-    public long getId() {
+    public Long getId() {
         return id;
     }
 
-    public void setId(long id) {
+    public void setId(Long id) {
         this.id = id;
     }
 
-    public long getObjectId() {
+    public Long getObjectId() {
         return objectId;
     }
 
-    public void setObjectId(long objectId) {
+    public void setObjectId(Long objectId) {
         this.objectId = objectId;
     }
 
-    public long getStreamId() {
+    public Long getStreamId() {
         return streamId;
     }
 
-    public void setStreamId(long streamId) {
+    public void setStreamId(Long streamId) {
         this.streamId = streamId;
     }
 
-    public long getStartOffset() {
+    public Long getStartOffset() {
         return startOffset;
     }
 
-    public void setStartOffset(long startOffset) {
+    public void setStartOffset(Long startOffset) {
         this.startOffset = startOffset;
     }
 
-    public long getEndOffset() {
+    public Long getEndOffset() {
         return endOffset;
     }
 
-    public void setEndOffset(long endOffset) {
+    public void setEndOffset(Long endOffset) {
         this.endOffset = endOffset;
     }
 
-    public long getObjectSize() {
+    public Long getObjectSize() {
         return objectSize;
     }
 
-    public void setObjectSize(long objectSize) {
+    public void setObjectSize(Long objectSize) {
         this.objectSize = objectSize;
     }
 
@@ -104,10 +104,15 @@ public class S3StreamObject {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        S3StreamObject that = (S3StreamObject) o;
-        return id == that.id && objectId == that.objectId && streamId == that.streamId && startOffset == that.startOffset && endOffset == that.endOffset && objectSize == that.objectSize && baseDataTimestamp == that.baseDataTimestamp && committedTimestamp == that.committedTimestamp;
+        if (this == o)
+            return true;
+        if (o == null || getClass() != o.getClass())
+            return false;
+        S3StreamObject object = (S3StreamObject) o;
+        return baseDataTimestamp == object.baseDataTimestamp && committedTimestamp == object.committedTimestamp
+            && Objects.equals(id, object.id) && Objects.equals(objectId, object.objectId)
+            && Objects.equals(streamId, object.streamId) && Objects.equals(startOffset, object.startOffset)
+            && Objects.equals(endOffset, object.endOffset) && Objects.equals(objectSize, object.objectSize);
     }
 
     @Override

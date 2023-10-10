@@ -72,7 +72,7 @@ public class SchedulerTask extends ControllerTask {
         } catch (Throwable e) {
             LOGGER.error("Unexpected exception raised", e);
         }
-        LOGGER.info("SchedulerTask completed");
+        LOGGER.debug("SchedulerTask completed");
     }
 
     private boolean doSchedule(SqlSession session, Map<Integer, List<QueueAssignment>> workload) {

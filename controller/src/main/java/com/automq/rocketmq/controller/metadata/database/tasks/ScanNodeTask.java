@@ -31,7 +31,7 @@ public class ScanNodeTask extends ScanTask {
 
     @Override
     public void run() {
-        LOGGER.info("ScanNodeTask starts");
+        LOGGER.debug("ScanNodeTask starts");
         try {
             try (SqlSession session = this.metadataStore.openSession()) {
                 NodeMapper mapper = session.getMapper(NodeMapper.class);
@@ -44,7 +44,7 @@ public class ScanNodeTask extends ScanTask {
         } catch (Throwable e) {
             LOGGER.error("Failed to scan nodes from database", e);
         }
-        LOGGER.info("ScanNodeTask completed");
+        LOGGER.debug("ScanNodeTask completed");
     }
 
     private void updateBrokers(List<Node> nodes) {

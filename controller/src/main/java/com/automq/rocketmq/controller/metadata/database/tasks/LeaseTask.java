@@ -34,7 +34,7 @@ public class LeaseTask extends ControllerTask {
 
     @Override
     public void run() {
-        LOGGER.info("LeaseTask starts");
+        LOGGER.debug("LeaseTask starts");
         try {
             try (SqlSession session = metadataStore.openSession()) {
                 tryCreateNode(session);
@@ -92,7 +92,7 @@ public class LeaseTask extends ControllerTask {
         } catch (Throwable e) {
             LOGGER.error("Exception raised while running scheduled job", e);
         }
-        LOGGER.info("LeaseTask completed");
+        LOGGER.debug("LeaseTask completed");
     }
 
     private void tryCreateNode(SqlSession session) {

@@ -57,17 +57,24 @@
         WHERE object_id = #{objectId}
     </select>
 
-    <update id="commit" parameterType="S3StreamObject">
-        UPDATE s3streamobject
-        SET committed_timestamp = #{committedTimestamp}
-        WHERE 1 = 1
-        <if test="null != objectId">
-            AND object_id = #{objectId}
-        </if>
-        <if test="null != streamId">
-            AND stream_id = #{streamId}
-        </if>
-    </update>
+    <insert id="commit" parameterType="S3StreamObject" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO s3streamobject(
+            stream_id,
+            object_id,
+            object_size,
+            start_offset,
+            end_offset,
+            base_data_timestamp,
+            committed_timestamp)
+        VALUES (
+            #{streamId},
+            #{objectId},
+            #{objectSize},
+            #{startOffset},
+            #{endOffset},
+            #{baseDataTimestamp},
+            #{committedTimestamp})
+    </insert>
 
     <delete id="delete">
         DELETE
