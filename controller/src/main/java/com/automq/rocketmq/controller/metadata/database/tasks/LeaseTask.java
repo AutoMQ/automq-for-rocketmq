@@ -101,7 +101,16 @@ public class LeaseTask extends ControllerTask {
         }
 
         NodeMapper mapper = session.getMapper(NodeMapper.class);
-        Node node = new Node();
+
+        // Check if current node has already been created before.
+        // Note this would make the mybatis cache friendly.
+        Node node = mapper.get(null, metadataStore.config().name(), null, null);
+        if (null != node) {
+            metadataStore.config().setNodeId(node.getId());
+            return;
+        }
+
+        node = new Node();
         node.setName(metadataStore.config().name());
         node.setInstanceId(metadataStore.config().instanceId());
         node.setAddress(metadataStore.config().advertiseAddress());
