@@ -174,7 +174,10 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
     @Override
     public CompletableFuture<Void> commitWalObject(S3WALObject walObject, List<S3StreamObject> streamObjects,
         List<Long> compactedObjects) {
-        return metadataStore.commitWalObject(walObject, streamObjects, compactedObjects);
+        // The underlying storage layer does not know the current node id when constructing the WAL object.
+        // So we should fill it here.
+        S3WALObject newWal = S3WALObject.newBuilder(walObject).setBrokerId(metadataStore.config().nodeId()).build();
+        return metadataStore.commitWalObject(newWal, streamObjects, compactedObjects);
     }
 
     @Override
