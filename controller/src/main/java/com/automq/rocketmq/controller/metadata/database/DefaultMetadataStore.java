@@ -333,7 +333,7 @@ public class DefaultMetadataStore implements MetadataStore {
         CompletableFuture<Long> future = new CompletableFuture<>();
         for (; ; ) {
             if (this.isLeader()) {
-                try (SqlSession session = getSessionFactory().openSession()) {
+                try (SqlSession session = openSession()) {
                     if (!maintainLeadershipWithSharedLock(session)) {
                         continue;
                     }
@@ -382,16 +382,17 @@ public class DefaultMetadataStore implements MetadataStore {
     private long createStream(StreamMapper streamMapper, long topicId, int queueId, Long groupId,
         StreamRole role, int nodeId) {
         // epoch and rangeId default to -1
-        Stream dataStream = new Stream();
-        dataStream.setState(StreamState.UNINITIALIZED);
-        dataStream.setTopicId(topicId);
-        dataStream.setQueueId(queueId);
-        dataStream.setGroupId(groupId);
-        dataStream.setStreamRole(role);
-        dataStream.setSrcNodeId(nodeId);
-        dataStream.setDstNodeId(nodeId);
-        streamMapper.create(dataStream);
-        return dataStream.getId();
+        Stream stream = new Stream();
+        stream.setState(StreamState.UNINITIALIZED);
+        stream.setTopicId(topicId);
+        stream.setQueueId(queueId);
+        stream.setGroupId(groupId);
+        stream.setStreamRole(role);
+        stream.setSrcNodeId(nodeId);
+        stream.setDstNodeId(nodeId);
+        streamMapper.create(stream);
+        LOGGER.info("Created {} stream for topic-id={}, queue-id={}, group-id={}", role, topicId, queueId, groupId);
+        return stream.getId();
     }
 
     @Override
@@ -402,7 +403,7 @@ public class DefaultMetadataStore implements MetadataStore {
         CompletableFuture<apache.rocketmq.controller.v1.Topic> future = new CompletableFuture<>();
         for (; ; ) {
             if (this.isLeader()) {
-                try (SqlSession session = getSessionFactory().openSession()) {
+                try (SqlSession session = openSession()) {
                     if (!maintainLeadershipWithSharedLock(session)) {
                         continue;
                     }
@@ -412,7 +413,7 @@ public class DefaultMetadataStore implements MetadataStore {
 
                     if (null == topic) {
                         ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE,
-                                String.format("Topic not found for topic-id=%d, topic-name=%s", topicId, topicName));
+                            String.format("Topic not found for topic-id=%d, topic-name=%s", topicId, topicName));
                         future.completeExceptionally(e);
                         return future;
                     }
@@ -486,7 +487,7 @@ public class DefaultMetadataStore implements MetadataStore {
             for (; ; ) {
                 if (this.isLeader()) {
                     Set<Integer> toNotify = new HashSet<>();
-                    try (SqlSession session = getSessionFactory().openSession()) {
+                    try (SqlSession session = openSession()) {
                         if (!maintainLeadershipWithSharedLock(session)) {
                             continue;
                         }
@@ -502,16 +503,16 @@ public class DefaultMetadataStore implements MetadataStore {
                         QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
                         List<QueueAssignment> assignments = assignmentMapper.list(topicId, null, null, null, null);
                         assignments.stream().filter(assignment -> assignment.getStatus() != AssignmentStatus.ASSIGNMENT_STATUS_DELETED)
-                                .forEach(assignment -> {
-                                    switch (assignment.getStatus()) {
-                                        case ASSIGNMENT_STATUS_ASSIGNED -> toNotify.add(assignment.getDstNodeId());
-                                        case ASSIGNMENT_STATUS_YIELDING -> toNotify.add(assignment.getSrcNodeId());
-                                        default -> {
-                                        }
+                            .forEach(assignment -> {
+                                switch (assignment.getStatus()) {
+                                    case ASSIGNMENT_STATUS_ASSIGNED -> toNotify.add(assignment.getDstNodeId());
+                                    case ASSIGNMENT_STATUS_YIELDING -> toNotify.add(assignment.getSrcNodeId());
+                                    default -> {
                                     }
-                                    assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_DELETED);
-                                    assignmentMapper.update(assignment);
-                                });
+                                }
+                                assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_DELETED);
+                                assignmentMapper.update(assignment);
+                            });
                         StreamMapper streamMapper = session.getMapper(StreamMapper.class);
                         streamMapper.updateStreamState(null, topicId, null, StreamState.DELETED);
                         session.commit();
@@ -534,13 +535,13 @@ public class DefaultMetadataStore implements MetadataStore {
         String topicName) {
         return CompletableFuture.supplyAsync(() -> {
             if (this.isLeader()) {
-                try (SqlSession session = getSessionFactory().openSession()) {
+                try (SqlSession session = openSession()) {
                     TopicMapper topicMapper = session.getMapper(TopicMapper.class);
                     Topic topic = topicMapper.get(topicId, topicName);
 
                     if (null == topic) {
                         ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE,
-                                String.format("Topic not found for topic-id=%d, topic-name=%s", topicId, topicName));
+                            String.format("Topic not found for topic-id=%d, topic-name=%s", topicId, topicName));
                         throw new CompletionException(e);
                     }
 
@@ -548,12 +549,12 @@ public class DefaultMetadataStore implements MetadataStore {
                     List<QueueAssignment> assignments = assignmentMapper.list(topic.getId(), null, null, null, null);
 
                     apache.rocketmq.controller.v1.Topic.Builder topicBuilder = apache.rocketmq.controller.v1.Topic
-                            .newBuilder()
-                            .setTopicId(topic.getId())
-                            .setCount(topic.getQueueNum())
-                            .setName(topic.getName())
-                            .addAllAcceptMessageTypes(gson.fromJson(topic.getAcceptMessageTypes(), new TypeToken<List<MessageType>>() {
-                            }.getType()));
+                        .newBuilder()
+                        .setTopicId(topic.getId())
+                        .setCount(topic.getQueueNum())
+                        .setName(topic.getName())
+                        .addAllAcceptMessageTypes(gson.fromJson(topic.getAcceptMessageTypes(), new TypeToken<List<MessageType>>() {
+                        }.getType()));
 
                     if (null != assignments) {
                         for (QueueAssignment assignment : assignments) {
@@ -601,7 +602,7 @@ public class DefaultMetadataStore implements MetadataStore {
     public CompletableFuture<List<apache.rocketmq.controller.v1.Topic>> listTopics() {
         CompletableFuture<List<apache.rocketmq.controller.v1.Topic>> future = new CompletableFuture<>();
         List<apache.rocketmq.controller.v1.Topic> result = new ArrayList<>();
-        try (SqlSession session = getSessionFactory().openSession()) {
+        try (SqlSession session = openSession()) {
             TopicMapper topicMapper = session.getMapper(TopicMapper.class);
             List<Topic> topics = topicMapper.list(null, null);
             for (Topic topic : topics) {
@@ -650,7 +651,7 @@ public class DefaultMetadataStore implements MetadataStore {
 
         BrokerNode brokerNode = nodes.get(this.lease.getNodeId());
         if (null == brokerNode) {
-            try (SqlSession session = getSessionFactory().openSession()) {
+            try (SqlSession session = openSession()) {
                 NodeMapper nodeMapper = session.getMapper(NodeMapper.class);
                 Node node = nodeMapper.get(this.lease.getNodeId(), null, null, null);
                 if (null != node) {
@@ -670,7 +671,7 @@ public class DefaultMetadataStore implements MetadataStore {
     public CompletableFuture<List<QueueAssignment>> listAssignments(Long topicId, Integer srcNodeId, Integer dstNodeId,
         AssignmentStatus status) {
         CompletableFuture<List<QueueAssignment>> future = new CompletableFuture<>();
-        try (SqlSession session = getSessionFactory().openSession()) {
+        try (SqlSession session = openSession()) {
             QueueAssignmentMapper mapper = session.getMapper(QueueAssignmentMapper.class);
             List<QueueAssignment> queueAssignments = mapper.list(topicId, srcNodeId, dstNodeId, status, null);
             future.complete(queueAssignments);
@@ -705,7 +706,8 @@ public class DefaultMetadataStore implements MetadataStore {
                                 assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_YIELDING);
                                 assignmentMapper.update(assignment);
                             }
-                            case ASSIGNMENT_STATUS_DELETED -> future.completeExceptionally(new ControllerException(Code.NOT_FOUND_VALUE, "Already deleted"));
+                            case ASSIGNMENT_STATUS_DELETED ->
+                                future.completeExceptionally(new ControllerException(Code.NOT_FOUND_VALUE, "Already deleted"));
                         }
                         break;
                     }
@@ -735,7 +737,7 @@ public class DefaultMetadataStore implements MetadataStore {
         CompletableFuture<Void> future = new CompletableFuture<>();
         for (; ; ) {
             if (isLeader()) {
-                try (SqlSession session = getSessionFactory().openSession()) {
+                try (SqlSession session = openSession()) {
                     QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
                     List<QueueAssignment> assignments = assignmentMapper.list(topicId, null, null, AssignmentStatus.ASSIGNMENT_STATUS_YIELDING, null);
                     for (QueueAssignment assignment : assignments) {
@@ -773,7 +775,7 @@ public class DefaultMetadataStore implements MetadataStore {
         CompletableFuture<Void> future = new CompletableFuture<>();
         for (; ; ) {
             if (isLeader()) {
-                try (SqlSession session = getSessionFactory().openSession()) {
+                try (SqlSession session = openSession()) {
                     if (!maintainLeadershipWithSharedLock(session)) {
                         continue;
                     }
@@ -807,7 +809,7 @@ public class DefaultMetadataStore implements MetadataStore {
 
     @Override
     public CompletableFuture<Long> getConsumerOffset(long consumerGroupId, long topicId, int queueId) {
-        try (SqlSession session = getSessionFactory().openSession()) {
+        try (SqlSession session = openSession()) {
             GroupProgressMapper groupProgressMapper = session.getMapper(GroupProgressMapper.class);
             GroupProgress progress = groupProgressMapper.get(consumerGroupId, topicId, queueId);
             if (Objects.isNull(progress)) {
@@ -824,7 +826,7 @@ public class DefaultMetadataStore implements MetadataStore {
         CompletableFuture<Long> future = new CompletableFuture<>();
         for (; ; ) {
             if (isLeader()) {
-                try (SqlSession session = getSessionFactory().openSession()) {
+                try (SqlSession session = openSession()) {
                     if (!maintainLeadershipWithSharedLock(session)) {
                         continue;
                     }
@@ -873,7 +875,7 @@ public class DefaultMetadataStore implements MetadataStore {
     @Override
     public CompletableFuture<StreamMetadata> getStream(long topicId, int queueId, Long groupId, StreamRole streamRole) {
         return CompletableFuture.supplyAsync(() -> {
-            try (SqlSession session = getSessionFactory().openSession()) {
+            try (SqlSession session = openSession()) {
                 StreamMapper streamMapper = session.getMapper(StreamMapper.class);
                 List<Stream> streams = streamMapper.list(topicId, queueId, groupId).stream()
                     .filter(stream -> stream.getStreamRole() == streamRole).toList();
@@ -886,6 +888,7 @@ public class DefaultMetadataStore implements MetadataStore {
                             .toList();
                         int nodeId = assignments.isEmpty() ? 0 : assignments.get(0).getDstNodeId();
                         long streamId = createStream(streamMapper, topicId, queueId, groupId, streamRole, nodeId);
+                        session.commit();
                         return StreamMetadata.newBuilder()
                             .setStreamId(streamId)
                             .setState(StreamState.UNINITIALIZED)
@@ -948,12 +951,12 @@ public class DefaultMetadataStore implements MetadataStore {
     @Override
     public CompletableFuture<ConsumerGroup> describeConsumerGroup(Long groupId, String groupName) {
         return CompletableFuture.supplyAsync(() -> {
-            try (SqlSession session = getSessionFactory().openSession()) {
+            try (SqlSession session = openSession()) {
                 GroupMapper groupMapper = session.getMapper(GroupMapper.class);
                 List<Group> groups = groupMapper.list(groupId, groupName, null, null);
                 if (groups.isEmpty()) {
                     ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE,
-                            String.format("Group with group-id=%d is not found", groupId));
+                        String.format("Group with group-id=%d is not found", groupId));
                     throw new CompletionException(e);
                 } else {
                     Group group = groups.get(0);
@@ -963,7 +966,7 @@ public class DefaultMetadataStore implements MetadataStore {
                         .setGroupType(group.getGroupType())
                         .setMaxDeliveryAttempt(group.getMaxDeliveryAttempt())
                         .setDeadLetterTopicId(group.getDeadLetterTopicId())
-                         .build();
+                        .build();
                 }
             }
         }, asyncExecutorService);
@@ -1108,7 +1111,7 @@ public class DefaultMetadataStore implements MetadataStore {
         CompletableFuture<StreamMetadata> future = new CompletableFuture<>();
         for (; ; ) {
             if (isLeader()) {
-                try (SqlSession session = getSessionFactory().openSession()) {
+                try (SqlSession session = openSession()) {
                     if (!maintainLeadershipWithSharedLock(session)) {
                         continue;
                     }
@@ -1169,6 +1172,8 @@ public class DefaultMetadataStore implements MetadataStore {
                         if (stream.getState() == StreamState.CLOSED) {
                             streamMapper.updateStreamState(streamId, stream.getTopicId(), stream.getQueueId(),
                                 StreamState.OPEN);
+                            // Commit transaction
+                            session.commit();
                             StreamMetadata metadata = StreamMetadata.newBuilder()
                                 .setStreamId(streamId)
                                 .setEpoch(stream.getEpoch())
@@ -1257,7 +1262,7 @@ public class DefaultMetadataStore implements MetadataStore {
         CompletableFuture<Void> future = new CompletableFuture<>();
         for (; ; ) {
             if (isLeader()) {
-                try (SqlSession session = getSessionFactory().openSession()) {
+                try (SqlSession session = openSession()) {
                     if (!maintainLeadershipWithSharedLock(session)) {
                         continue;
                     }
@@ -1328,27 +1333,27 @@ public class DefaultMetadataStore implements MetadataStore {
         CompletableFuture<List<StreamMetadata>> future = new CompletableFuture<>();
         for (; ; ) {
             if (isLeader()) {
-                try (SqlSession session = getSessionFactory().openSession()) {
+                try (SqlSession session = openSession()) {
                     if (!maintainLeadershipWithSharedLock(session)) {
                         continue;
                     }
                     StreamMapper streamMapper = session.getMapper(StreamMapper.class);
                     RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
                     List<StreamMetadata> streams = streamMapper.listByNode(nodeId, StreamState.OPEN)
-                            .stream()
-                            .map(stream -> {
-                                int rangeId = stream.getRangeId();
-                                Range range = rangeMapper.get(rangeId, stream.getId(), null);
-                                return StreamMetadata.newBuilder()
-                                    .setStreamId(stream.getId())
-                                     .setStartOffset(stream.getStartOffset())
-                                    .setEndOffset(null == range ? 0 : range.getEndOffset())
-                                    .setEpoch(stream.getEpoch())
-                                    .setState(stream.getState())
-                                    .setRangeId(stream.getRangeId())
-                                    .build();
-                            })
-                            .toList();
+                        .stream()
+                        .map(stream -> {
+                            int rangeId = stream.getRangeId();
+                            Range range = rangeMapper.get(rangeId, stream.getId(), null);
+                            return StreamMetadata.newBuilder()
+                                .setStreamId(stream.getId())
+                                .setStartOffset(stream.getStartOffset())
+                                .setEndOffset(null == range ? 0 : range.getEndOffset())
+                                .setEpoch(stream.getEpoch())
+                                .setState(stream.getState())
+                                .setRangeId(stream.getRangeId())
+                                .build();
+                        })
+                        .toList();
                     future.complete(streams);
                     break;
                 }
@@ -1373,7 +1378,7 @@ public class DefaultMetadataStore implements MetadataStore {
         CompletableFuture<Long> future = new CompletableFuture<>();
         for (; ; ) {
             if (isLeader()) {
-                try (SqlSession session = getSessionFactory().openSession()) {
+                try (SqlSession session = openSession()) {
                     if (!maintainLeadershipWithSharedLock(session)) {
                         continue;
                     }
@@ -1391,7 +1396,6 @@ public class DefaultMetadataStore implements MetadataStore {
                             return object.getId();
                         })
                         .toList();
-
                     session.commit();
                     if (objectIds.isEmpty()) {
                         LOGGER.error("S3Object creation failed, count[{}], ttl[{}]", count, ttlInMinutes);
@@ -1430,7 +1434,7 @@ public class DefaultMetadataStore implements MetadataStore {
         CompletableFuture<Void> future = new CompletableFuture<>();
         for (; ; ) {
             if (isLeader()) {
-                try (SqlSession session = getSessionFactory().openSession()) {
+                try (SqlSession session = openSession()) {
                     if (!maintainLeadershipWithSharedLock(session)) {
                         continue;
                     }
@@ -1519,11 +1523,9 @@ public class DefaultMetadataStore implements MetadataStore {
                     }
 
                     // generate compacted objects' remove record ...
-
+                    session.commit();
                     LOGGER.info("broker[broke-id={}] commit wal object[object-id={}] success, compacted objects[{}], stream objects[{}]",
                         brokerId, walObject.getObjectId(), compactedObjects, streamObjects);
-                    session.commit();
-
                     future.complete(null);
                 }
             } else {
@@ -1555,7 +1557,7 @@ public class DefaultMetadataStore implements MetadataStore {
         CompletableFuture<Void> future = new CompletableFuture<>();
         for (; ; ) {
             if (isLeader()) {
-                try (SqlSession session = getSessionFactory().openSession()) {
+                try (SqlSession session = openSession()) {
                     if (!maintainLeadershipWithSharedLock(session)) {
                         continue;
                     }
@@ -1607,8 +1609,8 @@ public class DefaultMetadataStore implements MetadataStore {
                     if (!Objects.isNull(compactedObjects) && !compactedObjects.isEmpty()) {
                         compactedObjects.forEach(id -> s3StreamObjectMapper.delete(null, null, id));
                     }
-                    LOGGER.info("S3StreamObject[object-id={}] commit success, compacted objects: {}", streamObject.getObjectId(), compactedObjects);
                     session.commit();
+                    LOGGER.info("S3StreamObject[object-id={}] commit success, compacted objects: {}", streamObject.getObjectId(), compactedObjects);
                     future.complete(null);
                 }
             } else {
@@ -1779,71 +1781,6 @@ public class DefaultMetadataStore implements MetadataStore {
             rangeMapper.update(range);
         }
         return true;
-    }
-
-    @Override
-    public CompletableFuture<Long> getOrCreateRetryStream(String groupName, long topicId,
-        int queueId) {
-        CompletableFuture<Long> future = new CompletableFuture<>();
-        for (; ; ) {
-            if (isLeader()) {
-                try (SqlSession session = getSessionFactory().openSession()) {
-                    if (!maintainLeadershipWithSharedLock(session)) {
-                        continue;
-                    }
-
-                    QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
-                    List<QueueAssignment> assignments = assignmentMapper
-                        .list(topicId, null, null, null, null)
-                        .stream().filter(assignment -> assignment.getStatus() != AssignmentStatus.ASSIGNMENT_STATUS_DELETED)
-                        .toList();
-                    if (assignments.isEmpty()) {
-                        ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE,
-                                String.format("No message queue found with topic-id=%d, queue-id=%d", topicId, queueId));
-                        future.completeExceptionally(e);
-                        return future;
-                    }
-                    QueueAssignment assignment = assignments.get(0);
-
-                    GroupMapper groupMapper = session.getMapper(GroupMapper.class);
-
-                    List<Group> groups = groupMapper.list(null, groupName, GroupStatus.GROUP_STATUS_ACTIVE, null);
-                    if (groups.isEmpty()) {
-                        ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE,
-                                String.format("Group '%s' is not found", groupName));
-                        future.completeExceptionally(e);
-                        return future;
-                    }
-
-                    long groupId = groups.get(0).getId(), streamId;
-                    StreamMapper streamMapper = session.getMapper(StreamMapper.class);
-                    List<Stream> streams = streamMapper.list(topicId, queueId, groupId)
-                        .stream().filter(stream -> stream.getStreamRole() == StreamRole.STREAM_ROLE_RETRY).toList();
-                    if (streams.isEmpty()) {
-                        streamId = createStream(streamMapper, topicId, queueId, groupId, StreamRole.STREAM_ROLE_RETRY, assignment.getSrcNodeId());
-                        session.commit();
-                    } else {
-                        streamId = streams.get(0).getId();
-                    }
-                    future.complete(streamId);
-                }
-            } else {
-                try {
-                    this.controllerClient.createRetryStream(leaderAddress(), groupName, topicId, queueId)
-                        .whenComplete((res, e) -> {
-                            if (null != e) {
-                                future.completeExceptionally(e);
-                            } else {
-                                future.complete(res);
-                            }
-                        });
-                } catch (ControllerException e) {
-                    future.completeExceptionally(e);
-                }
-            }
-            break;
-        }
-        return future;
     }
 
     @Override

@@ -359,17 +359,6 @@ message CreateGroupReply {
   int64 group_id = 2;
 }
 
-message CreateRetryStreamRequest {
-  ControllerRequestContext context = 1;
-  string group_name = 2;
-  MessageQueue queue = 3;
-}
-
-message CreateRetryStreamReply {
-  Status status = 1;
-  int64 stream_id = 2;
-}
-
 service ControllerService {
   rpc registerNode(NodeRegistrationRequest) returns (NodeRegistrationReply) {}
 
@@ -398,8 +387,6 @@ service ControllerService {
   rpc listMessageQueueReassignments(ListMessageQueueReassignmentsRequest) returns (ListMessageQueueReassignmentsReply) {}
 
   rpc createGroup(CreateGroupRequest) returns (CreateGroupReply) {}
-
-  rpc createRetryStream(CreateRetryStreamRequest) returns (CreateRetryStreamReply) {}
 
   rpc commitOffset(CommitOffsetRequest) returns (CommitOffsetReply) {}
 

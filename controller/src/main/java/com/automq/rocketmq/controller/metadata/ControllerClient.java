@@ -62,8 +62,6 @@ public interface ControllerClient extends Closeable {
     CompletableFuture<CreateGroupReply> createGroup(String target, CreateGroupRequest request)
         throws ControllerException;
 
-    CompletableFuture<Long> createRetryStream(String target, String groupName, long topicId, int queueId);
-
     CompletableFuture<Void> commitOffset(String target, long groupId, long topicId, int queueId,
         long offset);
 

@@ -57,7 +57,6 @@ import com.automq.rocketmq.controller.metadata.DatabaseTestBase;
 import com.automq.rocketmq.controller.metadata.GrpcControllerClient;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.DefaultMetadataStore;
-import com.automq.rocketmq.controller.metadata.database.dao.Group;
 import com.automq.rocketmq.controller.metadata.database.dao.GroupProgress;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
@@ -67,7 +66,6 @@ import com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject;
 import com.automq.rocketmq.controller.metadata.database.dao.S3WalObject;
 import com.automq.rocketmq.controller.metadata.database.dao.Stream;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
-import com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.GroupProgressMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper;
@@ -342,12 +340,11 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
         Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
         Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
 
-
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
-                    .atMost(10, TimeUnit.SECONDS)
-                    .until(metadataStore::isLeader);
+                .atMost(10, TimeUnit.SECONDS)
+                .until(metadataStore::isLeader);
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore))) {
                 testServer.start();
@@ -355,8 +352,8 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 ManagedChannel channel = Grpc.newChannelBuilderForAddress("localhost", port, InsecureChannelCredentials.create()).build();
                 ControllerServiceGrpc.ControllerServiceBlockingStub blockingStub = ControllerServiceGrpc.newBlockingStub(channel);
                 DeleteTopicRequest request = DeleteTopicRequest.newBuilder()
-                        .setTopicId(1)
-                        .build();
+                    .setTopicId(1)
+                    .build();
                 DeleteTopicReply reply = blockingStub.deleteTopic(request);
                 Assertions.assertEquals(404, reply.getStatus().getCode().getNumber());
                 channel.shutdownNow();
@@ -437,9 +434,8 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 Assertions.assertTrue(reply.getGroupId() > 0);
 
                 // Test duplication
-                client.createGroup(target, request).whenComplete((res, e) -> {
-                    Assertions.assertEquals(ExecutionException.class, e.getClass());
-                });
+                client.createGroup(target, request).whenComplete(
+                    (res, e) -> Assertions.assertEquals(ExecutionException.class, e.getClass()));
             }
         }
     }
@@ -490,66 +486,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             List<QueueAssignment> assignments = assignmentMapper.list(topicId, null, null, AssignmentStatus.ASSIGNMENT_STATUS_YIELDING, null);
             Assertions.assertEquals(1, assignments.size());
             session.commit();
-        }
-    }
-
-    @Test
-    public void testCreateRetryStream() throws IOException, ExecutionException, InterruptedException {
-        ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
-        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
-        Mockito.when(controllerConfig.nodeId()).thenReturn(1);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
-
-        long topicId = 1;
-        int queueId = 2;
-        int srcNodeId = 1;
-        int dstNodeId = 2;
-        String groupName = "G1";
-        long groupId;
-
-        try (SqlSession session = getSessionFactory().openSession()) {
-            QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
-            QueueAssignment assignment = new QueueAssignment();
-            assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNED);
-            assignment.setTopicId(topicId);
-            assignment.setQueueId(queueId);
-            assignment.setSrcNodeId(srcNodeId);
-            assignment.setDstNodeId(dstNodeId);
-            assignmentMapper.create(assignment);
-
-            GroupMapper groupMapper = session.getMapper(GroupMapper.class);
-            Group group = new Group();
-            group.setName(groupName);
-            group.setGroupType(GroupType.GROUP_TYPE_STANDARD);
-            group.setDeadLetterTopicId(1);
-            group.setMaxDeliveryAttempt(3);
-            groupMapper.create(group);
-            groupId = group.getId();
-
-            session.commit();
-        }
-
-        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
-            metadataStore.start();
-            Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
-                .atMost(10, TimeUnit.SECONDS)
-                .until(metadataStore::isLeader);
-
-            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-                 ControllerClient client = new GrpcControllerClient()
-            ) {
-                testServer.start();
-                int port = testServer.getPort();
-                client.createRetryStream(String.format("localhost:%d", port), groupName, topicId, queueId).get();
-            }
-        }
-
-        try (SqlSession session = getSessionFactory().openSession()) {
-            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
-            List<Stream> streams = streamMapper.list(topicId, queueId, groupId);
-            Assertions.assertEquals(1, streams.size());
         }
     }
 
@@ -881,7 +817,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testTrimStream() throws IOException, ControllerException, ExecutionException, InterruptedException {
+    public void testTrimStream() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
         ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
         Mockito.when(controllerConfig.nodeId()).thenReturn(2);
@@ -961,7 +897,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testTrimStream_WithS3Stream() throws IOException, ControllerException, ExecutionException, InterruptedException {
+    public void testTrimStream_WithS3Stream() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
         ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
         Mockito.when(controllerConfig.nodeId()).thenReturn(2);
@@ -1069,7 +1005,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testTrimStream_WithS3WAL() throws IOException, ControllerException, ExecutionException, InterruptedException {
+    public void testTrimStream_WithS3WAL() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
         ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
         Mockito.when(controllerConfig.nodeId()).thenReturn(2);
@@ -1185,7 +1121,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testTrimStream_WithRange() throws IOException, ControllerException, ExecutionException, InterruptedException {
+    public void testTrimStream_WithRange() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
         ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
         Mockito.when(controllerConfig.nodeId()).thenReturn(2);
@@ -1596,7 +1532,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
     }
 
-
     @Test
     public void testCreateTopic_OpenStream_CloseStream() throws IOException, ExecutionException, InterruptedException, ControllerException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
@@ -1637,7 +1572,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 node.setAddress(address);
                 node.setInstanceId(instanceId);
                 node.setId(nodeId);
-                ((DefaultMetadataStore) metadataStore).addBrokerNode(node);
+                metadataStore.addBrokerNode(node);
 
                 Long topicId = client.createTopic(String.format("localhost:%d", port), CreateTopicRequest.newBuilder()
                     .setTopic(topicName)

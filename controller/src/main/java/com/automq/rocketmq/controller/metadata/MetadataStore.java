@@ -44,6 +44,14 @@ public interface MetadataStore extends Closeable {
 
     ControllerConfig config();
 
+    /**
+     * Open a JDBC connection with auto-commit disabled.
+     * </p>
+     *
+     * Remember to commit session manually if updates are involved.
+     *
+     * @return SqlSession instance
+     */
     SqlSession openSession();
 
     ControllerClient controllerClient();
@@ -159,9 +167,6 @@ public interface MetadataStore extends Closeable {
 
     CompletableFuture<List<S3StreamObject>> listStreamObjects(long streamId, long startOffset, long endOffset,
         int limit);
-
-    CompletableFuture<Long> getOrCreateRetryStream(String groupName, long topicId,
-        int queueId) throws ControllerException;
 
     CompletableFuture<Long> getConsumerOffset(long consumerGroupId, long topicId, int queueId);
 
