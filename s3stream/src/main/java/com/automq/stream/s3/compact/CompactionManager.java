@@ -107,7 +107,7 @@ public class CompactionManager {
                         .thenAccept(result -> logger.info("Compaction complete, total cost {} ms, result {}",
                                 System.currentTimeMillis() - start, result))
                         .exceptionally(ex -> {
-                            logger.error("Compaction failed, cost {} ms, ", System.currentTimeMillis() - start, ex);
+                            logger.error("Compaction failed, cost {} ms, {}", System.currentTimeMillis() - start, ex.getMessage());
                             return null;
                         });
             } catch (Exception ex) {
@@ -138,10 +138,10 @@ public class CompactionManager {
                 return CompletableFuture.completedFuture(CompactResult.SKIPPED);
             }
 
-            logger.info("Build compact request complete, time cost: {} ms, start committing objects", System.currentTimeMillis() - start);
+            logger.info("Build compact request complete, {} objects compacted, WAL object id: {}, size: {}, stream object num: {}, time cost: {} ms, start committing objects",
+                    request.getCompactedObjectIds().size(), request.getObjectId(), request.getObjectSize(), request.getStreamObjects().size(), System.currentTimeMillis() - start);
             return objectManager.commitWALObject(request).thenApply(resp -> {
-                logger.info("Commit compact request succeed, {} objects compacted, WAL object id: {}, size: {}, stream object num: {}, time cost: {} ms",
-                        request.getCompactedObjectIds().size(), request.getObjectId(), request.getObjectSize(), request.getStreamObjects().size(), System.currentTimeMillis() - start);
+                logger.info("Commit compact request succeed, time cost: {} ms", System.currentTimeMillis() - start);
                 if (s3ObjectLogEnable) {
                     s3ObjectLogger.trace("[Compact] {}", request);
                 }
@@ -255,6 +255,7 @@ public class CompactionManager {
         List<CompletableFuture<StreamObject>> forceSplitCfs = splitWALObjects(objectsToSplit);
 
         CommitWALObjectRequest request = new CommitWALObjectRequest();
+        request.setObjectId(-1L);
         List<CompactionPlan> compactionPlans = new ArrayList<>();
         try {
             logger.info("{} WAL objects as compact candidates, total compaction size: {}",
