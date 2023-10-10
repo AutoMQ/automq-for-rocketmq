@@ -953,7 +953,8 @@ public class DefaultMetadataStore implements MetadataStore {
                     Stream stream = streams.get(0);
                     long endOffset = 0;
                     switch (stream.getState()) {
-                        case UNINITIALIZED -> {}
+                        case UNINITIALIZED -> {
+                        }
                         case DELETED -> {
                             ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE,
                                 String.format("Stream for topic-id=%d, queue-id=%d, stream-role=%s has been deleted",
@@ -1201,7 +1202,7 @@ public class DefaultMetadataStore implements MetadataStore {
                             // nodeId should be equal to stream.srcNodeId
                             if (nodeId != stream.getSrcNodeId()) {
                                 LOGGER.warn("State of Stream[stream-id={}] is {}. Current owner should be {}, while {} " +
-                                    "is attempting to open. Fenced!", stream.getId(), stream.getState(), stream.getSrcNodeId(),
+                                        "is attempting to open. Fenced!", stream.getId(), stream.getState(), stream.getSrcNodeId(),
                                     nodeId);
                                 ControllerException e = new ControllerException(Code.FENCED_VALUE, "Node does not match");
                                 future.completeExceptionally(e);
@@ -1254,7 +1255,6 @@ public class DefaultMetadataStore implements MetadataStore {
                             return future;
                         }
                     }
-
 
                     // Now that the request is valid, update the stream's epoch and create a new range for this broker
 
