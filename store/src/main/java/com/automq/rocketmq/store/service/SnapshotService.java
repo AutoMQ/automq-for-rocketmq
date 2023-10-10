@@ -23,6 +23,7 @@ import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.generated.CheckPoint;
 import com.automq.rocketmq.store.model.kv.KVReadOptions;
+import com.automq.rocketmq.store.model.message.TopicQueueId;
 import com.automq.rocketmq.store.model.operation.OperationSnapshot;
 import com.automq.rocketmq.store.model.stream.SingleRecord;
 import com.automq.rocketmq.store.service.api.KVService;
@@ -42,7 +43,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
-import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,7 +54,8 @@ public class SnapshotService implements Lifecycle, Runnable {
     private Thread snapshotTaker;
     private final KVService kvService;
     private volatile boolean stopped = false;
-    private ConcurrentMap<Pair<Long, Integer>, SnapshotStatus> snapshotStatusMap = new ConcurrentHashMap<>();
+    private final ConcurrentMap<TopicQueueId, SnapshotStatus> snapshotStatusMap = new ConcurrentHashMap<>();
+    private CompletableFuture<Void> takingSnapshot = CompletableFuture.completedFuture(null);
 
     public SnapshotService(StreamStore streamStore, KVService kvService) {
         this.streamStore = streamStore;
@@ -81,7 +82,7 @@ public class SnapshotService implements Lifecycle, Runnable {
     }
 
     public SnapshotStatus getSnapshotStatus(long topicId, int queueId) {
-        return snapshotStatusMap.computeIfAbsent(Pair.of(topicId, queueId), k -> new SnapshotStatus());
+        return snapshotStatusMap.computeIfAbsent(TopicQueueId.of(topicId, queueId), k -> new SnapshotStatus());
     }
 
     @Override
@@ -95,6 +96,12 @@ public class SnapshotService implements Lifecycle, Runnable {
     @Override
     public void shutdown() throws Exception {
         this.stopped = true;
+        // 1. wait for the current task to complete
+        takingSnapshot.join();
+        // 2. abort all waiting snapshot task
+        List<SnapshotTask> snapshotTasks = new ArrayList<>();
+        snapshotTaskQueue.drainTo(snapshotTasks);
+        snapshotTasks.forEach(SnapshotTask::abort);
         if (this.snapshotTaker != null) {
             this.snapshotTaker.interrupt();
         }
@@ -108,12 +115,15 @@ public class SnapshotService implements Lifecycle, Runnable {
                 if (snapshotTask == null) {
                     continue;
                 }
-                takeSnapshot(snapshotTask)
+                takingSnapshot = takeSnapshot(snapshotTask)
                     .exceptionally(e -> {
                         Throwable cause = FutureUtil.cause(e);
                         snapshotTask.completeFailure(cause);
                         return null;
-                    }).join();
+                    });
+                takingSnapshot.join();
+            } catch (InterruptedException ignore) {
+
             } catch (Exception e) {
                 Throwable cause = FutureUtil.cause(e);
                 LOGGER.warn("Failed to take snapshot", cause);
@@ -122,6 +132,10 @@ public class SnapshotService implements Lifecycle, Runnable {
     }
 
     CompletableFuture<Void> takeSnapshot(SnapshotTask task) {
+        if (stopped) {
+            task.abort();
+            return CompletableFuture.completedFuture(null);
+        }
         CompletableFuture<OperationSnapshot> snapshotFuture = task.snapshotSupplier.get();
         long topicId = task.topicId;
         int queueId = task.queueId;
@@ -147,7 +161,7 @@ public class SnapshotService implements Lifecycle, Runnable {
                 try {
                     kvService.releaseSnapshot(snapshot.getKvServiceSnapshotVersion());
                 } catch (StoreException e) {
-                    LOGGER.error("release snapshot failed", e);
+                    LOGGER.error("Release snapshot:{} failed", snapshot, e);
                 }
             }
             snapshot.setCheckPoints(checkPointList);
@@ -161,13 +175,12 @@ public class SnapshotService implements Lifecycle, Runnable {
             // trim operation stream
             streamStore.trim(operationStreamId, snapshot.getSnapshotEndOffset() + 1);
             task.completeSuccess(snapshot.getSnapshotEndOffset() + 1);
-            // release snapshot
             return null;
         });
     }
 
-    CompletableFuture<Long> addSnapshotTask(SnapshotTask task) {
-        CompletableFuture<Long> cf = new CompletableFuture<>();
+    CompletableFuture<TakeSnapshotResult> addSnapshotTask(SnapshotTask task) {
+        CompletableFuture<TakeSnapshotResult> cf = new CompletableFuture<>();
         task.setCf(cf);
         snapshotTaskQueue.add(task);
         return cf;
@@ -180,7 +193,7 @@ public class SnapshotService implements Lifecycle, Runnable {
         private final long snapshotStreamId;
         private final Supplier<CompletableFuture<OperationSnapshot>> snapshotSupplier;
 
-        private CompletableFuture<Long/*new start offset*/> cf;
+        private CompletableFuture<TakeSnapshotResult> cf;
 
         public SnapshotTask(long topicId, int queueId, long operationStreamId, long snapshotStreamId,
             Supplier<CompletableFuture<OperationSnapshot>> snapshotSupplier) {
@@ -191,17 +204,57 @@ public class SnapshotService implements Lifecycle, Runnable {
             this.snapshotSupplier = snapshotSupplier;
         }
 
-        public void setCf(CompletableFuture<Long> cf) {
+        public void setCf(CompletableFuture<TakeSnapshotResult> cf) {
             this.cf = cf;
         }
 
         public void completeFailure(Throwable cause) {
-            LOGGER.warn("[SnapshotTask]: take snapshot failed", cause);
+            LOGGER.warn("[SnapshotTask]: Take snapshot: {} failed", this, cause);
             this.cf.completeExceptionally(cause);
         }
 
         public void completeSuccess(long offset) {
-            this.cf.complete(offset);
+            this.cf.complete(TakeSnapshotResult.ofSuccess(offset));
+        }
+
+        public void abort() {
+            this.cf.complete(TakeSnapshotResult.ofAbort());
+        }
+
+        @Override
+        public String toString() {
+            return "SnapshotTask{" +
+                "topicId=" + topicId +
+                ", queueId=" + queueId +
+                ", operationStreamId=" + operationStreamId +
+                ", snapshotStreamId=" + snapshotStreamId +
+                '}';
+        }
+    }
+
+    static class TakeSnapshotResult {
+        private final boolean success;
+        private final long newOpStartOffset;
+
+        private TakeSnapshotResult(boolean success, long newOpStartOffset) {
+            this.success = success;
+            this.newOpStartOffset = newOpStartOffset;
+        }
+
+        public static TakeSnapshotResult ofSuccess(long newOpStartOffset) {
+            return new TakeSnapshotResult(true, newOpStartOffset);
+        }
+
+        public static TakeSnapshotResult ofAbort() {
+            return new TakeSnapshotResult(false, -1);
+        }
+
+        public boolean success() {
+            return success;
+        }
+
+        public long newOpStartOffset() {
+            return newOpStartOffset;
         }
     }
 }

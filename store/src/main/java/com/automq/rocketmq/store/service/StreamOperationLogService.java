@@ -124,12 +124,16 @@ public class StreamOperationLogService implements OperationLogService {
         MessageStateMachine stateMachine = operation.stateMachine();
         SnapshotService.SnapshotStatus snapshotStatus = snapshotService.getSnapshotStatus(stateMachine.topicId(), stateMachine.queueId());
         if (snapshotStatus.takingSnapshot().compareAndSet(false, true)) {
-            CompletableFuture<Long> taskCf = snapshotService.addSnapshotTask(new SnapshotService.SnapshotTask(
+            CompletableFuture<SnapshotService.TakeSnapshotResult> taskCf = snapshotService.addSnapshotTask(new SnapshotService.SnapshotTask(
                 operation.topicId(), operation.queueId(), operation.operationStreamId(), operation.snapshotStreamId(),
                 stateMachine::takeSnapshot));
-            taskCf.thenAccept(newStartOffset -> {
+            taskCf.thenAccept(takeSnapshotResult -> {
                 snapshotStatus.takingSnapshot().set(false);
-                snapshotStatus.operationStartOffset().set(newStartOffset);
+                if (takeSnapshotResult.success()) {
+                    snapshotStatus.operationStartOffset().set(takeSnapshotResult.newOpStartOffset());
+                } else {
+                    LOGGER.warn("Topic {}, queue: {}: Take snapshot task is aborted", operation.topicId(), operation.queueId());
+                }
             }).exceptionally(e -> {
                 Throwable cause = FutureUtil.cause(e);
                 LOGGER.error("Topic {}, queue: {}: Take snapshot failed", operation.topicId(), operation.queueId(), cause);
