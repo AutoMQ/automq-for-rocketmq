@@ -56,5 +56,5 @@ public interface GroupMapper {
      * @param id Optional group-id to delete
      * @return Number of rows affected.
      */
-    int delete(Long id);
+    int delete(@Param("id") Long id);
 }
