@@ -1172,7 +1172,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     }
 
                     if (nodeId != stream.getDstNodeId()) {
-                        LOGGER.warn("stream {}'s dst node {} is not match request node {}",
+                        LOGGER.warn("dst-node-id of stream {} does not match. Expecting {}, actual request node {}",
                             streamId, stream.getDstNodeId(), nodeId);
                         ControllerException e = new ControllerException(Code.ILLEGAL_STATE_VALUE, "Node is not match");
                         future.completeExceptionally(e);
@@ -1292,7 +1292,8 @@ public class DefaultMetadataStore implements MetadataStore {
                     .setStreamEpoch(streamEpoch)
                     .build();
                 try {
-                    return this.controllerClient.openStream(this.leaderAddress(), request).thenApply(OpenStreamReply::getStreamMetadata);
+                    return this.controllerClient.openStream(this.leaderAddress(), request)
+                        .thenApply(OpenStreamReply::getStreamMetadata);
                 } catch (ControllerException e) {
                     future.completeExceptionally(e);
                 }
@@ -1315,14 +1316,15 @@ public class DefaultMetadataStore implements MetadataStore {
 
                     // Verify resource existence
                     if (null == stream) {
-                        ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE, String.format("Stream[stream-id=%d] is not found", streamId));
+                        ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE,
+                            String.format("Stream[stream-id=%d] is not found", streamId));
                         future.completeExceptionally(e);
                         break;
                     }
 
                     // Verify node
                     if (nodeId != stream.getDstNodeId()) {
-                        LOGGER.warn("stream {}'s dst node {} is not match request node {}",
+                        LOGGER.warn("dst-node-id of stream {} is {}, fencing close stream request from Node[node-id={}]",
                             streamId, stream.getDstNodeId(), nodeId);
                         ControllerException e = new ControllerException(Code.ILLEGAL_STATE_VALUE, "Node is not match");
                         future.completeExceptionally(e);
