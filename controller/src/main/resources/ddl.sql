@@ -36,21 +36,21 @@ CREATE TABLE IF NOT EXISTS node
     epoch       INT          NOT NULL DEFAULT 0,
     create_time DATETIME              DEFAULT CURRENT_TIMESTAMP,
     update_time DATETIME              DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE INDEX idx_name(name),
-    UNIQUE INDEX idx_host_name(hostname),
-    UNIQUE INDEX idx_address(address)
+    UNIQUE INDEX idx_name (name),
+    UNIQUE INDEX idx_host_name (hostname),
+    UNIQUE INDEX idx_address (address)
 );
 
 CREATE TABLE IF NOT EXISTS topic
 (
-    id          BIGINT       NOT NULL PRIMARY KEY AUTO_INCREMENT,
-    name        VARCHAR(255) NOT NULL,
-    queue_num   INT          NOT NULL DEFAULT 0,
-    status      TINYINT  DEFAULT 0,
-    create_time DATETIME DEFAULT current_timestamp,
-    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    accept_message_types TEXT NOT NULL,
-    UNIQUE INDEX idx_topic_name(name)
+    id                   BIGINT       NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    name                 VARCHAR(255) NOT NULL,
+    queue_num            INT          NOT NULL DEFAULT 0,
+    status               TINYINT               DEFAULT 0,
+    create_time          DATETIME              DEFAULT current_timestamp,
+    update_time          DATETIME              DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    accept_message_types TEXT         NOT NULL,
+    UNIQUE INDEX idx_topic_name (name)
 );
 
 CREATE TABLE IF NOT EXISTS queue_assignment
@@ -70,11 +70,11 @@ CREATE TABLE IF NOT EXISTS stream
     topic_id     BIGINT    NOT NULL,
     queue_id     INT       NOT NULL,
     stream_role  TINYINT   NOT NULL DEFAULT 0,
-    group_id     BIGINT NULL,
+    group_id     BIGINT    NULL,
     src_node_id  INT,
     dst_node_id  INT,
     epoch        BIGINT    NOT NULL DEFAULT -1,
-    range_id     INT NOT NULL DEFAULT -1,
+    range_id     INT       NOT NULL DEFAULT -1,
     start_offset BIGINT    NOT NULL DEFAULT 0,
     state        INT       NOT NULL DEFAULT 1,
     create_time  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -88,7 +88,7 @@ CREATE TABLE IF NOT EXISTS consumer_group
     name                 VARCHAR(255) NOT NULL,
     status               TINYINT      NOT NULL DEFAULT 0,
     dead_letter_topic_id BIGINT,
-    max_delivery_attempt    INT          NOT NULL DEFAULT 16,
+    max_delivery_attempt INT          NOT NULL DEFAULT 16,
     group_type           TINYINT      NOT NULL,
     create_time          DATETIME              DEFAULT CURRENT_TIMESTAMP,
     update_time          DATETIME              DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -103,7 +103,7 @@ CREATE TABLE IF NOT EXISTS subscription
     expression  VARCHAR(255) NOT NULL,
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE INDEX idx_subscription_group_topic(group_id, topic_id)
+    UNIQUE INDEX idx_subscription_group_topic (group_id, topic_id)
 );
 
 CREATE TABLE IF NOT EXISTS group_progress
@@ -112,7 +112,7 @@ CREATE TABLE IF NOT EXISTS group_progress
     topic_id     BIGINT NOT NULL,
     queue_id     INT    NOT NULL,
     queue_offset BIGINT NOT NULL,
-    UNIQUE INDEX idx_group_progress(group_id, topic_id, queue_id)
+    UNIQUE INDEX idx_group_progress (group_id, topic_id, queue_id)
 );
 
 CREATE TABLE IF NOT EXISTS `range`
@@ -124,8 +124,8 @@ CREATE TABLE IF NOT EXISTS `range`
     start_offset BIGINT NOT NULL,
     end_offset   BIGINT NOT NULL,
     broker_id    INT    NOT NULL,
-    UNIQUE INDEX idx_stream_range(stream_id, range_id),
-    UNIQUE INDEX idx_stream_start_offset(stream_id, start_offset)
+    UNIQUE INDEX idx_stream_range (stream_id, range_id),
+    INDEX idx_stream_start_offset (stream_id, start_offset)
 );
 
 CREATE TABLE IF NOT EXISTS s3object
@@ -138,7 +138,7 @@ CREATE TABLE IF NOT EXISTS s3object
     expired_timestamp             BIGINT,
     marked_for_deletion_timestamp BIGINT,
     state                         TINYINT NOT NULL DEFAULT 0,
-    INDEX idx_s3_object_state_expired_timestamp(state, expired_timestamp)
+    INDEX idx_s3_object_state_expired_timestamp (state, expired_timestamp)
 );
 
 CREATE TABLE IF NOT EXISTS s3streamobject
@@ -151,8 +151,8 @@ CREATE TABLE IF NOT EXISTS s3streamobject
     object_size         BIGINT NOT NULL,
     base_data_timestamp BIGINT,
     committed_timestamp BIGINT,
-    UNIQUE INDEX uk_s3_stream_object_object_id(object_id),
-    INDEX idx_s3_stream_object_stream_id(stream_id, start_offset)
+    UNIQUE INDEX uk_s3_stream_object_object_id (object_id),
+    INDEX idx_s3_stream_object_stream_id (stream_id, start_offset)
 );
 
 CREATE TABLE IF NOT EXISTS s3walobject
@@ -164,6 +164,6 @@ CREATE TABLE IF NOT EXISTS s3walobject
     sub_streams         LONGTEXT NOT NULL, -- immutable
     base_data_timestamp BIGINT,
     committed_timestamp BIGINT,
-    UNIQUE INDEX uk_s3_wal_object_broker_sequence_id(broker_id, sequence_id),
-    INDEX idx_s3_wal_object_object_id(object_id)
+    UNIQUE INDEX uk_s3_wal_object_broker_sequence_id (broker_id, sequence_id),
+    INDEX idx_s3_wal_object_object_id (object_id)
 );
