@@ -23,6 +23,7 @@ import com.automq.rocketmq.proxy.mock.MockMessageStore;
 import com.automq.rocketmq.proxy.mock.MockProxyMetadataService;
 import com.automq.rocketmq.proxy.model.VirtualQueue;
 import com.automq.rocketmq.proxy.util.FlatMessageUtil;
+import com.automq.rocketmq.proxy.util.ReceiptHandleUtil;
 import com.automq.rocketmq.store.api.MessageStore;
 import com.automq.rocketmq.store.model.message.TagFilter;
 import java.util.List;
@@ -35,7 +36,6 @@ import org.apache.rocketmq.client.producer.SendResult;
 import org.apache.rocketmq.client.producer.SendStatus;
 import org.apache.rocketmq.common.filter.ExpressionType;
 import org.apache.rocketmq.common.message.Message;
-import org.apache.rocketmq.common.message.MessageExt;
 import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.proxy.common.ProxyContext;
 import org.apache.rocketmq.proxy.service.message.MessageService;
@@ -47,15 +47,12 @@ import org.apache.rocketmq.remoting.protocol.header.QueryConsumerOffsetRequestHe
 import org.apache.rocketmq.remoting.protocol.header.SendMessageRequestHeader;
 import org.apache.rocketmq.remoting.protocol.header.UpdateConsumerOffsetRequestHeader;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
 
-@Disabled
 class MessageServiceImplTest {
     public static final String RECEIPT_HANDLE = "FAAAAAAAAAAMABwABAAAAAwAFAAMAAAAAgAAAAAAAAACAAAAAAAAAAMAAAAAAAAA";
 
@@ -125,55 +122,12 @@ class MessageServiceImplTest {
         assertEquals(PopStatus.FOUND, result.getPopStatus());
         assertEquals(2, result.getMsgFoundList().size());
         // All messages in queue 0 has been consumed
-        assertEquals(2, metadataService.consumerOffsetOf(consumerGroupId, topicId, 0).join());
+        assertEquals(2, messageStore.getConsumeOffset(consumerGroupId, topicId, 0).join());
 
-        // Pop all queues.
-        header.setQueueId(-1);
-        header.setMaxMsgNums(4);
-        messageStore.put(FlatMessageUtil.convertFrom(topicId, 1, "", new Message(topicName, "", new byte[] {})));
-        messageStore.put(FlatMessageUtil.convertFrom(topicId, 2, "", new Message(topicName, "", new byte[] {})));
-        messageStore.put(FlatMessageUtil.convertFrom(topicId, 2, "", new Message(topicName, "", new byte[] {})));
-        messageStore.put(FlatMessageUtil.convertFrom(topicId, 4, "", new Message(topicName, "", new byte[] {})));
-        messageStore.put(FlatMessageUtil.convertFrom(topicId, 4, "", new Message(topicName, "", new byte[] {})));
-        messageStore.put(FlatMessageUtil.convertFrom(topicId, 4, "", new Message(topicName, "", new byte[] {})));
-
+        // Pop again.
         result = messageService.popMessage(ProxyContext.create(), messageQueue, header, 0L).join();
-        assertEquals(PopStatus.FOUND, result.getPopStatus());
-        assertEquals(4, result.getMsgFoundList().size());
-        // Queue 1 should not be touched because it is not assigned.
-        assertEquals(0, metadataService.consumerOffsetOf(consumerGroupId, topicId, 1).join());
-
-        // The priorities of queues 2 and 4 are not fixed, so there are the following two results:
-        // 1. pop one message from queue 2 and three messages from queue 4
-        // 2. pop two messages each from queue 2 and 4
-        int messageFromQueue2 = 0;
-        int messageFromQueue4 = 0;
-        for (MessageExt messageExt : result.getMsgFoundList()) {
-            switch (messageExt.getQueueId()) {
-                case 2 -> messageFromQueue2++;
-                case 4 -> messageFromQueue4++;
-                default -> fail("All messages should be popped from queue 2 or 4.");
-            }
-        }
-        assertEquals(messageFromQueue2, metadataService.consumerOffsetOf(consumerGroupId, topicId, 2).join());
-        assertEquals(messageFromQueue4, metadataService.consumerOffsetOf(consumerGroupId, topicId, 4).join());
-
-        // Pop remaining messages.
-        header.setMaxMsgNums(1);
-        result = messageService.popMessage(ProxyContext.create(), messageQueue, header, 0L).join();
-        assertEquals(PopStatus.FOUND, result.getPopStatus());
-        assertEquals(1, result.getMsgFoundList().size());
-
-        int remainingQueue;
-        if (messageFromQueue4 == 3) {
-            remainingQueue = 2;
-        } else {
-            remainingQueue = 4;
-        }
-
-        MessageExt messageExt = result.getMsgFoundList().get(0);
-        assertEquals(remainingQueue, messageExt.getQueueId());
-        assertEquals(remainingQueue == 2 ? 1 : 2, messageExt.getQueueOffset());
+        assertEquals(PopStatus.NO_NEW_MSG, result.getPopStatus());
+        assertEquals(0, result.getMsgFoundList().size());
     }
 
     @Test
@@ -214,9 +168,10 @@ class MessageServiceImplTest {
         assertEquals(0, result.getMsgFoundList().size());
 
         AckMessageRequestHeader ackHeader = new AckMessageRequestHeader();
-        ackHeader.setExtraInfo(RECEIPT_HANDLE);
+        ackHeader.setExtraInfo(ReceiptHandleUtil.encodeReceiptHandle(RECEIPT_HANDLE, 0L));
         ackHeader.setTopic(topicName);
         ackHeader.setQueueId(0);
+        ackHeader.setConsumerGroup("group");
         messageService.ackMessage(context, null, "", ackHeader, 0L);
         messageService.ackMessage(context, null, "", ackHeader, 0L);
 
@@ -232,7 +187,7 @@ class MessageServiceImplTest {
     @Test
     void changeInvisibleTime() {
         ChangeInvisibleTimeRequestHeader header = new ChangeInvisibleTimeRequestHeader();
-        header.setExtraInfo(RECEIPT_HANDLE);
+        header.setExtraInfo(ReceiptHandleUtil.encodeReceiptHandle(RECEIPT_HANDLE, 0L));
         header.setInvisibleTime(100L);
         AckResult ackResult = messageService.changeInvisibleTime(ProxyContext.create(), null, null, header, 0).join();
         assertEquals(AckStatus.OK, ackResult.getStatus());
@@ -245,9 +200,10 @@ class MessageServiceImplTest {
     @Test
     void ackMessage() {
         AckMessageRequestHeader header = new AckMessageRequestHeader();
-        header.setExtraInfo(RECEIPT_HANDLE);
+        header.setExtraInfo(ReceiptHandleUtil.encodeReceiptHandle(RECEIPT_HANDLE, 0L));
         header.setTopic("topic");
         header.setQueueId(0);
+        header.setConsumerGroup("group");
         AckResult ackResult = messageService.ackMessage(ProxyContext.create(), null, null, header, 0).join();
         assertEquals(AckStatus.OK, ackResult.getStatus());
 

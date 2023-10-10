@@ -153,4 +153,10 @@ public class MessageStoreImpl implements MessageStore {
         return topicQueueManager.getOrCreate(topicId, queueId)
             .thenCompose(TopicQueue::getOffsetRange);
     }
+
+    @Override
+    public CompletableFuture<Long> getConsumeOffset(long consumerGroupId, long topicId, int queueId) {
+        return topicQueueManager.getOrCreate(topicId, queueId)
+            .thenCompose(topicQueue -> topicQueue.getConsumeOffset(consumerGroupId));
+    }
 }
