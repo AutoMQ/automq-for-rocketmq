@@ -189,6 +189,16 @@ public class StreamTopicQueue extends TopicQueue {
     private CompletableFuture<PopResult> pop(long consumerGroupId, long streamId, long startOffset,
         PopOperation.PopOperationType operationType, Filter filter,
         int batchSize, long invisibleDuration) {
+        // Check offset
+        long confirmOffset = streamStore.confirmOffset(streamId);
+        if (startOffset == confirmOffset) {
+            return CompletableFuture.completedFuture(new PopResult(PopResult.Status.END_OF_QUEUE, 0, Collections.emptyList()));
+        }
+        if (startOffset > confirmOffset) {
+            return CompletableFuture.completedFuture(new PopResult(PopResult.Status.ILLEGAL_OFFSET, 0, Collections.emptyList()));
+        }
+
+
         int fetchBatchSize;
         if (filter.needApply()) {
             // If filter is applied, fetch more messages to apply filter.
@@ -288,7 +298,7 @@ public class StreamTopicQueue extends TopicQueue {
 
         long confirmOffset = streamStore.confirmOffset(streamId);
         if (offset >= confirmOffset) {
-            return CompletableFuture.failedFuture(new IllegalArgumentException("Offset " + offset + " is out of range [" + startOffset + ", " + confirmOffset + ")"));
+            return CompletableFuture.completedFuture(Collections.emptyList());
         }
 
         if (offset + batchSize > confirmOffset) {

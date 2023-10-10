@@ -119,15 +119,15 @@ public class MessageStoreTest {
 
         // 5. pop again
         popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, invisibleDuration).join();
-        assertEquals(PopResult.Status.NOT_FOUND, popResult.status());
+        assertEquals(PopResult.Status.END_OF_QUEUE, popResult.status());
         popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, true, invisibleDuration).join();
-        assertEquals(PopResult.Status.NOT_FOUND, popResult.status());
+        assertEquals(PopResult.Status.END_OF_QUEUE, popResult.status());
 
         // 6. after 1100ms, pop again
         long reviveTimestamp = System.nanoTime() + invisibleDuration;
         await().until(() -> reviveService.reviveTimestamp() >= reviveTimestamp);
         popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, invisibleDuration).join();
-        assertEquals(PopResult.Status.NOT_FOUND, popResult.status());
+        assertEquals(PopResult.Status.END_OF_QUEUE, popResult.status());
         popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, true, invisibleDuration).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(3, popResult.messageList().size());
@@ -146,7 +146,7 @@ public class MessageStoreTest {
         await().until(() -> reviveService.reviveTimestamp() >= reviveTimestamp1);
 
         popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, invisibleDuration).join();
-        assertEquals(PopResult.Status.NOT_FOUND, popResult.status());
+        assertEquals(PopResult.Status.END_OF_QUEUE, popResult.status());
         popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, true, invisibleDuration).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(3, popResult.messageList().size());
@@ -255,9 +255,9 @@ public class MessageStoreTest {
 
         // 5. pop again
         popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, invisibleDuration).join();
-        assertEquals(PopResult.Status.NOT_FOUND, popResult.status());
+        assertEquals(PopResult.Status.END_OF_QUEUE, popResult.status());
         popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, true, invisibleDuration).join();
-        assertEquals(PopResult.Status.NOT_FOUND, popResult.status());
+        assertEquals(PopResult.Status.END_OF_QUEUE, popResult.status());
 
         // 6. after 500ms, check if snapshot is taken
         StreamMetadata opStream = metadataService.operationStreamOf(TOPIC_ID, QUEUE_ID).join();
@@ -272,7 +272,7 @@ public class MessageStoreTest {
         await().until(() -> reviveService.reviveTimestamp() >= reviveTimestamp);
 
         popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, invisibleDuration).join();
-        assertEquals(PopResult.Status.NOT_FOUND, popResult.status());
+        assertEquals(PopResult.Status.END_OF_QUEUE, popResult.status());
         popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, true, invisibleDuration).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(3, popResult.messageList().size());
@@ -331,9 +331,9 @@ public class MessageStoreTest {
 
         // 5. pop again
         popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, 800 * 1000 * 1000).join();
-        assertEquals(PopResult.Status.NOT_FOUND, popResult.status());
+        assertEquals(PopResult.Status.END_OF_QUEUE, popResult.status());
         popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, true, 800 * 1000 * 1000).join();
-        assertEquals(PopResult.Status.NOT_FOUND, popResult.status());
+        assertEquals(PopResult.Status.END_OF_QUEUE, popResult.status());
 
         // 6. after 500ms, check if snapshot is taken
         StreamMetadata opStream = metadataService.operationStreamOf(TOPIC_ID, QUEUE_ID).join();
@@ -363,7 +363,7 @@ public class MessageStoreTest {
         // 8. after 1100ms, pop again
         Thread.sleep(1100);
         popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, 800 * 1000 * 1000).join();
-        assertEquals(PopResult.Status.NOT_FOUND, popResult.status());
+        assertEquals(PopResult.Status.END_OF_QUEUE, popResult.status());
         popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, true, 800 * 1000 * 1000).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(3, popResult.messageList().size());
