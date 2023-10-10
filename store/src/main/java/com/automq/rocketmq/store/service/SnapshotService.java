@@ -55,7 +55,7 @@ public class SnapshotService implements Lifecycle, Runnable {
     private final KVService kvService;
     private volatile boolean stopped = false;
     private final ConcurrentMap<TopicQueueId, SnapshotStatus> snapshotStatusMap = new ConcurrentHashMap<>();
-    private CompletableFuture<Void> takingSnapshot = CompletableFuture.completedFuture(null);
+    private CompletableFuture<Void> runningCf;
 
     public SnapshotService(StreamStore streamStore, KVService kvService) {
         this.streamStore = streamStore;
@@ -88,6 +88,7 @@ public class SnapshotService implements Lifecycle, Runnable {
     @Override
     public void start() throws Exception {
         this.stopped = false;
+        this.runningCf = new CompletableFuture<>();
         this.snapshotTaker = new Thread(this, "snapshot-taker");
         this.snapshotTaker.setDaemon(true);
         this.snapshotTaker.start();
@@ -97,38 +98,37 @@ public class SnapshotService implements Lifecycle, Runnable {
     public void shutdown() throws Exception {
         this.stopped = true;
         // 1. wait for the current task to complete
-        takingSnapshot.join();
+        if (runningCf != null) {
+            runningCf.join();
+        }
         // 2. abort all waiting snapshot task
         List<SnapshotTask> snapshotTasks = new ArrayList<>();
         snapshotTaskQueue.drainTo(snapshotTasks);
         snapshotTasks.forEach(SnapshotTask::abort);
-        if (this.snapshotTaker != null) {
-            this.snapshotTaker.interrupt();
-        }
     }
 
     @Override
     public void run() {
         while (!stopped) {
             try {
-                SnapshotTask snapshotTask = snapshotTaskQueue.poll(100, TimeUnit.MILLISECONDS);
-                if (snapshotTask == null) {
+                SnapshotTask task = snapshotTaskQueue.poll(100, TimeUnit.MILLISECONDS);
+                if (task == null) {
                     continue;
                 }
-                takingSnapshot = takeSnapshot(snapshotTask)
+                CompletableFuture<Void> takeCf = takeSnapshot(task)
                     .exceptionally(e -> {
                         Throwable cause = FutureUtil.cause(e);
-                        snapshotTask.completeFailure(cause);
+                        task.completeFailure(cause);
                         return null;
                     });
-                takingSnapshot.join();
+                takeCf.join();
             } catch (InterruptedException ignore) {
-
             } catch (Exception e) {
                 Throwable cause = FutureUtil.cause(e);
                 LOGGER.warn("Failed to take snapshot", cause);
             }
         }
+        runningCf.complete(null);
     }
 
     CompletableFuture<Void> takeSnapshot(SnapshotTask task) {
@@ -171,11 +171,13 @@ public class SnapshotService implements Lifecycle, Runnable {
             // append snapshot to snapshot stream
             return streamStore.append(snapshotStreamId, new SingleRecord(ByteBuffer.wrap(snapshotData)));
         });
-        return snapshotAppendCf.thenCombine(snapshotFuture, (appendResult, snapshot) -> {
+        return snapshotAppendCf.thenCombine(snapshotFuture, (appendResult, snapshot) -> snapshot).thenCompose(snapshot -> {
             // trim operation stream
-            streamStore.trim(operationStreamId, snapshot.getSnapshotEndOffset() + 1);
-            task.completeSuccess(snapshot.getSnapshotEndOffset() + 1);
-            return null;
+            return streamStore.trim(operationStreamId, snapshot.getSnapshotEndOffset() + 1)
+                .thenAccept(nil -> {
+                    // complete snapshot task
+                    task.completeSuccess(snapshot.getSnapshotEndOffset() + 1);
+                });
         });
     }
 
