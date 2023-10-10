@@ -52,10 +52,6 @@ public class FlatMessageUtil {
         // We should split them into two parts.
         Map<String, String> properties = rmqMessage.getProperties();
 
-        for (String systemPropertyKey : MessageConst.STRING_HASH_SET) {
-            properties.remove(systemPropertyKey);
-        }
-
         SystemPropertiesT systemPropertiesT = splitSystemProperties(flatMessageT, properties);
         systemPropertiesT.setStoreTimestamp(System.currentTimeMillis());
         systemPropertiesT.setStoreHost(storeHost);
@@ -166,6 +162,12 @@ public class FlatMessageUtil {
         if (!Strings.isNullOrEmpty(bornTimestampStr)) {
             systemPropertiesT.setBornTimestamp(Long.parseLong(bornTimestampStr));
         }
+
+        // Remove all system properties
+        for (String systemPropertyKey : MessageConst.STRING_HASH_SET) {
+            properties.remove(systemPropertyKey);
+        }
+
         // TODO: Split transaction and timer properties
         // TODO: handle producer group for transaction message
         return systemPropertiesT;
@@ -176,9 +178,20 @@ public class FlatMessageUtil {
         if (flatMessage.receiptHandle().isPresent()) {
             MessageAccessor.putProperty(messageExt, MessageConst.PROPERTY_POP_CK, encodeReceiptHandle(flatMessage.receiptHandle().get(), invisibleTime));
         }
-        MessageAccessor.putProperty(messageExt, MessageConst.PROPERTY_TAGS, flatMessage.message().tag());
-        MessageAccessor.putProperty(messageExt, MessageConst.PROPERTY_KEYS, flatMessage.message().keys());
-        MessageAccessor.putProperty(messageExt, MessageConst.PROPERTY_SHARDING_KEY, flatMessage.message().messageGroup());
-        MessageAccessor.putProperty(messageExt, MessageConst.PROPERTY_TRACE_CONTEXT, systemProperties.traceContext());
+        if (flatMessage.message().tag() != null) {
+            MessageAccessor.putProperty(messageExt, MessageConst.PROPERTY_TAGS, flatMessage.message().tag());
+        }
+        if (flatMessage.message().keys() != null) {
+            MessageAccessor.putProperty(messageExt, MessageConst.PROPERTY_KEYS, flatMessage.message().keys());
+        }
+        if (flatMessage.message().messageGroup() != null) {
+            MessageAccessor.putProperty(messageExt, MessageConst.PROPERTY_SHARDING_KEY, flatMessage.message().messageGroup());
+        }
+        if (systemProperties.messageId() != null) {
+            MessageAccessor.putProperty(messageExt, MessageConst.PROPERTY_UNIQ_CLIENT_MESSAGE_ID_KEYIDX, systemProperties.messageId());
+        }
+        if (systemProperties.traceContext() != null) {
+            MessageAccessor.putProperty(messageExt, MessageConst.PROPERTY_TRACE_CONTEXT, systemProperties.traceContext());
+        }
     }
 }
