@@ -112,7 +112,7 @@ public class MessageServiceImpl implements MessageService {
                 return CompletableFuture.failedFuture(new MQBrokerException(ResponseCode.TOPIC_NOT_EXIST, "Topic not exist"));
             }
 
-            return store.put(FlatMessageUtil.convertFrom(topic.getTopicId(), virtualQueue.physicalQueueId(), ctx.getLocalAddress(), message));
+            return store.put(FlatMessageUtil.convertFrom(topic.getTopicId(), virtualQueue.physicalQueueId(), ctx.getLocalAddress().split(":")[0], message));
         });
 
         return putFuture.thenApply(putResult -> {
@@ -166,10 +166,11 @@ public class MessageServiceImpl implements MessageService {
     }
 
     private CompletableFuture<Void> popSpecifiedQueue(long consumerGroupId, String clientId, long topicId, int queueId,
-        Filter filter, int batchSize, boolean fifo, long invisibleDuration, List<FlatMessageExt> messageList) {
+        Filter filter, int batchSize, boolean fifo, long invisibleDuration, long timeoutMillis,
+        List<FlatMessageExt> messageList) {
         if (lockService.tryLock(topicId, queueId, clientId, fifo)) {
             return popSpecifiedQueueUnsafe(consumerGroupId, topicId, queueId, filter, batchSize, fifo, invisibleDuration, messageList)
-                .orTimeout(invisibleDuration, TimeUnit.NANOSECONDS)
+                .orTimeout(timeoutMillis, TimeUnit.MILLISECONDS)
                 .whenComplete((v, throwable) -> {
                     // TODO: log exception.
                     // Release lock since complete or timeout.
@@ -215,7 +216,7 @@ public class MessageServiceImpl implements MessageService {
             }
 
             return popSpecifiedQueue(consumerGroupId, clientId, topicId, virtualQueue.physicalQueueId(), filter,
-                requestHeader.getMaxMsgNums(), requestHeader.isOrder(), requestHeader.getInvisibleTime(), messageList);
+                requestHeader.getMaxMsgNums(), requestHeader.isOrder(), requestHeader.getInvisibleTime(), timeoutMillis, messageList);
         });
 
         return popMessageFuture.thenApply(v -> {
