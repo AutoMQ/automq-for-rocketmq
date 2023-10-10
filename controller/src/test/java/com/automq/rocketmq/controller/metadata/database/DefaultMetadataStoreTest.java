@@ -1464,19 +1464,17 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             stream.setTopicId(1L);
             stream.setQueueId(2);
             stream.setRangeId(0);
-            stream.setState(StreamState.CLOSED);
+            stream.setState(StreamState.UNINITIALIZED);
             stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
             stream.setStartOffset(1234);
             streamMapper.create(stream);
             dataStreamId = stream.getId();
 
-            stream.setState(StreamState.CLOSED);
             stream.setStreamRole(StreamRole.STREAM_ROLE_OPS);
             stream.setStartOffset(1234);
             streamMapper.create(stream);
             opsStreamId = stream.getId();
 
-            stream.setState(StreamState.CLOSED);
             stream.setStreamRole(StreamRole.STREAM_ROLE_RETRY);
             stream.setGroupId(3L);
             stream.setStartOffset(1234);
