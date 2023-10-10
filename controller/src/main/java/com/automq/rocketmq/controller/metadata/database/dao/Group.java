@@ -22,12 +22,12 @@ import apache.rocketmq.controller.v1.GroupType;
 import java.util.Date;
 
 public class Group {
-    private long id;
+    private Long id;
     private String name;
 
     private GroupStatus status = GroupStatus.GROUP_STATUS_ACTIVE;
 
-    private long deadLetterTopicId;
+    private Long deadLetterTopicId;
 
     private int maxDeliveryAttempt;
 
@@ -36,11 +36,11 @@ public class Group {
     private Date createTime;
     private Date updateTime;
 
-    public long getId() {
+    public Long getId() {
         return id;
     }
 
-    public void setId(long id) {
+    public void setId(Long id) {
         this.id = id;
     }
 
@@ -76,11 +76,11 @@ public class Group {
         this.updateTime = updateTime;
     }
 
-    public long getDeadLetterTopicId() {
+    public Long getDeadLetterTopicId() {
         return deadLetterTopicId;
     }
 
-    public void setDeadLetterTopicId(long deadLetterTopicId) {
+    public void setDeadLetterTopicId(Long deadLetterTopicId) {
         this.deadLetterTopicId = deadLetterTopicId;
     }
 

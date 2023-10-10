@@ -34,12 +34,12 @@ public class GroupTest extends DatabaseTestBase {
             Group group = new Group();
             group.setName("G1");
             group.setStatus(GroupStatus.GROUP_STATUS_ACTIVE);
-            group.setDeadLetterTopicId(1);
+            group.setDeadLetterTopicId(1L);
             int rowsAffected = mapper.create(group);
             Assertions.assertEquals(1, rowsAffected);
 
             group.setStatus(GroupStatus.GROUP_STATUS_DELETED);
-            group.setDeadLetterTopicId(2);
+            group.setDeadLetterTopicId(2L);
             mapper.update(group);
 
             List<Group> groups = mapper.list(null, null, null, null);

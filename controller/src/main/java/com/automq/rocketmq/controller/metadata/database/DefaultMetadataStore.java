@@ -886,7 +886,50 @@ public class DefaultMetadataStore implements MetadataStore {
                             .list(topicId, null, null, null, null)
                             .stream().filter(assignment -> assignment.getQueueId() == queueId)
                             .toList();
-                        int nodeId = assignments.isEmpty() ? 0 : assignments.get(0).getDstNodeId();
+
+                        // Verify assignment and queue are OK
+                        if (assignments.isEmpty()) {
+                            String msg = String.format("Queue assignment for topic-id=%d queue-id=%d is not found",
+                                topicId, queueId);
+                            throw new CompletionException(new ControllerException(Code.NOT_FOUND_VALUE, msg));
+                        }
+
+                        if (assignments.size() != 1) {
+                            String msg = String.format("%d queue assignments for topic-id=%d queue-id=%d is found",
+                                assignments.size(), topicId, queueId);
+                            throw new CompletionException(new ControllerException(Code.ILLEGAL_STATE_VALUE, msg));
+                        }
+                        QueueAssignment assignment = assignments.get(0);
+                        switch (assignment.getStatus()) {
+                            case ASSIGNMENT_STATUS_YIELDING -> {
+                                String msg = String.format("Queue[topic-id=%d queue-id=%d] is under migration. " +
+                                    "Please create retry stream later", topicId, queueId);
+                                throw new CompletionException(new ControllerException(Code.ILLEGAL_STATE_VALUE, msg));
+                            }
+                            case ASSIGNMENT_STATUS_DELETED -> {
+                                String msg = String.format("Queue[topic-id=%d queue-id=%d] has been deleted",
+                                    topicId, queueId);
+                                throw new CompletionException(new ControllerException(Code.ILLEGAL_STATE_VALUE, msg));
+                            }
+                            case ASSIGNMENT_STATUS_ASSIGNED -> {
+                                // OK
+                            }
+                            default -> {
+                                String msg = String.format("Status of Queue[topic-id=%d queue-id=%d] is unsupported",
+                                    topicId, queueId);
+                                throw new CompletionException(new ControllerException(Code.INTERNAL_VALUE, msg));
+                            }
+                        }
+
+                        // Verify Group exists.
+                        GroupMapper groupMapper = session.getMapper(GroupMapper.class);
+                        List<Group> groups = groupMapper.list(groupId, null, GroupStatus.GROUP_STATUS_ACTIVE, null);
+                        if (groups.size() != 1) {
+                            String msg = String.format("Group[group-id=%d] is not found", groupId);
+                            throw new CompletionException(new ControllerException(Code.NOT_FOUND_VALUE, msg));
+                        }
+
+                        int nodeId = assignment.getDstNodeId();
                         long streamId = createStream(streamMapper, topicId, queueId, groupId, streamRole, nodeId);
                         session.commit();
                         return StreamMetadata.newBuilder()
