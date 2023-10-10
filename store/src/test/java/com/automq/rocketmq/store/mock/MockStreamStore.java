@@ -88,7 +88,7 @@ public class MockStreamStore implements StreamStore {
     @Override
     public long confirmOffset(long streamId) {
         Stream stream = openedStreams.get(streamId);
-        return Math.max(0, stream.nextOffset() - 1);
+        return stream.nextOffset();
     }
 
     @Override

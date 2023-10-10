@@ -25,6 +25,7 @@ public record PopResult(Status status, long deliveryTimestamp, List<FlatMessageE
         FOUND,
         NOT_FOUND,
         END_OF_QUEUE,
+        ILLEGAL_OFFSET,
         LOCKED,
         ERROR
     }

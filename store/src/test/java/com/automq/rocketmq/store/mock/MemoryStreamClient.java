@@ -52,7 +52,7 @@ public class MemoryStreamClient implements StreamClient {
 
     @Override
     public CompletableFuture<Stream> openStream(long streamId, OpenStreamOptions options) {
-        Stream stream = streamMap.computeIfAbsent(streamId, id -> new MemoryStream(id));
+        Stream stream = streamMap.computeIfAbsent(streamId, MemoryStream::new);
         return CompletableFuture.completedFuture(stream);
     }
 
@@ -79,6 +79,11 @@ public class MemoryStreamClient implements StreamClient {
         @Override
         public long startOffset() {
             return startOffset.get();
+        }
+
+        @Override
+        public long confirmOffset() {
+            return nextOffsetAlloc.get();
         }
 
         @Override

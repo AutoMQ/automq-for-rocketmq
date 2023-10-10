@@ -104,9 +104,8 @@ public class SnapshotServiceTest {
             streamStore.append(OP_STREAM_ID, buildRecord());
         }
 
-        SnapshotService.SnapshotTask task = new SnapshotService.SnapshotTask(TOPIC_ID, QUEUE_ID, OP_STREAM_ID, SNAPSHOT_STREAM_ID, () -> {
-            return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "test"));
-        });
+        SnapshotService.SnapshotTask task = new SnapshotService.SnapshotTask(TOPIC_ID, QUEUE_ID, OP_STREAM_ID, SNAPSHOT_STREAM_ID,
+            () -> CompletableFuture.failedFuture(new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "test")));
 
         // 2. add task
         CompletableFuture<SnapshotService.TakeSnapshotResult> taskCf = snapshotService.addSnapshotTask(task);
