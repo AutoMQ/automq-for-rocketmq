@@ -54,7 +54,6 @@ public class BrokerController implements Lifecycle {
         metadataStore = MetadataStoreBuilder.build(brokerConfig);
         // Start the node registrar first, so that the node is registered before the proxy starts.
         metadataStore.start();
-        metadataStore.registerCurrentNode(brokerConfig.name(), brokerConfig.advertiseAddress(), brokerConfig.instanceId());
 
         proxyMetadataService = new DefaultProxyMetadataService(metadataStore);
         storeMetadataService = new DefaultStoreMetadataService(metadataStore);
@@ -74,6 +73,7 @@ public class BrokerController implements Lifecycle {
         messageStore.start();
         messagingProcessor.start();
         grpcServer.start();
+        metadataStore.registerCurrentNode(brokerConfig.name(), brokerConfig.advertiseAddress(), brokerConfig.instanceId());
     }
 
     @Override
