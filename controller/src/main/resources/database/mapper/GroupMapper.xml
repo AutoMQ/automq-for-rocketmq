@@ -41,6 +41,12 @@
         </if>
     </delete>
 
+    <delete id="recycle">
+        DELETE FROM consumer_group
+        WHERE status = #{status}
+        AND #{updateTime} >= update_time
+    </delete>
+
     <select id="list" resultType="Group">
         SELECT id, name, status, dead_letter_topic_id, max_delivery_attempt, group_type, create_time, update_time
         FROM consumer_group

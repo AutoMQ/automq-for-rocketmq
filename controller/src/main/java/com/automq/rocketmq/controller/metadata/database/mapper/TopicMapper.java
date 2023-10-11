@@ -36,4 +36,7 @@ public interface TopicMapper {
     int delete(Long id);
 
     int update(Topic topic);
+
+    int recycle(@Param("status") TopicStatus status, @Param("updateTime") Date updateTime);
+
 }

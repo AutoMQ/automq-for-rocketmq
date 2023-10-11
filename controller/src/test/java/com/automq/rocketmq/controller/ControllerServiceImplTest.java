@@ -52,7 +52,6 @@ import apache.rocketmq.controller.v1.UpdateTopicReply;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.ControllerClient;
-import com.automq.rocketmq.common.config.ControllerConfig;
 import com.automq.rocketmq.controller.metadata.DatabaseTestBase;
 import com.automq.rocketmq.controller.metadata.GrpcControllerClient;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
@@ -99,11 +98,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
     @Test
     public void testRegisterBrokerNode() throws IOException {
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.nodeId()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
-
         ControllerClient client = Mockito.mock(ControllerClient.class);
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
@@ -152,10 +146,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
     @Test
     public void testRegisterBroker_BadRequest() throws IOException {
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.nodeId()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
 
         ControllerClient client = Mockito.mock(ControllerClient.class);
 
@@ -207,14 +197,10 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             nodeId = node.getId();
             session.commit();
         }
+        Mockito.when(config.nodeId()).thenReturn(nodeId);
 
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
-        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
-        Mockito.when(controllerConfig.nodeId()).thenReturn(1);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(1);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
                 .atMost(10, TimeUnit.SECONDS)
@@ -249,13 +235,8 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
         }
 
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
-        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
-        Mockito.when(controllerConfig.nodeId()).thenReturn(1);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
 
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
                 .atMost(10, TimeUnit.SECONDS)
@@ -293,18 +274,13 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
         }
 
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
-        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
-        Mockito.when(controllerConfig.nodeId()).thenReturn(1);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
 
         List<MessageType> messageTypeList = new ArrayList<>();
         messageTypeList.add(MessageType.NORMAL);
         messageTypeList.add(MessageType.FIFO);
         messageTypeList.add(MessageType.DELAY);
 
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
                 .atMost(10, TimeUnit.SECONDS)
@@ -329,17 +305,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
     @Test
     public void testDeleteTopic_NotFound() throws IOException {
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.nodeId()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
-
         ControllerClient client = Mockito.mock(ControllerClient.class);
-        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
-        Mockito.when(controllerConfig.nodeId()).thenReturn(1);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
@@ -365,13 +331,8 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     @Test
     public void testCommitOffset() throws IOException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
-        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
-        Mockito.when(controllerConfig.nodeId()).thenReturn(1);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
 
-        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
+        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
                 .atMost(10, TimeUnit.SECONDS)
@@ -403,13 +364,8 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     @Test
     public void testCreateGroup() throws IOException, ControllerException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
-        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
-        Mockito.when(controllerConfig.nodeId()).thenReturn(1);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
 
-        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
+        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
                 .atMost(10, TimeUnit.SECONDS)
@@ -444,11 +400,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     @Test
     public void testReassign() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
-        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
-        Mockito.when(controllerConfig.nodeId()).thenReturn(1);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
 
         long topicId = 1;
         int queueId = 2;
@@ -467,7 +418,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             session.commit();
         }
 
-        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
+        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
                 .atMost(10, TimeUnit.SECONDS)
@@ -493,11 +444,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     @Test
     public void testOpenStream() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
-        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
-        Mockito.when(controllerConfig.nodeId()).thenReturn(1);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
 
         long topicId = 1;
         int queueId = 2;
@@ -521,7 +467,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             session.commit();
         }
 
-        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
+        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
                 .atMost(10, TimeUnit.SECONDS)
@@ -552,11 +498,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     @Test
     public void testOpenStream_NotFound() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
-        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
-        Mockito.when(controllerConfig.nodeId()).thenReturn(1);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
 
         long topicId = 1;
         int queueId = 2;
@@ -592,7 +533,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             session.commit();
         }
 
-        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
+        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
                 .atMost(10, TimeUnit.SECONDS)
@@ -617,11 +558,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     @Test
     public void testOpenStream_Fenced() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
-        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
-        Mockito.when(controllerConfig.nodeId()).thenReturn(1);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
 
         long topicId = 1;
         int queueId = 2;
@@ -657,7 +593,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             session.commit();
         }
 
-        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
+        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
                 .atMost(10, TimeUnit.SECONDS)
@@ -682,11 +618,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     @Test
     public void testCloseStream() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
-        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
-        Mockito.when(controllerConfig.nodeId()).thenReturn(2);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
 
         long topicId = 1;
         int queueId = 2;
@@ -722,7 +653,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             session.commit();
         }
 
-        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
+        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
                 .atMost(3, TimeUnit.SECONDS)
@@ -754,11 +685,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     @Test
     public void testCloseStream_NotFound() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
-        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
-        Mockito.when(controllerConfig.nodeId()).thenReturn(2);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
 
         long topicId = 1;
         int queueId = 2;
@@ -794,7 +720,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             session.commit();
         }
 
-        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
+        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
                 .atMost(10, TimeUnit.SECONDS)
@@ -820,11 +746,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     @Test
     public void testTrimStream() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
-        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
-        Mockito.when(controllerConfig.nodeId()).thenReturn(2);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
 
         long topicId = 1;
         int queueId = 2;
@@ -862,7 +783,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             session.commit();
         }
 
-        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
+        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
                 .atMost(10, TimeUnit.SECONDS)
@@ -900,11 +821,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     @Test
     public void testTrimStream_WithS3Stream() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
-        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
-        Mockito.when(controllerConfig.nodeId()).thenReturn(2);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
 
         long topicId = 1;
         int queueId = 2;
@@ -960,7 +876,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             session.commit();
         }
 
-        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
+        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
                 .atMost(10, TimeUnit.SECONDS)
@@ -1008,11 +924,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     @Test
     public void testTrimStream_WithS3WAL() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
-        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
-        Mockito.when(controllerConfig.nodeId()).thenReturn(2);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
 
         long topicId = 1;
         int queueId = 2;
@@ -1075,7 +986,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             session.commit();
         }
 
-        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
+        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
                 .atMost(10, TimeUnit.SECONDS)
@@ -1124,11 +1035,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     @Test
     public void testTrimStream_WithRange() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
-        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
-        Mockito.when(controllerConfig.nodeId()).thenReturn(2);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
 
         long topicId = 1;
         int queueId = 2;
@@ -1193,7 +1099,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             session.commit();
         }
 
-        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
+        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
                 .atMost(10, TimeUnit.SECONDS)
@@ -1241,11 +1147,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     @Test
     public void testListOpenStreams() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
-        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
-        Mockito.when(controllerConfig.nodeId()).thenReturn(2);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
 
         try (SqlSession session = getSessionFactory().openSession()) {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
@@ -1264,7 +1165,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             session.commit();
         }
 
-        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
+        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
                 .atMost(10, TimeUnit.SECONDS)
@@ -1289,14 +1190,9 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     @Disabled
     public void test3StreamObjects_2PC() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
-        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
-        Mockito.when(controllerConfig.nodeId()).thenReturn(2);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
         long objectId, streamId = 1;
 
-        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
+        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
                 .atMost(10, TimeUnit.SECONDS)
@@ -1372,15 +1268,10 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     @Disabled
     public void test3WALObjects_2PC() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
-        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
-        Mockito.when(controllerConfig.nodeId()).thenReturn(2);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
         long objectId, streamId = 1;
         int nodeId = 2;
 
-        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
+        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
                 .atMost(10, TimeUnit.SECONDS)
@@ -1475,11 +1366,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     @Test
     public void testCreateTopic_OpenStream_CloseStream() throws IOException, ExecutionException, InterruptedException, ControllerException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
-        ControllerConfig controllerConfig = Mockito.mock(ControllerConfig.class);
-        Mockito.when(controllerConfig.nodeId()).thenReturn(1);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
 
         long streamId;
         int rangeId;
@@ -1492,7 +1378,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
         messageTypeList.add(MessageType.FIFO);
         messageTypeList.add(MessageType.DELAY);
 
-        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), controllerConfig)) {
+        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
                 .atMost(10, TimeUnit.SECONDS)

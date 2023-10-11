@@ -57,4 +57,6 @@ public interface GroupMapper {
      * @return Number of rows affected.
      */
     int delete(@Param("id") Long id);
+
+    int recycle(@Param("status") GroupStatus status, @Param("updateTime") Date updateTime);
 }
