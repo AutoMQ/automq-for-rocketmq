@@ -1906,7 +1906,8 @@ public class DefaultMetadataStore implements MetadataStore {
                         .build())
                     .toList();
 
-                List<S3WALObject> walObjects = s3WalObjectMapper.list(config.nodeId(), null)
+                List<S3WALObject> walObjects = new ArrayList<>();
+                s3WalObjectMapper.list(config.nodeId(), null)
                     .parallelStream()
                     .map(s3WalObject -> {
                         TypeToken<Map<Long, SubStream>> typeToken = new TypeToken<>() {
@@ -1920,9 +1921,18 @@ public class DefaultMetadataStore implements MetadataStore {
                         return streamsRecords.isEmpty() ? null : buildS3WALObject(s3WalObject, streamsRecords);
                     })
                     .filter(Objects::nonNull)
-                    .limit(limit - s3StreamObjects.size())
-                    .toList();
+                    .limit(limit)
+                    .forEach(walObjects::add);
 
+                if (!walObjects.isEmpty()) {
+                    walObjects.sort((l, r) -> {
+                        long lhs = l.getSubStreamsMap().get(streamId).getStartOffset();
+                        long rhs = r.getSubStreamsMap().get(streamId).getStartOffset();
+                        return Long.compare(lhs, rhs);
+                    });
+                }
+
+                // TODO: apply limit in whole.
                 return new ImmutablePair<>(s3StreamObjects, walObjects);
             }
         }, asyncExecutorService);
