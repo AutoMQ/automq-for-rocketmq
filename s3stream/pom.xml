@@ -59,7 +59,6 @@
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
             <version>3.13.0</version>
-<<<<<<< HEAD
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
@@ -84,8 +83,24 @@
             <artifactId>mockito-junit-jupiter</artifactId>
             <version>${mockito-core.version}</version>
             <scope>test</scope>
-=======
->>>>>>> fd843cf (feat(s3stream): remove pom parent)
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit-jupiter.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>${mockito-core.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
+            <version>${mockito-core.version}</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 
