@@ -47,6 +47,7 @@
         <slf4j.version>2.0.9</slf4j.version>
         <logback.version>1.4.11</logback.version>
         <snakeyaml.version>2.2</snakeyaml.version>
+        <s3stream.version>0.1.0-SNAPSHOT</s3stream.version>
 
         <!-- Flat buffers related -->
         <flatbuffers.version>23.5.26</flatbuffers.version>
@@ -105,6 +106,11 @@
                 <groupId>com.google.flatbuffers</groupId>
                 <artifactId>flatbuffers-java</artifactId>
                 <version>${flatbuffers.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.automq.elasticstream</groupId>
+                <artifactId>s3stream</artifactId>
+                <version>${s3stream.version}</version>
             </dependency>
 
             <!-- Below artifact are not directly used by the project, but are required by the dependencies of the project. -->
