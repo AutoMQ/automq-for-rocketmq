@@ -34,7 +34,6 @@
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
-
     <dependencies>
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
@@ -60,6 +59,7 @@
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
             <version>3.13.0</version>
+<<<<<<< HEAD
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
@@ -84,6 +84,8 @@
             <artifactId>mockito-junit-jupiter</artifactId>
             <version>${mockito-core.version}</version>
             <scope>test</scope>
+=======
+>>>>>>> fd843cf (feat(s3stream): remove pom parent)
         </dependency>
     </dependencies>
 
