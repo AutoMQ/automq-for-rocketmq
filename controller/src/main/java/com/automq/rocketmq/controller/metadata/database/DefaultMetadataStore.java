@@ -1284,7 +1284,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     // Create a new range for the stream
                     Range range = new Range();
                     range.setStreamId(streamId);
-                    range.setBrokerId(stream.getDstNodeId());
+                    range.setNodeId(stream.getDstNodeId());
                     range.setStartOffset(startOffset);
                     range.setEndOffset(startOffset);
                     range.setEpoch(epoch + 1);
@@ -1580,7 +1580,7 @@ public class DefaultMetadataStore implements MetadataStore {
                         s3WALObject.setObjectId(objectId);
                         s3WALObject.setObjectSize(walObject.getObjectSize());
                         s3WALObject.setBaseDataTimestamp(dataTs);
-                        s3WALObject.setBrokerId(brokerId);
+                        s3WALObject.setNodeId(brokerId);
                         s3WALObject.setSequenceId(walObject.getSequenceId());
                         s3WALObject.setSubStreams(gson.toJson(walObject.getSubStreamsMap()));
                         s3WALObjectMapper.create(s3WALObject);
@@ -1727,8 +1727,8 @@ public class DefaultMetadataStore implements MetadataStore {
     public CompletableFuture<List<S3WALObject>> listWALObjects() {
         CompletableFuture<List<S3WALObject>> future = new CompletableFuture<>();
         try (SqlSession session = this.sessionFactory.openSession()) {
-            S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
-            List<S3WALObject> walObjects = s3WALObjectMapper.list(this.config.nodeId(), null).stream()
+            S3WalObjectMapper s3WalObjectMapper = session.getMapper(S3WalObjectMapper.class);
+            List<S3WALObject> walObjects = s3WalObjectMapper.list(this.config.nodeId(), null).stream()
                 .map(s3WALObject -> {
                     Map<Long, SubStream> subStreams = gson.fromJson(new String(s3WALObject.getSubStreams().getBytes(StandardCharsets.UTF_8)), new TypeToken<Map<Long, SubStream>>() {
 
@@ -1747,8 +1747,8 @@ public class DefaultMetadataStore implements MetadataStore {
         long endOffset, int limit) {
         CompletableFuture<List<S3WALObject>> future = new CompletableFuture<>();
         try (SqlSession session = this.sessionFactory.openSession()) {
-            S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
-            List<S3WalObject> s3WalObjects = s3WALObjectMapper.list(this.config.nodeId(), null);
+            S3WalObjectMapper s3WalObjectMapper = session.getMapper(S3WalObjectMapper.class);
+            List<S3WalObject> s3WalObjects = s3WalObjectMapper.list(this.config.nodeId(), null);
 
             List<S3WALObject> walObjects = s3WalObjects.stream()
                 .map(s3WALObject -> {
@@ -1806,7 +1806,7 @@ public class DefaultMetadataStore implements MetadataStore {
         return S3WALObject.newBuilder()
             .setObjectId(originalObject.getObjectId())
             .setObjectSize(originalObject.getObjectSize())
-            .setBrokerId(originalObject.getBrokerId())
+            .setBrokerId(originalObject.getNodeId())
             .setSequenceId(originalObject.getSequenceId())
             .setBaseDataTimestamp(originalObject.getBaseDataTimestamp())
             .setCommittedTimestamp(originalObject.getCommittedTimestamp())
@@ -1877,7 +1877,7 @@ public class DefaultMetadataStore implements MetadataStore {
         return CompletableFuture.supplyAsync(() -> {
             try (SqlSession session = this.sessionFactory.openSession()) {
                 S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
-                S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
+                S3WalObjectMapper s3WalObjectMapper = session.getMapper(S3WalObjectMapper.class);
                 List<apache.rocketmq.controller.v1.S3StreamObject> s3StreamObjects = s3StreamObjectMapper.list(null, streamId, startOffset, endOffset, limit)
                     .parallelStream()
                     .map(streamObject -> apache.rocketmq.controller.v1.S3StreamObject.newBuilder()
@@ -1891,18 +1891,18 @@ public class DefaultMetadataStore implements MetadataStore {
                         .build())
                     .toList();
 
-                List<S3WALObject> walObjects = s3WALObjectMapper.list(config.nodeId(), null)
+                List<S3WALObject> walObjects = s3WalObjectMapper.list(config.nodeId(), null)
                     .parallelStream()
-                    .map(s3WALObject -> {
+                    .map(s3WalObject -> {
                         TypeToken<Map<Long, SubStream>> typeToken = new TypeToken<>() {
                         };
-                        Map<Long, SubStream> subStreams = gson.fromJson(new String(s3WALObject.getSubStreams().getBytes(StandardCharsets.UTF_8)), typeToken.getType());
+                        Map<Long, SubStream> subStreams = gson.fromJson(new String(s3WalObject.getSubStreams().getBytes(StandardCharsets.UTF_8)), typeToken.getType());
                         Map<Long, SubStream> streamsRecords = new HashMap<>();
                         subStreams.entrySet().stream()
                             .filter(entry -> !Objects.isNull(entry) && entry.getKey().equals(streamId))
                             .filter(entry -> entry.getValue().getStartOffset() <= endOffset && entry.getValue().getEndOffset() > startOffset)
                             .forEach(entry -> streamsRecords.put(entry.getKey(), entry.getValue()));
-                        return streamsRecords.isEmpty() ? null : buildS3WALObject(s3WALObject, streamsRecords);
+                        return streamsRecords.isEmpty() ? null : buildS3WALObject(s3WalObject, streamsRecords);
                     })
                     .filter(Objects::nonNull)
                     .limit(limit - s3StreamObjects.size())

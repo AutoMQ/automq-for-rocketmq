@@ -600,10 +600,10 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         try (SqlSession session = getSessionFactory().openSession()) {
             S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
             S3WalObject s3WALObject = new S3WalObject();
-            s3WALObject.setObjectId(123);
-            s3WALObject.setBrokerId(1);
-            s3WALObject.setObjectSize(22);
-            s3WALObject.setSequenceId(999);
+            s3WALObject.setObjectId(123L);
+            s3WALObject.setNodeId(1);
+            s3WALObject.setObjectSize(22L);
+            s3WALObject.setSequenceId(999L);
             s3WALObject.setSubStreams(subStreamsJson);
 
             s3WALObject.setBaseDataTimestamp(System.currentTimeMillis());
@@ -677,10 +677,10 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         try (SqlSession session = getSessionFactory().openSession()) {
             S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
             S3WalObject s3WALObject = new S3WalObject();
-            s3WALObject.setObjectId(123);
-            s3WALObject.setBrokerId(1);
-            s3WALObject.setObjectSize(22);
-            s3WALObject.setSequenceId(999);
+            s3WALObject.setObjectId(123L);
+            s3WALObject.setNodeId(1);
+            s3WALObject.setObjectSize(22L);
+            s3WALObject.setSequenceId(999L);
             s3WALObject.setSubStreams(subStreamsJson);
 
             s3WALObject.setBaseDataTimestamp(System.currentTimeMillis());
@@ -753,10 +753,10 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         try (SqlSession session = getSessionFactory().openSession()) {
             S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
             S3WalObject s3WALObject = new S3WalObject();
-            s3WALObject.setObjectId(123);
-            s3WALObject.setBrokerId(1);
-            s3WALObject.setObjectSize(22);
-            s3WALObject.setSequenceId(999);
+            s3WALObject.setObjectId(123L);
+            s3WALObject.setNodeId(1);
+            s3WALObject.setObjectSize(22L);
+            s3WALObject.setSequenceId(999L);
             s3WALObject.setSubStreams(subStreamsJson);
 
             s3WALObject.setBaseDataTimestamp(System.currentTimeMillis());
@@ -851,10 +851,10 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         try (SqlSession session = getSessionFactory().openSession()) {
             S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
             S3WalObject s3WALObject = new S3WalObject();
-            s3WALObject.setObjectId(123);
-            s3WALObject.setBrokerId(1);
-            s3WALObject.setObjectSize(22);
-            s3WALObject.setSequenceId(999);
+            s3WALObject.setObjectId(123L);
+            s3WALObject.setNodeId(1);
+            s3WALObject.setObjectSize(22L);
+            s3WALObject.setSequenceId(999L);
             s3WALObject.setSubStreams(subStreamsJson);
 
             s3WALObject.setBaseDataTimestamp(System.currentTimeMillis());
@@ -949,10 +949,10 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         try (SqlSession session = getSessionFactory().openSession()) {
             S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
             S3WalObject s3WALObject = new S3WalObject();
-            s3WALObject.setObjectId(123);
-            s3WALObject.setBrokerId(1);
-            s3WALObject.setObjectSize(22);
-            s3WALObject.setSequenceId(999);
+            s3WALObject.setObjectId(123L);
+            s3WALObject.setNodeId(1);
+            s3WALObject.setObjectSize(22L);
+            s3WALObject.setSequenceId(999L);
             s3WALObject.setSubStreams(subStreamsJson);
 
             s3WALObject.setBaseDataTimestamp(System.currentTimeMillis());
@@ -1112,7 +1112,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             range.setEpoch(streamEpoch);
             range.setStartOffset(1234L);
             range.setEndOffset(2345L);
-            range.setBrokerId(1);
+            range.setNodeId(1);
             rangeMapper.create(range);
             session.commit();
         }
@@ -1188,7 +1188,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             range.setEpoch(streamEpoch);
             range.setStartOffset(1234L);
             range.setEndOffset(2345L);
-            range.setBrokerId(1);
+            range.setNodeId(1);
             rangeMapper.create(range);
             session.commit();
         }
@@ -1284,7 +1284,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             range.setEpoch(streamEpoch);
             range.setStartOffset(1234L);
             range.setEndOffset(2345L);
-            range.setBrokerId(nodeId);
+            range.setNodeId(nodeId);
             rangeMapper.create(range);
             session.commit();
         }
@@ -1379,7 +1379,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             range.setEpoch(streamEpoch);
             range.setStartOffset(1234L);
             range.setEndOffset(2345L);
-            range.setBrokerId(1);
+            range.setNodeId(1);
             rangeMapper.create(range);
             session.commit();
         }
@@ -1588,7 +1588,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             range.setEpoch(0L);
             range.setStartOffset(1234L);
             range.setEndOffset(2345L);
-            range.setBrokerId(nodeId);
+            range.setNodeId(nodeId);
             rangeMapper.create(range);
 
             session.commit();
@@ -1619,7 +1619,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Range range = rangeMapper.get(rangId, streamId, null);
             Assertions.assertEquals(newStartOffset, range.getStartOffset());
             Assertions.assertEquals(2345, range.getEndOffset());
-            Assertions.assertEquals(nodeId, range.getBrokerId());
+            Assertions.assertEquals(nodeId, range.getNodeId());
             Assertions.assertEquals(streamId, range.getStreamId());
         }
 
@@ -1650,7 +1650,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             range.setEpoch(0L);
             range.setStartOffset(1234L);
             range.setEndOffset(2345L);
-            range.setBrokerId(nodeId);
+            range.setNodeId(nodeId);
             rangeMapper.create(range);
 
             session.commit();
@@ -1711,7 +1711,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             range.setEpoch(0L);
             range.setStartOffset(1234L);
             range.setEndOffset(2345L);
-            range.setBrokerId(nodeId);
+            range.setNodeId(nodeId);
             rangeMapper.create(range);
 
             session.commit();
@@ -2006,17 +2006,17 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
             S3WalObject s3WALObject = new S3WalObject();
             s3WALObject.setObjectId(objectId + 2);
-            s3WALObject.setObjectSize(333);
+            s3WALObject.setObjectSize(333L);
             s3WALObject.setBaseDataTimestamp(3);
-            s3WALObject.setSequenceId(1);
+            s3WALObject.setSequenceId(1L);
             s3WALObject.setSubStreams(expectSubStream.replace("1234567890", String.valueOf(streamId)));
             s3WALObjectMapper.create(s3WALObject);
 
             S3WalObject s3WalObject1 = new S3WalObject();
             s3WalObject1.setObjectId(objectId + 3);
-            s3WalObject1.setObjectSize(444);
+            s3WalObject1.setObjectSize(444L);
             s3WalObject1.setBaseDataTimestamp(4);
-            s3WALObject.setSequenceId(2);
+            s3WALObject.setSequenceId(2L);
             s3WalObject1.setSubStreams(expectSubStream.replace("1234567890", String.valueOf(streamId)));
             s3WALObjectMapper.create(s3WalObject1);
 
@@ -2162,7 +2162,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             range.setEpoch(3L);
             range.setStartOffset(0L);
             range.setEndOffset(0L);
-            range.setBrokerId(nodeId);
+            range.setNodeId(nodeId);
             rangeMapper.create(range);
 
             S3ObjectMapper objectMapper = session.getMapper(S3ObjectMapper.class);

@@ -24,11 +24,11 @@
 
     <insert id="create" parameterType="S3WalObject">
         INSERT INTO
-        s3walobject (object_id, object_size, broker_id, sequence_id, sub_streams, base_data_timestamp)
+        s3walobject (object_id, object_size, node_id, sequence_id, sub_streams, base_data_timestamp)
         VALUES (
         #{objectId},
         #{objectSize},
-        #{brokerId},
+        #{nodeId},
         #{sequenceId},
         #{subStreams},
         #{baseDataTimestamp}
@@ -42,8 +42,8 @@
         <if test="null != objectId">
             AND object_id = #{objectId}
         </if>
-        <if test="null != brokerId">
-            AND broker_id = #{brokerId}
+        <if test="null != nodeId">
+            AND node_id = #{nodeId}
         </if>
          <if test="null != sequenceId">
              AND sequence_id = #{sequenceId}
@@ -51,7 +51,7 @@
     </update>
 
     <select id="getByObjectId" resultType="S3WalObject">
-        SELECT object_id, object_size, broker_id, sequence_id, sub_streams, base_data_timestamp, committed_timestamp
+        SELECT object_id, object_size, node_id, sequence_id, sub_streams, base_data_timestamp, committed_timestamp
         FROM s3walobject
         WHERE object_id = #{objectId}
     </select>
@@ -63,8 +63,8 @@
         <if test="null != objectId">
             AND object_id = #{objectId}
         </if>
-        <if test="null != brokerId">
-            AND broker_id = #{brokerId}
+        <if test="null != nodeId">
+            AND node_id = #{nodeId}
         </if>
         <if test="null != sequenceId">
             AND sequence_id = #{sequenceId}
@@ -72,11 +72,11 @@
     </delete>
 
     <select id="list" resultType="S3WalObject">
-        SELECT object_id, object_size, broker_id, sequence_id, sub_streams, base_data_timestamp, committed_timestamp
+        SELECT object_id, object_size, node_id, sequence_id, sub_streams, base_data_timestamp, committed_timestamp
         FROM s3walobject
         WHERE 1 = 1
-        <if test="null != brokerId">
-            AND broker_id = #{brokerId}
+        <if test="null != nodeId">
+            AND node_id = #{nodeId}
         </if>
         <if test="null != sequenceId">
             AND sequence_id = #{sequenceId}

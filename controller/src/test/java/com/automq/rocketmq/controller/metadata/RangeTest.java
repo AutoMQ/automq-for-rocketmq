@@ -41,7 +41,7 @@ public class RangeTest extends DatabaseTestBase {
             range.setEpoch(1L);
             range.setStartOffset(1234L);
             range.setEndOffset(2345L);
-            range.setBrokerId(33);
+            range.setNodeId(33);
 
             int affectedRows = rangeMapper.create(range);
             Assertions.assertEquals(1, affectedRows);
@@ -50,31 +50,20 @@ public class RangeTest extends DatabaseTestBase {
             Range range1 = rangeMapper.getById(range.getId());
             Assertions.assertEquals(range, range1);
 
-            // test listByRangeId
-            List<Range> ranges = rangeMapper.listByRangeId(range.getRangeId());
-            Assertions.assertNotNull(ranges);
-            Assertions.assertEquals(1, ranges.size());
-            range1 = ranges.get(0);
-            Assertions.assertEquals(22, range1.getRangeId());
-            Assertions.assertEquals(11, range1.getStreamId());
-            Assertions.assertEquals(1, range1.getEpoch());
-            Assertions.assertEquals(1234, range1.getStartOffset());
-            Assertions.assertEquals(2345, range1.getEndOffset());
-            Assertions.assertEquals(33, range1.getBrokerId());
 
             // test listByStreamId
-            ranges = rangeMapper.listByStreamId(range1.getStreamId());
+            List<Range> ranges = rangeMapper.listByStreamId(range1.getStreamId());
             Assertions.assertNotNull(ranges);
             Assertions.assertEquals(1, ranges.size());
             Assertions.assertEquals(range, ranges.get(0));
 
             // test listByBrokerId
-            List<Range> ranges1 = rangeMapper.listByBrokerId(range1.getBrokerId());
+            List<Range> ranges1 = rangeMapper.listByNodeId(range1.getNodeId());
             Assertions.assertNotNull(ranges1);
             Assertions.assertEquals(1, ranges.size());
 
             // test get
-            Range range2 = rangeMapper.get(range.getRangeId(), null, range.getBrokerId());
+            Range range2 = rangeMapper.get(range.getRangeId(), null, range.getNodeId());
             Assertions.assertEquals(range, range2);
 
             ranges = rangeMapper.list(null, range.getStreamId(), 2000L);

@@ -33,7 +33,7 @@ public class Range {
 
     Long endOffset;
 
-    Integer brokerId;
+    Integer nodeId;
 
     public Long getId() {
         return id;
@@ -83,12 +83,12 @@ public class Range {
         this.endOffset = endOffset;
     }
 
-    public Integer getBrokerId() {
-        return brokerId;
+    public Integer getNodeId() {
+        return nodeId;
     }
 
-    public void setBrokerId(Integer brokerId) {
-        this.brokerId = brokerId;
+    public void setNodeId(Integer nodeId) {
+        this.nodeId = nodeId;
     }
 
     @Override
@@ -96,11 +96,11 @@ public class Range {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Range range = (Range) o;
-        return Objects.equals(id, range.id) && Objects.equals(rangeId, range.rangeId) && Objects.equals(streamId, range.streamId) && Objects.equals(epoch, range.epoch) && Objects.equals(startOffset, range.startOffset) && Objects.equals(endOffset, range.endOffset) && Objects.equals(brokerId, range.brokerId);
+        return Objects.equals(id, range.id) && Objects.equals(rangeId, range.rangeId) && Objects.equals(streamId, range.streamId) && Objects.equals(epoch, range.epoch) && Objects.equals(startOffset, range.startOffset) && Objects.equals(endOffset, range.endOffset) && Objects.equals(nodeId, range.nodeId);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, rangeId, streamId, epoch, startOffset, endOffset, brokerId);
+        return Objects.hash(id, rangeId, streamId, epoch, startOffset, endOffset, nodeId);
     }
 }

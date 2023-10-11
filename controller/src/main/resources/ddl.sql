@@ -123,7 +123,7 @@ CREATE TABLE IF NOT EXISTS `range`
     epoch        BIGINT NOT NULL,
     start_offset BIGINT NOT NULL,
     end_offset   BIGINT NOT NULL,
-    broker_id    INT    NOT NULL,
+    node_id      INT    NOT NULL,
     UNIQUE INDEX idx_stream_range (stream_id, range_id),
     INDEX idx_stream_start_offset (stream_id, start_offset)
 );
@@ -159,11 +159,11 @@ CREATE TABLE IF NOT EXISTS s3walobject
 (
     object_id           BIGINT   NOT NULL,
     object_size         BIGINT   NOT NULL,
-    broker_id           INT      NOT NULL,
+    node_id             INT      NOT NULL,
     sequence_id         BIGINT   NOT NULL,
     sub_streams         LONGTEXT NOT NULL, -- immutable
     base_data_timestamp BIGINT,
     committed_timestamp BIGINT,
-    UNIQUE INDEX uk_s3_wal_object_broker_sequence_id (broker_id, sequence_id),
+    UNIQUE INDEX uk_s3_wal_object_node_sequence_id (node_id, sequence_id),
     INDEX idx_s3_wal_object_object_id (object_id)
 );

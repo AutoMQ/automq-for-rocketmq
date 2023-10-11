@@ -32,21 +32,24 @@ public interface RangeMapper {
      */
     int create(Range range);
 
-    Range getById(long id);
+    /**
+     *
+     * @param id Primary key
+     * @return Range instance
+     */
+    Range getById(@Param("id") long id);
 
-    List<Range> listByRangeId(int rangeId);
-
-    List<Range> listByStreamId(long streamId);
+    List<Range> listByStreamId(@Param("streamId") long streamId);
 
     void delete(@Param("rangeId") Integer rangeId, @Param("streamId") Long streamId);
 
-    List<Range> listByBrokerId(int brokerId);
+    List<Range> listByNodeId(@Param("nodeId") int nodeId);
 
     Range get(@Param("rangeId") Integer rangeId,
         @Param("streamId") Long streamId,
-        @Param("brokerId") Integer brokerId);
+        @Param("nodeId") Integer nodeId);
 
-    List<Range> list(@Param("brokerId") Integer brokerId,
+    List<Range> list(@Param("nodeId") Integer nodeId,
         @Param("streamId") Long streamId,
         @Param("offset") Long offset);
 
