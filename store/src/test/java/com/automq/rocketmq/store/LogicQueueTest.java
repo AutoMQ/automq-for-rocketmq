@@ -85,8 +85,8 @@ public class LogicQueueTest {
         streamStore = new MockStreamStore();
         stateMachine = Mockito.spy(new DefaultLogicQueueStateMachine(TOPIC_ID, QUEUE_ID, kvService));
         inflightService = new InflightService();
-        SnapshotService snapshotService = new SnapshotService(streamStore, kvService);
-        OperationLogService operationLogService = new StreamOperationLogService(streamStore, snapshotService, new StoreConfig());
+        snapshotService = new SnapshotService(streamStore, kvService);
+        operationLogService = new StreamOperationLogService(streamStore, snapshotService, new StoreConfig());
         logicQueue = new StreamLogicQueue(new StoreConfig(), TOPIC_ID, QUEUE_ID,
             metadataService, stateMachine, streamStore, operationLogService, inflightService);
         logicQueue.open().join();
