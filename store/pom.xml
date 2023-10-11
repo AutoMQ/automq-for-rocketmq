@@ -42,7 +42,6 @@
         <dependency>
             <groupId>com.automq.elasticstream</groupId>
             <artifactId>s3stream</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>org.rocksdb</groupId>
