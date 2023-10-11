@@ -583,7 +583,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             Range range = new Range();
             range.setRangeId(0);
             range.setStartOffset(0L);
-            range.setBrokerId(2);
+            range.setNodeId(2);
             range.setStreamId(streamId);
             range.setEpoch(1L);
             range.setEndOffset(100L);
@@ -648,7 +648,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             Range range = new Range();
             range.setRangeId(0);
             range.setStartOffset(0L);
-            range.setBrokerId(2);
+            range.setNodeId(2);
             range.setStreamId(streamId);
             range.setEpoch(1L);
             range.setEndOffset(100L);
@@ -713,7 +713,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             Range range = new Range();
             range.setRangeId(0);
             range.setStartOffset(0L);
-            range.setBrokerId(1);
+            range.setNodeId(1);
             range.setStreamId(streamId);
             range.setEpoch(1L);
             range.setEndOffset(100L);
@@ -785,7 +785,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             Range range = new Range();
             range.setRangeId(0);
             range.setStartOffset(0L);
-            range.setBrokerId(1);
+            range.setNodeId(1);
             range.setStreamId(streamId);
             range.setEpoch(1L);
             range.setEndOffset(100L);
@@ -853,7 +853,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             Range range = new Range();
             range.setRangeId(0);
             range.setStartOffset(0L);
-            range.setBrokerId(2);
+            range.setNodeId(2);
             range.setStreamId(streamId);
             range.setEpoch(1L);
             range.setEndOffset(100L);
@@ -934,7 +934,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             range.setRangeId(0);
             range.setStartOffset(0L);
             range.setStreamId(streamId);
-            range.setBrokerId(2);
+            range.setNodeId(2);
             range.setEpoch(1L);
             range.setEndOffset(100L);
             rangeMapper.create(range);
@@ -1049,7 +1049,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             range.setRangeId(0);
             range.setStartOffset(0L);
             range.setStreamId(streamId);
-            range.setBrokerId(2);
+            range.setNodeId(2);
             range.setEpoch(1L);
             range.setEndOffset(100L);
             rangeMapper.create(range);
@@ -1158,7 +1158,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             range.setRangeId(0);
             range.setStartOffset(0L);
             range.setStreamId(streamId);
-            range.setBrokerId(2);
+            range.setNodeId(2);
             range.setEpoch(1L);
             range.setEndOffset(30L);
             rangeMapper.create(range);
@@ -1167,7 +1167,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             range1.setRangeId(1);
             range1.setStartOffset(50L);
             range1.setStreamId(streamId);
-            range1.setBrokerId(2);
+            range1.setNodeId(2);
             range1.setEpoch(1L);
             range1.setEndOffset(100L);
             rangeMapper.create(range1);

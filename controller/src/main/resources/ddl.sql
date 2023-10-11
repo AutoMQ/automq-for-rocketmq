@@ -123,7 +123,7 @@ CREATE TABLE IF NOT EXISTS `range`
     epoch        BIGINT NOT NULL,
     start_offset BIGINT NOT NULL,
     end_offset   BIGINT NOT NULL,
-    broker_id    INT    NOT NULL,
+    node_id    INT    NOT NULL,
     UNIQUE INDEX idx_stream_range (stream_id, range_id),
     INDEX idx_stream_start_offset (stream_id, start_offset)
 );

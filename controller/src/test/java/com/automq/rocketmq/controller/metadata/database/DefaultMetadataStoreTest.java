@@ -1112,7 +1112,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             range.setEpoch(streamEpoch);
             range.setStartOffset(1234L);
             range.setEndOffset(2345L);
-            range.setBrokerId(1);
+            range.setNodeId(1);
             rangeMapper.create(range);
             session.commit();
         }
@@ -1188,7 +1188,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             range.setEpoch(streamEpoch);
             range.setStartOffset(1234L);
             range.setEndOffset(2345L);
-            range.setBrokerId(1);
+            range.setNodeId(1);
             rangeMapper.create(range);
             session.commit();
         }
@@ -1284,7 +1284,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             range.setEpoch(streamEpoch);
             range.setStartOffset(1234L);
             range.setEndOffset(2345L);
-            range.setBrokerId(nodeId);
+            range.setNodeId(nodeId);
             rangeMapper.create(range);
             session.commit();
         }
@@ -1379,7 +1379,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             range.setEpoch(streamEpoch);
             range.setStartOffset(1234L);
             range.setEndOffset(2345L);
-            range.setBrokerId(1);
+            range.setNodeId(1);
             rangeMapper.create(range);
             session.commit();
         }
@@ -1588,7 +1588,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             range.setEpoch(0L);
             range.setStartOffset(1234L);
             range.setEndOffset(2345L);
-            range.setBrokerId(nodeId);
+            range.setNodeId(nodeId);
             rangeMapper.create(range);
 
             session.commit();
@@ -1619,7 +1619,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Range range = rangeMapper.get(rangId, streamId, null);
             Assertions.assertEquals(newStartOffset, range.getStartOffset());
             Assertions.assertEquals(2345, range.getEndOffset());
-            Assertions.assertEquals(nodeId, range.getBrokerId());
+            Assertions.assertEquals(nodeId, range.getNodeId());
             Assertions.assertEquals(streamId, range.getStreamId());
         }
 
@@ -1650,7 +1650,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             range.setEpoch(0L);
             range.setStartOffset(1234L);
             range.setEndOffset(2345L);
-            range.setBrokerId(nodeId);
+            range.setNodeId(nodeId);
             rangeMapper.create(range);
 
             session.commit();
@@ -1711,7 +1711,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             range.setEpoch(0L);
             range.setStartOffset(1234L);
             range.setEndOffset(2345L);
-            range.setBrokerId(nodeId);
+            range.setNodeId(nodeId);
             rangeMapper.create(range);
 
             session.commit();
@@ -2162,7 +2162,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             range.setEpoch(3L);
             range.setStartOffset(0L);
             range.setEndOffset(0L);
-            range.setBrokerId(nodeId);
+            range.setNodeId(nodeId);
             rangeMapper.create(range);
 
             S3ObjectMapper objectMapper = session.getMapper(S3ObjectMapper.class);

@@ -21,14 +21,14 @@
 <mapper namespace="com.automq.rocketmq.controller.metadata.database.mapper.RangeMapper">
 
     <insert id="create" parameterType="Range" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
-        INSERT INTO `range` (range_id, stream_id, epoch, start_offset, end_offset, broker_id)
+        INSERT INTO `range` (range_id, stream_id, epoch, start_offset, end_offset, node_id)
         VALUES (
             #{rangeId},
             #{streamId},
             #{epoch},
             #{startOffset},
             #{endOffset},
-            #{brokerId}
+            #{nodeId}
         )
     </insert>
 
@@ -47,8 +47,8 @@
             <if test="null != endOffset">
                 end_offset = #{endOffset},
             </if>
-            <if test="null != brokerId">
-                broker_id = #{brokerId},
+            <if test="null != nodeId">
+                node_id = #{nodeId},
             </if>
         </set>
         WHERE 1 = 1
@@ -60,28 +60,22 @@
         </if>
     </update>
 
-    <select id="listByRangeId" resultType="Range">
-        SELECT id, range_id, stream_id, epoch, start_offset, end_offset, broker_id
-        FROM `range`
-        WHERE range_id = #{rangeId}
-    </select>
-
-    <select id="getById" resultType="Range" parameterType="long">
-        SELECT id, range_id, stream_id, epoch, start_offset, end_offset, broker_id
+    <select id="getById" resultType="Range">
+        SELECT id, range_id, stream_id, epoch, start_offset, end_offset, node_id
         FROM `range`
         WHERE id = #{id}
     </select>
 
     <select id="get" resultType="Range">
-        SELECT id, range_id, stream_id, epoch, start_offset, end_offset, broker_id
+        SELECT id, range_id, stream_id, epoch, start_offset, end_offset, node_id
         FROM `range`
         WHERE 1 = 1
         <if test="null != streamId and null != rangeId">
             AND stream_id = #{streamId}
             AND range_id = #{rangeId}
         </if>
-        <if test="null != brokerId">
-            AND broker_id = #{brokerId}
+        <if test="null != nodeId">
+            AND node_id = #{nodeId}
         </if>
     </select>
 
@@ -97,23 +91,23 @@
     </delete>
 
     <select id="listByStreamId" resultType="Range">
-        SELECT id, range_id, stream_id, epoch, start_offset, end_offset, broker_id
+        SELECT id, range_id, stream_id, epoch, start_offset, end_offset, node_id
         FROM `range`
         WHERE stream_id = #{streamId}
     </select>
 
-    <select id="listByBrokerId" resultType="Range">
-        SELECT id, range_id, stream_id, epoch, start_offset, end_offset, broker_id
+    <select id="listByNodeId" resultType="Range">
+        SELECT id, range_id, stream_id, epoch, start_offset, end_offset, node_id
         FROM `range`
-        WHERE broker_id = #{brokerId}
+        WHERE node_id = #{nodeId}
     </select>
 
     <select id="list" resultType="Range">
-        SELECT id, range_id, stream_id, epoch, start_offset, end_offset, broker_id
+        SELECT id, range_id, stream_id, epoch, start_offset, end_offset, node_id
         FROM `range`
         WHERE 1 = 1
-        <if test="null != brokerId">
-            AND broker_id = #{brokerId}
+        <if test="null != nodeId">
+            AND node_id = #{nodeId}
         </if>
         <if test="null != streamId">
             AND stream_id = #{streamId}
