@@ -86,7 +86,8 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     public void registerNode(NodeRegistrationRequest request,
         StreamObserver<NodeRegistrationReply> responseObserver) {
         metadataStore.registerBrokerNode(request.getBrokerName(), request.getAddress(),
-            request.getInstanceId()).whenComplete((res, e) -> {
+            request.getInstanceId())
+            .whenComplete((res, e) -> {
                 if (null != e) {
                     if (e.getCause() instanceof ControllerException ex) {
                         NodeRegistrationReply reply = NodeRegistrationReply.newBuilder()
@@ -104,8 +105,7 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
                             .build();
                         responseObserver.onNext(reply);
                         responseObserver.onCompleted();
-                    }
-                    else {
+                    } else {
                         responseObserver.onError(e);
                     }
                 } else {
@@ -152,18 +152,30 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
         }
 
         try {
-            this.metadataStore.createTopic(request.getTopic(), request.getCount(), request.getAcceptMessageTypesList()).whenCompleteAsync((topicId, e) -> {
-                if (null != e) {
-                    responseObserver.onError(e);
-                } else {
-                    CreateTopicReply reply = CreateTopicReply.newBuilder()
-                        .setStatus(Status.newBuilder().setCode(Code.OK).build())
-                        .setTopicId(topicId)
-                         .build();
-                    responseObserver.onNext(reply);
-                    responseObserver.onCompleted();
-                }
-            });
+            this.metadataStore.createTopic(request.getTopic(), request.getCount(), request.getAcceptMessageTypesList())
+                .whenCompleteAsync((topicId, e) -> {
+                    if (null != e) {
+                        if (e instanceof ControllerException ex) {
+                            CreateTopicReply reply = CreateTopicReply.newBuilder()
+                                .setStatus(Status.newBuilder()
+                                    .setCode(Code.forNumber(ex.getErrorCode()))
+                                    .setMessage(ex.getMessage())
+                                    .build())
+                                .build();
+                            responseObserver.onNext(reply);
+                            responseObserver.onCompleted();
+                        } else {
+                            responseObserver.onError(e);
+                        }
+                    } else {
+                        CreateTopicReply reply = CreateTopicReply.newBuilder()
+                            .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                            .setTopicId(topicId)
+                            .build();
+                        responseObserver.onNext(reply);
+                        responseObserver.onCompleted();
+                    }
+                });
         } catch (ControllerException e) {
             if (Code.DUPLICATED_VALUE == e.getErrorCode()) {
                 CreateTopicReply reply = CreateTopicReply.newBuilder()
@@ -244,7 +256,8 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
                 queueNumber = request.getCount();
             }
             this.metadataStore.updateTopic(request.getTopicId(), request.getName(), queueNumber,
-                request.getAcceptMessageTypesList()).whenComplete((res, e) -> {
+                request.getAcceptMessageTypesList())
+                .whenComplete((res, e) -> {
                     if (null != e) {
                         responseObserver.onError(e);
                     } else {
@@ -362,7 +375,8 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
         metadataStore.commitOffset(request.getGroupId(),
             request.getQueue().getTopicId(),
             request.getQueue().getQueueId(),
-            request.getOffset()).whenComplete((res, e) -> {
+            request.getOffset())
+            .whenComplete((res, e) -> {
                 if (null != e) {
                     if (e instanceof ControllerException ex) {
                         CommitOffsetReply reply = CommitOffsetReply.newBuilder()
@@ -387,29 +401,31 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
 
     @Override
     public void createGroup(CreateGroupRequest request, StreamObserver<CreateGroupReply> responseObserver) {
-        try {
-            metadataStore.createGroup(request.getName(), request.getMaxRetryAttempt(), request.getGroupType(),
-                request.getDeadLetterTopicId()).whenComplete((groupId, e) -> {
-                    if (null != e) {
-                        responseObserver.onError(e);
-                    } else {
+        metadataStore.createGroup(request.getName(), request.getMaxRetryAttempt(), request.getGroupType(),
+            request.getDeadLetterTopicId())
+            .whenComplete((groupId, e) -> {
+                if (null != e) {
+                    if (e instanceof ControllerException ex) {
                         CreateGroupReply reply = CreateGroupReply.newBuilder()
-                            .setGroupId(groupId)
-                            .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                            .setStatus(Status.newBuilder()
+                                .setCode(Code.forNumber(ex.getErrorCode()))
+                                .setMessage(ex.getMessage())
+                                .build())
                             .build();
                         responseObserver.onNext(reply);
                         responseObserver.onCompleted();
+                    } else {
+                        responseObserver.onError(e);
                     }
-                });
-        } catch (ControllerException e) {
-            CreateGroupReply reply = CreateGroupReply.newBuilder()
-                .setStatus(Status.newBuilder()
-                    .setCode(Code.forNumber(e.getErrorCode()))
-                    .setMessage(e.getMessage()).build())
-                .build();
-            responseObserver.onNext(reply);
-            responseObserver.onCompleted();
-        }
+                } else {
+                    CreateGroupReply reply = CreateGroupReply.newBuilder()
+                        .setGroupId(groupId)
+                        .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                        .build();
+                    responseObserver.onNext(reply);
+                    responseObserver.onCompleted();
+                }
+            });
     }
 
     @Override

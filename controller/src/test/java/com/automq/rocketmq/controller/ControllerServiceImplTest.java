@@ -1521,6 +1521,12 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                     .addAllAcceptMessageTypes(messageTypeList)
                     .build()).get();
 
+                Assertions.assertThrows(ExecutionException.class, () -> client.createTopic(String.format("localhost:%d", port), CreateTopicRequest.newBuilder()
+                    .setTopic(topicName)
+                    .setCount(queueNum)
+                    .addAllAcceptMessageTypes(messageTypeList)
+                    .build()).get());
+
                 StreamMetadata metadata = metadataStore.getStream(topicId, 0, null, StreamRole.STREAM_ROLE_DATA).get();
                 streamId = metadata.getStreamId();
                 OpenStreamRequest request = OpenStreamRequest.newBuilder()

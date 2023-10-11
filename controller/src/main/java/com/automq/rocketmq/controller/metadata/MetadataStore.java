@@ -130,8 +130,7 @@ public interface MetadataStore extends Closeable {
 
     CompletableFuture<Void> commitOffset(long groupId, long topicId, int queueId, long offset);
 
-    CompletableFuture<Long> createGroup(String groupName, int maxRetry, GroupType type,
-        long dlq) throws ControllerException;
+    CompletableFuture<Long> createGroup(String groupName, int maxRetry, GroupType type, long dlq);
 
     CompletableFuture<StreamMetadata> getStream(long topicId, int queueId, Long groupId, StreamRole streamRole);
 
