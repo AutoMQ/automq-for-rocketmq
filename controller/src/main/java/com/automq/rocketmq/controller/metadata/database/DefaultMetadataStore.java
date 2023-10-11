@@ -86,7 +86,6 @@ import com.google.common.base.Strings;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.HashSet;
@@ -103,7 +102,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import com.google.gson.Gson;
@@ -1759,11 +1757,12 @@ public class DefaultMetadataStore implements MetadataStore {
 
             S3WalObjectMapper s3WalObjectMapper = session.getMapper(S3WalObjectMapper.class);
             List<S3WALObject> s3WALObjects = new ArrayList<>();
-            for(int nodeId: nodes) {
+            for (int nodeId : nodes) {
                 List<S3WalObject> s3WalObjects = s3WalObjectMapper.list(nodeId, null);
                 s3WalObjects.stream()
                     .map(s3WalObject -> {
-                        TypeToken<Map<Long, SubStream>> typeToken = new TypeToken<>() {};
+                        TypeToken<Map<Long, SubStream>> typeToken = new TypeToken<>() {
+                        };
                         Map<Long, SubStream> subStreams = gson.fromJson(new String(s3WalObject.getSubStreams().getBytes(StandardCharsets.UTF_8)), typeToken.getType());
                         Map<Long, SubStream> streamsRecords = new HashMap<>();
                         if (!Objects.isNull(subStreams) && subStreams.containsKey(streamId)) {
