@@ -24,6 +24,7 @@ import com.automq.rocketmq.store.api.MessageStore;
 import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.rocketmq.store.api.TopicQueueManager;
 import com.automq.rocketmq.store.exception.StoreException;
+import com.automq.rocketmq.store.queue.DefaultLogicQueueManager;
 import com.automq.rocketmq.store.service.InflightService;
 import com.automq.rocketmq.store.service.ReviveService;
 import com.automq.rocketmq.store.service.RocksDBKVService;
@@ -43,7 +44,7 @@ public class MessageStoreBuilder {
         InflightService inflightService = new InflightService();
         SnapshotService snapshotService = new SnapshotService(streamStore, kvService);
         OperationLogService operationLogService = new StreamOperationLogService(streamStore, snapshotService, storeConfig);
-        TopicQueueManager topicQueueManager = new DefaultTopicQueueManager(storeConfig, streamStore, kvService,
+        TopicQueueManager topicQueueManager = new DefaultLogicQueueManager(storeConfig, streamStore, kvService,
             metadataService, operationLogService, inflightService);
         ReviveService reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, KV_NAMESPACE_TIMER_TAG, kvService, metadataService, inflightService, topicQueueManager);
 

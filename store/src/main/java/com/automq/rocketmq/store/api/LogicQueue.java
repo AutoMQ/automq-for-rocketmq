@@ -26,13 +26,13 @@ import com.automq.rocketmq.store.model.message.PullResult;
 import com.automq.rocketmq.store.model.message.PutResult;
 import java.util.concurrent.CompletableFuture;
 
-public abstract class TopicQueue {
+public abstract class LogicQueue {
 
     protected long topicId;
 
     protected int queueId;
 
-    protected TopicQueue(long topicId, int queueId) {
+    protected LogicQueue(long topicId, int queueId) {
         this.topicId = topicId;
         this.queueId = queueId;
     }

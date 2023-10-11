@@ -22,14 +22,15 @@ import com.automq.rocketmq.common.config.StoreConfig;
 import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
+import com.automq.rocketmq.store.api.LogicQueue;
 import com.automq.rocketmq.store.api.MessageStore;
 import com.automq.rocketmq.store.api.StreamStore;
-import com.automq.rocketmq.store.api.TopicQueue;
 import com.automq.rocketmq.store.api.TopicQueueManager;
 import com.automq.rocketmq.store.mock.MockStoreMetadataService;
 import com.automq.rocketmq.store.mock.MockStreamStore;
 import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PopResult;
+import com.automq.rocketmq.store.queue.DefaultLogicQueueManager;
 import com.automq.rocketmq.store.service.InflightService;
 import com.automq.rocketmq.store.service.ReviveService;
 import com.automq.rocketmq.store.service.RocksDBKVService;
@@ -78,7 +79,7 @@ public class MessageStoreTest {
         config = new StoreConfig();
         SnapshotService snapshotService = new SnapshotService(streamStore, kvService);
         OperationLogService operationLogService = new StreamOperationLogService(streamStore, snapshotService, config);
-        topicQueueManager = new DefaultTopicQueueManager(config, streamStore, kvService, metadataService, operationLogService, inflightService);
+        topicQueueManager = new DefaultLogicQueueManager(config, streamStore, kvService, metadataService, operationLogService, inflightService);
         reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, KV_NAMESPACE_TIMER_TAG, kvService, metadataService, inflightService, topicQueueManager);
         messageStore = new MessageStoreImpl(config, streamStore, metadataService, kvService, inflightService, snapshotService, topicQueueManager, reviveService);
         messageStore.start();
@@ -286,19 +287,19 @@ public class MessageStoreTest {
         assertEquals(4, popResult.messageList().get(2).originalOffset());
         assertEquals(2, popResult.messageList().get(2).deliveryAttempts());
 
-        TopicQueue topicQueue = topicQueueManager.getOrCreate(TOPIC_ID, QUEUE_ID).join();
+        LogicQueue logicQueue = topicQueueManager.getOrCreate(TOPIC_ID, QUEUE_ID).join();
 
-        assertEquals(5, topicQueue.getConsumeOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(5, topicQueue.getAckOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(3, topicQueue.getRetryConsumeOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(0, topicQueue.getRetryAckOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(5, logicQueue.getConsumeOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(5, logicQueue.getAckOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(3, logicQueue.getRetryConsumeOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(0, logicQueue.getRetryAckOffset(CONSUMER_GROUP_ID).join());
 
         // 7. ack msg_0, msg_3, msg_4
         messageStore.ack(popResult.messageList().get(0).receiptHandle().get()).join();
         messageStore.ack(popResult.messageList().get(1).receiptHandle().get()).join();
         messageStore.ack(popResult.messageList().get(2).receiptHandle().get()).join();
 
-        assertEquals(3, topicQueue.getRetryAckOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(3, logicQueue.getRetryAckOffset(CONSUMER_GROUP_ID).join());
     }
 
     @Test
@@ -377,18 +378,18 @@ public class MessageStoreTest {
         assertEquals(4, popResult.messageList().get(2).originalOffset());
         assertEquals(2, popResult.messageList().get(2).deliveryAttempts());
 
-        TopicQueue topicQueue = topicQueueManager.getOrCreate(TOPIC_ID, QUEUE_ID).join();
+        LogicQueue logicQueue = topicQueueManager.getOrCreate(TOPIC_ID, QUEUE_ID).join();
 
-        assertEquals(5, topicQueue.getConsumeOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(5, topicQueue.getAckOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(3, topicQueue.getRetryConsumeOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(0, topicQueue.getRetryAckOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(5, logicQueue.getConsumeOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(5, logicQueue.getAckOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(3, logicQueue.getRetryConsumeOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(0, logicQueue.getRetryAckOffset(CONSUMER_GROUP_ID).join());
 
         // 7. ack msg_0, msg_3, msg_4
         messageStore.ack(popResult.messageList().get(0).receiptHandle().get()).join();
         messageStore.ack(popResult.messageList().get(1).receiptHandle().get()).join();
         messageStore.ack(popResult.messageList().get(2).receiptHandle().get()).join();
 
-        assertEquals(3, topicQueue.getRetryAckOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(3, logicQueue.getRetryAckOffset(CONSUMER_GROUP_ID).join());
     }
 }

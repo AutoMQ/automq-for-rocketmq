@@ -20,9 +20,9 @@ package com.automq.rocketmq.store;
 import com.automq.rocketmq.common.config.StoreConfig;
 import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
+import com.automq.rocketmq.store.api.LogicQueue;
 import com.automq.rocketmq.store.api.MessageStore;
 import com.automq.rocketmq.store.api.StreamStore;
-import com.automq.rocketmq.store.api.TopicQueue;
 import com.automq.rocketmq.store.api.TopicQueueManager;
 import com.automq.rocketmq.store.model.generated.ReceiptHandle;
 import com.automq.rocketmq.store.model.message.AckResult;
@@ -149,9 +149,9 @@ public class MessageStoreImpl implements MessageStore {
     }
 
     @Override
-    public CompletableFuture<TopicQueue.QueueOffsetRange> getOffsetRange(long topicId, int queueId) {
+    public CompletableFuture<LogicQueue.QueueOffsetRange> getOffsetRange(long topicId, int queueId) {
         return topicQueueManager.getOrCreate(topicId, queueId)
-            .thenCompose(TopicQueue::getOffsetRange);
+            .thenCompose(LogicQueue::getOffsetRange);
     }
 
     @Override

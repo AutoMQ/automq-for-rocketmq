@@ -19,12 +19,13 @@ package com.automq.rocketmq.store;
 
 import com.automq.rocketmq.common.config.StoreConfig;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
+import com.automq.rocketmq.store.api.LogicQueue;
 import com.automq.rocketmq.store.api.StreamStore;
-import com.automq.rocketmq.store.api.TopicQueue;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.mock.MockOperationLogService;
 import com.automq.rocketmq.store.mock.MockStoreMetadataService;
 import com.automq.rocketmq.store.mock.MockStreamStore;
+import com.automq.rocketmq.store.queue.DefaultLogicQueueManager;
 import com.automq.rocketmq.store.service.InflightService;
 import com.automq.rocketmq.store.service.RocksDBKVService;
 import com.automq.rocketmq.store.service.api.KVService;
@@ -36,7 +37,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class DefaultTopicQueueManagerTest {
+class DefaultLogicQueueManagerTest {
     private static final String PATH = "/tmp/ros/topic_queue_manager_test/";
     private static final long TOPIC_ID = 0;
     private static final int QUEUE_ID = 1;
@@ -46,7 +47,7 @@ class DefaultTopicQueueManagerTest {
     private static StreamStore streamStore;
     private static InflightService inflightService;
     private static MockOperationLogService operationLogService;
-    private DefaultTopicQueueManager topicQueueManager;
+    private DefaultLogicQueueManager topicQueueManager;
 
     @BeforeEach
     void setUp() throws StoreException {
@@ -55,7 +56,7 @@ class DefaultTopicQueueManagerTest {
         streamStore = new MockStreamStore();
         inflightService = new InflightService();
         operationLogService = new MockOperationLogService();
-        topicQueueManager = new DefaultTopicQueueManager(new StoreConfig(), streamStore, kvService, metadataService, operationLogService, inflightService);
+        topicQueueManager = new DefaultLogicQueueManager(new StoreConfig(), streamStore, kvService, metadataService, operationLogService, inflightService);
     }
 
     @AfterEach
@@ -66,7 +67,7 @@ class DefaultTopicQueueManagerTest {
     @Test
     void getOrCreate() {
         // Create new TopicQueue
-        CompletableFuture<TopicQueue> future = topicQueueManager.getOrCreate(TOPIC_ID, QUEUE_ID);
+        CompletableFuture<LogicQueue> future = topicQueueManager.getOrCreate(TOPIC_ID, QUEUE_ID);
         assertEquals(topicQueueManager.size(), 1);
         assertTrue(future.isDone());
 
@@ -74,16 +75,16 @@ class DefaultTopicQueueManagerTest {
         future = topicQueueManager.getOrCreate(TOPIC_ID, QUEUE_ID);
         assertEquals(topicQueueManager.size(), 1);
         assertTrue(future.isDone());
-        TopicQueue topicQueue = future.join();
-        assertEquals(TOPIC_ID, topicQueue.topicId());
-        assertEquals(QUEUE_ID, topicQueue.queueId());
+        LogicQueue logicQueue = future.join();
+        assertEquals(TOPIC_ID, logicQueue.topicId());
+        assertEquals(QUEUE_ID, logicQueue.queueId());
     }
 
     @Test
     void getOrCreate_exception() {
         operationLogService.setRecoverFailed(true);
 
-        CompletableFuture<TopicQueue> future = topicQueueManager.getOrCreate(TOPIC_ID, QUEUE_ID);
+        CompletableFuture<LogicQueue> future = topicQueueManager.getOrCreate(TOPIC_ID, QUEUE_ID);
         assertTrue(future.isCompletedExceptionally());
         assertEquals(topicQueueManager.size(), 0);
     }
