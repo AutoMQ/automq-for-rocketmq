@@ -39,10 +39,10 @@ public class S3WalObjectTest extends DatabaseTestBase {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             S3WalObjectMapper s3WalObjectMapper = session.getMapper(S3WalObjectMapper.class);
             S3WalObject s3WALObject = new S3WalObject();
-            s3WALObject.setObjectId(123);
-            s3WALObject.setObjectSize(22);
-            s3WALObject.setBrokerId(1);
-            s3WALObject.setSequenceId(999);
+            s3WALObject.setObjectId(123L);
+            s3WALObject.setObjectSize(22L);
+            s3WALObject.setNodeId(1);
+            s3WALObject.setSequenceId(999L);
             s3WALObject.setSubStreams("<json><json>");
 
             Calendar calendar = Calendar.getInstance();
@@ -57,14 +57,14 @@ public class S3WalObjectTest extends DatabaseTestBase {
             S3WalObject s3WalObject1 = s3WalObjectMapper.getByObjectId(s3WALObject.getObjectId());
             Assertions.assertEquals(s3WALObject, s3WalObject1);
 
-            List<S3WalObject> s3WalObjects = s3WalObjectMapper.list(s3WalObject1.getBrokerId(), s3WalObject1.getSequenceId());
+            List<S3WalObject> s3WalObjects = s3WalObjectMapper.list(s3WalObject1.getNodeId(), s3WalObject1.getSequenceId());
             Assertions.assertNotNull(s3WalObjects);
             Assertions.assertFalse(s3WalObjects.isEmpty());
             Assertions.assertEquals(1, s3WalObjects.size());
 
             Assertions.assertEquals(123, s3WalObjects.get(0).getObjectId());
             Assertions.assertEquals(22, s3WalObjects.get(0).getObjectSize());
-            Assertions.assertEquals(1, s3WalObjects.get(0).getBrokerId());
+            Assertions.assertEquals(1, s3WalObjects.get(0).getNodeId());
             Assertions.assertEquals(999, s3WalObjects.get(0).getSequenceId());
             Assertions.assertEquals("<json><json>", s3WalObjects.get(0).getSubStreams());
             Assertions.assertEquals(time, s3WalObjects.get(0).getBaseDataTimestamp());
@@ -82,10 +82,10 @@ public class S3WalObjectTest extends DatabaseTestBase {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             S3WalObjectMapper s3WalObjectMapper = session.getMapper(S3WalObjectMapper.class);
             S3WalObject s3WALObject = new S3WalObject();
-            s3WALObject.setObjectId(123);
-            s3WALObject.setObjectSize(22);
-            s3WALObject.setBrokerId(1);
-            s3WALObject.setSequenceId(999);
+            s3WALObject.setObjectId(123L);
+            s3WALObject.setObjectSize(22L);
+            s3WALObject.setNodeId(1);
+            s3WALObject.setSequenceId(999L);
             s3WALObject.setSubStreams("<json><json>");
 
             Calendar calendar = Calendar.getInstance();
@@ -105,7 +105,7 @@ public class S3WalObjectTest extends DatabaseTestBase {
             Assertions.assertEquals(1, affectedRows);
             Assertions.assertEquals(s3WalObject1, s3WalObject2);
 
-            s3WalObjectMapper.delete(null, s3WalObject1.getBrokerId(), null);
+            s3WalObjectMapper.delete(null, s3WalObject1.getNodeId(), null);
             List<S3WalObject> s3WalObjects = s3WalObjectMapper.list(null, s3WalObject1.getSequenceId());
             Assertions.assertTrue(s3WalObjects.isEmpty());
         }

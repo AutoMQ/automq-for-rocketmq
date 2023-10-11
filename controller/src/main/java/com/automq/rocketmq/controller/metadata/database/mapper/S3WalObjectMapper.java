@@ -29,11 +29,10 @@ public interface S3WalObjectMapper {
     S3WalObject getByObjectId(long objectId);
 
     int delete(@Param("objectId") Long objectId,
-        @Param("brokerId") Integer brokerId,
+        @Param("nodeId") Integer nodeId,
         @Param("sequenceId") Long sequenceId);
 
-    List<S3WalObject> list(@Param("brokerId") Integer brokerId,
-        @Param("sequenceId") Long sequenceId);
+    List<S3WalObject> list(@Param("nodeId") Integer nodeId, @Param("sequenceId") Long sequenceId);
 
     int commit(S3WalObject s3WALObject);
 }

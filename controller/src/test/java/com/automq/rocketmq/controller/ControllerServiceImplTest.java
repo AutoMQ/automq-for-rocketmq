@@ -1019,7 +1019,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
         int srcNodeId = 1;
         int dstNodeId = 2;
         long streamId;
-        long objectId = 2;
+        long objectId;
         long newStartOffset = 40L;
         String expectSubStream = """
             {
@@ -1067,10 +1067,10 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
             S3WalObject s3WALObject = new S3WalObject();
             s3WALObject.setObjectId(objectId);
-            s3WALObject.setObjectSize(500);
-            s3WALObject.setSequenceId(111);
+            s3WALObject.setObjectSize(500L);
+            s3WALObject.setSequenceId(111L);
             s3WALObject.setSubStreams(replacedJson);
-            s3WALObject.setBrokerId(2);
+            s3WALObject.setNodeId(2);
             s3WALObjectMapper.create(s3WALObject);
             session.commit();
         }
@@ -1135,7 +1135,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
         int srcNodeId = 1;
         int dstNodeId = 2;
         long streamId;
-        long objectId = 2;
+        long objectId;
         long newStartOffset = 60;
 
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -1407,14 +1407,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .setBrokerId(nodeId)
                 .build();
 
-            String expectSubStream = """
-                {
-                  "1234567890": {
-                    "streamId_": 1234567890,
-                    "startOffset_": 0,
-                    "endOffset_": 10
-                  }}""";
-
             long time = System.currentTimeMillis();
             List<Long> compactedObjects = new ArrayList<>();
             compactedObjects.add(objectId + 2);
@@ -1489,7 +1481,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
         Mockito.when(controllerConfig.leaseLifeSpanInSecs()).thenReturn(2);
         Mockito.when(controllerConfig.scanIntervalInSecs()).thenReturn(1);
 
-        long streamId, streamEpoch;
+        long streamId;
         int rangeId;
         int nodeId = 1;
 

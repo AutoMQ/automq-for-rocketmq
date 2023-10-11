@@ -1580,7 +1580,7 @@ public class DefaultMetadataStore implements MetadataStore {
                         s3WALObject.setObjectId(objectId);
                         s3WALObject.setObjectSize(walObject.getObjectSize());
                         s3WALObject.setBaseDataTimestamp(dataTs);
-                        s3WALObject.setBrokerId(brokerId);
+                        s3WALObject.setNodeId(brokerId);
                         s3WALObject.setSequenceId(walObject.getSequenceId());
                         s3WALObject.setSubStreams(gson.toJson(walObject.getSubStreamsMap()));
                         s3WALObjectMapper.create(s3WALObject);
@@ -1806,7 +1806,7 @@ public class DefaultMetadataStore implements MetadataStore {
         return S3WALObject.newBuilder()
             .setObjectId(originalObject.getObjectId())
             .setObjectSize(originalObject.getObjectSize())
-            .setBrokerId(originalObject.getBrokerId())
+            .setBrokerId(originalObject.getNodeId())
             .setSequenceId(originalObject.getSequenceId())
             .setBaseDataTimestamp(originalObject.getBaseDataTimestamp())
             .setCommittedTimestamp(originalObject.getCommittedTimestamp())

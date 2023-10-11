@@ -22,13 +22,13 @@ import java.util.Objects;
 
 public class S3WalObject {
 
-    long objectId;
+    Long objectId;
 
-    int brokerId;
+    Integer nodeId;
 
-    long objectSize;
+    Long objectSize;
 
-    long sequenceId;
+    Long sequenceId;
 
     String subStreams;
 
@@ -36,35 +36,35 @@ public class S3WalObject {
 
     long committedTimestamp;
 
-    public long getObjectId() {
+    public Long getObjectId() {
         return objectId;
     }
 
-    public void setObjectId(long objectId) {
+    public void setObjectId(Long objectId) {
         this.objectId = objectId;
     }
 
-    public long getObjectSize() {
+    public Integer getNodeId() {
+        return nodeId;
+    }
+
+    public void setNodeId(Integer nodeId) {
+        this.nodeId = nodeId;
+    }
+
+    public Long getObjectSize() {
         return objectSize;
     }
 
-    public void setObjectSize(long objectSize) {
+    public void setObjectSize(Long objectSize) {
         this.objectSize = objectSize;
     }
 
-    public int getBrokerId() {
-        return brokerId;
-    }
-
-    public void setBrokerId(int brokerId) {
-        this.brokerId = brokerId;
-    }
-
-    public long getSequenceId() {
+    public Long getSequenceId() {
         return sequenceId;
     }
 
-    public void setSequenceId(long sequenceId) {
+    public void setSequenceId(Long sequenceId) {
         this.sequenceId = sequenceId;
     }
 
@@ -94,14 +94,19 @@ public class S3WalObject {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        S3WalObject that = (S3WalObject) o;
-        return objectId == that.objectId && brokerId == that.brokerId && objectSize == that.objectSize && sequenceId == that.sequenceId && baseDataTimestamp == that.baseDataTimestamp && committedTimestamp == that.committedTimestamp && Objects.equals(subStreams, that.subStreams);
+        if (this == o)
+            return true;
+        if (o == null || getClass() != o.getClass())
+            return false;
+        S3WalObject object = (S3WalObject) o;
+        return baseDataTimestamp == object.baseDataTimestamp && committedTimestamp == object.committedTimestamp
+            && objectId.equals(object.objectId) && nodeId.equals(object.nodeId)
+            && objectSize.equals(object.objectSize) && sequenceId.equals(object.sequenceId)
+            && Objects.equals(subStreams, object.subStreams);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(objectId, brokerId, objectSize, sequenceId, subStreams, baseDataTimestamp, committedTimestamp);
+        return Objects.hash(objectId, nodeId, objectSize, sequenceId, subStreams, baseDataTimestamp, committedTimestamp);
     }
 }
