@@ -29,6 +29,7 @@ import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Timer;
 import com.google.common.util.concurrent.RateLimiter;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -165,6 +166,7 @@ public class ProduceMessage implements Callable<Void> {
         ClientConfiguration clientConfiguration = ClientConfiguration.newBuilder()
             .setEndpoints(mqAdmin.endpoint)
             .setCredentialProvider(staticSessionCredentialsProvider)
+            .setRequestTimeout(Duration.ofSeconds(10))
             .build();
 
         try {

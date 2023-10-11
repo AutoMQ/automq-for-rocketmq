@@ -27,6 +27,7 @@ import picocli.CommandLine;
 public class CreateTopic implements Callable<Void> {
     @CommandLine.Option(names = {"-t", "--topicName"}, description = "Topic name", required = true)
     String topicName;
+
     @CommandLine.Option(names = {"-q", "--queueNums"}, description = "Queue number")
     int queueNums = 1;
 

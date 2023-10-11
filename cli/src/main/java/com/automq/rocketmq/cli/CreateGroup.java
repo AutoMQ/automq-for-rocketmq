@@ -30,11 +30,13 @@ public class CreateGroup implements Callable<Void>  {
     MQAdmin mqAdmin;
 
     @CommandLine.Option(names = {"-g", "--groupName"}, description = "Group name", required = true)
-    private String groupName;
+    String groupName;
+
     @CommandLine.Option(names = {"-r", "--maxRetryAttempt"}, description = "Max retry attempt")
-    private int maxRetryAttempt = 16;
+    int maxRetryAttempt = 16;
+
     @CommandLine.Option(names = {"-t", "--groupType"}, description = "Group type")
-    private GroupType groupType = GroupType.GROUP_TYPE_STANDARD;
+    GroupType groupType = GroupType.GROUP_TYPE_STANDARD;
 
     @Override
     public Void call() throws Exception {

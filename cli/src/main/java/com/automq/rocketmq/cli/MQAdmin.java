@@ -27,7 +27,8 @@ import picocli.CommandLine;
     subcommands = {
         CreateTopic.class,
         CreateGroup.class,
-        ProduceMessage.class
+        ProduceMessage.class,
+        ConsumeMessage.class
     }
 )
 public class MQAdmin implements Runnable {
