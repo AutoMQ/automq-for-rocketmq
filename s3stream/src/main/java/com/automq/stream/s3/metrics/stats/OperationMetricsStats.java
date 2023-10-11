@@ -39,9 +39,9 @@ public class OperationMetricsStats {
 
         public OperationMetrics(S3Operation s3Operation) {
             Map<String, String> tags = Map.of("operation", s3Operation.getName());
-            operationCount = S3StreamMetricsRegistry.METRICS_GROUP.newCounter(s3Operation.getType().getName(),
+            operationCount = S3StreamMetricsRegistry.metricsGroup.newCounter(s3Operation.getType().getName(),
                     s3Operation.getType().getName() + "OperationCount", tags);
-            operationTime = S3StreamMetricsRegistry.METRICS_GROUP.newHistogram(s3Operation.getType().getName(),
+            operationTime = S3StreamMetricsRegistry.metricsGroup.newHistogram(s3Operation.getType().getName(),
                     s3Operation.getType().getName() + "OperationTime", tags);
         }
 

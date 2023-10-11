@@ -19,7 +19,7 @@ package com.automq.stream.s3.metrics;
 
 import java.util.Map;
 
-public class NoopS3StreamMetricsGroup implements S3StreamMetricsGroup{
+public class NoopS3StreamMetricsGroup implements S3StreamMetricsGroup {
     @Override
     public Counter newCounter(String type, String name, Map<String, String> tags) {
         return new Counter() {

@@ -449,8 +449,8 @@ public class DefaultS3Operator implements S3Operator {
             });
             closeCf.whenComplete((nil, ex) -> {
                 S3ObjectMetricsStats.getOrCreateS3ObjectMetrics(S3ObjectStage.TOTAL).update(timerUtil.elapsed());
-                S3ObjectMetricsStats.s3ObjectCount.inc();
-                S3ObjectMetricsStats.s3ObjectSize.update(totalWriteSize.get());
+                S3ObjectMetricsStats.S3_OBJECT_COUNT.inc();
+                S3ObjectMetricsStats.S3_OBJECT_SIZE.update(totalWriteSize.get());
                 long totalUploadTime = timerUtil.elapsed();
                 long now = System.currentTimeMillis();
                 if (now - LAST_LOG_TIMESTAMP.get() > 10000) {

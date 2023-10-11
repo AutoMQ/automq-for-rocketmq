@@ -18,7 +18,7 @@
 package com.automq.stream.s3.metrics;
 
 public class S3StreamMetricsRegistry {
-    public static S3StreamMetricsGroup METRICS_GROUP = new NoopS3StreamMetricsGroup();
+    public static S3StreamMetricsGroup metricsGroup = new NoopS3StreamMetricsGroup();
 
     private S3StreamMetricsRegistry() {
 
