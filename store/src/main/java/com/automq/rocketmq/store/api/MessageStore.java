@@ -87,7 +87,7 @@ public interface MessageStore extends Lifecycle {
      * @param queueId queue id
      * @return offset range, <code>[startOffset, endOffset)</code>
      */
-    CompletableFuture<TopicQueue.QueueOffsetRange> getOffsetRange(long topicId, int queueId);
+    CompletableFuture<LogicQueue.QueueOffsetRange> getOffsetRange(long topicId, int queueId);
 
     /**
      * Get consume offset of specified consumer group.

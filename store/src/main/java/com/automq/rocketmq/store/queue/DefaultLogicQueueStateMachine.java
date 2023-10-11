@@ -15,8 +15,9 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.store;
+package com.automq.rocketmq.store.queue;
 
+import com.automq.rocketmq.store.MessageStoreImpl;
 import com.automq.rocketmq.store.api.MessageStateMachine;
 import com.automq.rocketmq.store.exception.StoreErrorCode;
 import com.automq.rocketmq.store.exception.StoreException;
@@ -60,8 +61,8 @@ import static com.automq.rocketmq.store.util.SerializeUtil.buildOrderIndexValue;
 import static com.automq.rocketmq.store.util.SerializeUtil.buildReceiptHandle;
 import static com.automq.rocketmq.store.util.SerializeUtil.buildTimerTagKey;
 
-public class DefaultMessageStateMachine implements MessageStateMachine {
-    private static final Logger LOGGER = LoggerFactory.getLogger(DefaultMessageStateMachine.class);
+public class DefaultLogicQueueStateMachine implements MessageStateMachine {
+    private static final Logger LOGGER = LoggerFactory.getLogger(DefaultLogicQueueStateMachine.class);
     private final long topicId;
     private final int queueId;
     private Map<Long/*consumerGroup*/, ConsumerGroupMetadata> consumerGroupMetadataMap;
@@ -74,7 +75,7 @@ public class DefaultMessageStateMachine implements MessageStateMachine {
     private final KVService kvService;
     private final String identity;
 
-    public DefaultMessageStateMachine(long topicId, int queueId, KVService kvService) {
+    public DefaultLogicQueueStateMachine(long topicId, int queueId, KVService kvService) {
         this.consumerGroupMetadataMap = new ConcurrentHashMap<>();
         this.kvService = kvService;
         this.topicId = topicId;

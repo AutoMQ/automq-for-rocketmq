@@ -15,13 +15,13 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.store;
+package com.automq.rocketmq.store.queue;
 
 import com.automq.rocketmq.common.config.StoreConfig;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
+import com.automq.rocketmq.store.api.LogicQueue;
 import com.automq.rocketmq.store.api.MessageStateMachine;
 import com.automq.rocketmq.store.api.StreamStore;
-import com.automq.rocketmq.store.api.TopicQueue;
 import com.automq.rocketmq.store.api.TopicQueueManager;
 import com.automq.rocketmq.store.model.message.TopicQueueId;
 import com.automq.rocketmq.store.service.InflightService;
@@ -33,8 +33,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class DefaultTopicQueueManager implements TopicQueueManager {
-    protected static final Logger LOGGER = LoggerFactory.getLogger(DefaultTopicQueueManager.class);
+public class DefaultLogicQueueManager implements TopicQueueManager {
+    protected static final Logger LOGGER = LoggerFactory.getLogger(DefaultLogicQueueManager.class);
 
     private final StoreConfig storeConfig;
     private final StreamStore streamStore;
@@ -42,9 +42,9 @@ public class DefaultTopicQueueManager implements TopicQueueManager {
     private final StoreMetadataService metadataService;
     private final OperationLogService operationLogService;
     private final InflightService inflightService;
-    private final Map<TopicQueueId, CompletableFuture<TopicQueue>> topicQueueMap;
+    private final Map<TopicQueueId, CompletableFuture<LogicQueue>> topicQueueMap;
 
-    public DefaultTopicQueueManager(StoreConfig storeConfig, StreamStore streamStore,
+    public DefaultLogicQueueManager(StoreConfig storeConfig, StreamStore streamStore,
         KVService kvService, StoreMetadataService metadataService, OperationLogService operationLogService,
         InflightService inflightService) {
         this.storeConfig = storeConfig;
@@ -71,9 +71,9 @@ public class DefaultTopicQueueManager implements TopicQueueManager {
     }
 
     @Override
-    public CompletableFuture<TopicQueue> getOrCreate(long topicId, int queueId) {
+    public CompletableFuture<LogicQueue> getOrCreate(long topicId, int queueId) {
         TopicQueueId key = new TopicQueueId(topicId, queueId);
-        CompletableFuture<TopicQueue> future = topicQueueMap.get(key);
+        CompletableFuture<LogicQueue> future = topicQueueMap.get(key);
 
         if (future != null) {
             return future;
@@ -92,7 +92,7 @@ public class DefaultTopicQueueManager implements TopicQueueManager {
             // Put the future into the map to serve next request.
             topicQueueMap.put(key, future);
             future.exceptionally(ex -> {
-                LOGGER.error("Create topic: {} queue: {} failed.", topicId, queueId, ex);
+                LOGGER.error("Create logic queue failed: topic: {} queue: {}", topicId, queueId, ex);
                 topicQueueMap.remove(key);
                 return null;
             });
@@ -102,29 +102,29 @@ public class DefaultTopicQueueManager implements TopicQueueManager {
 
     @Override
     public CompletableFuture<Void> close(long topicId, int queueId) {
-        LOGGER.info("Close topic: {} queue: {}", topicId, queueId);
+        LOGGER.info("Close logic queue: {} queue: {}", topicId, queueId);
         TopicQueueId key = new TopicQueueId(topicId, queueId);
-        CompletableFuture<TopicQueue> future = topicQueueMap.remove(key);
+        CompletableFuture<LogicQueue> future = topicQueueMap.remove(key);
         if (future != null) {
-            return future.thenCompose(TopicQueue::close);
+            return future.thenCompose(LogicQueue::close);
         }
         return CompletableFuture.completedFuture(null);
     }
 
-    public CompletableFuture<TopicQueue> createAndOpen(long topicId, int queueId) {
+    public CompletableFuture<LogicQueue> createAndOpen(long topicId, int queueId) {
         TopicQueueId id = new TopicQueueId(topicId, queueId);
         if (topicQueueMap.containsKey(id)) {
             return CompletableFuture.completedFuture(null);
         }
 
-        MessageStateMachine stateMachine = new DefaultMessageStateMachine(topicId, queueId, kvService);
-        TopicQueue topicQueue = new StreamTopicQueue(storeConfig, topicId, queueId,
+        MessageStateMachine stateMachine = new DefaultLogicQueueStateMachine(topicId, queueId, kvService);
+        LogicQueue logicQueue = new StreamLogicQueue(storeConfig, topicId, queueId,
             metadataService, stateMachine, streamStore, operationLogService, inflightService);
 
         // TODO: handle exception when open topic queue failed.
-        LOGGER.info("Create and open topic: {} queue: {}", topicId, queueId);
-        return topicQueue.open()
-            .thenApply(nil -> topicQueue);
+        LOGGER.info("Create and open logic queue success: topic: {} queue: {}", topicId, queueId);
+        return logicQueue.open()
+            .thenApply(nil -> logicQueue);
     }
 
 }

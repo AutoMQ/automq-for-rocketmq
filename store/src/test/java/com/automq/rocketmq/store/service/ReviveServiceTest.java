@@ -20,12 +20,10 @@ package com.automq.rocketmq.store.service;
 import com.automq.rocketmq.common.config.StoreConfig;
 import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
-import com.automq.rocketmq.store.DefaultMessageStateMachine;
 import com.automq.rocketmq.store.MessageStoreImpl;
-import com.automq.rocketmq.store.StreamTopicQueue;
+import com.automq.rocketmq.store.api.LogicQueue;
 import com.automq.rocketmq.store.api.MessageStateMachine;
 import com.automq.rocketmq.store.api.StreamStore;
-import com.automq.rocketmq.store.api.TopicQueue;
 import com.automq.rocketmq.store.api.TopicQueueManager;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.mock.MockStoreMetadataService;
@@ -34,6 +32,8 @@ import com.automq.rocketmq.store.model.generated.ReceiptHandle;
 import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PopResult;
 import com.automq.rocketmq.store.model.message.PullResult;
+import com.automq.rocketmq.store.queue.DefaultLogicQueueStateMachine;
+import com.automq.rocketmq.store.queue.StreamLogicQueue;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.service.api.OperationLogService;
 import com.automq.rocketmq.store.util.SerializeUtil;
@@ -68,7 +68,7 @@ class ReviveServiceTest {
     private InflightService inflightService;
     private ReviveService reviveService;
     private MessageStateMachine stateMachine;
-    private TopicQueue topicQueue;
+    private LogicQueue logicQueue;
 
     @BeforeEach
     public void setUp() throws StoreException {
@@ -77,16 +77,16 @@ class ReviveServiceTest {
         streamStore = new MockStreamStore();
         inflightService = new InflightService();
         streamStore = new MockStreamStore();
-        stateMachine = new DefaultMessageStateMachine(TOPIC_ID, QUEUE_ID, kvService);
+        stateMachine = new DefaultLogicQueueStateMachine(TOPIC_ID, QUEUE_ID, kvService);
         inflightService = new InflightService();
         SnapshotService snapshotService = new SnapshotService(streamStore, kvService);
         OperationLogService operationLogService = new StreamOperationLogService(streamStore, snapshotService, new StoreConfig());
-        topicQueue = new StreamTopicQueue(new StoreConfig(), TOPIC_ID, QUEUE_ID,
+        logicQueue = new StreamLogicQueue(new StoreConfig(), TOPIC_ID, QUEUE_ID,
             metadataService, stateMachine, streamStore, operationLogService, inflightService);
         TopicQueueManager manager = Mockito.mock(TopicQueueManager.class);
-        Mockito.when(manager.getOrCreate(TOPIC_ID, QUEUE_ID)).thenReturn(CompletableFuture.completedFuture(topicQueue));
+        Mockito.when(manager.getOrCreate(TOPIC_ID, QUEUE_ID)).thenReturn(CompletableFuture.completedFuture(logicQueue));
         reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, KV_NAMESPACE_TIMER_TAG, kvService, metadataService, inflightService, manager);
-        topicQueue.open().join();
+        logicQueue.open().join();
     }
 
     @AfterEach
@@ -98,10 +98,10 @@ class ReviveServiceTest {
     void tryRevive() throws StoreException {
         // Append mock message.
         FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
-        topicQueue.put(message).join();
+        logicQueue.put(message).join();
         // pop message
         int invisibleDuration = 1000 * 1000 * 1000;
-        PopResult popResult = topicQueue.popNormal(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
+        PopResult popResult = logicQueue.popNormal(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
         assertEquals(1, popResult.messageList().size());
         // check ck exist
         ReceiptHandle handle = SerializeUtil.decodeReceiptHandle(popResult.messageList().get(0).receiptHandle().get());
@@ -123,7 +123,7 @@ class ReviveServiceTest {
         assertNull(ckValue);
 
         // check if this message has been appended to retry stream
-        PullResult retryPullResult = topicQueue.pullRetry(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 0, 100).join();
+        PullResult retryPullResult = logicQueue.pullRetry(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 0, 100).join();
         assertEquals(1, retryPullResult.messageList().size());
     }
 }

@@ -20,7 +20,7 @@ package com.automq.rocketmq.store.service;
 import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.util.Lifecycle;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
-import com.automq.rocketmq.store.api.TopicQueue;
+import com.automq.rocketmq.store.api.LogicQueue;
 import com.automq.rocketmq.store.api.TopicQueueManager;
 import com.automq.rocketmq.store.exception.StoreErrorCode;
 import com.automq.rocketmq.store.exception.StoreException;
@@ -122,14 +122,14 @@ public class ReviveService implements Runnable, Lifecycle {
                 }
                 CheckPoint checkPoint = SerializeUtil.decodeCheckPoint(ByteBuffer.wrap(ckValue));
                 PopOperation.PopOperationType operationType = PopOperation.PopOperationType.valueOf(checkPoint.popOperationType());
-                TopicQueue topicQueue = topicQueueManager.getOrCreate(topicId, queueId).join();
+                LogicQueue logicQueue = topicQueueManager.getOrCreate(topicId, queueId).join();
 
                 // TODO: async
                 PullResult pullResult;
                 if (operationType == PopOperation.PopOperationType.POP_RETRY) {
-                    pullResult = topicQueue.pullRetry(consumerGroupId, Filter.DEFAULT_FILTER, checkPoint.messageOffset(), 1).join();
+                    pullResult = logicQueue.pullRetry(consumerGroupId, Filter.DEFAULT_FILTER, checkPoint.messageOffset(), 1).join();
                 } else {
-                    pullResult = topicQueue.pullNormal(consumerGroupId, Filter.DEFAULT_FILTER, checkPoint.messageOffset(), 1).join();
+                    pullResult = logicQueue.pullNormal(consumerGroupId, Filter.DEFAULT_FILTER, checkPoint.messageOffset(), 1).join();
                 }
                 assert pullResult.messageList().size() <= 1;
                 // Message has already been deleted.
@@ -142,13 +142,13 @@ public class ReviveService implements Runnable, Lifecycle {
                 messageExt.setDeliveryAttempts(messageExt.deliveryAttempts() + 1);
                 if (operationType != PopOperation.PopOperationType.POP_ORDER) {
                     if (messageExt.deliveryAttempts() <= metadataService.maxDeliveryAttemptsOf(consumerGroupId).join()) {
-                        topicQueue.putRetry(consumerGroupId, messageExt.message()).join();
+                        logicQueue.putRetry(consumerGroupId, messageExt.message()).join();
                     } else {
                         // TODO: dead letter
                     }
                 }
 
-                topicQueue.ackTimeout(SerializeUtil.encodeReceiptHandle(receiptHandle)).join();
+                logicQueue.ackTimeout(SerializeUtil.encodeReceiptHandle(receiptHandle)).join();
             } catch (Exception e) {
                 Throwable cause = FutureUtil.cause(e);
                 LOGGER.error("{}: Failed to revive message", identity, cause);

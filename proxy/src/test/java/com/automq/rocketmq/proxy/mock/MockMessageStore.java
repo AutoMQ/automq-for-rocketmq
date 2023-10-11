@@ -19,8 +19,8 @@ package com.automq.rocketmq.proxy.mock;
 
 import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.model.generated.FlatMessage;
+import com.automq.rocketmq.store.api.LogicQueue;
 import com.automq.rocketmq.store.api.MessageStore;
-import com.automq.rocketmq.store.api.TopicQueue;
 import com.automq.rocketmq.store.model.message.AckResult;
 import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
 import com.automq.rocketmq.store.model.message.Filter;
@@ -128,14 +128,14 @@ public class MockMessageStore implements MessageStore {
     }
 
     @Override
-    public CompletableFuture<TopicQueue.QueueOffsetRange> getOffsetRange(long topicId, int queueId) {
+    public CompletableFuture<LogicQueue.QueueOffsetRange> getOffsetRange(long topicId, int queueId) {
         long startOffset = 0;
         List<FlatMessageExt> messageList = messageMap.computeIfAbsent(topicId + queueId, v -> new ArrayList<>());
         if (!messageList.isEmpty()) {
             startOffset = messageList.get(0).offset();
         }
         long endOffset = offsetMap.computeIfAbsent(topicId + queueId, v -> new AtomicLong()).get();
-        return CompletableFuture.completedFuture(new TopicQueue.QueueOffsetRange(startOffset, endOffset));
+        return CompletableFuture.completedFuture(new LogicQueue.QueueOffsetRange(startOffset, endOffset));
     }
 
     @Override

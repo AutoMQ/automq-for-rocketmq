@@ -15,16 +15,16 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.store;
+package com.automq.rocketmq.store.queue;
 
 import com.automq.rocketmq.common.config.StoreConfig;
 import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.common.util.Pair;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
+import com.automq.rocketmq.store.api.LogicQueue;
 import com.automq.rocketmq.store.api.MessageStateMachine;
 import com.automq.rocketmq.store.api.StreamStore;
-import com.automq.rocketmq.store.api.TopicQueue;
 import com.automq.rocketmq.store.exception.StoreErrorCode;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.generated.ReceiptHandle;
@@ -51,7 +51,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static com.automq.rocketmq.store.util.SerializeUtil.decodeReceiptHandle;
 
-public class StreamTopicQueue extends TopicQueue {
+public class StreamLogicQueue extends LogicQueue {
     private final StoreMetadataService metadataService;
     private final MessageStateMachine stateMachine;
     private long dataStreamId;
@@ -64,7 +64,7 @@ public class StreamTopicQueue extends TopicQueue {
     private final InflightService inflightService;
     private final AtomicReference<State> state;
 
-    public StreamTopicQueue(StoreConfig config, long topicId, int queueId,
+    public StreamLogicQueue(StoreConfig config, long topicId, int queueId,
         StoreMetadataService metadataService, MessageStateMachine stateMachine, StreamStore streamStore,
         OperationLogService operationLogService, InflightService inflightService) {
         super(topicId, queueId);
