@@ -598,17 +598,27 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
               }
             }""";
         try (SqlSession session = getSessionFactory().openSession()) {
+            RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
+
+            Range range = new Range();
+            range.setStreamId(streamId);
+            range.setRangeId(0);
+            range.setStartOffset(startOffset);
+            range.setEndOffset(endOffset);
+            range.setEpoch(1L);
+            range.setNodeId(1);
+            rangeMapper.create(range);
+
             S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
-            S3WalObject s3WALObject = new S3WalObject();
-            s3WALObject.setObjectId(123L);
-            s3WALObject.setNodeId(1);
-            s3WALObject.setObjectSize(22L);
-            s3WALObject.setSequenceId(999L);
-            s3WALObject.setSubStreams(subStreamsJson);
+            S3WalObject s3WalObject = new S3WalObject();
+            s3WalObject.setObjectId(123L);
+            s3WalObject.setNodeId(1);
+            s3WalObject.setObjectSize(22L);
+            s3WalObject.setSequenceId(999L);
+            s3WalObject.setSubStreams(subStreamsJson);
+            s3WalObject.setBaseDataTimestamp(System.currentTimeMillis());
 
-            s3WALObject.setBaseDataTimestamp(System.currentTimeMillis());
-
-            s3WALObjectMapper.create(s3WALObject);
+            s3WALObjectMapper.create(s3WalObject);
             session.commit();
         }
         String expectSubStream = """
