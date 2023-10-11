@@ -1347,17 +1347,30 @@ public class DefaultMetadataStore implements MetadataStore {
                         break;
                     }
 
-                    // Verify node
-                    if (nodeId != stream.getDstNodeId()) {
-                        LOGGER.warn("dst-node-id of stream {} is {}, fencing close stream request from Node[node-id={}]",
-                            streamId, stream.getDstNodeId(), nodeId);
-                        ControllerException e = new ControllerException(Code.ILLEGAL_STATE_VALUE, "Node is not match");
-                        future.completeExceptionally(e);
-                        break;
+                    // Verify stream owner
+                    switch (stream.getState()) {
+                        case CLOSING -> {
+                            if (nodeId != stream.getSrcNodeId()) {
+                                LOGGER.warn("State of Stream[stream-id={}] is {}, stream.srcNodeId={} while close stream request from Node[node-id={}]. Fenced",
+                                    streamId, stream.getState(), stream.getDstNodeId(), nodeId);
+                                ControllerException e = new ControllerException(Code.FENCED_VALUE,
+                                    "Close stream op is fenced by non-owner");
+                                future.completeExceptionally(e);
+                            }
+                        }
+                        case OPEN -> {
+                            if (nodeId != stream.getDstNodeId()) {
+                                LOGGER.warn("dst-node-id of stream {} is {}, fencing close stream request from Node[node-id={}]",
+                                    streamId, stream.getDstNodeId(), nodeId);
+                                ControllerException e = new ControllerException(Code.FENCED_VALUE,
+                                    "Close stream op is fenced by non-owner");
+                                future.completeExceptionally(e);
+                            }
+                        }
                     }
 
                     // Verify epoch
-                    if (streamEpoch < stream.getEpoch()) {
+                    if (streamEpoch != stream.getEpoch()) {
                         ControllerException e = new ControllerException(Code.FENCED_VALUE, "Stream epoch is deprecated");
                         future.completeExceptionally(e);
                         break;
