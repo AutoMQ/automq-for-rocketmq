@@ -53,8 +53,6 @@ public class StreamOperationLogService implements OperationLogService {
     @Override
     public CompletableFuture<Void> recover(MessageStateMachine stateMachine, long operationStreamId,
         long snapshotStreamId) {
-        // TODO: clear all states of this queue before start
-
         // 1. get snapshot
         SnapshotService.SnapshotStatus snapshotStatus = snapshotService.getSnapshotStatus(stateMachine.topicId(), stateMachine.queueId());
         long snapStartOffset = streamStore.startOffset(snapshotStreamId);

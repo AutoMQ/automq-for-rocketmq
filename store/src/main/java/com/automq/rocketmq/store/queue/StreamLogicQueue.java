@@ -98,8 +98,9 @@ public class StreamLogicQueue extends LogicQueue {
                     return streamStore.open(metadata.getStreamId(), metadata.getEpoch());
                 });
 
-            // TODO: when we open retry-streams?
             return CompletableFuture.allOf(openDataStreamFuture, openOperationStreamFuture, openSnapshotStreamFuture)
+                .thenCompose(nil -> stateMachine.clear())
+                .thenAccept(nil -> inflightService.clearInflightCount(topicId, queueId))
                 // recover from operation log
                 .thenCompose(nil -> operationLogService.recover(stateMachine, operationStreamId, snapshotStreamId))
                 .thenAccept(nil -> state.set(State.OPENED));
