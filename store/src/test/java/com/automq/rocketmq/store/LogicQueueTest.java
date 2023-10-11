@@ -45,9 +45,12 @@ import com.automq.rocketmq.store.util.SerializeUtil;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import static com.automq.rocketmq.store.mock.MockMessageUtil.buildMessage;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -66,19 +69,21 @@ public class LogicQueueTest {
     private static final long SNAPSHOT_STREAM_ID = 131313131313L;
     private static final long EPOCH = 13131313131313L;
 
-    private static KVService kvService;
-    private static StoreMetadataService metadataService;
-    private static StreamStore streamStore;
-    private static MessageStateMachine stateMachine;
-    private static InflightService inflightService;
-    private static LogicQueue logicQueue;
+    private KVService kvService;
+    private StoreMetadataService metadataService;
+    private StreamStore streamStore;
+    private MessageStateMachine stateMachine;
+    private InflightService inflightService;
+    private OperationLogService operationLogService;
+    private SnapshotService snapshotService;
+    private LogicQueue logicQueue;
 
     @BeforeEach
     public void setUp() throws StoreException {
         kvService = new RocksDBKVService(PATH);
         metadataService = new MockStoreMetadataService();
         streamStore = new MockStreamStore();
-        stateMachine = new DefaultLogicQueueStateMachine(TOPIC_ID, QUEUE_ID, kvService);
+        stateMachine = Mockito.spy(new DefaultLogicQueueStateMachine(TOPIC_ID, QUEUE_ID, kvService));
         inflightService = new InflightService();
         SnapshotService snapshotService = new SnapshotService(streamStore, kvService);
         OperationLogService operationLogService = new StreamOperationLogService(streamStore, snapshotService, new StoreConfig());
@@ -621,4 +626,130 @@ public class LogicQueueTest {
         assertEquals(3, stateMachine.retryAckOffset(CONSUMER_GROUP_ID).join());
     }
 
+    @Test
+    void open_close() {
+        // 1. append 5 messages
+        for (int i = 0; i < 5; i++) {
+            FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
+            logicQueue.put(message);
+        }
+
+        // 2. pop 2 messages
+        PopResult popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 2, 100).join();
+        assertEquals(PopResult.Status.FOUND, popResult.status());
+        assertEquals(2, popResult.messageList().size());
+        assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
+        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
+        String receiptHandle0 = popResult.messageList().get(0).receiptHandle().get();
+        String receiptHandle1 = popResult.messageList().get(1).receiptHandle().get();
+
+        // 3. check ck exist
+        checkCkExist(receiptHandle0, true);
+        checkCkExist(receiptHandle1, true);
+        assertEquals(2, scanAllTimerTag().size());
+
+        // 4. close normally
+        logicQueue.close().join();
+
+        // 5. check ck not exist
+        checkCkExist(receiptHandle0, false);
+        checkCkExist(receiptHandle1, false);
+        assertEquals(0, scanAllTimerTag().size());
+
+        // 6. open again
+        logicQueue = new StreamLogicQueue(new StoreConfig(), TOPIC_ID, QUEUE_ID,
+            metadataService, stateMachine, streamStore, operationLogService, inflightService);
+        logicQueue.open().join();
+
+        // 7. check ck exist
+        checkCkExist(receiptHandle0, true);
+        checkCkExist(receiptHandle1, true);
+        assertEquals(2, scanAllTimerTag().size());
+        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(0, stateMachine.ackOffset(CONSUMER_GROUP_ID).join());
+    }
+
+    @Test
+    void open_close_ungracefully() {
+        // 1. append 5 messages
+        for (int i = 0; i < 5; i++) {
+            FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
+            logicQueue.put(message);
+        }
+
+        // 2. pop 2 messages
+        PopResult popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 2, 100).join();
+        assertEquals(PopResult.Status.FOUND, popResult.status());
+        assertEquals(2, popResult.messageList().size());
+        assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
+        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(0, stateMachine.ackOffset(CONSUMER_GROUP_ID).join());
+        String receiptHandle0 = popResult.messageList().get(0).receiptHandle().get();
+        String receiptHandle1 = popResult.messageList().get(1).receiptHandle().get();
+
+        // 3. check ck exist
+        checkCkExist(receiptHandle0, true);
+        checkCkExist(receiptHandle1, true);
+        assertEquals(2, scanAllTimerTag().size());
+
+        // 4. mock that close ungracefully, stream closed but states is not cleaned
+        Mockito.doReturn(CompletableFuture.completedFuture(null)).when(stateMachine).clear();
+        logicQueue.close().join();
+
+        // 5. check ck exist
+        checkCkExist(receiptHandle0, true);
+        checkCkExist(receiptHandle1, true);
+        assertEquals(2, scanAllTimerTag().size());
+
+        // 5. open again
+        Mockito.doAnswer(ink -> {
+            ink.callRealMethod();
+            // 6. check ck not exist
+            checkCkExist(receiptHandle0, false);
+            checkCkExist(receiptHandle1, false);
+            assertEquals(0, scanAllTimerTag().size());
+            return CompletableFuture.completedFuture(null);
+        }).when(stateMachine).clear();
+        logicQueue = new StreamLogicQueue(new StoreConfig(), TOPIC_ID, QUEUE_ID,
+            metadataService, stateMachine, streamStore, operationLogService, inflightService);
+        logicQueue.open().join();
+
+        // 5. check ck exist
+        checkCkExist(receiptHandle0, true);
+        checkCkExist(receiptHandle1, true);
+        assertEquals(2, scanAllTimerTag().size());
+        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(0, stateMachine.ackOffset(CONSUMER_GROUP_ID).join());
+    }
+
+    private void checkCkExist(String receiptHandle, boolean expectExist) {
+        try {
+            ReceiptHandle handle0 = SerializeUtil.decodeReceiptHandle(receiptHandle);
+            byte[] bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle0.operationId()));
+            if (expectExist) {
+                assertNotNull(bytes);
+            } else {
+                assertNull(bytes);
+            }
+        } catch (Exception e) {
+            Assertions.fail(e);
+        }
+    }
+
+    private List<ReceiptHandle> scanAllTimerTag() {
+        byte[] start = ByteBuffer.allocate(8).putLong(0).array();
+        long endTimestamp = System.nanoTime() - 1;
+        byte[] end = ByteBuffer.allocate(8).putLong(endTimestamp).array();
+        List<ReceiptHandle> receiptHandleList = new ArrayList<>();
+        try {
+            // Iterate timer tag until now to find messages need to reconsume.
+            kvService.iterate(MessageStoreImpl.KV_NAMESPACE_TIMER_TAG, null, start, end, (key, value) -> {
+                ReceiptHandle receiptHandle = ReceiptHandle.getRootAsReceiptHandle(ByteBuffer.wrap(value));
+                receiptHandleList.add(receiptHandle);
+            });
+        } catch (Exception e) {
+            Assertions.fail(e);
+        }
+        return receiptHandleList;
+    }
 }

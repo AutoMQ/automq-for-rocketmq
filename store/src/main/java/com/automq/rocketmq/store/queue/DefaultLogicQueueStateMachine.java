@@ -412,6 +412,7 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
                 RoaringBitmap retryBitmap = new RoaringBitmap(new ImmutableRoaringBitmap(ByteBuffer.wrap(metadataSnapshot.getRetryAckOffsetBitmapBuffer())));
                 getRetryAckCommitter(metadataSnapshot.getConsumerGroupId(), retryBitmap);
             });
+            this.currentOperationOffset = snapshot.getSnapshotEndOffset();
             // recover states in kv service
             snapshot.getCheckPoints().forEach(checkPoint -> {
                 try {
@@ -438,7 +439,9 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
                             requestList.add(writeOrderIndexRequest);
                         }
                     }
-                    kvService.batch(requestList.toArray(new BatchRequest[0]));
+                    if (!requestList.isEmpty()) {
+                        kvService.batch(requestList.toArray(new BatchRequest[0]));
+                    }
                 } catch (StoreException e) {
                     LOGGER.error("{}: Recover from snapshot: {} failed", identity, snapshot, e);
                     throw new RuntimeException(e);
@@ -489,7 +492,9 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
                     }
                 }
             });
-            kvService.batch(requestList.toArray(new BatchRequest[0]));
+            if (!requestList.isEmpty()) {
+                kvService.batch(requestList.toArray(new BatchRequest[0]));
+            }
             return CompletableFuture.completedFuture(null);
         } catch (StoreException e) {
             LOGGER.error("{}: Clear failed", identity, e);
