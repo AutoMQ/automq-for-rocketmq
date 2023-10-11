@@ -44,6 +44,7 @@ public class BrokerController implements Lifecycle {
     private final StoreMetadataService storeMetadataService;
     private final ProxyMetadataService proxyMetadataService;
     private final MessagingProcessor messagingProcessor;
+    private final MetricsExporter metricsExporter;
 
     public BrokerController(BrokerConfig brokerConfig) throws Exception {
         this.brokerConfig = brokerConfig;
@@ -66,6 +67,8 @@ public class BrokerController implements Lifecycle {
         // TODO: Split controller to a separate port
         ControllerServiceImpl controllerService = MetadataStoreBuilder.build(metadataStore);
         grpcServer = new GrpcProtocolServer(brokerConfig.proxy(), messagingProcessor, controllerService);
+
+        metricsExporter = new MetricsExporter(brokerConfig, messageStore, (ExtendMessagingProcessor) messagingProcessor);
     }
 
     @Override
@@ -74,6 +77,7 @@ public class BrokerController implements Lifecycle {
         messagingProcessor.start();
         grpcServer.start();
         metadataStore.registerCurrentNode(brokerConfig.name(), brokerConfig.advertiseAddress(), brokerConfig.instanceId());
+        metricsExporter.start();
     }
 
     @Override
@@ -82,5 +86,6 @@ public class BrokerController implements Lifecycle {
         messagingProcessor.shutdown();
         messageStore.shutdown();
         metadataStore.close();
+        metricsExporter.shutdown();
     }
 }
