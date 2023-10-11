@@ -25,4 +25,5 @@ jobs:
         with:
           key: docker-${{ runner.os }}
       - name: Build with Maven
+        working-directory: s3stream
         run: mvn clean install -U
