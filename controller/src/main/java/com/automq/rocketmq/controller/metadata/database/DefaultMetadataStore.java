@@ -79,6 +79,8 @@ import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 import com.automq.rocketmq.controller.metadata.database.tasks.KeepAliveTask;
 import com.automq.rocketmq.controller.metadata.database.tasks.LeaseTask;
+import com.automq.rocketmq.controller.metadata.database.tasks.RecycleGroupTask;
+import com.automq.rocketmq.controller.metadata.database.tasks.RecycleTopicTask;
 import com.automq.rocketmq.controller.metadata.database.tasks.ScanNodeTask;
 import com.automq.rocketmq.controller.metadata.database.tasks.ScanYieldingQueueTask;
 import com.automq.rocketmq.controller.metadata.database.tasks.SchedulerTask;
@@ -190,6 +192,10 @@ public class DefaultMetadataStore implements MetadataStore {
             config.scanIntervalInSecs(), TimeUnit.SECONDS);
         this.scheduledExecutorService.scheduleAtFixedRate(new KeepAliveTask(this), 3,
             Math.max(config().nodeAliveIntervalInSecs() / 2, 10), TimeUnit.SECONDS);
+        this.scheduledExecutorService.scheduleWithFixedDelay(new RecycleTopicTask(this), 1,
+            config.deletedTopicLingersInSecs(), TimeUnit.SECONDS);
+        this.scheduledExecutorService.scheduleWithFixedDelay(new RecycleGroupTask(this), 1,
+            config.deletedGroupLingersInSecs(), TimeUnit.SECONDS);
         LOGGER.info("MetadataStore tasks scheduled");
     }
 

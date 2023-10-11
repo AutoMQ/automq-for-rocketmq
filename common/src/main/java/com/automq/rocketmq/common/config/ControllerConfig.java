@@ -47,6 +47,14 @@ public interface ControllerConfig {
         return 60;
     }
 
+    default int deletedTopicLingersInSecs() {
+        return 300;
+    }
+
+    default int deletedGroupLingersInSecs() {
+        return 300;
+    }
+
     /**
      * @return Tolerance of workload unfairness among nodes in terms of stream number.
      */
