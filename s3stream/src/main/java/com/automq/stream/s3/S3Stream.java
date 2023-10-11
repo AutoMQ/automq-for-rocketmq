@@ -26,6 +26,8 @@ import com.automq.stream.api.RecordBatch;
 import com.automq.stream.api.RecordBatchWithContext;
 import com.automq.stream.api.Stream;
 import com.automq.stream.api.StreamClientException;
+import com.automq.stream.s3.metrics.operations.S3Operation;
+import com.automq.stream.s3.metrics.stats.OperationMetricsStats;
 import com.automq.stream.s3.model.StreamRecordBatch;
 import com.automq.stream.s3.streams.StreamManager;
 import com.automq.stream.utils.FutureUtil;
@@ -125,9 +127,14 @@ public class S3Stream implements Stream {
     public CompletableFuture<AppendResult> append(RecordBatch recordBatch) {
         writeLock.lock();
         try {
+            long start = System.currentTimeMillis();
             CompletableFuture<AppendResult> cf = exec(() -> append0(recordBatch), LOGGER, "append");
             pendingAppends.add(cf);
-            cf.whenComplete((nil, ex) -> pendingAppends.remove(cf));
+            cf.whenComplete((nil, ex) -> {
+                OperationMetricsStats.getOrCreateOperationMetrics(S3Operation.APPEND_STREAM).operationCount.inc();
+                OperationMetricsStats.getOrCreateOperationMetrics(S3Operation.APPEND_STREAM).operationTime.update(System.currentTimeMillis() - start);
+                pendingAppends.remove(cf);
+            });
             return cf;
         } finally {
             writeLock.unlock();
@@ -162,9 +169,14 @@ public class S3Stream implements Stream {
     public CompletableFuture<FetchResult> fetch(long startOffset, long endOffset, int maxBytes) {
         readLock.lock();
         try {
+            long start = System.currentTimeMillis();
             CompletableFuture<FetchResult> cf = exec(() -> fetch0(startOffset, endOffset, maxBytes), LOGGER, "fetch");
             pendingFetches.add(cf);
-            cf.whenComplete((nil, ex) -> pendingFetches.remove(cf));
+            cf.whenComplete((nil, ex) -> {
+                OperationMetricsStats.getOrCreateOperationMetrics(S3Operation.FETCH_STREAM).operationCount.inc();
+                OperationMetricsStats.getOrCreateOperationMetrics(S3Operation.FETCH_STREAM).operationTime.update(System.currentTimeMillis() - start);
+                pendingFetches.remove(cf);
+            });
             return cf;
         } finally {
             readLock.unlock();
@@ -195,10 +207,15 @@ public class S3Stream implements Stream {
     public CompletableFuture<Void> trim(long newStartOffset) {
         writeLock.lock();
         try {
+            long start = System.currentTimeMillis();
             return exec(() -> {
                 CompletableFuture<Void> cf = new CompletableFuture<>();
                 lastPendingTrim.whenComplete((nil, ex) -> propagate(trim0(newStartOffset), cf));
                 this.lastPendingTrim = cf;
+                cf.whenComplete((nil, ex) -> {
+                    OperationMetricsStats.getOrCreateOperationMetrics(S3Operation.TRIM_STREAM).operationCount.inc();
+                    OperationMetricsStats.getOrCreateOperationMetrics(S3Operation.TRIM_STREAM).operationTime.update(System.currentTimeMillis() - start);
+                });
                 return cf;
             }, LOGGER, "trim");
         } finally {
