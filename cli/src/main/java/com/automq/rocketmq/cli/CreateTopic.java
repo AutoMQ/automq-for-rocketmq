@@ -23,15 +23,15 @@ import com.automq.rocketmq.controller.metadata.GrpcControllerClient;
 import java.util.concurrent.Callable;
 import picocli.CommandLine;
 
-@CommandLine.Command(name = "createTopic", mixinStandardHelpOptions = true)
+@CommandLine.Command(name = "createTopic", mixinStandardHelpOptions = true, showDefaultValues = true)
 public class CreateTopic implements Callable<Void> {
     @CommandLine.Option(names = {"-t", "--topicName"}, description = "Topic name", required = true)
     String topicName;
-    @CommandLine.Option(names = {"-q", "--queueNums"}, description = "Queue number", defaultValue = "1")
-    int queueNums;
+    @CommandLine.Option(names = {"-q", "--queueNums"}, description = "Queue number")
+    int queueNums = 1;
 
-    @CommandLine.Option(names = {"-m", "--messageType"}, description = "Message type", defaultValue = "NORMAL")
-    MessageType messageType;
+    @CommandLine.Option(names = {"-m", "--messageType"}, description = "Message type")
+    MessageType messageType = MessageType.NORMAL;
 
     @CommandLine.ParentCommand
     MQAdmin mqAdmin;

@@ -24,17 +24,17 @@ import com.automq.rocketmq.controller.metadata.GrpcControllerClient;
 import java.util.concurrent.Callable;
 import picocli.CommandLine;
 
-@CommandLine.Command(name = "createGroup", mixinStandardHelpOptions = true)
+@CommandLine.Command(name = "createGroup", mixinStandardHelpOptions = true, showDefaultValues = true)
 public class CreateGroup implements Callable<Void>  {
     @CommandLine.ParentCommand
     MQAdmin mqAdmin;
 
     @CommandLine.Option(names = {"-g", "--groupName"}, description = "Group name", required = true)
     private String groupName;
-    @CommandLine.Option(names = {"-r", "--maxRetryAttempt"}, description = "Max retry attempt", defaultValue = "16")
-    private int maxRetryAttempt;
-    @CommandLine.Option(names = {"-t", "--groupType"}, description = "Group type", defaultValue = "GROUP_TYPE_STANDARD")
-    private GroupType groupType;
+    @CommandLine.Option(names = {"-r", "--maxRetryAttempt"}, description = "Max retry attempt")
+    private int maxRetryAttempt = 16;
+    @CommandLine.Option(names = {"-t", "--groupType"}, description = "Group type")
+    private GroupType groupType = GroupType.GROUP_TYPE_STANDARD;
 
     @Override
     public Void call() throws Exception {
