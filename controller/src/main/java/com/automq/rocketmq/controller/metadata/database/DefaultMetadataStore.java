@@ -341,6 +341,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     if (null != topicMapper.get(null, topicName)) {
                         ControllerException e = new ControllerException(Code.DUPLICATED_VALUE, String.format("Topic %s was taken", topicName));
                         future.completeExceptionally(e);
+                        return future;
                     }
 
                     Topic topic = new Topic();
@@ -820,8 +821,7 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public CompletableFuture<Long> createGroup(String groupName, int maxRetry, GroupType type,
-        long deadLetterTopicId) throws ControllerException {
+    public CompletableFuture<Long> createGroup(String groupName, int maxRetry, GroupType type, long deadLetterTopicId) {
         CompletableFuture<Long> future = new CompletableFuture<>();
         for (; ; ) {
             if (isLeader()) {
@@ -834,6 +834,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     if (!groups.isEmpty()) {
                         ControllerException e = new ControllerException(Code.DUPLICATED_VALUE, String.format("Group name '%s' is not available", groupName));
                         future.completeExceptionally(e);
+                        return future;
                     }
 
                     Group group = new Group();

@@ -156,7 +156,8 @@ public class GrpcControllerClient implements ControllerClient {
                 switch (result.getStatus().getCode()) {
                     case OK -> future.complete(result.getTopicId());
                     case DUPLICATED -> {
-                        ControllerException e = new ControllerException(Code.DUPLICATED_VALUE, "Topic name is taken");
+                        String msg = String.format("Topic name '%s' has been taken", request.getTopic());
+                        ControllerException e = new ControllerException(Code.DUPLICATED_VALUE, msg);
                         future.completeExceptionally(e);
                     }
                     default -> {
@@ -368,7 +369,23 @@ public class GrpcControllerClient implements ControllerClient {
         Futures.addCallback(this.buildStubForTarget(target).createGroup(request), new FutureCallback<>() {
             @Override
             public void onSuccess(CreateGroupReply result) {
-                future.complete(result);
+                switch (result.getStatus().getCode()) {
+                    case OK -> {
+                        future.complete(result);
+                    }
+                    case DUPLICATED -> {
+                        LOGGER.info("Group name {} has been taken", request.getName());
+                        ControllerException e = new ControllerException(result.getStatus().getCodeValue(),
+                            result.getStatus().getMessage());
+                        future.completeExceptionally(e);
+                    }
+                    default -> {
+                        LOGGER.warn("Unexpected error while creating group {}", request.getName());
+                        ControllerException e = new ControllerException(result.getStatus().getCodeValue(),
+                            result.getStatus().getMessage());
+                        future.completeExceptionally(e);
+                    }
+                }
             }
 
             @Override
