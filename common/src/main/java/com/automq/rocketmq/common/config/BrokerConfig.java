@@ -49,6 +49,7 @@ public class BrokerConfig implements ControllerConfig {
      */
     private String advertiseAddress;
 
+    private final MetricsConfig metrics;
     private final ProxyConfig proxy;
     private final StoreConfig store;
     private final S3StreamConfig s3Stream;
@@ -56,6 +57,7 @@ public class BrokerConfig implements ControllerConfig {
     private final DatabaseConfig db;
 
     public BrokerConfig() {
+        this.metrics = new MetricsConfig();
         this.proxy = new ProxyConfig();
         this.store = new StoreConfig();
         this.s3Stream = new S3StreamConfig();
@@ -115,6 +117,10 @@ public class BrokerConfig implements ControllerConfig {
         return this.db.getPassword();
     }
 
+    public MetricsConfig metrics() {
+        return metrics;
+    }
+
     public ProxyConfig proxy() {
         return proxy;
     }
@@ -127,7 +133,7 @@ public class BrokerConfig implements ControllerConfig {
         return s3Stream;
     }
 
-    public DatabaseConfig getDb() {
+    public DatabaseConfig db() {
         return db;
     }
 
