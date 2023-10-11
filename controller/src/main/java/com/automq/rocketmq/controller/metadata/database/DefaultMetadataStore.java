@@ -86,6 +86,7 @@ import com.google.common.base.Strings;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.HashSet;
@@ -1742,37 +1743,52 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public CompletableFuture<List<S3WALObject>> listWALObjects(long streamId,
-        long startOffset,
+    public CompletableFuture<List<S3WALObject>> listWALObjects(long streamId, long startOffset,
         long endOffset, int limit) {
         CompletableFuture<List<S3WALObject>> future = new CompletableFuture<>();
         try (SqlSession session = this.sessionFactory.openSession()) {
+            RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
+
+            List<Integer> nodes = rangeMapper.listByStreamId(streamId)
+                .stream()
+                .filter(range -> range.getEndOffset() > startOffset && range.getStartOffset() < endOffset)
+                .mapToInt(Range::getNodeId)
+                .distinct()
+                .boxed()
+                .toList();
+
             S3WalObjectMapper s3WalObjectMapper = session.getMapper(S3WalObjectMapper.class);
-            List<S3WalObject> s3WalObjects = s3WalObjectMapper.list(this.config.nodeId(), null);
-
-            List<S3WALObject> walObjects = s3WalObjects.stream()
-                .map(s3WALObject -> {
-                    TypeToken<Map<Long, SubStream>> typeToken = new TypeToken<>() {
-
-                    };
-                    Map<Long, SubStream> subStreams = gson.fromJson(new String(s3WALObject.getSubStreams().getBytes(StandardCharsets.UTF_8)), typeToken.getType());
-                    Map<Long, SubStream> streamsRecords = new HashMap<>();
-                    if (!Objects.isNull(subStreams) && subStreams.containsKey(streamId)) {
-                        SubStream subStream = subStreams.get(streamId);
-                        if (subStream.getStartOffset() <= endOffset && subStream.getEndOffset() > startOffset) {
-                            streamsRecords.put(streamId, subStream);
+            List<S3WALObject> s3WALObjects = new ArrayList<>();
+            for(int nodeId: nodes) {
+                List<S3WalObject> s3WalObjects = s3WalObjectMapper.list(nodeId, null);
+                s3WalObjects.stream()
+                    .map(s3WalObject -> {
+                        TypeToken<Map<Long, SubStream>> typeToken = new TypeToken<>() {};
+                        Map<Long, SubStream> subStreams = gson.fromJson(new String(s3WalObject.getSubStreams().getBytes(StandardCharsets.UTF_8)), typeToken.getType());
+                        Map<Long, SubStream> streamsRecords = new HashMap<>();
+                        if (!Objects.isNull(subStreams) && subStreams.containsKey(streamId)) {
+                            SubStream subStream = subStreams.get(streamId);
+                            if (subStream.getStartOffset() <= endOffset && subStream.getEndOffset() > startOffset) {
+                                streamsRecords.put(streamId, subStream);
+                            }
                         }
-                    }
-                    if (!streamsRecords.isEmpty()) {
-                        return buildS3WALObject(s3WALObject, streamsRecords);
-                    }
-                    return null;
+                        if (!streamsRecords.isEmpty()) {
+                            return buildS3WALObject(s3WalObject, streamsRecords);
+                        }
+                        return null;
+                    })
+                    .filter(Objects::nonNull)
+                    .forEach(s3WALObjects::add);
+            }
 
-                })
-                .filter(Objects::nonNull)
-                .limit(limit)
-                .collect(Collectors.toList());
-            future.complete(walObjects);
+            // Sort by start-offset of the given stream
+            s3WALObjects.sort((l, r) -> {
+                long lhs = l.getSubStreamsMap().get(streamId).getStartOffset();
+                long rhs = r.getSubStreamsMap().get(streamId).getStartOffset();
+                return Long.compare(lhs, rhs);
+            });
+
+            future.complete(s3WALObjects.stream().limit(limit).toList());
         }
         return future;
     }
