@@ -32,17 +32,17 @@ public class MockOperationLogService implements OperationLogService {
     AtomicBoolean recoverFailed = new AtomicBoolean(false);
 
     @Override
-    public CompletableFuture<Long> logPopOperation(PopOperation operation) {
+    public CompletableFuture<LogResult> logPopOperation(PopOperation operation) {
         return null;
     }
 
     @Override
-    public CompletableFuture<Long> logAckOperation(AckOperation operation) {
+    public CompletableFuture<LogResult> logAckOperation(AckOperation operation) {
         return null;
     }
 
     @Override
-    public CompletableFuture<Long> logChangeInvisibleDurationOperation(ChangeInvisibleDurationOperation operation) {
+    public CompletableFuture<LogResult> logChangeInvisibleDurationOperation(ChangeInvisibleDurationOperation operation) {
         return null;
     }
 

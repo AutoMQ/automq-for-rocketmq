@@ -94,7 +94,7 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
     }
 
     @Override
-    public CompletableFuture<Void> replayPopOperation(long operationOffset, PopOperation operation) {
+    public ReplayPopResult replayPopOperation(long operationOffset, PopOperation operation) throws StoreException {
         reentrantLock.lock();
         try {
             this.currentOperationOffset = operationOffset;
@@ -108,16 +108,12 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
                 default:
                     throw new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "Unknown pop operation type");
             }
-        } catch (Exception e) {
-            Throwable cause = FutureUtil.cause(e);
-            LOGGER.error("{}: Replay pop operation failed", identity, cause);
-            return CompletableFuture.failedFuture(cause);
         } finally {
             reentrantLock.unlock();
         }
     }
 
-    private CompletableFuture<Void> replayPopNormalOperation(long operationOffset,
+    private ReplayPopResult replayPopNormalOperation(long operationOffset,
         PopOperation operation) throws StoreException {
         long topicId = operation.topicId();
         int queueId = operation.queueId();
@@ -143,7 +139,7 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
                 long currOffset = baseOffset + i;
                 this.getAckCommitter(consumerGroupId).commitAck(currOffset);
             }
-            return CompletableFuture.completedFuture(null);
+            return ReplayPopResult.empty();
         }
 
         List<BatchRequest> requestList = new ArrayList<>();
@@ -160,11 +156,14 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
             buildReceiptHandle(consumerGroupId, topicId, queueId, operationId));
         requestList.add(writeTimerTagRequest);
 
+        Integer currentConsumeTimes = metadata.getConsumeTimes().getOrDefault(offset, 0);
+        Integer newConsumeTimes = metadata.getConsumeTimes().put(offset, currentConsumeTimes + 1);
+
         kvService.batch(requestList.toArray(new BatchRequest[0]));
-        return CompletableFuture.completedFuture(null);
+        return ReplayPopResult.of(newConsumeTimes);
     }
 
-    private CompletableFuture<Void> replayPopRetryOperation(long operationOffset,
+    private ReplayPopResult replayPopRetryOperation(long operationOffset,
         PopOperation operation) throws StoreException {
         long topicId = operation.topicId();
         int queueId = operation.queueId();
@@ -190,7 +189,7 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
                 long currOffset = baseOffset + i;
                 this.getAckCommitter(consumerGroupId).commitAck(currOffset);
             }
-            return CompletableFuture.completedFuture(null);
+            return ReplayPopResult.empty();
         }
 
         List<BatchRequest> requestList = new ArrayList<>();
@@ -208,10 +207,10 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
         requestList.add(writeTimerTagRequest);
 
         kvService.batch(requestList.toArray(new BatchRequest[0]));
-        return CompletableFuture.completedFuture(null);
+        return ReplayPopResult.empty();
     }
 
-    private CompletableFuture<Void> replayPopFifoOperation(long operationOffset,
+    private ReplayPopResult replayPopFifoOperation(long operationOffset,
         PopOperation operation) throws StoreException {
         long topicId = operation.topicId();
         int queueId = operation.queueId();
@@ -238,7 +237,7 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
                 long currOffset = baseOffset + i;
                 this.getAckCommitter(consumerGroupId).commitAck(currOffset);
             }
-            return CompletableFuture.completedFuture(null);
+            return ReplayPopResult.empty();
         }
 
         List<BatchRequest> requestList = new ArrayList<>();
@@ -264,8 +263,11 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
             requestList.add(writeOrderIndexRequest);
         }
 
+        Integer currentConsumeTimes = metadata.getConsumeTimes().getOrDefault(offset, 0);
+        Integer newConsumeTimes = metadata.getConsumeTimes().put(offset, currentConsumeTimes + 1);
+
         kvService.batch(requestList.toArray(new BatchRequest[0]));
-        return CompletableFuture.completedFuture(null);
+        return ReplayPopResult.of(newConsumeTimes);
     }
 
     private AckCommitter getAckCommitter(long consumerGroupId) {
@@ -401,7 +403,8 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
                     return new OperationSnapshot.ConsumerGroupMetadataSnapshot(metadata.getConsumerGroupId(), metadata.getConsumeOffset(), metadata.getAckOffset(),
                         metadata.getRetryConsumeOffset(), metadata.getRetryAckOffset(),
                         getAckCommitter(metadata.getConsumerGroupId()).getAckBitmapBuffer().array(),
-                        getRetryAckCommitter(metadata.getConsumerGroupId()).getAckBitmapBuffer().array());
+                        getRetryAckCommitter(metadata.getConsumerGroupId()).getAckBitmapBuffer().array(),
+                        metadata.getConsumeTimes());
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
@@ -425,7 +428,7 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
             this.consumerGroupMetadataMap = snapshot.getConsumerGroupMetadataList().stream().collect(Collectors.toMap(
                 ConsumerGroupMetadata::getConsumerGroupId, metadataSnapshot ->
                     new ConsumerGroupMetadata(metadataSnapshot.getConsumerGroupId(), metadataSnapshot.getConsumeOffset(), metadataSnapshot.getAckOffset(),
-                        metadataSnapshot.getRetryConsumeOffset(), metadataSnapshot.getRetryAckOffset())));
+                        metadataSnapshot.getRetryConsumeOffset(), metadataSnapshot.getRetryAckOffset(), metadataSnapshot.getConsumeTimes())));
             snapshot.getConsumerGroupMetadataList().forEach(metadataSnapshot -> {
                 RoaringBitmap bitmap = new RoaringBitmap(new ImmutableRoaringBitmap(ByteBuffer.wrap(metadataSnapshot.getAckOffsetBitmapBuffer())));
                 getAckCommitter(metadataSnapshot.getConsumerGroupId(), bitmap);

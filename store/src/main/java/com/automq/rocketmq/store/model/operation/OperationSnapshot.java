@@ -21,6 +21,7 @@ import com.automq.rocketmq.store.model.generated.CheckPoint;
 import com.automq.rocketmq.store.model.metadata.ConsumerGroupMetadata;
 import java.util.List;
 import java.util.Objects;
+import java.util.TreeMap;
 
 public class OperationSnapshot {
 
@@ -89,8 +90,8 @@ public class OperationSnapshot {
 
         public ConsumerGroupMetadataSnapshot(long consumerGroupId, long consumeOffset, long ackOffset,
             long retryConsumeOffset, long retryAckOffset,
-            byte[] ackOffsetBitmapBuffer, byte[] retryAckOffsetBitmapBuffer) {
-            super(consumerGroupId, consumeOffset, ackOffset, retryConsumeOffset, retryAckOffset);
+            byte[] ackOffsetBitmapBuffer, byte[] retryAckOffsetBitmapBuffer, TreeMap<Long, Integer> consumeTimes) {
+            super(consumerGroupId, consumeOffset, ackOffset, retryConsumeOffset, retryAckOffset, consumeTimes);
             this.ackOffsetBitmapBuffer = ackOffsetBitmapBuffer;
             this.retryAckOffsetBitmapBuffer = retryAckOffsetBitmapBuffer;
         }

@@ -27,26 +27,20 @@ public interface OperationLogService {
     /**
      * Log pop operation to WAL.
      * Each queue has its own operation log.
-     *
-     * @return monotonic serial number
      */
-    CompletableFuture<Long> logPopOperation(PopOperation operation);
+    CompletableFuture<LogResult> logPopOperation(PopOperation operation);
 
     /**
      * Log ack operation to WAL.
      * Each queue has its own operation log.
-     *
-     * @return monotonic serial number
      */
-    CompletableFuture<Long> logAckOperation(AckOperation operation);
+    CompletableFuture<LogResult> logAckOperation(AckOperation operation);
 
     /**
      * Log change invisible time operation to WAL.
      * Each queue has its own operation log.
-     *
-     * @return monotonic serial number
      */
-    CompletableFuture<Long> logChangeInvisibleDurationOperation(ChangeInvisibleDurationOperation operation);
+    CompletableFuture<LogResult> logChangeInvisibleDurationOperation(ChangeInvisibleDurationOperation operation);
 
     /**
      * Recover.
@@ -55,4 +49,25 @@ public interface OperationLogService {
      * @return monotonic serial number
      */
     CompletableFuture<Void> recover(MessageStateMachine stateMachine, long operationStreamId, long snapshotStreamId);
+
+    class LogResult {
+        private final long operationOffset;
+        // only for pop operation
+        private long popTimes = -1;
+        public LogResult(long operationOffset) {
+            this.operationOffset = operationOffset;
+        }
+
+        public long getOperationOffset() {
+            return operationOffset;
+        }
+
+        public void setPopTimes(long popTimes) {
+            this.popTimes = popTimes;
+        }
+
+        public long getPopTimes() {
+            return popTimes;
+        }
+    }
 }

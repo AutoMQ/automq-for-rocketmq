@@ -25,6 +25,7 @@ import com.automq.rocketmq.store.model.operation.OperationSnapshot;
 import com.automq.rocketmq.store.model.operation.PopOperation.PopOperationType;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.TreeMap;
 import org.junit.jupiter.api.Test;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -142,6 +143,10 @@ public class SerializeUtilTest {
 
     @Test
     void encodeOperationSnapshot() throws Exception {
+        TreeMap<Long, Integer> consumeTimes = new TreeMap<>();
+        consumeTimes.put(1L, 2);
+        consumeTimes.put(3L, 4);
+        consumeTimes.put(5L, 6);
         RoaringBitmap ackBitmap = new RoaringBitmap();
         ackBitmap.add(1, 3, 5);
         int ackBitmapLength = ackBitmap.serializedSizeInBytes();
@@ -157,7 +162,8 @@ public class SerializeUtilTest {
         retryAckBitmapBuffer.flip();
 
         OperationSnapshot.ConsumerGroupMetadataSnapshot consumerGroupMetadataSnapshot = new OperationSnapshot.ConsumerGroupMetadataSnapshot(
-            CONSUMER_GROUP_ID, 1, 2, 3, 4, ackBitmapBuffer.array(), retryAckBitmapBuffer.array()
+            CONSUMER_GROUP_ID, 1, 2, 3, 4, ackBitmapBuffer.array(), retryAckBitmapBuffer.array(),
+            consumeTimes
         );
         byte[] checkPointValue = SerializeUtil.buildCheckPointValue(TOPIC_ID, QUEUE_ID, OFFSET, COUNT, CONSUMER_GROUP_ID, OPERATION_ID, POP_OPERATION_TYPE, DELIVERY_TIMESTAMP, NEXT_VISIBLE_TIMESTAMP);
         CheckPoint checkPoint = CheckPoint.getRootAsCheckPoint(ByteBuffer.wrap(checkPointValue));
@@ -190,5 +196,6 @@ public class SerializeUtilTest {
         byte[] decodedRetryAckBitmapBuffer = decodedOperationSnapshot.getConsumerGroupMetadataList().get(0).getRetryAckOffsetBitmapBuffer();
         RoaringBitmap decodedRetryAckBitmap = new RoaringBitmap(new ImmutableRoaringBitmap(ByteBuffer.wrap(decodedRetryAckBitmapBuffer)));
         assertEquals(retryAckBitmap, decodedRetryAckBitmap);
+        assertEquals(operationSnapshot.getConsumerGroupMetadataList().get(0).getConsumeTimes(), decodedOperationSnapshot.getConsumerGroupMetadataList().get(0).getConsumeTimes());
     }
 }

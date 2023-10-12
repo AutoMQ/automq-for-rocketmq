@@ -94,24 +94,45 @@ public class StreamOperationLogService implements OperationLogService {
     }
 
     @Override
-    public CompletableFuture<Long> logPopOperation(PopOperation operation) {
+    public CompletableFuture<LogResult> logPopOperation(PopOperation operation) {
         return streamStore.append(operation.operationStreamId(),
                 new SingleRecord(ByteBuffer.wrap(SerializeUtil.encodePopOperation(operation))))
-            .thenApply(result -> doReplay(result, operation));
+            .thenApply(result -> {
+                try {
+                    return doReplay(result, operation);
+                } catch (StoreException e) {
+                    LOGGER.error("Topic {}, queue: {}: Replay pop operation failed", operation.topicId(), operation.queueId(), e);
+                    throw new CompletionException(e);
+                }
+            });
     }
 
     @Override
-    public CompletableFuture<Long> logAckOperation(AckOperation operation) {
+    public CompletableFuture<LogResult> logAckOperation(AckOperation operation) {
         return streamStore.append(operation.operationStreamId(),
                 new SingleRecord(ByteBuffer.wrap(SerializeUtil.encodeAckOperation(operation))))
-            .thenApply(result -> doReplay(result, operation));
+            .thenApply(result -> {
+                try {
+                    return doReplay(result, operation);
+                } catch (StoreException e) {
+                    LOGGER.error("Topic {}, queue: {}: Replay ack operation failed", operation.topicId(), operation.queueId(), e);
+                    throw new CompletionException(e);
+                }
+            });
     }
 
     @Override
-    public CompletableFuture<Long> logChangeInvisibleDurationOperation(ChangeInvisibleDurationOperation operation) {
+    public CompletableFuture<LogResult> logChangeInvisibleDurationOperation(ChangeInvisibleDurationOperation operation) {
         return streamStore.append(operation.operationStreamId(),
                 new SingleRecord(ByteBuffer.wrap(SerializeUtil.encodeChangeInvisibleDurationOperation(operation))))
-            .thenApply(result -> doReplay(result, operation));
+            .thenApply(result -> {
+                try {
+                    return doReplay(result, operation);
+                } catch (StoreException e) {
+                    LOGGER.error("Topic {}, queue: {}: Replay change invisible duration operation failed", operation.topicId(), operation.queueId(), e);
+                    throw new CompletionException(e);
+                }
+            });
     }
 
     private void notifySnapshot(Operation operation) {
@@ -137,30 +158,29 @@ public class StreamOperationLogService implements OperationLogService {
         }
     }
 
-    private long doReplay(AppendResult result, Operation operation) {
-        try {
-            replay(result.baseOffset(), operation);
-        } catch (StoreException e) {
-            LOGGER.error("Topic {}, queue: {}: Replay operation:{} failed", operation.topicId(), operation.queueId(), operation, e);
-            throw new CompletionException(e);
-        }
-
+    private LogResult doReplay(AppendResult appendResult, Operation operation) throws StoreException {
+        long operationOffset = appendResult.baseOffset();
+        LogResult logResult = replay(operationOffset, operation);
         MessageStateMachine stateMachine = operation.stateMachine();
         SnapshotService.SnapshotStatus snapshotStatus = snapshotService.getSnapshotStatus(stateMachine.topicId(), stateMachine.queueId());
-        if (result.baseOffset() - snapshotStatus.operationStartOffset().get() + 1 >= storeConfig.operationSnapshotInterval()) {
+        if (operationOffset - snapshotStatus.operationStartOffset().get() + 1 >= storeConfig.operationSnapshotInterval()) {
             notifySnapshot(operation);
         }
-        return result.baseOffset();
+        return logResult;
     }
 
-    private void replay(long operationOffset, Operation operation) throws StoreException {
-        // TODO: optimize concurrent control
+    private LogResult replay(long operationOffset, Operation operation) throws StoreException {
+        LogResult logResult = new LogResult(operationOffset);
         switch (operation.operationType()) {
-            case POP -> operation.stateMachine().replayPopOperation(operationOffset, (PopOperation) operation);
+            case POP -> {
+                MessageStateMachine.ReplayPopResult replayPopResult = operation.stateMachine().replayPopOperation(operationOffset, (PopOperation) operation);
+                logResult.setPopTimes(replayPopResult.getPopTimes());
+            }
             case ACK -> operation.stateMachine().replayAckOperation(operationOffset, (AckOperation) operation);
             case CHANGE_INVISIBLE_DURATION ->
                 operation.stateMachine().replayChangeInvisibleDurationOperation(operationOffset, (ChangeInvisibleDurationOperation) operation);
             default -> throw new IllegalStateException("Unexpected value: " + operation.operationType());
         }
+        return logResult;
     }
 }
