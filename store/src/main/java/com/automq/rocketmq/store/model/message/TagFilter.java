@@ -68,4 +68,9 @@ public class TagFilter implements Filter {
             .filter(messageExt -> !Strings.isNullOrEmpty(messageExt.message().tag()) && tagSet.contains(messageExt.message().tag()))
             .collect(Collectors.toList());
     }
+
+    @Override
+    public boolean doFilter(String tag) {
+        return tagSet.contains(tag);
+    }
 }
