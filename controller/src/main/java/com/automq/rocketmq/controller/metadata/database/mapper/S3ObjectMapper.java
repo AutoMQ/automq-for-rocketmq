@@ -19,6 +19,7 @@ package com.automq.rocketmq.controller.metadata.database.mapper;
 
 import apache.rocketmq.controller.v1.S3ObjectState;
 import com.automq.rocketmq.controller.metadata.database.dao.S3Object;
+import java.util.Date;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
@@ -31,7 +32,7 @@ public interface S3ObjectMapper {
 
     int commit(S3Object s3Object);
 
-    int markToDelete(@Param("id") long id);
+    int markToDelete(@Param("id") long id, @Param("time") Date time);
 
     int delete(@Param("id") Long id);
 
@@ -41,5 +42,5 @@ public interface S3ObjectMapper {
 
     int prepare(S3Object s3Object);
 
-    int rollback();
+    int rollback(@Param("current")Date current);
 }

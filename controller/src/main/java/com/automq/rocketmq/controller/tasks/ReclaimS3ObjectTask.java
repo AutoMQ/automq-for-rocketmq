@@ -23,6 +23,7 @@ import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.dao.S3Object;
 import com.automq.rocketmq.controller.metadata.database.mapper.S3ObjectMapper;
+import java.util.Date;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import org.apache.ibatis.session.SqlSession;
@@ -45,7 +46,7 @@ public class ReclaimS3ObjectTask extends ControllerTask {
             }
 
             S3ObjectMapper mapper = session.getMapper(S3ObjectMapper.class);
-            int rows = mapper.rollback();
+            int rows = mapper.rollback(new Date());
             if (rows > 0) {
                 LOGGER.info("Rollback {} expired prepared S3 Object rows", rows);
             }
