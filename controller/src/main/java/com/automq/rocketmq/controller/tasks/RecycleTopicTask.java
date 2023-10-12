@@ -18,6 +18,7 @@
 package com.automq.rocketmq.controller.tasks;
 
 import apache.rocketmq.controller.v1.TopicStatus;
+import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 import java.util.Calendar;
@@ -30,29 +31,23 @@ public class RecycleTopicTask extends ControllerTask {
     }
 
     @Override
-    public void run() {
-        LOGGER.debug("RecycleTopicTask starts");
-        try {
-            if (!metadataStore.isLeader()) {
+    public void process() throws ControllerException {
+        if (!metadataStore.isLeader()) {
+            return;
+        }
+        try (SqlSession session = metadataStore.openSession()) {
+            if (!metadataStore.maintainLeadershipWithSharedLock(session)) {
                 return;
             }
-            try (SqlSession session = metadataStore.openSession()) {
-                if (!metadataStore.maintainLeadershipWithSharedLock(session)) {
-                    return;
-                }
 
-                TopicMapper topicMapper = session.getMapper(TopicMapper.class);
-                Calendar calendar = Calendar.getInstance();
-                calendar.add(Calendar.SECOND, -metadataStore.config().deletedTopicLingersInSecs());
-                int rowsAffected = topicMapper.recycle(TopicStatus.TOPIC_STATUS_DELETED, calendar.getTime());
-                if (rowsAffected > 0) {
-                    LOGGER.info("Deleted {} topics", rowsAffected);
-                    session.commit();
-                }
+            TopicMapper topicMapper = session.getMapper(TopicMapper.class);
+            Calendar calendar = Calendar.getInstance();
+            calendar.add(Calendar.SECOND, -metadataStore.config().deletedTopicLingersInSecs());
+            int rowsAffected = topicMapper.recycle(TopicStatus.TOPIC_STATUS_DELETED, calendar.getTime());
+            if (rowsAffected > 0) {
+                LOGGER.info("Deleted {} topics", rowsAffected);
+                session.commit();
             }
-        } catch (Throwable e) {
-            LOGGER.error("Exception raised while recycle previously deleted topics", e);
         }
-        LOGGER.debug("RecycleTopicTask completed");
     }
 }

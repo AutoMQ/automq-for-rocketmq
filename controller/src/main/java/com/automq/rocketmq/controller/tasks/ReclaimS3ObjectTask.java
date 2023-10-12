@@ -19,31 +19,21 @@ package com.automq.rocketmq.controller.tasks;
 
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
-import com.google.common.base.Stopwatch;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.automq.rocketmq.controller.metadata.database.mapper.S3ObjectMapper;
+import org.apache.ibatis.session.SqlSession;
 
-public abstract class ControllerTask implements Runnable {
-    protected static final Logger LOGGER = LoggerFactory.getLogger(LeaseTask.class);
+public class ReclaimS3ObjectTask extends ControllerTask {
 
-    protected final MetadataStore metadataStore;
-
-    public ControllerTask(MetadataStore metadataStore) {
-        this.metadataStore = metadataStore;
+    public ReclaimS3ObjectTask(MetadataStore metadataStore) {
+        super(metadataStore);
     }
 
-    public abstract void process() throws ControllerException;
-
     @Override
-    public void run() {
-        String taskName = getClass().getSimpleName();
-        LOGGER.debug("{} starts", taskName);
-        Stopwatch stopwatch = Stopwatch.createStarted();
-        try {
-            process();
-        } catch (Throwable e) {
-            LOGGER.error("Unexpected exception raised while execute {}", taskName, e);
+    public void process() throws ControllerException {
+        try (SqlSession session = metadataStore.openSession()) {
+            S3ObjectMapper mapper = session.getMapper(S3ObjectMapper.class);
+
         }
-        LOGGER.debug("{} completed, costing {}ms", taskName, stopwatch.elapsed().toMillis());
+
     }
 }

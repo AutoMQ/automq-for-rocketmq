@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.controller.tasks;
 
+import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.Role;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
@@ -33,66 +34,60 @@ public class LeaseTask extends ControllerTask {
     }
 
     @Override
-    public void run() {
-        LOGGER.debug("LeaseTask starts");
-        try {
-            try (SqlSession session = metadataStore.openSession()) {
-                tryCreateNode(session);
+    public void process() throws ControllerException {
+        try (SqlSession session = metadataStore.openSession()) {
+            tryCreateNode(session);
 
-                LeaseMapper leaseMapper = session.getMapper(LeaseMapper.class);
-                Lease lease = leaseMapper.current();
-                this.metadataStore.setLease(lease);
-                if (!lease.expired()) {
-                    if (lease.getNodeId() == metadataStore.config().nodeId()) {
-                        // Current node is lease leader.
-                        Lease update = leaseMapper.currentWithWriteLock();
-                        this.metadataStore.setLease(update);
-
-                        if (update.getNodeId() != lease.getNodeId() || update.getEpoch() != lease.getEpoch()) {
-                            session.rollback();
-                            this.metadataStore.setLease(update);
-                            // Someone must have won the leader election campaign.
-                            return;
-                        }
-                        Calendar calendar = Calendar.getInstance();
-                        calendar.add(Calendar.SECOND, metadataStore.config().leaseLifeSpanInSecs());
-                        update.setExpirationTime(calendar.getTime());
-                        int affectedRows = leaseMapper.update(update);
-                        if (1 == affectedRows) {
-                            metadataStore.setRole(Role.Leader);
-                        } else {
-                            LOGGER.warn("Unexpected state, update lease affected {} rows", affectedRows);
-                        }
-                        session.commit();
-                        metadataStore.setLease(update);
-                    } else {
-                        metadataStore.setRole(Role.Follower);
-                        LOGGER.info("Node[id={}, epoch={}] is controller leader currently, expiring at {}",
-                            lease.getNodeId(), lease.getEpoch(), lease.getExpirationTime());
-                    }
-                } else {
-                    // Perform leader election campaign
+            LeaseMapper leaseMapper = session.getMapper(LeaseMapper.class);
+            Lease lease = leaseMapper.current();
+            this.metadataStore.setLease(lease);
+            if (!lease.expired()) {
+                if (lease.getNodeId() == metadataStore.config().nodeId()) {
+                    // Current node is lease leader.
                     Lease update = leaseMapper.currentWithWriteLock();
-                    if (lease.getEpoch() == update.getEpoch() && lease.getNodeId() == update.getNodeId()) {
-                        update.setEpoch(update.getEpoch() + 1);
-                        update.setNodeId(metadataStore.config().nodeId());
-                        Calendar calendar = Calendar.getInstance();
-                        calendar.add(Calendar.SECOND, metadataStore.config().leaseLifeSpanInSecs());
-                        update.setExpirationTime(calendar.getTime());
-                        leaseMapper.update(update);
+                    this.metadataStore.setLease(update);
+
+                    if (update.getNodeId() != lease.getNodeId() || update.getEpoch() != lease.getEpoch()) {
+                        session.rollback();
                         this.metadataStore.setLease(update);
-                        session.commit();
-                        metadataStore.setRole(Role.Leader);
-                        LOGGER.info("Completes campaign and become controller leader");
-                    } else {
-                        LOGGER.info("Another controller has taken the lease");
+                        // Someone must have won the leader election campaign.
+                        return;
                     }
+                    Calendar calendar = Calendar.getInstance();
+                    calendar.add(Calendar.SECOND, metadataStore.config().leaseLifeSpanInSecs());
+                    update.setExpirationTime(calendar.getTime());
+                    int affectedRows = leaseMapper.update(update);
+                    if (1 == affectedRows) {
+                        metadataStore.setRole(Role.Leader);
+                    } else {
+                        LOGGER.warn("Unexpected state, update lease affected {} rows", affectedRows);
+                    }
+                    session.commit();
+                    metadataStore.setLease(update);
+                } else {
+                    metadataStore.setRole(Role.Follower);
+                    LOGGER.info("Node[id={}, epoch={}] is controller leader currently, expiring at {}",
+                        lease.getNodeId(), lease.getEpoch(), lease.getExpirationTime());
+                }
+            } else {
+                // Perform leader election campaign
+                Lease update = leaseMapper.currentWithWriteLock();
+                if (lease.getEpoch() == update.getEpoch() && lease.getNodeId() == update.getNodeId()) {
+                    update.setEpoch(update.getEpoch() + 1);
+                    update.setNodeId(metadataStore.config().nodeId());
+                    Calendar calendar = Calendar.getInstance();
+                    calendar.add(Calendar.SECOND, metadataStore.config().leaseLifeSpanInSecs());
+                    update.setExpirationTime(calendar.getTime());
+                    leaseMapper.update(update);
+                    this.metadataStore.setLease(update);
+                    session.commit();
+                    metadataStore.setRole(Role.Leader);
+                    LOGGER.info("Completes campaign and become controller leader");
+                } else {
+                    LOGGER.info("Another controller has taken the lease");
                 }
             }
-        } catch (Throwable e) {
-            LOGGER.error("Exception raised while running scheduled job", e);
         }
-        LOGGER.debug("LeaseTask completed");
     }
 
     private void tryCreateNode(SqlSession session) {

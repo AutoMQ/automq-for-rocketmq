@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.controller.tasks;
 
+import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 
 public class KeepAliveTask extends ControllerTask {
@@ -25,16 +26,10 @@ public class KeepAliveTask extends ControllerTask {
     }
 
     @Override
-    public void run() {
-        LOGGER.debug("Keep-alive task starts");
-        try {
-            int nodeId = metadataStore.config().nodeId();
-            if (!metadataStore.isLeader()) {
-                metadataStore.keepAlive(nodeId, metadataStore.config().epoch(), false);
-            }
-        } catch (Throwable e) {
-            LOGGER.error("Unexpected exception raised while keeping node alive", e);
+    public void process() throws ControllerException {
+        int nodeId = metadataStore.config().nodeId();
+        if (!metadataStore.isLeader()) {
+            metadataStore.keepAlive(nodeId, metadataStore.config().epoch(), false);
         }
-        LOGGER.debug("Keep-alive completed");
     }
 }
