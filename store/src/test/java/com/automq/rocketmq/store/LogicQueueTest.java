@@ -737,13 +737,10 @@ public class LogicQueueTest {
     }
 
     private List<ReceiptHandle> scanAllTimerTag() {
-        byte[] start = ByteBuffer.allocate(8).putLong(0).array();
-        long endTimestamp = System.nanoTime() - 1;
-        byte[] end = ByteBuffer.allocate(8).putLong(endTimestamp).array();
         List<ReceiptHandle> receiptHandleList = new ArrayList<>();
         try {
             // Iterate timer tag until now to find messages need to reconsume.
-            kvService.iterate(MessageStoreImpl.KV_NAMESPACE_TIMER_TAG, null, start, end, (key, value) -> {
+            kvService.iterate(MessageStoreImpl.KV_NAMESPACE_TIMER_TAG, (key, value) -> {
                 ReceiptHandle receiptHandle = ReceiptHandle.getRootAsReceiptHandle(ByteBuffer.wrap(value));
                 receiptHandleList.add(receiptHandle);
             });
