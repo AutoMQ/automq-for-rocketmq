@@ -36,6 +36,11 @@ public interface Filter {
         public List<FlatMessageExt> doFilter(List<FlatMessageExt> messageList) {
             return messageList;
         }
+
+        @Override
+        public boolean doFilter(String tag) {
+            return true;
+        }
     };
 
     FilterType type();
@@ -47,4 +52,6 @@ public interface Filter {
     String expression();
 
     List<FlatMessageExt> doFilter(List<FlatMessageExt> messageList);
+
+    boolean doFilter(String tag);
 }

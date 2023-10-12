@@ -41,6 +41,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.rocketmq.client.consumer.AckResult;
@@ -84,6 +85,7 @@ public class MessageServiceImpl implements MessageService {
     private final ProxyMetadataService metadataService;
     private final MessageStore store;
     private final LockService lockService;
+    private final SuspendPopRequestService suspendPopRequestService;
 
     public MessageServiceImpl(ProxyConfig config, MessageStore store, ProxyMetadataService metadataService,
         LockService lockService) {
@@ -91,6 +93,7 @@ public class MessageServiceImpl implements MessageService {
         this.store = store;
         this.metadataService = metadataService;
         this.lockService = lockService;
+        this.suspendPopRequestService = new SuspendPopRequestService();
     }
 
     @Override
@@ -101,11 +104,11 @@ public class MessageServiceImpl implements MessageService {
         }
         Message message = msgList.get(0);
         String messageId = MessageClientIDSetter.getUniqID(message);
+        VirtualQueue virtualQueue = new VirtualQueue(messageQueue);
 
         CompletableFuture<Topic> topicFuture = topicOf(requestHeader.getTopic());
 
         CompletableFuture<PutResult> putFuture = topicFuture.thenCompose(topic -> {
-            VirtualQueue virtualQueue = new VirtualQueue(messageQueue);
             if (topic.getTopicId() != virtualQueue.topicId()) {
                 LOGGER.error("Topic id in request header {} does not match topic id in message queue {}, maybe the topic is recreated.",
                     topic.getTopicId(), virtualQueue.topicId());
@@ -116,6 +119,9 @@ public class MessageServiceImpl implements MessageService {
         });
 
         return putFuture.thenApply(putResult -> {
+            // Wakeup the suspended pop request if there is any message arrival.
+            suspendPopRequestService.notifyMessageArrival(virtualQueue.topicId(), virtualQueue.physicalQueueId(), message.getTags());
+
             SendResult result = new SendResult();
             result.setSendStatus(SendStatus.SEND_OK);
             result.setMsgId(messageId);
@@ -137,8 +143,9 @@ public class MessageServiceImpl implements MessageService {
         throw new UnsupportedOperationException();
     }
 
-    private CompletableFuture<Void> popSpecifiedQueueUnsafe(long consumerGroupId, long topicId, int queueId,
-        Filter filter, int batchSize, boolean fifo, long invisibleDuration, List<FlatMessageExt> messageList) {
+    private CompletableFuture<List<FlatMessageExt>> popSpecifiedQueueUnsafe(long consumerGroupId, long topicId,
+        int queueId, Filter filter, int batchSize, boolean fifo, long invisibleDuration) {
+        List<FlatMessageExt> messageList = new ArrayList<>();
 
         // Decide whether to pop the retry-messages first
         boolean retryPriority = !fifo && CommonUtil.applyPercentage(config.retryPriorityPercentage());
@@ -152,24 +159,26 @@ public class MessageServiceImpl implements MessageService {
 
         // There is no retry message when pop orderly. So that return origin messages directly.
         if (fifo) {
-            return popFuture.thenAccept(resultMessageList -> {
-            });
+            return popFuture;
         }
 
-        return popFuture.thenCompose(resultMessageList -> {
-            if (resultMessageList.size() < batchSize) {
-                return store.pop(consumerGroupId, topicId, queueId, filter, batchSize - resultMessageList.size(), false, !retryPriority, invisibleDuration)
-                    .thenApply(com.automq.rocketmq.store.model.message.PopResult::messageList);
+        return popFuture.thenCompose(firstResultList -> {
+            if (firstResultList.size() < batchSize) {
+                return store.pop(consumerGroupId, topicId, queueId, filter, batchSize - firstResultList.size(), false, !retryPriority, invisibleDuration)
+                    .thenApply(secondResult -> {
+                        messageList.addAll(secondResult.messageList());
+                        return messageList;
+                    });
             }
-            return CompletableFuture.completedFuture(new ArrayList<FlatMessageExt>());
-        }).thenAccept(messageList::addAll);
+            return CompletableFuture.completedFuture(messageList);
+        });
     }
 
-    private CompletableFuture<Void> popSpecifiedQueue(long consumerGroupId, String clientId, long topicId, int queueId,
-        Filter filter, int batchSize, boolean fifo, long invisibleDuration, long timeoutMillis,
-        List<FlatMessageExt> messageList) {
+    private CompletableFuture<List<FlatMessageExt>> popSpecifiedQueue(long consumerGroupId, String clientId,
+        long topicId, int queueId, Filter filter, int batchSize, boolean fifo, long invisibleDuration,
+        long timeoutMillis) {
         if (lockService.tryLock(topicId, queueId, clientId, fifo)) {
-            return popSpecifiedQueueUnsafe(consumerGroupId, topicId, queueId, filter, batchSize, fifo, invisibleDuration, messageList)
+            return popSpecifiedQueueUnsafe(consumerGroupId, topicId, queueId, filter, batchSize, fifo, invisibleDuration)
                 .orTimeout(timeoutMillis, TimeUnit.MILLISECONDS)
                 .whenComplete((v, throwable) -> {
                     // TODO: log exception.
@@ -177,7 +186,7 @@ public class MessageServiceImpl implements MessageService {
                     lockService.release(topicId, queueId);
                 });
         }
-        return CompletableFuture.completedFuture(null);
+        return CompletableFuture.completedFuture(Collections.emptyList());
     }
 
     @Override
@@ -188,45 +197,42 @@ public class MessageServiceImpl implements MessageService {
 
         // Build the virtual queue
         VirtualQueue virtualQueue = new VirtualQueue(messageQueue);
-        List<FlatMessageExt> messageList = new ArrayList<>();
+        String clientId = ctx.getClientID();
 
-        CompletableFuture<Void> popMessageFuture = topicFuture.thenCombine(groupFuture, (topic, group) -> {
+        Filter filter;
+        if (StringUtils.isNotBlank(requestHeader.getExpType())) {
+            filter = switch (requestHeader.getExpType()) {
+                case ExpressionType.TAG ->
+                    requestHeader.getExp().contains(TagFilter.SUB_ALL) ? Filter.DEFAULT_FILTER : new TagFilter(requestHeader.getExp());
+                case ExpressionType.SQL92 -> new SQLFilter(requestHeader.getExp());
+                default -> Filter.DEFAULT_FILTER;
+            };
+        } else {
+            filter = Filter.DEFAULT_FILTER;
+        }
+
+        AtomicLong topicId = new AtomicLong();
+        AtomicLong consumerGroupId = new AtomicLong();
+        CompletableFuture<List<FlatMessageExt>> popMessageFuture = topicFuture.thenCombine(groupFuture, (topic, group) -> {
             if (topic.getTopicId() != virtualQueue.topicId()) {
                 LOGGER.error("Topic id in request header {} does not match topic id in message queue {}, maybe the topic is recreated.",
                     topic.getTopicId(), virtualQueue.topicId());
                 throw new CompletionException(new MQBrokerException(ResponseCode.TOPIC_NOT_EXIST, "Topic not exist"));
             }
 
-            return Pair.of(topic, group);
-        }).thenCompose(pair -> {
-            long consumerGroupId = pair.getRight().getGroupId();
-            long topicId = pair.getLeft().getTopicId();
-            String clientId = ctx.getClientID();
+            topicId.set(topic.getTopicId());
+            consumerGroupId.set(group.getGroupId());
+            return null;
+        }).thenCompose(nil -> popSpecifiedQueue(consumerGroupId.get(), clientId, topicId.get(), virtualQueue.physicalQueueId(), filter,
+            requestHeader.getMaxMsgNums(), requestHeader.isOrder(), requestHeader.getInvisibleTime(), timeoutMillis));
 
-            Filter filter;
-            if (StringUtils.isNotBlank(requestHeader.getExpType())) {
-                filter = switch (requestHeader.getExpType()) {
-                    case ExpressionType.TAG ->
-                        requestHeader.getExp().contains(TagFilter.SUB_ALL) ? Filter.DEFAULT_FILTER : new TagFilter(requestHeader.getExp());
-                    case ExpressionType.SQL92 -> new SQLFilter(requestHeader.getExp());
-                    default -> Filter.DEFAULT_FILTER;
-                };
-            } else {
-                filter = Filter.DEFAULT_FILTER;
-            }
-
-            return popSpecifiedQueue(consumerGroupId, clientId, topicId, virtualQueue.physicalQueueId(), filter,
-                requestHeader.getMaxMsgNums(), requestHeader.isOrder(), requestHeader.getInvisibleTime(), timeoutMillis, messageList);
-        });
-
-        return popMessageFuture.thenApply(v -> {
-            PopStatus status;
+        return popMessageFuture.thenCompose(messageList -> {
             if (messageList.isEmpty()) {
-                status = PopStatus.NO_NEW_MSG;
-            } else {
-                status = PopStatus.FOUND;
+                return suspendPopRequestService.suspendPopRequest(requestHeader, topicId.get(), virtualQueue.physicalQueueId(), filter,
+                    () -> popSpecifiedQueue(consumerGroupId.get(), clientId, topicId.get(), virtualQueue.physicalQueueId(), filter,
+                        requestHeader.getMaxMsgNums(), requestHeader.isOrder(), requestHeader.getInvisibleTime(), timeoutMillis));
             }
-            return new PopResult(status, FlatMessageUtil.convertTo(messageList, requestHeader.getTopic(), requestHeader.getInvisibleTime()));
+            return CompletableFuture.completedFuture(new PopResult(PopStatus.FOUND, FlatMessageUtil.convertTo(messageList, requestHeader.getTopic(), requestHeader.getInvisibleTime())));
         });
     }
 

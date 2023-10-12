@@ -86,7 +86,7 @@ public class ReviveService implements Runnable, Lifecycle {
         if (!started.compareAndSet(false, true)) {
             return;
         }
-        this.mainExecutor.scheduleWithFixedDelay(this::run, 0, 1000, TimeUnit.MILLISECONDS);
+        this.mainExecutor.scheduleWithFixedDelay(this, 0, 1000, TimeUnit.MILLISECONDS);
     }
 
     @Override
