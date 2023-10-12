@@ -20,7 +20,6 @@ package com.automq.rocketmq.store.queue;
 import com.automq.rocketmq.common.config.StoreConfig;
 import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.model.generated.FlatMessage;
-import com.automq.rocketmq.common.util.Pair;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.store.api.LogicQueue;
 import com.automq.rocketmq.store.api.MessageStateMachine;
@@ -48,6 +47,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.commons.lang3.tuple.Pair;
 
 import static com.automq.rocketmq.store.util.SerializeUtil.decodeReceiptHandle;
 
@@ -283,10 +283,10 @@ public class StreamLogicQueue extends LogicQueue {
         }
         CompletableFuture<Long> retryStreamIdCf = retryStreamId(consumerGroupId);
         CompletableFuture<Long> retryOffsetCf = stateMachine.retryConsumeOffset(consumerGroupId);
-        return retryStreamIdCf.thenCombine(retryOffsetCf, Pair::new)
+        return retryStreamIdCf.thenCombine(retryOffsetCf, Pair::of)
             .thenCompose(pair -> {
-                Long retryStreamId = pair.left();
-                Long startOffset = pair.right();
+                Long retryStreamId = pair.getLeft();
+                Long startOffset = pair.getRight();
                 return pop(consumerGroupId, retryStreamId, startOffset, PopOperation.PopOperationType.POP_RETRY, filter, batchSize, invisibleDuration);
             });
     }
