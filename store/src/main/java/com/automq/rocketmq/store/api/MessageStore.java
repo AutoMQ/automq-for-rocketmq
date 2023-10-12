@@ -27,6 +27,11 @@ import com.automq.rocketmq.store.model.message.PutResult;
 import java.util.concurrent.CompletableFuture;
 
 public interface MessageStore extends Lifecycle {
+
+    TopicQueueManager getTopicQueueManager();
+
+    S3ObjectManager getS3ObjectManager();
+
     /**
      * Pop message from specified topic and queue.
      *

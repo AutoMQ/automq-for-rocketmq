@@ -18,7 +18,7 @@
 package com.automq.rocketmq.controller.metadata.database.tasks;
 
 import apache.rocketmq.controller.v1.AssignmentStatus;
-import com.automq.rocketmq.common.StoreHandle;
+import com.automq.rocketmq.common.api.DataStore;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper;
@@ -83,9 +83,9 @@ public class ScanYieldingQueueTask extends ScanTask {
         }
 
         public void doNext() {
-            StoreHandle storeHandle = metadataStore.getStoreHandle();
+            DataStore dataStore = metadataStore.getDataStore();
             switch (next) {
-                case STORE_CLOSE -> closeQueue(storeHandle,
+                case STORE_CLOSE -> closeQueue(dataStore,
                     assignment.getTopicId(), assignment.getQueueId());
 
                 case NOTIFY_LEADER -> ScanYieldingQueueTask.this.metadataStore
@@ -101,8 +101,8 @@ public class ScanYieldingQueueTask extends ScanTask {
             }
         }
 
-        private void closeQueue(StoreHandle handle, long topicId, int queueId) {
-            handle.close(topicId, queueId)
+        private void closeQueue(DataStore handle, long topicId, int queueId) {
+            handle.closeQueue(topicId, queueId)
                 .whenComplete((res, e) -> {
                     if (null != e) {
                         LOGGER.error("Failed to close queue[topic-id={}, queue-id={}]", topicId, queueId);
@@ -135,9 +135,9 @@ public class ScanYieldingQueueTask extends ScanTask {
             List<QueueAssignment> assignments = assignmentMapper.list(null, metadataStore.config().nodeId(),
                 null, AssignmentStatus.ASSIGNMENT_STATUS_YIELDING, this.lastScanTime);
 
-            StoreHandle storeHandle = metadataStore.getStoreHandle();
+            DataStore dataStore = metadataStore.getDataStore();
 
-            if (null != storeHandle && !assignments.isEmpty()) {
+            if (null != dataStore && !assignments.isEmpty()) {
                 for (QueueAssignment assignment : assignments) {
                     this.assignments.putIfAbsent(new ImmutablePair<>(assignment.getTopicId(), assignment.getQueueId()),
                         new QueueAssignmentStateMachine(assignment));
