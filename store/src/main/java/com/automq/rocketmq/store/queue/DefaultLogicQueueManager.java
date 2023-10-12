@@ -28,6 +28,7 @@ import com.automq.rocketmq.store.service.InflightService;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.service.api.OperationLogService;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
@@ -98,6 +99,16 @@ public class DefaultLogicQueueManager implements TopicQueueManager {
             });
             return future;
         }
+    }
+
+    @Override
+    public CompletableFuture<Optional<LogicQueue>> get(long topicId, int queueId) {
+        TopicQueueId key = new TopicQueueId(topicId, queueId);
+        CompletableFuture<LogicQueue> future = topicQueueMap.get(key);
+        if (future != null) {
+            return future.thenApply(Optional::of);
+        }
+        return CompletableFuture.completedFuture(Optional.empty());
     }
 
     @Override
