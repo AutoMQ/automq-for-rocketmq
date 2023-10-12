@@ -61,7 +61,7 @@ public class BrokerController implements Lifecycle {
 
         messageStore = MessageStoreBuilder.build(brokerConfig.store(), brokerConfig.s3Stream(), storeMetadataService);
 
-        DataStore dataStore = new DataStoreFacade(messageStore.getS3ObjectManager(), messageStore.getTopicQueueManager());
+        DataStore dataStore = new DataStoreFacade(messageStore.getS3ObjectOperator(), messageStore.getTopicQueueManager());
         metadataStore.setDataStore(dataStore);
 
 

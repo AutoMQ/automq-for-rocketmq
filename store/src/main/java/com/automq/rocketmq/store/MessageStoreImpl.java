@@ -22,7 +22,7 @@ import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.store.api.LogicQueue;
 import com.automq.rocketmq.store.api.MessageStore;
-import com.automq.rocketmq.store.api.S3ObjectManager;
+import com.automq.rocketmq.store.api.S3ObjectOperator;
 import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.rocketmq.store.api.TopicQueueManager;
 import com.automq.rocketmq.store.model.generated.ReceiptHandle;
@@ -37,7 +37,6 @@ import com.automq.rocketmq.store.service.SnapshotService;
 import com.automq.rocketmq.store.service.api.KVService;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.apache.commons.lang3.NotImplementedException;
 
 import static com.automq.rocketmq.store.util.SerializeUtil.decodeReceiptHandle;
 
@@ -53,16 +52,16 @@ public class MessageStoreImpl implements MessageStore {
     private final StreamStore streamStore;
     private final StoreMetadataService metadataService;
     private final KVService kvService;
-
-    private ReviveService reviveService;
+    private final ReviveService reviveService;
     private final InflightService inflightService;
     private final SnapshotService snapshotService;
-
     private final TopicQueueManager topicQueueManager;
+    private final S3ObjectOperator s3ObjectOperator;
 
     public MessageStoreImpl(StoreConfig config, StreamStore streamStore,
         StoreMetadataService metadataService, KVService kvService, InflightService inflightService,
-        SnapshotService snapshotService, TopicQueueManager topicQueueManager, ReviveService reviveService) {
+        SnapshotService snapshotService, TopicQueueManager topicQueueManager, ReviveService reviveService,
+        S3ObjectOperator s3ObjectOperator) {
         this.config = config;
         this.streamStore = streamStore;
         this.metadataService = metadataService;
@@ -71,6 +70,7 @@ public class MessageStoreImpl implements MessageStore {
         this.snapshotService = snapshotService;
         this.topicQueueManager = topicQueueManager;
         this.reviveService = reviveService;
+        this.s3ObjectOperator = s3ObjectOperator;
     }
 
     @Override
@@ -79,13 +79,11 @@ public class MessageStoreImpl implements MessageStore {
     }
 
     /**
-     * TODO: implement it
-     *
-     * @return S3ObjectManager instance
+     * @return {@link S3ObjectOperator} instance
      */
     @Override
-    public S3ObjectManager getS3ObjectManager() {
-        throw new NotImplementedException();
+    public S3ObjectOperator getS3ObjectOperator() {
+        return s3ObjectOperator;
     }
 
     @Override

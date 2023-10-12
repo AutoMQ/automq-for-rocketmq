@@ -34,7 +34,6 @@ import com.automq.stream.s3.cache.DefaultS3BlockCache;
 import com.automq.stream.s3.cache.S3BlockCache;
 import com.automq.stream.s3.compact.CompactionManager;
 import com.automq.stream.s3.objects.ObjectManager;
-import com.automq.stream.s3.operator.DefaultS3Operator;
 import com.automq.stream.s3.operator.S3Operator;
 import com.automq.stream.s3.streams.StreamManager;
 import com.automq.stream.s3.wal.BlockWALService;
@@ -61,7 +60,7 @@ public class S3StreamStore implements StreamStore {
     // TODO: Should clean the closed streams to avoid memory leak.
     private final Map<Long, Stream> openStreams = new ConcurrentHashMap<>();
 
-    public S3StreamStore(S3StreamConfig streamConfig, StoreMetadataService metadataService) {
+    public S3StreamStore(S3StreamConfig streamConfig, StoreMetadataService metadataService, S3Operator operator) {
         this.s3Config = configFrom(streamConfig);
 
         // Build meta service and related manager
@@ -69,8 +68,7 @@ public class S3StreamStore implements StreamStore {
         this.streamManager = new S3StreamManager(metadataService);
         this.objectManager = new S3ObjectManager(metadataService);
 
-        this.operator = new DefaultS3Operator(s3Config.s3Endpont(), s3Config.s3Region(), s3Config.s3Bucket(),
-            s3Config.s3ForcePathStyle(), s3Config.s3AccessKey(), s3Config.s3SecretKey());
+        this.operator = operator;
         this.writeAheadLog = BlockWALService.builder(s3Config.s3WALPath(), s3Config.s3WALCapacity()).config(s3Config).build();
         this.blockCache = new DefaultS3BlockCache(s3Config.s3CacheSize(), objectManager, operator);
 

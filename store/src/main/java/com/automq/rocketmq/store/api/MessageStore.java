@@ -30,7 +30,7 @@ public interface MessageStore extends Lifecycle {
 
     TopicQueueManager getTopicQueueManager();
 
-    S3ObjectManager getS3ObjectManager();
+    S3ObjectOperator getS3ObjectOperator();
 
     /**
      * Pop message from specified topic and queue.
