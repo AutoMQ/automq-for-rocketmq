@@ -45,4 +45,6 @@ table SystemProperties {
     // The queue offset in the original queue
     // This field is only used in the retry message
     original_queue_offset: long = -1;
+    dlq_original_topic_id: long = -1;
+    dlq_original_queue_id: int = -1;
 }

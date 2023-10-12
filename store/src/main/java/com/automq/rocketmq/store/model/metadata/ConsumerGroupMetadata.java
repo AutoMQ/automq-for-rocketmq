@@ -18,6 +18,7 @@
 package com.automq.rocketmq.store.model.metadata;
 
 import java.util.Objects;
+import java.util.TreeMap;
 
 public class ConsumerGroupMetadata {
     private final long consumerGroupId;
@@ -25,17 +26,20 @@ public class ConsumerGroupMetadata {
     private long ackOffset;
     private long retryConsumeOffset;
     private long retryAckOffset;
+    private final TreeMap<Long/*offset*/, Integer/*times*/> consumeTimes;
 
     public ConsumerGroupMetadata(long consumerGroupId) {
         this.consumerGroupId = consumerGroupId;
+        this.consumeTimes = new TreeMap<>();
     }
 
-    public ConsumerGroupMetadata(long consumerGroupId, long consumeOffset, long ackOffset, long retryConsumeOffset, long retryAckOffset) {
+    public ConsumerGroupMetadata(long consumerGroupId, long consumeOffset, long ackOffset, long retryConsumeOffset, long retryAckOffset, TreeMap<Long, Integer> consumeTimes) {
         this.consumerGroupId = consumerGroupId;
         this.consumeOffset = consumeOffset;
         this.ackOffset = ackOffset;
         this.retryConsumeOffset = retryConsumeOffset;
         this.retryAckOffset = retryAckOffset;
+        this.consumeTimes = consumeTimes;
     }
 
     public long getConsumeOffset() {
@@ -64,6 +68,8 @@ public class ConsumerGroupMetadata {
 
     public void setAckOffset(long ackOffset) {
         this.ackOffset = ackOffset;
+        // when ack offset is updated, we should clear the consume times
+        this.consumeTimes.subMap(0L, ackOffset).clear();
     }
 
     public void setRetryConsumeOffset(long retryConsumeOffset) {
@@ -74,6 +80,10 @@ public class ConsumerGroupMetadata {
         this.retryAckOffset = retryAckOffset;
     }
 
+    public TreeMap<Long, Integer> getConsumeTimes() {
+        return consumeTimes;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o)
@@ -81,11 +91,11 @@ public class ConsumerGroupMetadata {
         if (o == null || getClass() != o.getClass())
             return false;
         ConsumerGroupMetadata metadata = (ConsumerGroupMetadata) o;
-        return consumerGroupId == metadata.consumerGroupId && consumeOffset == metadata.consumeOffset && ackOffset == metadata.ackOffset && retryConsumeOffset == metadata.retryConsumeOffset && retryAckOffset == metadata.retryAckOffset;
+        return consumerGroupId == metadata.consumerGroupId && consumeOffset == metadata.consumeOffset && ackOffset == metadata.ackOffset && retryConsumeOffset == metadata.retryConsumeOffset && retryAckOffset == metadata.retryAckOffset && Objects.equals(consumeTimes, metadata.consumeTimes);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(consumerGroupId, consumeOffset, ackOffset, retryConsumeOffset, retryAckOffset);
+        return Objects.hash(consumerGroupId, consumeOffset, ackOffset, retryConsumeOffset, retryAckOffset, consumeTimes);
     }
 }

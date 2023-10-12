@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.store.api;
 
+import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.operation.AckOperation;
 import com.automq.rocketmq.store.model.operation.ChangeInvisibleDurationOperation;
 import com.automq.rocketmq.store.model.operation.OperationSnapshot;
@@ -28,7 +29,7 @@ public interface MessageStateMachine {
 
     int queueId();
 
-    CompletableFuture<Void> replayPopOperation(long operationOffset, PopOperation operation);
+    ReplayPopResult replayPopOperation(long operationOffset, PopOperation operation) throws StoreException;
 
     CompletableFuture<Void> replayAckOperation(long operationOffset, AckOperation operation);
 
@@ -49,4 +50,24 @@ public interface MessageStateMachine {
     CompletableFuture<Long> retryAckOffset(long consumerGroupId);
 
     CompletableFuture<Boolean> isLocked(long consumerGroupId, long offset);
+
+    class ReplayPopResult {
+        private final long popTimes;
+        private ReplayPopResult(long popTimes) {
+            this.popTimes = popTimes;
+        }
+
+        public static ReplayPopResult empty() {
+            return new ReplayPopResult(-1);
+        }
+
+        public static ReplayPopResult of(long popTimes) {
+            return new ReplayPopResult(popTimes);
+        }
+
+        public long getPopTimes() {
+            return popTimes;
+        }
+    }
+
 }

@@ -218,7 +218,7 @@ public class StreamLogicQueue extends LogicQueue {
             List<FlatMessageExt> messageExtList = filterFetchResult.messageList;
             // write pop operation to operation log
             long preOffset = filterFetchResult.startOffset - 1;
-            List<CompletableFuture<Long>> appendOpCfs = new ArrayList<>(messageExtList.size());
+            List<CompletableFuture<OperationLogService.LogResult>> appendOpCfs = new ArrayList<>(messageExtList.size());
             // write pop operation for each need consumed message
             for (FlatMessageExt messageExt : messageExtList) {
                 int count = (int) (messageExt.offset() - preOffset);
@@ -227,9 +227,10 @@ public class StreamLogicQueue extends LogicQueue {
                     stateMachine, consumerGroupId, messageExt.offset(), count, invisibleDuration, operationTimestamp,
                     false, operationType);
                 appendOpCfs.add(operationLogService.logPopOperation(popOperation)
-                    .thenApply(operationId -> {
+                    .thenApply(logResult -> {
+                        long operationId = logResult.getOperationOffset();
                         messageExt.setReceiptHandle(SerializeUtil.encodeReceiptHandle(consumerGroupId, topicId, queueId, operationId));
-                        return operationId;
+                        return logResult;
                     }));
             }
             // write special pop operation for the last message to update consume offset

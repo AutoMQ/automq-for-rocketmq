@@ -31,6 +31,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import java.util.TreeMap;
 
 public class SerializeUtil {
 
@@ -161,11 +162,17 @@ public class SerializeUtil {
             OperationSnapshot.ConsumerGroupMetadataSnapshot consumerGroupMetadata = snapshot.getConsumerGroupMetadataList().get(i);
             int ackOffsetBitmapOffset = builder.createByteVector(consumerGroupMetadata.getAckOffsetBitmapBuffer());
             int retryAckOffsetBitmapOffset = builder.createByteVector(consumerGroupMetadata.getRetryAckOffsetBitmapBuffer());
+            List<Integer> consumeTimesOffsets = new ArrayList<>(consumerGroupMetadata.getConsumeTimes().size());
+            consumerGroupMetadata.getConsumeTimes().entrySet().forEach(entry -> {
+                int consumeTimeOffset = com.automq.rocketmq.store.model.generated.ConsumeTimes.createConsumeTimes(builder, entry.getKey(), entry.getValue());
+                consumeTimesOffsets.add(consumeTimeOffset);
+            });
+            int consumeTimesVectorOffset = com.automq.rocketmq.store.model.generated.ConsumerGroupMetadata.createConsumeTimesVector(builder, consumeTimesOffsets.stream().mapToInt(Integer::intValue).toArray());
             int consumerGroupMetadataOffset = com.automq.rocketmq.store.model.generated.ConsumerGroupMetadata.createConsumerGroupMetadata(builder,
                 consumerGroupMetadata.getConsumerGroupId(), consumerGroupMetadata.getConsumeOffset(), consumerGroupMetadata.getAckOffset(),
                 ackOffsetBitmapOffset,
                 consumerGroupMetadata.getRetryConsumeOffset(), consumerGroupMetadata.getRetryAckOffset(),
-                retryAckOffsetBitmapOffset);
+                retryAckOffsetBitmapOffset, consumeTimesVectorOffset);
             consumerGroupMetadataOffsets[i] = consumerGroupMetadataOffset;
         }
         int consumerGroupMetadataVectorOffset = com.automq.rocketmq.store.model.generated.OperationSnapshot.createConsumerGroupMetadatasVector(builder, consumerGroupMetadataOffsets);
@@ -184,16 +191,21 @@ public class SerializeUtil {
 
     public static OperationSnapshot decodeOperationSnapshot(ByteBuffer buffer) {
         com.automq.rocketmq.store.model.generated.OperationSnapshot snapshot = com.automq.rocketmq.store.model.generated.OperationSnapshot.getRootAsOperationSnapshot(buffer);
-        List<OperationSnapshot.ConsumerGroupMetadataSnapshot> consumerGroupMetadataList = new ArrayList<>();
+        List<OperationSnapshot.ConsumerGroupMetadataSnapshot> consumerGroupMetadataList = new ArrayList<>(snapshot.consumerGroupMetadatasLength());
         for (int i = 0; i < snapshot.consumerGroupMetadatasLength(); i++) {
             com.automq.rocketmq.store.model.generated.ConsumerGroupMetadata consumerGroupMetadata = snapshot.consumerGroupMetadatas(i);
             byte[] ackBitMap = new byte[consumerGroupMetadata.ackBitMapLength()];
             consumerGroupMetadata.ackBitMapAsByteBuffer().get(ackBitMap);
             byte[] retryAckBitMap = new byte[consumerGroupMetadata.retryAckBitMapLength()];
+            TreeMap<Long, Integer> consumeTimes = new TreeMap<>();
+            for (int j = 0; j < consumerGroupMetadata.consumeTimesLength(); j++) {
+                com.automq.rocketmq.store.model.generated.ConsumeTimes consumeTime = consumerGroupMetadata.consumeTimes(j);
+                consumeTimes.put(consumeTime.offset(), consumeTime.consumeTimes());
+            }
             consumerGroupMetadata.retryAckBitMapAsByteBuffer().get(retryAckBitMap);
             consumerGroupMetadataList.add(new OperationSnapshot.ConsumerGroupMetadataSnapshot(consumerGroupMetadata.consumerGroupId(),
                 consumerGroupMetadata.consumeOffset(), consumerGroupMetadata.ackOffset(), consumerGroupMetadata.retryConsumeOffset(), consumerGroupMetadata.retryAckOffset(),
-                ackBitMap, retryAckBitMap));
+                ackBitMap, retryAckBitMap, consumeTimes));
         }
         List<CheckPoint> checkPointList = new ArrayList<>(snapshot.checkPointsLength());
         for (int i = 0; i < snapshot.checkPointsLength(); i++) {
