@@ -24,6 +24,7 @@ import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.store.api.LogicQueue;
 import com.automq.rocketmq.store.api.MessageStore;
+import com.automq.rocketmq.store.api.S3ObjectOperator;
 import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.rocketmq.store.api.TopicQueueManager;
 import com.automq.rocketmq.store.mock.MockStoreMetadataService;
@@ -38,6 +39,7 @@ import com.automq.rocketmq.store.service.SnapshotService;
 import com.automq.rocketmq.store.service.StreamOperationLogService;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.service.api.OperationLogService;
+import com.automq.stream.s3.operator.MemoryS3Operator;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -81,7 +83,8 @@ public class MessageStoreTest {
         OperationLogService operationLogService = new StreamOperationLogService(streamStore, snapshotService, config);
         topicQueueManager = new DefaultLogicQueueManager(config, streamStore, kvService, metadataService, operationLogService, inflightService);
         reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, KV_NAMESPACE_TIMER_TAG, kvService, metadataService, inflightService, topicQueueManager);
-        messageStore = new MessageStoreImpl(config, streamStore, metadataService, kvService, inflightService, snapshotService, topicQueueManager, reviveService);
+        S3ObjectOperator operator = new S3ObjectOperatorImpl(new MemoryS3Operator());
+        messageStore = new MessageStoreImpl(config, streamStore, metadataService, kvService, inflightService, snapshotService, topicQueueManager, reviveService, operator);
         messageStore.start();
     }
 

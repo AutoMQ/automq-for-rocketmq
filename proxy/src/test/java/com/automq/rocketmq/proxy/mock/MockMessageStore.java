@@ -21,7 +21,7 @@ import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.store.api.LogicQueue;
 import com.automq.rocketmq.store.api.MessageStore;
-import com.automq.rocketmq.store.api.S3ObjectManager;
+import com.automq.rocketmq.store.api.S3ObjectOperator;
 import com.automq.rocketmq.store.api.TopicQueueManager;
 import com.automq.rocketmq.store.model.message.AckResult;
 import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
@@ -68,7 +68,7 @@ public class MockMessageStore implements MessageStore {
     }
 
     @Override
-    public S3ObjectManager getS3ObjectManager() {
+    public S3ObjectOperator getS3ObjectOperator() {
         throw new NotImplementedException();
     }
 

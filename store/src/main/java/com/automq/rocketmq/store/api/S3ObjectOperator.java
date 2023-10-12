@@ -23,7 +23,7 @@ import java.util.concurrent.CompletableFuture;
 /**
  * Provide S3 object management, such as delete.
  */
-public interface S3ObjectManager {
+public interface S3ObjectOperator {
     /**
      * Delete a list of S3 objects by object id.
      * <p>

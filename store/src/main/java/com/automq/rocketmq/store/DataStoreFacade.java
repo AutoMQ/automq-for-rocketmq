@@ -18,19 +18,19 @@
 package com.automq.rocketmq.store;
 
 import com.automq.rocketmq.common.api.DataStore;
-import com.automq.rocketmq.store.api.S3ObjectManager;
+import com.automq.rocketmq.store.api.S3ObjectOperator;
 import com.automq.rocketmq.store.api.TopicQueueManager;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 public class DataStoreFacade implements DataStore {
 
-    private final S3ObjectManager s3ObjectManager;
+    private final S3ObjectOperator s3ObjectOperator;
 
     private final TopicQueueManager topicQueueManager;
 
-    public DataStoreFacade(S3ObjectManager s3ObjectManager, TopicQueueManager topicQueueManager) {
-        this.s3ObjectManager = s3ObjectManager;
+    public DataStoreFacade(S3ObjectOperator s3ObjectOperator, TopicQueueManager topicQueueManager) {
+        this.s3ObjectOperator = s3ObjectOperator;
         this.topicQueueManager = topicQueueManager;
     }
 
@@ -41,6 +41,6 @@ public class DataStoreFacade implements DataStore {
 
     @Override
     public CompletableFuture<List<Long>> batchDeleteS3Objects(List<Long> objectIds) {
-        return s3ObjectManager.delete(objectIds);
+        return s3ObjectOperator.delete(objectIds);
     }
 }
