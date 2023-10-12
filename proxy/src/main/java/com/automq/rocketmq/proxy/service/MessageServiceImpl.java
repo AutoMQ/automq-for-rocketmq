@@ -23,7 +23,6 @@ import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.common.config.ProxyConfig;
 import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.util.CommonUtil;
-import com.automq.rocketmq.common.util.Pair;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.metadata.api.ProxyMetadataService;
 import com.automq.rocketmq.proxy.model.VirtualQueue;
@@ -43,6 +42,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.rocketmq.client.consumer.AckResult;
 import org.apache.rocketmq.client.consumer.AckStatus;
 import org.apache.rocketmq.client.consumer.PopResult;
@@ -197,10 +197,10 @@ public class MessageServiceImpl implements MessageService {
                 throw new CompletionException(new MQBrokerException(ResponseCode.TOPIC_NOT_EXIST, "Topic not exist"));
             }
 
-            return new Pair<>(topic, group);
+            return Pair.of(topic, group);
         }).thenCompose(pair -> {
-            long consumerGroupId = pair.right().getGroupId();
-            long topicId = pair.left().getTopicId();
+            long consumerGroupId = pair.getRight().getGroupId();
+            long topicId = pair.getLeft().getTopicId();
             String clientId = ctx.getClientID();
 
             Filter filter;
@@ -283,11 +283,11 @@ public class MessageServiceImpl implements MessageService {
             }
         );
 
-        CompletableFuture<Pair<Topic, ConsumerGroup>> resourceF = topicFuture.thenCombine(groupFuture, Pair::new);
+        CompletableFuture<Pair<Topic, ConsumerGroup>> resourceF = topicFuture.thenCombine(groupFuture, Pair::of);
 
         resultF.thenCombine(resourceF, (ackResult, pair) -> {
-            long groupId = pair.right().getGroupId();
-            long topicId = pair.left().getTopicId();
+            long groupId = pair.getRight().getGroupId();
+            long topicId = pair.getLeft().getTopicId();
             return store.getInflightStats(groupId, topicId, queueId).thenAccept(inflight -> {
                 // Expire the lock later to allow other client preempted when all inflight messages are acked.
                 if (inflight == 0) {
@@ -311,8 +311,8 @@ public class MessageServiceImpl implements MessageService {
         CompletableFuture<ConsumerGroup> consumeGroupFuture = metadataService.consumerGroupOf(requestHeader.getConsumerGroup());
         CompletableFuture<Topic> topicFuture = metadataService.topicOf(requestHeader.getTopic());
 
-        return consumeGroupFuture.thenCombine(topicFuture, Pair::new)
-            .thenCompose(pair -> metadataService.consumerOffsetOf(pair.left().getGroupId(), pair.right().getTopicId(), requestHeader.getQueueId()));
+        return consumeGroupFuture.thenCombine(topicFuture, Pair::of)
+            .thenCompose(pair -> metadataService.consumerOffsetOf(pair.getLeft().getGroupId(), pair.getRight().getTopicId(), requestHeader.getQueueId()));
     }
 
     @Override
@@ -321,8 +321,8 @@ public class MessageServiceImpl implements MessageService {
         CompletableFuture<ConsumerGroup> consumeGroupFuture = metadataService.consumerGroupOf(requestHeader.getConsumerGroup());
         CompletableFuture<Topic> topicFuture = metadataService.topicOf(requestHeader.getTopic());
         // TODO: support retry topic.
-        return consumeGroupFuture.thenCombine(topicFuture, Pair::new)
-            .thenCompose(pair -> metadataService.updateConsumerOffset(pair.left().getGroupId(), pair.right().getTopicId(), requestHeader.getQueueId(), requestHeader.getCommitOffset()));
+        return consumeGroupFuture.thenCombine(topicFuture, Pair::of)
+            .thenCompose(pair -> metadataService.updateConsumerOffset(pair.getLeft().getGroupId(), pair.getRight().getTopicId(), requestHeader.getQueueId(), requestHeader.getCommitOffset()));
     }
 
     @Override

@@ -19,7 +19,6 @@ package com.automq.rocketmq.store.service;
 
 import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.util.Lifecycle;
-import com.automq.rocketmq.common.util.Pair;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.store.api.LogicQueue;
 import com.automq.rocketmq.store.api.TopicQueueManager;
@@ -45,6 +44,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -142,8 +142,8 @@ public class ReviveService implements Runnable, Lifecycle {
                     return pullCf.thenApply(result -> Pair.of(queue, result));
                 }, backgroundExecutor);
                 CompletableFuture<Triple<LogicQueue, FlatMessageExt, Integer>> cf = pullMsgCf.thenCombineAsync(metadataService.maxDeliveryAttemptsOf(consumerGroupId), (pair, maxDeliveryAttempts) -> {
-                    LogicQueue logicQueue = pair.left();
-                    PullResult pullResult = pair.right();
+                    LogicQueue logicQueue = pair.getLeft();
+                    PullResult pullResult = pair.getRight();
                     if (pullResult.messageList().size() != 1) {
                         throw new CompletionException(new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "Revive message not found"));
                     }
