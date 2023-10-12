@@ -81,6 +81,7 @@ import io.grpc.stub.StreamObserver;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -857,10 +858,14 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
             S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
             S3Object s3Object = new S3Object();
+            s3Object.setId(nextS3ObjectId());
             s3Object.setStreamId(streamId);
             s3Object.setState(S3ObjectState.BOS_COMMITTED);
             s3Object.setObjectSize(1000L);
-            s3ObjectMapper.create(s3Object);
+            Calendar calendar = Calendar.getInstance();
+            calendar.add(Calendar.MINUTE, 5);
+            s3Object.setExpiredTimestamp(calendar.getTime());
+            s3ObjectMapper.prepare(s3Object);
             objectId = s3Object.getId();
 
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
@@ -911,13 +916,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
             List<S3StreamObject> objects = s3StreamObjectMapper.listByStreamId(streamId);
             Assertions.assertEquals(0, objects.size());
-
-            S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
-            S3Object s3Object = s3ObjectMapper.getById(objectId);
-            long cost = s3Object.getMarkedForDeletionTimestamp() - System.currentTimeMillis();
-            if (cost > 5 * 60) {
-                Assertions.fail();
-            }
         }
     }
 
@@ -967,10 +965,14 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
             S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
             S3Object s3Object = new S3Object();
+            s3Object.setId(nextS3ObjectId());
             s3Object.setStreamId(streamId);
             s3Object.setState(S3ObjectState.BOS_COMMITTED);
             s3Object.setObjectSize(1000L);
-            s3ObjectMapper.create(s3Object);
+            Calendar calendar = Calendar.getInstance();
+            calendar.add(Calendar.MINUTE, 5);
+            s3Object.setExpiredTimestamp(calendar.getTime());
+            s3ObjectMapper.prepare(s3Object);
             objectId = s3Object.getId();
 
             String replacedJson = expectSubStream.replace("1234567890", streamId + "");
@@ -1022,13 +1024,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             S3WalObject object = s3WALObjectMapper.getByObjectId(objectId);
             Assertions.assertEquals(500, object.getObjectSize());
             Assertions.assertEquals(111, object.getSequenceId());
-
-            S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
-            S3Object s3Object = s3ObjectMapper.getById(objectId);
-            long cost = s3Object.getMarkedForDeletionTimestamp() - System.currentTimeMillis();
-            if (cost > 5 * 60) {
-                Assertions.fail();
-            }
         }
     }
 
@@ -1080,10 +1075,14 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
             S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
             S3Object s3Object = new S3Object();
+            s3Object.setId(nextS3ObjectId());
             s3Object.setStreamId(streamId);
             s3Object.setState(S3ObjectState.BOS_COMMITTED);
             s3Object.setObjectSize(1000L);
-            s3ObjectMapper.create(s3Object);
+            Calendar calendar = Calendar.getInstance();
+            calendar.add(Calendar.MINUTE, 5);
+            s3Object.setExpiredTimestamp(calendar.getTime());
+            s3ObjectMapper.prepare(s3Object);
             objectId = s3Object.getId();
 
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
@@ -1134,13 +1133,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
             List<S3StreamObject> objects = s3StreamObjectMapper.listByStreamId(streamId);
             Assertions.assertEquals(0, objects.size());
-
-            S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
-            S3Object s3Object = s3ObjectMapper.getById(objectId);
-            long cost = s3Object.getMarkedForDeletionTimestamp() - System.currentTimeMillis();
-            if (cost > 5 * 60) {
-                Assertions.fail();
-            }
         }
     }
 
@@ -1242,10 +1234,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
                 for (long index = objectId; index < objectId + 2; index++) {
                     S3Object object = s3ObjectMapper.getById(index);
-                    Assertions.assertEquals(S3ObjectState.BOS_DELETED, object.getState());
-                    if (object.getMarkedForDeletionTimestamp() - time > 5 * 60) {
-                        Assertions.fail();
-                    }
+                    Assertions.assertEquals(S3ObjectState.BOS_WILL_DELETE, object.getState());
                 }
 
                 S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
@@ -1325,17 +1314,11 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 for (long index = objectId; index < objectId + 2; index++) {
                     S3Object object = s3ObjectMapper.getById(index);
                     Assertions.assertEquals(S3ObjectState.BOS_COMMITTED, object.getState());
-                    if (object.getCommittedTimestamp() - time > 5 * 60) {
-                        Assertions.fail();
-                    }
                 }
 
                 for (long index = objectId + 2; index < objectId + 4; index++) {
                     S3Object object = s3ObjectMapper.getById(index);
-                    Assertions.assertEquals(S3ObjectState.BOS_DELETED, object.getState());
-                    if (object.getMarkedForDeletionTimestamp() - time > 5 * 60) {
-                        Assertions.fail();
-                    }
+                    Assertions.assertEquals(S3ObjectState.BOS_WILL_DELETE, object.getState());
                 }
 
                 S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);

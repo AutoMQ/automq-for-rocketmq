@@ -64,6 +64,7 @@
     </environments>
 
     <mappers>
+        <mapper resource="database/mapper/SequenceMapper.xml" />
         <mapper resource="database/mapper/GroupMapper.xml" />
         <mapper resource="database/mapper/GroupProgressMapper.xml" />
         <mapper resource="database/mapper/SubscriptionMapper.xml" />

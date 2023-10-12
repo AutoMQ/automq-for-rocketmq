@@ -75,6 +75,7 @@ import com.automq.rocketmq.controller.metadata.database.mapper.S3ObjectMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.S3StreamObjectMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.S3WalObjectMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.RangeMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.SequenceMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 import com.automq.rocketmq.controller.tasks.KeepAliveTask;
@@ -89,6 +90,8 @@ import com.google.common.base.Strings;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.HashSet;
@@ -1132,8 +1135,8 @@ public class DefaultMetadataStore implements MetadataStore {
                             s3StreamObjectMapper.delete(null, streamId, streamObject.getObjectId());
                             // markDestroyObjects
                             S3Object s3Object = s3ObjectMapper.getById(streamObject.getObjectId());
-                            s3Object.setMarkedForDeletionTimestamp(System.currentTimeMillis());
-                            s3ObjectMapper.delete(s3Object);
+                            s3Object.setMarkedForDeletionTimestamp(new Date());
+                            s3ObjectMapper.markToDelete(s3Object.getId());
                         }
                     });
 
@@ -1150,8 +1153,8 @@ public class DefaultMetadataStore implements MetadataStore {
                             if (s3WALObject.getSubStreamsMap().size() == 1) {
                                 // only this range, but we will remove this range, so now we can remove this wal object
                                 S3Object s3Object = s3ObjectMapper.getById(s3WALObject.getObjectId());
-                                s3Object.setMarkedForDeletionTimestamp(System.currentTimeMillis());
-                                s3ObjectMapper.delete(s3Object);
+                                s3Object.setMarkedForDeletionTimestamp(new Date());
+                                s3ObjectMapper.markToDelete(s3Object.getId());
                             }
 
                             // remove offset range about sub-stream ...
@@ -1474,28 +1477,24 @@ public class DefaultMetadataStore implements MetadataStore {
                     if (!maintainLeadershipWithSharedLock(session)) {
                         continue;
                     }
-                    S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
-                    long prepareTs = System.currentTimeMillis(), expiredTs = prepareTs + (long) ttlInMinutes * 60 * 1000;
 
-                    List<Long> objectIds = IntStream.range(0, count)
-                        .boxed()
-                        .map(i -> {
-                            S3Object object = new S3Object();
-                            object.setState(S3ObjectState.BOS_PREPARED);
-                            object.setPreparedTimestamp(prepareTs);
-                            object.setExpiredTimestamp(expiredTs);
-                            s3ObjectMapper.prepare(object);
-                            return object.getId();
-                        })
-                        .toList();
+                    // Get and update sequence
+                    SequenceMapper sequenceMapper = session.getMapper(SequenceMapper.class);
+                    long next = sequenceMapper.next(S3ObjectMapper.SEQUENCE_NAME);
+                    sequenceMapper.update(S3ObjectMapper.SEQUENCE_NAME, next + count);
+
+                    S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
+                    Calendar calendar = Calendar.getInstance();
+                    calendar.add(Calendar.MINUTE, ttlInMinutes);
+                    IntStream.range(0, count).forEach(i -> {
+                        S3Object object = new S3Object();
+                        object.setId(next + i);
+                        object.setState(S3ObjectState.BOS_PREPARED);
+                        object.setExpiredTimestamp(calendar.getTime());
+                        s3ObjectMapper.prepare(object);
+                    });
                     session.commit();
-                    if (objectIds.isEmpty()) {
-                        LOGGER.error("S3Object creation failed, count[{}], ttl[{}]", count, ttlInMinutes);
-                        ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE, String.format("S3Object creation failed, count[%d], ttl[%d]", count, ttlInMinutes));
-                        future.completeExceptionally(e);
-                        break;
-                    }
-                    future.complete(objectIds.get(0));
+                    future.complete(next);
                 }
             } else {
                 PrepareS3ObjectsRequest request = PrepareS3ObjectsRequest.newBuilder()
@@ -1534,7 +1533,6 @@ public class DefaultMetadataStore implements MetadataStore {
                     S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
                     S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
                     S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
-                    long committedTs = System.currentTimeMillis();
 
                     int brokerId = walObject.getBrokerId();
                     long objectId = walObject.getObjectId();
@@ -1558,23 +1556,23 @@ public class DefaultMetadataStore implements MetadataStore {
                     }
 
                     // commit S3 object
-                    if (objectId != S3Constants.NOOP_OBJECT_ID && !commitObject(objectId, session, committedTs)) {
+                    if (objectId != S3Constants.NOOP_OBJECT_ID && !commitObject(objectId, session)) {
                         ControllerException e = new ControllerException(Code.ILLEGAL_STATE_VALUE,
                             String.format("S3WALObject[object-id=%d] is not prepare", walObject.getObjectId()));
                         future.completeExceptionally(e);
                         return future;
                     }
 
-                    long dataTs = committedTs;
+                    long dataTs = System.currentTimeMillis();
                     if (!Objects.isNull(compactedObjects) && !compactedObjects.isEmpty()) {
                         // update dataTs to the min compacted object's dataTs
                         dataTs = compactedObjects.stream()
                             .map(id -> {
                                 // mark destroy compacted object
                                 S3Object object = s3ObjectMapper.getById(id);
-                                object.setState(S3ObjectState.BOS_DELETED);
-                                object.setMarkedForDeletionTimestamp(System.currentTimeMillis());
-                                s3ObjectMapper.delete(object);
+                                object.setState(S3ObjectState.BOS_WILL_DELETE);
+                                object.setMarkedForDeletionTimestamp(new Date());
+                                s3ObjectMapper.markToDelete(object.getId());
 
                                 S3WalObject s3WALObject = s3WALObjectMapper.getByObjectId(id);
                                 return s3WALObject.getBaseDataTimestamp();
@@ -1599,7 +1597,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     if (!Objects.isNull(streamObjects) && !streamObjects.isEmpty()) {
                         for (apache.rocketmq.controller.v1.S3StreamObject s3StreamObject : streamObjects) {
                             long oId = s3StreamObject.getObjectId();
-                            if (!commitObject(oId, session, committedTs)) {
+                            if (!commitObject(oId, session)) {
                                 ControllerException e = new ControllerException(Code.ILLEGAL_STATE_VALUE, String.format("S3StreamObject[object-id=%d] is not prepare", oId));
                                 future.completeExceptionally(e);
                                 return future;
@@ -1610,7 +1608,7 @@ public class DefaultMetadataStore implements MetadataStore {
                             S3StreamObject object = new S3StreamObject();
                             object.setStreamId(s3StreamObject.getStreamId());
                             object.setObjectId(s3StreamObject.getObjectId());
-                            object.setCommittedTimestamp(committedTs);
+                            object.setCommittedTimestamp(System.currentTimeMillis());
                             object.setStartOffset(s3StreamObject.getStartOffset());
                             object.setBaseDataTimestamp(s3StreamObject.getBaseDataTimestamp());
                             object.setEndOffset(s3StreamObject.getEndOffset());
@@ -1671,7 +1669,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
 
                     // commit object
-                    if (!commitObject(streamObject.getObjectId(), session, committedTs)) {
+                    if (!commitObject(streamObject.getObjectId(), session)) {
                         ControllerException e = new ControllerException(Code.ILLEGAL_STATE_VALUE, String.format("S3StreamObject[object-id=%d] is not prepare", streamObject.getObjectId()));
                         future.completeExceptionally(e);
                         return future;
@@ -1682,9 +1680,9 @@ public class DefaultMetadataStore implements MetadataStore {
                             .map(id -> {
                                 // mark destroy compacted object
                                 S3Object object = s3ObjectMapper.getById(id);
-                                object.setState(S3ObjectState.BOS_DELETED);
-                                object.setMarkedForDeletionTimestamp(System.currentTimeMillis());
-                                s3ObjectMapper.delete(object);
+                                object.setState(S3ObjectState.BOS_WILL_DELETE);
+                                object.setMarkedForDeletionTimestamp(new Date());
+                                s3ObjectMapper.markToDelete(object.getId());
 
                                 // update dataTs to the min compacted object's dataTs
                                 S3StreamObject s3StreamObject = s3StreamObjectMapper.getByObjectId(id);
@@ -1839,7 +1837,7 @@ public class DefaultMetadataStore implements MetadataStore {
             .build();
     }
 
-    private boolean commitObject(Long objectId, SqlSession session, long committedTs) {
+    private boolean commitObject(Long objectId, SqlSession session) {
         S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
         S3Object s3Object = s3ObjectMapper.getById(objectId);
         if (Objects.isNull(s3Object)) {
@@ -1855,7 +1853,7 @@ public class DefaultMetadataStore implements MetadataStore {
             LOGGER.error("object[object-id={}] is not prepared but try to commit", objectId);
             return false;
         }
-        s3Object.setCommittedTimestamp(committedTs);
+        s3Object.setCommittedTimestamp(new Date());
         s3Object.setState(S3ObjectState.BOS_COMMITTED);
         s3ObjectMapper.commit(s3Object);
         return true;

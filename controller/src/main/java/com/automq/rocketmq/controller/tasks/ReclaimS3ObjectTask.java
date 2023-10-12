@@ -17,9 +17,14 @@
 
 package com.automq.rocketmq.controller.tasks;
 
+import apache.rocketmq.controller.v1.Code;
+import apache.rocketmq.controller.v1.S3ObjectState;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
+import com.automq.rocketmq.controller.metadata.database.dao.S3Object;
 import com.automq.rocketmq.controller.metadata.database.mapper.S3ObjectMapper;
+import java.util.List;
+import java.util.concurrent.ExecutionException;
 import org.apache.ibatis.session.SqlSession;
 
 public class ReclaimS3ObjectTask extends ControllerTask {
@@ -31,8 +36,31 @@ public class ReclaimS3ObjectTask extends ControllerTask {
     @Override
     public void process() throws ControllerException {
         try (SqlSession session = metadataStore.openSession()) {
-            S3ObjectMapper mapper = session.getMapper(S3ObjectMapper.class);
+            if (!metadataStore.isLeader()) {
+                return;
+            }
 
+            if (!metadataStore.maintainLeadershipWithSharedLock(session)) {
+                return;
+            }
+
+            S3ObjectMapper mapper = session.getMapper(S3ObjectMapper.class);
+            int rows = mapper.rollback();
+            if (rows > 0) {
+                LOGGER.info("Rollback {} expired prepared S3 Object rows", rows);
+            }
+            List<S3Object> s3Objects = mapper.list(S3ObjectState.BOS_WILL_DELETE, null);
+            List<Long> ids = s3Objects.stream().mapToLong(S3Object::getId).boxed().toList();
+            if (!ids.isEmpty()) {
+                List<Long> result = metadataStore.getDataStore().batchDeleteS3Objects(ids).get();
+                if (null != result && !result.isEmpty()) {
+                    mapper.batchDelete(result);
+                }
+            }
+            session.commit();
+        } catch (ExecutionException | InterruptedException e) {
+            LOGGER.error("Failed to batch delete S3 Objects", e);
+            throw new ControllerException(Code.INTERNAL_VALUE, e);
         }
 
     }

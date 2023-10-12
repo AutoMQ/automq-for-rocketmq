@@ -36,6 +36,7 @@ import java.io.InputStream;
 import java.util.Calendar;
 import java.util.Properties;
 
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.ibatis.io.Resources;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
@@ -50,7 +51,10 @@ public class DatabaseTestBase {
 
     protected ControllerConfig config;
 
+    AtomicLong s3ObjectIdSequence;
+
     public DatabaseTestBase() {
+        this.s3ObjectIdSequence = new AtomicLong(1);
         config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.nodeId()).thenReturn(1);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
@@ -58,6 +62,10 @@ public class DatabaseTestBase {
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
         Mockito.when(config.deletedTopicLingersInSecs()).thenCallRealMethod();
         Mockito.when(config.deletedGroupLingersInSecs()).thenCallRealMethod();
+    }
+
+    protected long nextS3ObjectId() {
+        return this.s3ObjectIdSequence.getAndIncrement();
     }
 
     static MySQLContainer mySQLContainer = new MySQLContainer<>(DockerImageName.parse("mysql:8"))
@@ -89,7 +97,7 @@ public class DatabaseTestBase {
             session.getMapper(TopicMapper.class).delete(null);
             session.getMapper(StreamMapper.class).delete(null);
             session.getMapper(RangeMapper.class).delete(null, null);
-            session.getMapper(S3ObjectMapper.class).deleteDangerous();
+            session.getMapper(S3ObjectMapper.class).delete(null);
             session.getMapper(S3StreamObjectMapper.class).delete(null, null, null);
             session.getMapper(S3WalObjectMapper.class).delete(null, null, null);
 

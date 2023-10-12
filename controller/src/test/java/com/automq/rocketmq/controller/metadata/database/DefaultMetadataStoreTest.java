@@ -58,6 +58,7 @@ import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletionException;
@@ -75,7 +76,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 class DefaultMetadataStoreTest extends DatabaseTestBase {
-
     ControllerClient client;
 
     public DefaultMetadataStoreTest() {
@@ -1635,7 +1635,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         long objectId;
         int nodeId = 1;
 
-        long time = System.currentTimeMillis();
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertNull(metadataStore.getLease());
             Lease lease = new Lease();
@@ -1652,12 +1651,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             for (long index = objectId; index < objectId + 3; index++) {
                 S3Object object = s3ObjectMapper.getById(index);
                 Assertions.assertEquals(S3ObjectState.BOS_PREPARED, object.getState());
-                if (object.getPreparedTimestamp() - time > 5 * 60) {
-                    Assertions.fail();
-                }
-                if (object.getExpiredTimestamp() - time - 5 * 60 * 1000 > 5 * 60) {
-                    Assertions.fail();
-                }
             }
         }
     }
@@ -1719,10 +1712,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
             for (long index = objectId; index < objectId + 2; index++) {
                 S3Object object = s3ObjectMapper.getById(index);
-                Assertions.assertEquals(S3ObjectState.BOS_DELETED, object.getState());
-                if (object.getMarkedForDeletionTimestamp() - time > 5 * 60) {
-                    Assertions.fail();
-                }
+                Assertions.assertEquals(S3ObjectState.BOS_WILL_DELETE, object.getState());
             }
 
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
@@ -1906,17 +1896,11 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             for (long index = objectId; index < objectId + 2; index++) {
                 S3Object object = s3ObjectMapper.getById(index);
                 Assertions.assertEquals(S3ObjectState.BOS_COMMITTED, object.getState());
-                if (object.getCommittedTimestamp() - time > 5 * 60) {
-                    Assertions.fail();
-                }
             }
 
             for (long index = objectId + 2; index < objectId + 4; index++) {
                 S3Object object = s3ObjectMapper.getById(index);
-                Assertions.assertEquals(S3ObjectState.BOS_DELETED, object.getState());
-                if (object.getMarkedForDeletionTimestamp() - time > 5 * 60) {
-                    Assertions.fail();
-                }
+                Assertions.assertEquals(S3ObjectState.BOS_WILL_DELETE, object.getState());
             }
 
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
@@ -2018,12 +2002,14 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
             S3ObjectMapper objectMapper = session.getMapper(S3ObjectMapper.class);
             S3Object s3Object = new S3Object();
+            s3Object.setId(nextS3ObjectId());
             s3Object.setState(S3ObjectState.BOS_PREPARED);
             s3Object.setStreamId(streamId);
             s3Object.setObjectSize(2139L);
-            s3Object.setPreparedTimestamp(System.currentTimeMillis());
-            s3Object.setExpiredTimestamp(System.currentTimeMillis() + TimeUnit.HOURS.toMillis(1));
-            objectMapper.create(s3Object);
+            Calendar calendar = Calendar.getInstance();
+            calendar.add(Calendar.HOUR, 1);
+            s3Object.setExpiredTimestamp(calendar.getTime());
+            objectMapper.prepare(s3Object);
             objectId = s3Object.getId();
 
             session.commit();
@@ -2057,7 +2043,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
             S3ObjectMapper objectMapper = session.getMapper(S3ObjectMapper.class);
             S3Object s3Object = objectMapper.getById(objectId);
-            Assertions.assertTrue(s3Object.getCommittedTimestamp() > 0);
+            Assertions.assertNotNull(s3Object.getCommittedTimestamp());
 
             RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
             Range range = rangeMapper.get(1, streamId, null);

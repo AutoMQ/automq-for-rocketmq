@@ -19,15 +19,12 @@
     PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.automq.rocketmq.controller.metadata.database.mapper.S3ObjectMapper">
-
-    <insert id="create" parameterType="S3Object" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
-        INSERT INTO s3object (object_size, stream_id, state)
-        VALUES (
-            #{objectSize},
-            #{streamId},
-            #{state}
-        )
-    </insert>
+    <delete id="rollback">
+        DELETE
+        FROM s3object
+        WHERE state = 1
+        AND CURRENT_TIMESTAMP(3) > expired_timestamp
+    </delete>
 
     <select id="getById" resultType="S3Object">
         SELECT id, stream_id, object_size, prepared_timestamp, committed_timestamp, expired_timestamp,
@@ -36,69 +33,43 @@
         WHERE id = #{id}
     </select>
 
-
-    <update id="delete" parameterType="S3Object">
+    <update id="markToDelete">
         UPDATE s3object
-        SET marked_for_deletion_timestamp = #{markedForDeletionTimestamp}
-        <if test="state != null">
-            , state = #{state}
-        </if>
-        WHERE 1 = 1
-        <if test="null != id">
-            AND id = #{id}
-        </if>
+        SET marked_for_deletion_timestamp = CURRENT_TIMESTAMP(3),
+            state = 3
+        WHERE
+            id = #{id}
     </update>
 
-    <update id="deleteDangerous">
+    <delete id="delete">
         DELETE FROM s3object
         WHERE 1 = 1
-    </update>
-
-    <update id="expired" parameterType="S3Object">
-        UPDATE s3object
-        SET expired_timestamp = #{expiredTimestamp}
-        <if test="state != null">
-            , state = #{state}
-        </if>
-        WHERE 1 = 1
         <if test="null != id">
-            AND id = #{id}
+            id = #{id}
         </if>
-    </update>
+    </delete>
 
-    <insert id="prepare" parameterType="S3Object" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
-        INSERT INTO s3object (prepared_timestamp, expired_timestamp, state
-        <if test="objectSize != null">
-            , object_size
-        </if>
-        <if test="streamId != null">
-            , stream_id
-        </if>
-        )
+    <delete id="batchDelete">
+        DELETE FROM s3object
+        <where>
+            <foreach item="item" collection="ids" open="id IN (" close=")" separator=",">
+                #{item}
+            </foreach>
+        </where>
+    </delete>
 
-        VALUES (
-        #{preparedTimestamp},
-        #{expiredTimestamp},
-        #{state}
-        <if test="objectSize != null">
-            , #{objectSize}
-        </if>
-        <if test="streamId != null">
-            , #{streamId}
-        </if>
-        )
+    <insert id="prepare" parameterType="S3Object">
+        INSERT INTO s3object (id, prepared_timestamp, expired_timestamp)
+        VALUES (#{id}, #{preparedTimestamp}, #{expiredTimestamp})
     </insert>
 
-    <update id="commit" parameterType="S3Object">
+    <update id="commit">
         UPDATE s3object
-        SET committed_timestamp = #{committedTimestamp}
-        <if test="state != null">
-            , state = #{state}
-        </if>
-        WHERE 1 = 1
-        <if test="null != id">
-            AND id = #{id}
-        </if>
+        SET state = 2,
+        object_size = #{objectSize},
+        stream_id = #{streamId},
+        committed_timestamp = CURRENT_TIMESTAMP(3)
+        WHERE id = #{id}
     </update>
 
     <select id="list" resultType="S3Object">
@@ -109,8 +80,8 @@
         <if test="null != state">
             AND state = #{state}
         </if>
-        <if test="null != expiredTimestamp">
-            AND expired_timestamp &lt;= #{expiredTimestamp}
+        <if test="null != streamId">
+            AND stream_id = #{streamId}
         </if>
     </select>
     

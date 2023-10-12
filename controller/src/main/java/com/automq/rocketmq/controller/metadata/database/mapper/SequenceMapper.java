@@ -17,29 +17,27 @@
 
 package com.automq.rocketmq.controller.metadata.database.mapper;
 
-import apache.rocketmq.controller.v1.S3ObjectState;
-import com.automq.rocketmq.controller.metadata.database.dao.S3Object;
 import org.apache.ibatis.annotations.Param;
 
-import java.util.List;
+public interface SequenceMapper {
 
-public interface S3ObjectMapper {
+    /**
+     * Create a new sequence
+     *
+     * @param name The sequence name
+     * @param next initial next value
+     * @return rows affected
+     */
+    int create(@Param("name") String name, @Param("next") long next);
 
-    String SEQUENCE_NAME = "S3_OBJECT_ID_SEQ";
+    /**
+     * Get the next value of the sequence with write lock held.
+     * See <a href="https://dev.mysql.com/doc/refman/8.0/en/innodb-locking-reads.html">Locking Reads</a>
+     *
+     * @param name Sequence name
+     * @return Next value of the given sequence name
+     */
+    long next(@Param("name") String name);
 
-    S3Object getById(long id);
-
-    int commit(S3Object s3Object);
-
-    int markToDelete(@Param("id") long id);
-
-    int delete(@Param("id") Long id);
-
-    int batchDelete(@Param("ids") List<Long> ids);
-
-    List<S3Object> list(@Param("state") S3ObjectState state, @Param("streamId") Long streamId);
-
-    int prepare(S3Object s3Object);
-
-    int rollback();
+    int update(@Param("name") String name, @Param("next") long next);
 }
