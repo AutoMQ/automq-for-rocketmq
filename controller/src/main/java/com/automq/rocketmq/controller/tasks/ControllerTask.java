@@ -15,9 +15,11 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.metadata.database.tasks;
+package com.automq.rocketmq.controller.tasks;
 
+import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
+import com.google.common.base.Stopwatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,5 +32,18 @@ public abstract class ControllerTask implements Runnable {
         this.metadataStore = metadataStore;
     }
 
+    public abstract void process() throws ControllerException;
 
+    @Override
+    public void run() {
+        String taskName = getClass().getSimpleName();
+        LOGGER.debug("{} starts", taskName);
+        Stopwatch stopwatch = Stopwatch.createStarted();
+        try {
+            process();
+        } catch (Throwable e) {
+            LOGGER.error("Unexpected exception raised while execute {}", taskName, e);
+        }
+        LOGGER.debug("{} completed, costing {}ms", taskName, stopwatch.elapsed().toMillis());
+    }
 }

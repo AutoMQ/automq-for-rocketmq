@@ -15,19 +15,29 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.metadata.database.tasks;
+package com.automq.rocketmq.controller.metadata.database.mapper;
 
-import com.automq.rocketmq.controller.metadata.MetadataStore;
-import java.util.Date;
+import org.apache.ibatis.annotations.Param;
 
-public abstract class ScanTask extends ControllerTask {
+public interface SequenceMapper {
 
-    protected Date lastScanTime;
+    /**
+     * Create a new sequence
+     *
+     * @param name The sequence name
+     * @param next initial next value
+     * @return rows affected
+     */
+    int create(@Param("name") String name, @Param("next") long next);
 
-    public ScanTask(MetadataStore metadataStore) {
-        super(metadataStore);
-    }
+    /**
+     * Get the next value of the sequence with write lock held.
+     * See <a href="https://dev.mysql.com/doc/refman/8.0/en/innodb-locking-reads.html">Locking Reads</a>
+     *
+     * @param name Sequence name
+     * @return Next value of the given sequence name
+     */
+    long next(@Param("name") String name);
 
-
-
+    int update(@Param("name") String name, @Param("next") long next);
 }

@@ -15,31 +15,25 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.metadata.database.mapper;
+package com.automq.rocketmq.controller.metadata.database.dao;
 
-import apache.rocketmq.controller.v1.S3ObjectState;
-import com.automq.rocketmq.controller.metadata.database.dao.S3Object;
-import org.apache.ibatis.annotations.Param;
+public class Sequence {
+    private String name;
+    private long next;
 
-import java.util.List;
+    public String getName() {
+        return name;
+    }
 
-public interface S3ObjectMapper {
+    public void setName(String name) {
+        this.name = name;
+    }
 
-    String SEQUENCE_NAME = "S3_OBJECT_ID_SEQ";
+    public long getNext() {
+        return next;
+    }
 
-    S3Object getById(long id);
-
-    int commit(S3Object s3Object);
-
-    int markToDelete(@Param("id") long id);
-
-    int delete(@Param("id") Long id);
-
-    int batchDelete(@Param("ids") List<Long> ids);
-
-    List<S3Object> list(@Param("state") S3ObjectState state, @Param("streamId") Long streamId);
-
-    int prepare(S3Object s3Object);
-
-    int rollback();
+    public void setNext(long next) {
+        this.next = next;
+    }
 }

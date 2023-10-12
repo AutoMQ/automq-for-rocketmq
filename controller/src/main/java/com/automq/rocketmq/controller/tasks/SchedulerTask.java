@@ -15,9 +15,10 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.metadata.database.tasks;
+package com.automq.rocketmq.controller.tasks;
 
 import apache.rocketmq.controller.v1.AssignmentStatus;
+import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper;
@@ -35,44 +36,38 @@ public class SchedulerTask extends ControllerTask {
     }
 
     @Override
-    public void run() {
-        LOGGER.debug("SchedulerTask starts");
-        try {
-            if (!metadataStore.isLeader()) {
-                LOGGER.debug("Node[node-id={}] is not leader. Leader address is {}", metadataStore.config().nodeId(),
-                    metadataStore.leaderAddress());
+    public void process() throws ControllerException {
+        if (!metadataStore.isLeader()) {
+            LOGGER.debug("Node[node-id={}] is not leader. Leader address is {}", metadataStore.config().nodeId(),
+                metadataStore.leaderAddress());
+            return;
+        }
+
+        try (SqlSession session = metadataStore.openSession()) {
+            // Lock lease with shared lock
+            if (!metadataStore.maintainLeadershipWithSharedLock(session)) {
+                LOGGER.info("Node[node-id={}] lost leadership", metadataStore.config().nodeId());
                 return;
             }
 
-            try (SqlSession session = metadataStore.openSession()) {
-                // Lock lease with shared lock
-                if (!metadataStore.maintainLeadershipWithSharedLock(session)) {
-                    LOGGER.info("Node[node-id={}] lost leadership", metadataStore.config().nodeId());
-                    return;
+            QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
+            List<QueueAssignment> assignments = assignmentMapper
+                .list(null, null, null, null, null)
+                .stream()
+                .filter(assignment -> assignment.getStatus() != AssignmentStatus.ASSIGNMENT_STATUS_DELETED)
+                .toList();
+            Map<Integer, List<QueueAssignment>> workload = new HashMap<>();
+            assignments.forEach(assignment -> {
+                if (!workload.containsKey(assignment.getDstNodeId())) {
+                    workload.put(assignment.getDstNodeId(), new ArrayList<>());
                 }
+                workload.get(assignment.getDstNodeId()).add(assignment);
+            });
 
-                QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
-                List<QueueAssignment> assignments = assignmentMapper
-                    .list(null, null, null, null, null)
-                    .stream()
-                    .filter(assignment -> assignment.getStatus() != AssignmentStatus.ASSIGNMENT_STATUS_DELETED)
-                    .toList();
-                Map<Integer, List<QueueAssignment>> workload = new HashMap<>();
-                assignments.forEach(assignment -> {
-                    if (!workload.containsKey(assignment.getDstNodeId())) {
-                        workload.put(assignment.getDstNodeId(), new ArrayList<>());
-                    }
-                    workload.get(assignment.getDstNodeId()).add(assignment);
-                });
-
-                if (doSchedule(session, workload)) {
-                    session.commit();
-                }
+            if (doSchedule(session, workload)) {
+                session.commit();
             }
-        } catch (Throwable e) {
-            LOGGER.error("Unexpected exception raised", e);
         }
-        LOGGER.debug("SchedulerTask completed");
     }
 
     private boolean doSchedule(SqlSession session, Map<Integer, List<QueueAssignment>> workload) {

@@ -15,10 +15,11 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.metadata.database.tasks;
+package com.automq.rocketmq.controller.tasks;
 
 import apache.rocketmq.controller.v1.AssignmentStatus;
 import com.automq.rocketmq.common.api.DataStore;
+import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper;
@@ -127,9 +128,7 @@ public class ScanYieldingQueueTask extends ScanTask {
     }
 
     @Override
-    public void run() {
-        LOGGER.debug("Start to scan yielding queues");
-
+    public void process() throws ControllerException {
         try (SqlSession session = metadataStore.openSession()) {
             QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
             List<QueueAssignment> assignments = assignmentMapper.list(null, metadataStore.config().nodeId(),
@@ -147,10 +146,6 @@ public class ScanYieldingQueueTask extends ScanTask {
             for (Map.Entry<Pair<Long, Integer>, QueueAssignmentStateMachine> entry : this.assignments.entrySet()) {
                 entry.getValue().doNext();
             }
-        } catch (Throwable e) {
-            LOGGER.error("Unexpected error raised", e);
         }
-
-        LOGGER.debug("Scan-yielding-queue completed");
     }
 }

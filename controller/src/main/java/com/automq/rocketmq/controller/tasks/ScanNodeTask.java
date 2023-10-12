@@ -15,8 +15,9 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.metadata.database.tasks;
+package com.automq.rocketmq.controller.tasks;
 
+import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
@@ -30,21 +31,15 @@ public class ScanNodeTask extends ScanTask {
     }
 
     @Override
-    public void run() {
-        LOGGER.debug("ScanNodeTask starts");
-        try {
-            try (SqlSession session = this.metadataStore.openSession()) {
-                NodeMapper mapper = session.getMapper(NodeMapper.class);
-                List<Node> nodes = mapper.list(this.lastScanTime);
-                if (!nodes.isEmpty()) {
-                    LOGGER.debug("Found {} broker nodes", nodes.size());
-                }
-                updateBrokers(nodes);
+    public void process() throws ControllerException {
+        try (SqlSession session = this.metadataStore.openSession()) {
+            NodeMapper mapper = session.getMapper(NodeMapper.class);
+            List<Node> nodes = mapper.list(this.lastScanTime);
+            if (!nodes.isEmpty()) {
+                LOGGER.debug("Found {} broker nodes", nodes.size());
             }
-        } catch (Throwable e) {
-            LOGGER.error("Failed to scan nodes from database", e);
+            updateBrokers(nodes);
         }
-        LOGGER.debug("ScanNodeTask completed");
     }
 
     private void updateBrokers(List<Node> nodes) {

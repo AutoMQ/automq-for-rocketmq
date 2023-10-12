@@ -15,31 +15,19 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.metadata.database.mapper;
+package com.automq.rocketmq.controller.tasks;
 
-import apache.rocketmq.controller.v1.S3ObjectState;
-import com.automq.rocketmq.controller.metadata.database.dao.S3Object;
-import org.apache.ibatis.annotations.Param;
+import com.automq.rocketmq.controller.metadata.MetadataStore;
+import java.util.Date;
 
-import java.util.List;
+public abstract class ScanTask extends ControllerTask {
 
-public interface S3ObjectMapper {
+    protected Date lastScanTime;
 
-    String SEQUENCE_NAME = "S3_OBJECT_ID_SEQ";
+    public ScanTask(MetadataStore metadataStore) {
+        super(metadataStore);
+    }
 
-    S3Object getById(long id);
 
-    int commit(S3Object s3Object);
 
-    int markToDelete(@Param("id") long id);
-
-    int delete(@Param("id") Long id);
-
-    int batchDelete(@Param("ids") List<Long> ids);
-
-    List<S3Object> list(@Param("state") S3ObjectState state, @Param("streamId") Long streamId);
-
-    int prepare(S3Object s3Object);
-
-    int rollback();
 }
