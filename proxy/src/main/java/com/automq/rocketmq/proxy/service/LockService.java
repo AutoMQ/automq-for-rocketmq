@@ -72,7 +72,7 @@ public class LockService {
         public boolean tryLock(String clientId) {
             boolean result = processing.compareAndSet(false, true);
             if (result) {
-                this.lockTime = System.nanoTime();
+                this.lockTime = System.currentTimeMillis();
                 this.ownerId = clientId;
                 return true;
             }
@@ -91,9 +91,9 @@ public class LockService {
                     if (StringUtils.isBlank(this.ownerId) || this.ownerId.equals(clientId)) {
                         // Only same clientId could acquire the lock.
                         return tryLock(clientId);
-                    } else if (lockTime + expireTime < System.nanoTime()) {
+                    } else if (lockTime + expireTime <= System.currentTimeMillis()) {
                         // Try to preempt expired lock.
-                        this.lockTime = System.nanoTime();
+                        this.lockTime = System.currentTimeMillis();
                         this.ownerId = clientId;
                         this.processing.set(true);
                         return true;
@@ -115,7 +115,7 @@ public class LockService {
                         return;
                     }
 
-                    lockTime = System.nanoTime() + later - expireTime;
+                    lockTime = System.currentTimeMillis() + later - expireTime;
                 } finally {
                     preempting.set(false);
                 }

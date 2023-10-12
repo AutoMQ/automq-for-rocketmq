@@ -43,8 +43,8 @@ public class ProxyConfig extends BaseConfig {
     // default is 20, available value from 0 to 100.
     private int retryPriorityPercentage = 20;
 
-    // lock expire time, default is 15min, unit in nanoseconds.
-    private long lockExpireTime = Duration.ofMinutes(15).toNanos();
+    // lock expire time, default is 15min, unit in milliseconds.
+    private long lockExpireTime = Duration.ofMinutes(15).toMillis();
 
     private int grpcThreadPoolNums = 16 + PROCESSOR_NUMBER * 2;
     private int grpcThreadPoolQueueCapacity = 100000;

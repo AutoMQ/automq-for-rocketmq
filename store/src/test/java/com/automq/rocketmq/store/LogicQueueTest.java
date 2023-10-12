@@ -531,9 +531,9 @@ public class LogicQueueTest {
         logicQueue.put(message);
 
         // 2. pop message
-        long popStartTimestamp = System.nanoTime();
+        long popStartTimestamp = System.currentTimeMillis();
         PopResult popResult = logicQueue.popNormal(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
-        long popEndTimestamp = System.nanoTime();
+        long popEndTimestamp = System.currentTimeMillis();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertFalse(popResult.messageList().isEmpty());
         assertEquals(1, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
@@ -551,9 +551,9 @@ public class LogicQueueTest {
         // 3. change invisible duration.
         FlatMessageExt messageExt = popResult.messageList().get(0);
         String receiptHandle = SerializeUtil.encodeReceiptHandle(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, handle.operationId());
-        long changeStartTimestamp = System.nanoTime();
+        long changeStartTimestamp = System.currentTimeMillis();
         logicQueue.changeInvisibleDuration(receiptHandle, 1000L).join();
-        long changeEndTimestamp = System.nanoTime();
+        long changeEndTimestamp = System.currentTimeMillis();
         assertEquals(1, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
 
         bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, checkPointKey);

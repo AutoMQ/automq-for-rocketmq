@@ -101,7 +101,7 @@ class ReviveServiceTest {
         FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
         logicQueue.put(message).join();
         // pop message
-        int invisibleDuration = 1000 * 1000 * 1000;
+        int invisibleDuration = 1000;
         PopResult popResult = logicQueue.popNormal(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
         assertEquals(1, popResult.messageList().size());
         // check ck exist
@@ -114,7 +114,7 @@ class ReviveServiceTest {
         ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.operationId()));
         assertNotNull(ckValue);
         // after 1s revive can clear ck
-        long reviveTimestamp = System.nanoTime() + invisibleDuration;
+        long reviveTimestamp = System.currentTimeMillis() + invisibleDuration;
         await().until(() -> {
             reviveService.tryRevive();
             return reviveService.reviveTimestamp() >= reviveTimestamp && reviveService.inflightReviveCount() == 0;

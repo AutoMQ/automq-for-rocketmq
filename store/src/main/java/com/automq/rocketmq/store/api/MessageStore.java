@@ -41,7 +41,7 @@ public interface MessageStore extends Lifecycle {
      * @param filter            filter to apply to messages
      * @param batchSize         maximum count of messages
      * @param fifo              is orderly pop
-     * @param invisibleDuration the duration for the next time this batch of messages will be visible, in nanoseconds
+     * @param invisibleDuration the duration for the next time this batch of messages will be visible, in milliseconds
      * @return pop result, see {@link PopResult}
      */
     CompletableFuture<PopResult> pop(long consumerGroupId, long topicId, int queueId, Filter filter,
@@ -68,7 +68,7 @@ public interface MessageStore extends Lifecycle {
      * Change invisible duration for an inflight message.
      *
      * @param receiptHandle     unique receipt handle to identify inflight message
-     * @param invisibleDuration the duration for the next time this batch of messages will be visible, in nanoseconds
+     * @param invisibleDuration the duration for the next time this batch of messages will be visible, in milliseconds
      * @return change invisible duration result, see {@link ChangeInvisibleDurationResult}
      */
     CompletableFuture<ChangeInvisibleDurationResult> changeInvisibleDuration(String receiptHandle, long invisibleDuration);
