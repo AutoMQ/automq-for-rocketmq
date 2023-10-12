@@ -15,10 +15,23 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.common;
+package com.automq.rocketmq.common.api;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-public interface StoreHandle {
-    CompletableFuture<Void> close(long topicId, int queueId);
+public interface DataStore {
+
+    CompletableFuture<Void> closeQueue(long topicId, int queueId);
+
+    /**
+     * Delete a list of S3 objects by object id.
+     * <p>
+     * Regard non-exist object as success delete.
+     *
+     * @param objectIds the objects to delete.
+     * @return the future of delete result, contains the deleted object id.
+     */
+    CompletableFuture<List<Long>> batchDeleteS3Objects(List<Long> objectIds);
+
 }

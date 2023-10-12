@@ -47,7 +47,7 @@ import apache.rocketmq.controller.v1.TopicStatus;
 import apache.rocketmq.controller.v1.TrimStreamRequest;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.common.PrefixThreadFactory;
-import com.automq.rocketmq.common.StoreHandle;
+import com.automq.rocketmq.common.api.DataStore;
 import com.automq.rocketmq.common.system.S3Constants;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.BrokerNode;
@@ -140,7 +140,7 @@ public class DefaultMetadataStore implements MetadataStore {
 
     private final Gson gson;
 
-    private StoreHandle storeHandle;
+    private DataStore dataStore;
 
     public DefaultMetadataStore(ControllerClient client, SqlSessionFactory sessionFactory, ControllerConfig config) {
         this.controllerClient = client;
@@ -170,13 +170,13 @@ public class DefaultMetadataStore implements MetadataStore {
         return controllerClient;
     }
 
-    public StoreHandle getStoreHandle() {
-        return storeHandle;
+    public DataStore getDataStore() {
+        return dataStore;
     }
 
     @Override
-    public void setStoreHandle(StoreHandle storeHandle) {
-        this.storeHandle = storeHandle;
+    public void setDataStore(DataStore dataStore) {
+        this.dataStore = dataStore;
     }
 
     public void start() {

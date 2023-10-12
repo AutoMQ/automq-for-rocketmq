@@ -18,6 +18,7 @@
 package com.automq.rocketmq.broker;
 
 import com.automq.rocketmq.broker.protocol.GrpcProtocolServer;
+import com.automq.rocketmq.common.api.DataStore;
 import com.automq.rocketmq.common.config.BrokerConfig;
 import com.automq.rocketmq.common.util.Lifecycle;
 import com.automq.rocketmq.controller.ControllerServiceImpl;
@@ -30,6 +31,7 @@ import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.proxy.config.ProxyConfiguration;
 import com.automq.rocketmq.proxy.processor.ExtendMessagingProcessor;
 import com.automq.rocketmq.proxy.service.DefaultServiceManager;
+import com.automq.rocketmq.store.DataStoreFacade;
 import com.automq.rocketmq.store.MessageStoreBuilder;
 import com.automq.rocketmq.store.api.MessageStore;
 import org.apache.rocketmq.proxy.processor.MessagingProcessor;
@@ -53,13 +55,15 @@ public class BrokerController implements Lifecycle {
         ProxyConfiguration.intConfig(brokerConfig.proxy());
 
         metadataStore = MetadataStoreBuilder.build(brokerConfig);
-        // Start the node registrar first, so that the node is registered before the proxy starts.
-        metadataStore.start();
 
         proxyMetadataService = new DefaultProxyMetadataService(metadataStore);
         storeMetadataService = new DefaultStoreMetadataService(metadataStore);
 
         messageStore = MessageStoreBuilder.build(brokerConfig.store(), brokerConfig.s3Stream(), storeMetadataService);
+
+        DataStore dataStore = new DataStoreFacade(messageStore.getS3ObjectManager(), messageStore.getTopicQueueManager());
+        metadataStore.setDataStore(dataStore);
+
 
         serviceManager = new DefaultServiceManager(brokerConfig.proxy(), proxyMetadataService, messageStore);
         messagingProcessor = ExtendMessagingProcessor.createForS3RocketMQ(serviceManager);
@@ -73,6 +77,9 @@ public class BrokerController implements Lifecycle {
 
     @Override
     public void start() throws Exception {
+        // Start the node registrar first, so that the node is registered before the proxy starts.
+        metadataStore.start();
+
         messageStore.start();
         messagingProcessor.start();
         grpcServer.start();
