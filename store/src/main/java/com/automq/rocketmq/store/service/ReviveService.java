@@ -122,7 +122,7 @@ public class ReviveService implements Runnable, Lifecycle {
             long operationId = receiptHandle.operationId();
             byte[] ckKey = SerializeUtil.buildCheckPointKey(topicId, queueId, operationId);
             if (inflightRevive.containsKey(operationId)) {
-                LOGGER.warn("{}: Inflight revive operation: {}", identity, operationId);
+                LOGGER.trace("{}: Inflight revive operation: {}", identity, operationId);
                 return;
             }
             try {
@@ -132,7 +132,11 @@ public class ReviveService implements Runnable, Lifecycle {
                 }
                 CheckPoint checkPoint = SerializeUtil.decodeCheckPoint(ByteBuffer.wrap(ckValue));
                 PopOperation.PopOperationType operationType = PopOperation.PopOperationType.valueOf(checkPoint.popOperationType());
-                CompletableFuture<Pair<LogicQueue, PullResult>> pullMsgCf = topicQueueManager.getOrCreate(topicId, queueId).thenComposeAsync(queue -> {
+                CompletableFuture<Pair<LogicQueue, PullResult>> pullMsgCf = topicQueueManager.get(topicId, queueId).thenComposeAsync(optionalLogicQueue -> {
+                    if (!optionalLogicQueue.isPresent()) {
+                        throw new CompletionException(new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "Queue not found"));
+                    }
+                    LogicQueue queue = optionalLogicQueue.get();
                     CompletableFuture<PullResult> pullCf;
                     if (operationType == PopOperation.PopOperationType.POP_RETRY) {
                         pullCf = queue.pullRetry(consumerGroupId, Filter.DEFAULT_FILTER, checkPoint.messageOffset(), 1);
@@ -153,7 +157,7 @@ public class ReviveService implements Runnable, Lifecycle {
                     messageExt.setDeliveryAttempts(messageExt.deliveryAttempts() + 1);
                     return Triple.of(logicQueue, messageExt, maxDeliveryAttempts);
                 }, backgroundExecutor);
-                CompletableFuture<LogicQueue> resendCf = cf.thenComposeAsync(triple -> {
+                CompletableFuture<LogicQueue> resendCf = cf.thenCompose(triple -> {
                     LogicQueue logicQueue = triple.getLeft();
                     FlatMessageExt messageExt = triple.getMiddle();
                     int maxDeliveryAttempts = triple.getRight();
@@ -168,7 +172,7 @@ public class ReviveService implements Runnable, Lifecycle {
                         }
                     }
                     return CompletableFuture.completedFuture(logicQueue);
-                }, backgroundExecutor);
+                });
                 CompletableFuture<AckResult> ackCf = resendCf.thenComposeAsync(queue -> {
                     // ack timeout
                     return queue.ackTimeout(SerializeUtil.encodeReceiptHandle(receiptHandle));
