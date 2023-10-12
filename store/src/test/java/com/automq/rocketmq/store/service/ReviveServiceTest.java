@@ -116,7 +116,7 @@ class ReviveServiceTest {
         long reviveTimestamp = System.nanoTime() + invisibleDuration;
         await().until(() -> {
             reviveService.tryRevive();
-            return reviveService.reviveTimestamp() >= reviveTimestamp;
+            return reviveService.reviveTimestamp() >= reviveTimestamp && reviveService.inflightReviveCount() == 0;
         });
 
         ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.operationId()));

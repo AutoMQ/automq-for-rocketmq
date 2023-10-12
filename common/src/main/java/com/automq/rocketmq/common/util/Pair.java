@@ -26,6 +26,10 @@ public class Pair<L/*left element*/, R/*right element*/> {
         this.right = right;
     }
 
+    public static <L, R> Pair<L, R> of(L left, R right) {
+        return new Pair<>(left, right);
+    }
+
     public L left() {
         return left;
     }
