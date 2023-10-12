@@ -55,7 +55,7 @@ import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class MessageStoreTest {
-    private static final String PATH = "/tmp/ros/topic_queue_test/";
+    private static final String PATH = "/tmp/ros/message_store_test/";
     private static final long TOPIC_ID = 1313;
     private static final int QUEUE_ID = 13;
     private static final long CONSUMER_GROUP_ID = 131313;
