@@ -1136,7 +1136,7 @@ public class DefaultMetadataStore implements MetadataStore {
                             // markDestroyObjects
                             S3Object s3Object = s3ObjectMapper.getById(streamObject.getObjectId());
                             s3Object.setMarkedForDeletionTimestamp(new Date());
-                            s3ObjectMapper.markToDelete(s3Object.getId());
+                            s3ObjectMapper.markToDelete(s3Object.getId(), new Date());
                         }
                     });
 
@@ -1154,7 +1154,7 @@ public class DefaultMetadataStore implements MetadataStore {
                                 // only this range, but we will remove this range, so now we can remove this wal object
                                 S3Object s3Object = s3ObjectMapper.getById(s3WALObject.getObjectId());
                                 s3Object.setMarkedForDeletionTimestamp(new Date());
-                                s3ObjectMapper.markToDelete(s3Object.getId());
+                                s3ObjectMapper.markToDelete(s3Object.getId(), new Date());
                             }
 
                             // remove offset range about sub-stream ...
@@ -1572,7 +1572,7 @@ public class DefaultMetadataStore implements MetadataStore {
                                 S3Object object = s3ObjectMapper.getById(id);
                                 object.setState(S3ObjectState.BOS_WILL_DELETE);
                                 object.setMarkedForDeletionTimestamp(new Date());
-                                s3ObjectMapper.markToDelete(object.getId());
+                                s3ObjectMapper.markToDelete(object.getId(), new Date());
 
                                 S3WalObject s3WALObject = s3WALObjectMapper.getByObjectId(id);
                                 return s3WALObject.getBaseDataTimestamp();
@@ -1682,7 +1682,7 @@ public class DefaultMetadataStore implements MetadataStore {
                                 S3Object object = s3ObjectMapper.getById(id);
                                 object.setState(S3ObjectState.BOS_WILL_DELETE);
                                 object.setMarkedForDeletionTimestamp(new Date());
-                                s3ObjectMapper.markToDelete(object.getId());
+                                s3ObjectMapper.markToDelete(object.getId(), new Date());
 
                                 // update dataTs to the min compacted object's dataTs
                                 S3StreamObject s3StreamObject = s3StreamObjectMapper.getByObjectId(id);
