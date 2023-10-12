@@ -15,20 +15,26 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.metadata.database.tasks;
+package com.automq.rocketmq.controller.tasks;
 
 import com.automq.rocketmq.controller.metadata.MetadataStore;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-public abstract class ControllerTask implements Runnable {
-    protected static final Logger LOGGER = LoggerFactory.getLogger(LeaseTask.class);
-
-    protected final MetadataStore metadataStore;
-
-    public ControllerTask(MetadataStore metadataStore) {
-        this.metadataStore = metadataStore;
+public class KeepAliveTask extends ControllerTask {
+    public KeepAliveTask(MetadataStore metadataStore) {
+        super(metadataStore);
     }
 
-
+    @Override
+    public void run() {
+        LOGGER.debug("Keep-alive task starts");
+        try {
+            int nodeId = metadataStore.config().nodeId();
+            if (!metadataStore.isLeader()) {
+                metadataStore.keepAlive(nodeId, metadataStore.config().epoch(), false);
+            }
+        } catch (Throwable e) {
+            LOGGER.error("Unexpected exception raised while keeping node alive", e);
+        }
+        LOGGER.debug("Keep-alive completed");
+    }
 }

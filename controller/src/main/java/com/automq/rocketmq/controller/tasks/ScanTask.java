@@ -15,26 +15,19 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.metadata.database.tasks;
+package com.automq.rocketmq.controller.tasks;
 
 import com.automq.rocketmq.controller.metadata.MetadataStore;
+import java.util.Date;
 
-public class KeepAliveTask extends ControllerTask {
-    public KeepAliveTask(MetadataStore metadataStore) {
+public abstract class ScanTask extends ControllerTask {
+
+    protected Date lastScanTime;
+
+    public ScanTask(MetadataStore metadataStore) {
         super(metadataStore);
     }
 
-    @Override
-    public void run() {
-        LOGGER.debug("Keep-alive task starts");
-        try {
-            int nodeId = metadataStore.config().nodeId();
-            if (!metadataStore.isLeader()) {
-                metadataStore.keepAlive(nodeId, metadataStore.config().epoch(), false);
-            }
-        } catch (Throwable e) {
-            LOGGER.error("Unexpected exception raised while keeping node alive", e);
-        }
-        LOGGER.debug("Keep-alive completed");
-    }
+
+
 }

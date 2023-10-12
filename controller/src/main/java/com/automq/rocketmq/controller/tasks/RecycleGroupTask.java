@@ -15,23 +15,23 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.metadata.database.tasks;
+package com.automq.rocketmq.controller.tasks;
 
-import apache.rocketmq.controller.v1.TopicStatus;
+import apache.rocketmq.controller.v1.GroupStatus;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
-import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper;
 import java.util.Calendar;
 import org.apache.ibatis.session.SqlSession;
 
-public class RecycleTopicTask extends ControllerTask {
+public class RecycleGroupTask extends ControllerTask {
 
-    public RecycleTopicTask(MetadataStore metadataStore) {
+    public RecycleGroupTask(MetadataStore metadataStore) {
         super(metadataStore);
     }
 
     @Override
     public void run() {
-        LOGGER.debug("RecycleTopicTask starts");
+        LOGGER.debug("RecycleGroupTask starts");
         try {
             if (!metadataStore.isLeader()) {
                 return;
@@ -40,19 +40,18 @@ public class RecycleTopicTask extends ControllerTask {
                 if (!metadataStore.maintainLeadershipWithSharedLock(session)) {
                     return;
                 }
-
-                TopicMapper topicMapper = session.getMapper(TopicMapper.class);
+                GroupMapper topicMapper = session.getMapper(GroupMapper.class);
                 Calendar calendar = Calendar.getInstance();
-                calendar.add(Calendar.SECOND, -metadataStore.config().deletedTopicLingersInSecs());
-                int rowsAffected = topicMapper.recycle(TopicStatus.TOPIC_STATUS_DELETED, calendar.getTime());
+                calendar.add(Calendar.SECOND, -metadataStore.config().deletedGroupLingersInSecs());
+                int rowsAffected = topicMapper.recycle(GroupStatus.GROUP_STATUS_DELETED, calendar.getTime());
                 if (rowsAffected > 0) {
-                    LOGGER.info("Deleted {} topics", rowsAffected);
+                    LOGGER.info("Deleted {} consumer groups", rowsAffected);
                     session.commit();
                 }
             }
         } catch (Throwable e) {
-            LOGGER.error("Exception raised while recycle previously deleted topics", e);
+            LOGGER.error("Exception raised while recycle previously deleted consumer groups", e);
         }
-        LOGGER.debug("RecycleTopicTask completed");
+        LOGGER.debug("RecycleGroupTask completed");
     }
 }

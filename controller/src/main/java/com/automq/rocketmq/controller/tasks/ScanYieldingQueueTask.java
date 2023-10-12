@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.metadata.database.tasks;
+package com.automq.rocketmq.controller.tasks;
 
 import apache.rocketmq.controller.v1.AssignmentStatus;
 import com.automq.rocketmq.common.api.DataStore;

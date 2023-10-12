@@ -15,19 +15,20 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.metadata.database.tasks;
+package com.automq.rocketmq.controller.tasks;
 
 import com.automq.rocketmq.controller.metadata.MetadataStore;
-import java.util.Date;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-public abstract class ScanTask extends ControllerTask {
+public abstract class ControllerTask implements Runnable {
+    protected static final Logger LOGGER = LoggerFactory.getLogger(LeaseTask.class);
 
-    protected Date lastScanTime;
+    protected final MetadataStore metadataStore;
 
-    public ScanTask(MetadataStore metadataStore) {
-        super(metadataStore);
+    public ControllerTask(MetadataStore metadataStore) {
+        this.metadataStore = metadataStore;
     }
-
 
 
 }

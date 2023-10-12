@@ -15,10 +15,10 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.metadata.database.tasks;
+package com.automq.rocketmq.controller.tasks;
 
+import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.Role;
-import com.automq.rocketmq.controller.metadata.database.DefaultMetadataStore;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.mapper.LeaseMapper;
 import com.automq.rocketmq.controller.metadata.database.dao.Lease;
@@ -28,7 +28,7 @@ import org.apache.ibatis.session.SqlSession;
 
 public class LeaseTask extends ControllerTask {
 
-    public LeaseTask(DefaultMetadataStore metadataStore) {
+    public LeaseTask(MetadataStore metadataStore) {
         super(metadataStore);
     }
 
