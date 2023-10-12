@@ -27,8 +27,8 @@ public class StoreConfig {
     // Default is 10MB, unit in bytes
     private long maxFetchBytes = 10L * 1024 * 1024;
 
-    // Default is 10s, unit in nanoseconds
-    private long maxFetchTimeNanos = 10L * 1000 * 1000_000;
+    // Default is 10s, unit in milliseconds
+    private long maxFetchTimeMillis = 10L * 1000;
 
     private int fetchBatchSizeFactor = 2;
 
@@ -46,8 +46,8 @@ public class StoreConfig {
         return maxFetchBytes;
     }
 
-    public long maxFetchTimeNanos() {
-        return maxFetchTimeNanos;
+    public long maxFetchTimeMillis() {
+        return maxFetchTimeMillis;
     }
 
     public int fetchBatchSizeFactor() {

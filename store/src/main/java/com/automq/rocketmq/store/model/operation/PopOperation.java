@@ -31,8 +31,7 @@ public class PopOperation extends Operation {
 
     public PopOperation(long topicId, int queueId, long operationStreamId, long snapshotStreamId,
         MessageStateMachine stateMachine, long consumerGroupId, long offset, int count, long invisibleDuration,
-        long operationTimestamp, boolean endMark,
-        PopOperationType popOperationType) {
+        long operationTimestamp, boolean endMark, PopOperationType popOperationType) {
         this.topicId = topicId;
         this.queueId = queueId;
         this.operationStreamId = operationStreamId;

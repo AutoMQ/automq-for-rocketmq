@@ -47,7 +47,7 @@ class LockServiceTest {
     }
 
     @Test
-    void lock_WithFifo() throws InterruptedException {
+    void lock_WithFifo() {
         LockService lockService = new LockService(new ProxyConfig());
 
         boolean result = lockService.tryLock(0, 0, "client1", true);

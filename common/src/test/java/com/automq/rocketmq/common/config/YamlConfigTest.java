@@ -31,7 +31,7 @@ class YamlConfigTest {
         store:
           maxFetchCount: 1
           maxFetchBytes: 2
-          maxFetchTimeNanos: 3
+          maxFetchTimeMillis: 3
         s3Stream:
           s3Region: us-east-1
           s3Bucket: bucket1
@@ -46,7 +46,7 @@ class YamlConfigTest {
         assertEquals("proxy1", config.proxy().name());
         assertEquals(1, config.store().maxFetchCount());
         assertEquals(2, config.store().maxFetchBytes());
-        assertEquals(3, config.store().maxFetchTimeNanos());
+        assertEquals(3, config.store().maxFetchTimeMillis());
         assertEquals("us-east-1", config.s3Stream().s3Region());
         assertEquals("bucket1", config.s3Stream().s3Bucket());
 

@@ -109,7 +109,7 @@ public class ReviveService implements Runnable, Lifecycle {
 
     protected void tryRevive() throws StoreException {
         byte[] start = ByteBuffer.allocate(8).putLong(0).array();
-        long endTimestamp = System.nanoTime() - 1;
+        long endTimestamp = System.currentTimeMillis() - 1;
         byte[] end = ByteBuffer.allocate(8).putLong(endTimestamp).array();
 
         // Iterate timer tag until now to find messages need to reconsume.
