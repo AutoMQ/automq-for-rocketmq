@@ -144,8 +144,7 @@ public class MessageServiceImpl implements MessageService {
     }
 
     private CompletableFuture<List<FlatMessageExt>> popSpecifiedQueueUnsafe(long consumerGroupId, long topicId,
-        int queueId,
-        Filter filter, int batchSize, boolean fifo, long invisibleDuration) {
+        int queueId, Filter filter, int batchSize, boolean fifo, long invisibleDuration) {
         List<FlatMessageExt> messageList = new ArrayList<>();
 
         // Decide whether to pop the retry-messages first
@@ -176,8 +175,8 @@ public class MessageServiceImpl implements MessageService {
     }
 
     private CompletableFuture<List<FlatMessageExt>> popSpecifiedQueue(long consumerGroupId, String clientId,
-        long topicId, int queueId,
-        Filter filter, int batchSize, boolean fifo, long invisibleDuration, long timeoutMillis) {
+        long topicId, int queueId, Filter filter, int batchSize, boolean fifo, long invisibleDuration,
+        long timeoutMillis) {
         if (lockService.tryLock(topicId, queueId, clientId, fifo)) {
             return popSpecifiedQueueUnsafe(consumerGroupId, topicId, queueId, filter, batchSize, fifo, invisibleDuration)
                 .orTimeout(timeoutMillis, TimeUnit.MILLISECONDS)
@@ -187,7 +186,7 @@ public class MessageServiceImpl implements MessageService {
                     lockService.release(topicId, queueId);
                 });
         }
-        return CompletableFuture.completedFuture(null);
+        return CompletableFuture.completedFuture(Collections.emptyList());
     }
 
     @Override
