@@ -29,10 +29,7 @@ import apache.rocketmq.controller.v1.GroupStatus;
 import apache.rocketmq.controller.v1.GroupType;
 import apache.rocketmq.controller.v1.ListOpenStreamsRequest;
 import apache.rocketmq.controller.v1.ListOpenStreamsReply;
-import apache.rocketmq.controller.v1.MessageQueue;
-import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.MessageType;
-import apache.rocketmq.controller.v1.OngoingMessageQueueReassignment;
 import apache.rocketmq.controller.v1.OpenStreamReply;
 import apache.rocketmq.controller.v1.OpenStreamRequest;
 import apache.rocketmq.controller.v1.S3WALObject;
@@ -83,9 +80,11 @@ import com.automq.rocketmq.controller.tasks.LeaseTask;
 import com.automq.rocketmq.controller.tasks.ReclaimS3ObjectTask;
 import com.automq.rocketmq.controller.tasks.RecycleGroupTask;
 import com.automq.rocketmq.controller.tasks.RecycleTopicTask;
+import com.automq.rocketmq.controller.tasks.ScanAssignmentTask;
 import com.automq.rocketmq.controller.tasks.ScanNodeTask;
 import com.automq.rocketmq.controller.tasks.ScanYieldingQueueTask;
 import com.automq.rocketmq.controller.tasks.SchedulerTask;
+import com.automq.rocketmq.controller.tasks.ScanTopicTask;
 import com.google.common.base.Strings;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -146,6 +145,10 @@ public class DefaultMetadataStore implements MetadataStore {
 
     private DataStore dataStore;
 
+    private final TopicCache topicCache;
+
+    private final AssignmentCache assignmentCache;
+
     public DefaultMetadataStore(ControllerClient client, SqlSessionFactory sessionFactory, ControllerConfig config) {
         this.controllerClient = client;
         this.sessionFactory = sessionFactory;
@@ -157,6 +160,8 @@ public class DefaultMetadataStore implements MetadataStore {
         this.scheduledExecutorService = new ScheduledThreadPoolExecutor(Runtime.getRuntime().availableProcessors(),
             new PrefixThreadFactory("Controller"));
         this.asyncExecutorService = Executors.newFixedThreadPool(10, new PrefixThreadFactory("Controller-Async"));
+        this.topicCache = new TopicCache();
+        this.assignmentCache = new AssignmentCache();
     }
 
     @Override
@@ -201,6 +206,10 @@ public class DefaultMetadataStore implements MetadataStore {
         this.scheduledExecutorService.scheduleWithFixedDelay(new RecycleGroupTask(this), 1,
             config.deletedGroupLingersInSecs(), TimeUnit.SECONDS);
         this.scheduledExecutorService.scheduleWithFixedDelay(new ReclaimS3ObjectTask(this), 1,
+            config.scanIntervalInSecs(), TimeUnit.SECONDS);
+        this.scheduledExecutorService.scheduleWithFixedDelay(new ScanTopicTask(this), 1,
+            config.scanIntervalInSecs(), TimeUnit.SECONDS);
+        this.scheduledExecutorService.scheduleWithFixedDelay(new ScanAssignmentTask(this), 1,
             config.scanIntervalInSecs(), TimeUnit.SECONDS);
         LOGGER.info("MetadataStore tasks scheduled");
     }
@@ -545,6 +554,24 @@ public class DefaultMetadataStore implements MetadataStore {
     @Override
     public CompletableFuture<apache.rocketmq.controller.v1.Topic> describeTopic(Long topicId,
         String topicName) {
+
+        // Look up cache first
+        Topic topicMetadataCache = null;
+        if (null != topicId) {
+            topicMetadataCache = this.topicCache.byId(topicId);
+        }
+        if (null == topicMetadataCache && null != topicName) {
+            topicMetadataCache = this.topicCache.byName(topicName);
+        }
+        if (null != topicMetadataCache) {
+            Map<Integer, QueueAssignment> assignmentMap = assignmentCache.byTopicId(topicMetadataCache.getId());
+            if (null != assignmentMap && !assignmentMap.isEmpty()) {
+                apache.rocketmq.controller.v1.Topic topic =
+                    GrpcHelper.buildTopic(gson, topicMetadataCache, assignmentMap.values());
+                return CompletableFuture.completedFuture(topic);
+            }
+        }
+
         return CompletableFuture.supplyAsync(() -> {
             if (this.isLeader()) {
                 try (SqlSession session = openSession()) {
@@ -559,46 +586,7 @@ public class DefaultMetadataStore implements MetadataStore {
 
                     QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
                     List<QueueAssignment> assignments = assignmentMapper.list(topic.getId(), null, null, null, null);
-
-                    apache.rocketmq.controller.v1.Topic.Builder topicBuilder = apache.rocketmq.controller.v1.Topic
-                        .newBuilder()
-                        .setTopicId(topic.getId())
-                        .setCount(topic.getQueueNum())
-                        .setName(topic.getName())
-                        .addAllAcceptMessageTypes(gson.fromJson(topic.getAcceptMessageTypes(), new TypeToken<List<MessageType>>() {
-                        }.getType()));
-
-                    if (null != assignments) {
-                        for (QueueAssignment assignment : assignments) {
-                            switch (assignment.getStatus()) {
-                                case ASSIGNMENT_STATUS_DELETED -> {
-                                }
-
-                                case ASSIGNMENT_STATUS_ASSIGNED -> {
-                                    MessageQueueAssignment queueAssignment = MessageQueueAssignment.newBuilder()
-                                        .setQueue(MessageQueue.newBuilder()
-                                            .setTopicId(assignment.getTopicId())
-                                            .setQueueId(assignment.getQueueId()))
-                                        .setNodeId(assignment.getDstNodeId())
-                                        .build();
-                                    topicBuilder.addAssignments(queueAssignment);
-                                }
-
-                                case ASSIGNMENT_STATUS_YIELDING -> {
-                                    OngoingMessageQueueReassignment reassignment = OngoingMessageQueueReassignment.newBuilder()
-                                        .setQueue(MessageQueue.newBuilder()
-                                            .setTopicId(assignment.getTopicId())
-                                            .setQueueId(assignment.getQueueId())
-                                            .build())
-                                        .setSrcNodeId(assignment.getSrcNodeId())
-                                        .setDstNodeId(assignment.getDstNodeId())
-                                        .build();
-                                    topicBuilder.addReassignments(reassignment);
-                                }
-                            }
-                        }
-                    }
-                    return topicBuilder.build();
+                    return GrpcHelper.buildTopic(gson, topic, assignments);
                 }
             } else {
                 try {
@@ -2002,5 +1990,15 @@ public class DefaultMetadataStore implements MetadataStore {
             }
         }
         return null;
+    }
+
+    @Override
+    public void applyTopicChange(List<Topic> topics) {
+        topicCache.apply(topics);
+    }
+
+    @Override
+    public void applyAssignmentChange(List<QueueAssignment> assignments) {
+        assignmentCache.apply(assignments);
     }
 }

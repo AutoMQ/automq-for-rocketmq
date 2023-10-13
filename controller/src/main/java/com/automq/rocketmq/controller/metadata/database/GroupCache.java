@@ -15,16 +15,7 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.tasks;
+package com.automq.rocketmq.controller.metadata.database;
 
-import com.automq.rocketmq.controller.metadata.MetadataStore;
-import java.util.Date;
-
-public abstract class ScanTask extends ControllerTask {
-
-    protected Date lastScanTime;
-
-    public ScanTask(MetadataStore metadataStore) {
-        super(metadataStore);
-    }
+public class GroupCache {
 }

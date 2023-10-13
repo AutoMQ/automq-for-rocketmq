@@ -174,4 +174,9 @@ public interface MetadataStore extends Closeable {
     CompletableFuture<Pair<List<S3StreamObject>, List<S3WALObject>>> listObjects(long streamId, long startOffset, long endOffset, int limit);
 
     boolean maintainLeadershipWithSharedLock(SqlSession session);
+
+    void applyTopicChange(List<com.automq.rocketmq.controller.metadata.database.dao.Topic> topics);
+
+    void applyAssignmentChange(List<QueueAssignment> assignments);
+
 }
