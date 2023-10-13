@@ -38,6 +38,7 @@ import com.automq.stream.s3.operator.S3Operator;
 import com.automq.stream.s3.streams.StreamManager;
 import com.automq.stream.s3.wal.BlockWALService;
 import com.automq.stream.s3.wal.WriteAheadLog;
+import com.automq.stream.utils.FutureUtil;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -166,7 +167,8 @@ public class S3StreamStore implements StreamStore {
             .thenAccept(stream -> openStreams.put(streamId, stream))
             .whenComplete((stream, ex) -> {
                 if (ex != null) {
-                    LOGGER.error("Failed to open stream {}", streamId, ex);
+                    Throwable cause = FutureUtil.cause(ex);
+                    LOGGER.error("Failed to open stream {}", streamId, cause);
                 } else {
                     LOGGER.info("Stream {} opened", streamId);
                 }

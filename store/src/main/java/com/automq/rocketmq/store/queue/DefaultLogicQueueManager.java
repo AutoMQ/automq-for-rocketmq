@@ -27,6 +27,7 @@ import com.automq.rocketmq.store.model.message.TopicQueueId;
 import com.automq.rocketmq.store.service.InflightService;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.service.api.OperationLogService;
+import com.automq.stream.utils.FutureUtil;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -72,19 +73,19 @@ public class DefaultLogicQueueManager implements TopicQueueManager {
     }
 
     @Override
-    public CompletableFuture<LogicQueue> getOrCreate(long topicId, int queueId) {
+    public CompletableFuture<Optional<LogicQueue>> getOrCreate(long topicId, int queueId) {
         TopicQueueId key = new TopicQueueId(topicId, queueId);
         CompletableFuture<LogicQueue> future = topicQueueMap.get(key);
 
         if (future != null) {
-            return future;
+            return future.thenApply(Optional::of);
         }
 
         // Prevent concurrent create.
         synchronized (this) {
             future = topicQueueMap.get(key);
             if (future != null) {
-                return future;
+                return future.thenApply(Optional::of);
             }
 
             // Create and open the topic queue.
@@ -92,12 +93,13 @@ public class DefaultLogicQueueManager implements TopicQueueManager {
 
             // Put the future into the map to serve next request.
             topicQueueMap.put(key, future);
-            future.exceptionally(ex -> {
-                LOGGER.error("Create logic queue failed: topic: {} queue: {}", topicId, queueId, ex);
-                topicQueueMap.remove(key);
-                return null;
-            });
-            return future;
+            return future.thenApply(Optional::of)
+                .exceptionally(ex -> {
+                    Throwable cause = FutureUtil.cause(ex);
+                    LOGGER.error("Create logic queue failed: topic: {} queue: {}", topicId, queueId, cause);
+                    topicQueueMap.remove(key);
+                    return Optional.empty();
+                });
         }
     }
 
