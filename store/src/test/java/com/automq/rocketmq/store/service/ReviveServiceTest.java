@@ -101,6 +101,11 @@ class ReviveServiceTest {
 
     @Test
     void tryRevive_normal() throws StoreException {
+        Mockito.doAnswer(ink -> {
+            FlatMessageExt flatMessageExt = ink.getArgument(0);
+            assertNotNull(flatMessageExt);
+            return CompletableFuture.completedFuture(null);
+        }).when(dlqSender).send(Mockito.any(FlatMessageExt.class));
         // mock max delivery attempts
         Mockito.doReturn(CompletableFuture.completedFuture(2))
             .when(metadataService).maxDeliveryAttemptsOf(Mockito.anyLong());
@@ -131,21 +136,16 @@ class ReviveServiceTest {
         assertNull(ckValue);
 
         // check if this message has been appended to retry stream
-        PullResult retryPullResult = logicQueue.pullRetry(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 0, 100).join();
+        PullResult retryPullResult = logicQueue.pullRetry(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 0, invisibleDuration).join();
         assertEquals(1, retryPullResult.messageList().size());
 
         // pop retry
-        PopResult retryPopResult = logicQueue.popRetry(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
+        PopResult retryPopResult = logicQueue.popRetry(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
         assertEquals(1, retryPopResult.messageList().size());
         FlatMessageExt msg = retryPopResult.messageList().get(0);
         assertEquals(2, msg.deliveryAttempts());
 
         long reviveTimestamp1 = System.currentTimeMillis() + invisibleDuration;
-        Mockito.doAnswer(ink -> {
-            FlatMessageExt flatMessageExt = ink.getArgument(0);
-            assertNotNull(flatMessageExt);
-            return CompletableFuture.completedFuture(null);
-        }).when(dlqSender).send(Mockito.any(FlatMessageExt.class));
         // after 1s
         await().until(() -> {
             reviveService.tryRevive();
@@ -154,12 +154,17 @@ class ReviveServiceTest {
 
         // check if this message has been sent to DLQ
         Mockito.verify(dlqSender, Mockito.times(1)).send(Mockito.any(FlatMessageExt.class));
-        PopResult popResult1 = logicQueue.popRetry(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
+        PopResult popResult1 = logicQueue.popRetry(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
         assertEquals(0, popResult1.messageList().size());
     }
 
     @Test
     void tryRevive_fifo() throws StoreException {
+        Mockito.doAnswer(ink -> {
+            FlatMessageExt flatMessageExt = ink.getArgument(0);
+            assertNotNull(flatMessageExt);
+            return CompletableFuture.completedFuture(null);
+        }).when(dlqSender).send(Mockito.any(FlatMessageExt.class));
         // mock max delivery attempts
         Mockito.doReturn(CompletableFuture.completedFuture(2))
             .when(metadataService).maxDeliveryAttemptsOf(Mockito.anyLong());
@@ -192,18 +197,13 @@ class ReviveServiceTest {
         assertNull(ckValue);
 
         // pop again
-        PopResult retryPopResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
+        PopResult retryPopResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
         assertEquals(1, retryPopResult.messageList().size());
         FlatMessageExt msg = retryPopResult.messageList().get(0);
         assertEquals(2, msg.consumeTimes());
         assertEquals(0, msg.offset());
 
         long reviveTimestamp1 = System.currentTimeMillis() + invisibleDuration;
-        Mockito.doAnswer(ink -> {
-            FlatMessageExt flatMessageExt = ink.getArgument(0);
-            assertNotNull(flatMessageExt);
-            return CompletableFuture.completedFuture(null);
-        }).when(dlqSender).send(Mockito.any(FlatMessageExt.class));
         // after 1s
         await().until(() -> {
             reviveService.tryRevive();
@@ -216,7 +216,7 @@ class ReviveServiceTest {
         assertEquals(1, logicQueue.getAckOffset(CONSUMER_GROUP_ID).join());
 
         // pop again
-        PopResult retryPopResult1 = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
+        PopResult retryPopResult1 = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
         assertEquals(1, retryPopResult1.messageList().size());
         FlatMessageExt msg1 = retryPopResult1.messageList().get(0);
         assertEquals(1, msg1.consumeTimes());

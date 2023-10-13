@@ -42,9 +42,12 @@ public class DefaultServiceManager implements ServiceManager {
     private final ProxyRelayService proxyRelayService;
     private final TransactionService transactionService;
     private final AdminService adminService;
+    private final DLQService dlqService;
 
-    public DefaultServiceManager(ProxyConfig config, ProxyMetadataService metadataService, MessageStore messageStore) {
+    public DefaultServiceManager(ProxyConfig config, ProxyMetadataService metadataService, DLQService dlqService,
+        MessageStore messageStore) {
         this.metadataService = metadataService;
+        this.dlqService = dlqService;
         LockService lockService = new LockService(config);
         this.messageService = new MessageServiceImpl(config, messageStore, metadataService, lockService);
         this.resourceMetadataService = new ResourceMetadataService(metadataService);

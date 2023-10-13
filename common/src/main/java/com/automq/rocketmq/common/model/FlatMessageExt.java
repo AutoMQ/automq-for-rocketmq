@@ -133,6 +133,9 @@ public class FlatMessageExt {
     }
 
     public int consumeTimes() {
+        if (consumeTimes == -1) {
+            return message.systemProperties().deliveryAttempts();
+        }
         return consumeTimes;
     }
 }
