@@ -112,7 +112,11 @@ public class FlatMessageUtil {
         messageExt.setMsgId(systemProperties.messageId());
 
         // Re-consume times is the number of delivery attempts minus 1.
-        messageExt.setReconsumeTimes(systemProperties.deliveryAttempts() - 1);
+        if (systemProperties.deliveryAttempts() > 1) {
+            messageExt.setReconsumeTimes(systemProperties.deliveryAttempts() - 1);
+        } else {
+            messageExt.setReconsumeTimes(flatMessage.consumeTimes() - 1);
+        }
 
         KeyValue.Vector propertiesVector = flatMessage.message().userPropertiesVector();
         for (int i = 0; i < propertiesVector.length(); i++) {
@@ -163,6 +167,16 @@ public class FlatMessageUtil {
             systemPropertiesT.setBornTimestamp(Long.parseLong(bornTimestampStr));
         }
 
+        // set DLQ related properties
+        String dlqOriginalTopicId = properties.remove(MessageConst.PROPERTY_DLQ_ORIGIN_TOPIC);
+        if (!Strings.isNullOrEmpty(dlqOriginalTopicId)) {
+            systemPropertiesT.setDlqOriginalTopicId(Long.parseLong(dlqOriginalTopicId));
+        }
+        String dlqOriginalMessageId = properties.remove(MessageConst.PROPERTY_DLQ_ORIGIN_MESSAGE_ID);
+        if (!Strings.isNullOrEmpty(dlqOriginalMessageId)) {
+            systemPropertiesT.setDlqOriginalMessageId(dlqOriginalMessageId);
+        }
+
         // Remove all system properties
         for (String systemPropertyKey : MessageConst.STRING_HASH_SET) {
             properties.remove(systemPropertyKey);
@@ -192,6 +206,12 @@ public class FlatMessageUtil {
         }
         if (systemProperties.traceContext() != null) {
             MessageAccessor.putProperty(messageExt, MessageConst.PROPERTY_TRACE_CONTEXT, systemProperties.traceContext());
+        }
+        if (systemProperties.dlqOriginalTopicId() != -1) {
+            MessageAccessor.putProperty(messageExt, MessageConst.PROPERTY_DLQ_ORIGIN_TOPIC, String.valueOf(systemProperties.dlqOriginalTopicId()));
+        }
+        if (systemProperties.dlqOriginalMessageId() != null) {
+            MessageAccessor.putProperty(messageExt, MessageConst.PROPERTY_DLQ_ORIGIN_MESSAGE_ID, String.valueOf(systemProperties.dlqOriginalMessageId()));
         }
     }
 }

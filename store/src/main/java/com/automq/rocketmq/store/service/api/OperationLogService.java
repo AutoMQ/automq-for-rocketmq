@@ -53,7 +53,7 @@ public interface OperationLogService {
     class LogResult {
         private final long operationOffset;
         // only for pop operation
-        private long popTimes = -1;
+        private int popTimes = -1;
         public LogResult(long operationOffset) {
             this.operationOffset = operationOffset;
         }
@@ -62,11 +62,11 @@ public interface OperationLogService {
             return operationOffset;
         }
 
-        public void setPopTimes(long popTimes) {
+        public void setPopTimes(int popTimes) {
             this.popTimes = popTimes;
         }
 
-        public long getPopTimes() {
+        public int getPopTimes() {
             return popTimes;
         }
     }

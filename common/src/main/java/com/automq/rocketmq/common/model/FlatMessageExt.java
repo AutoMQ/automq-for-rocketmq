@@ -35,6 +35,8 @@ public class FlatMessageExt {
     // The offset of the message in the queue
     private long offset = -1;
 
+    private int consumeTimes = -1;
+
     private FlatMessageExt() {
     }
 
@@ -61,6 +63,11 @@ public class FlatMessageExt {
 
         public Builder offset(long offset) {
             messageExt.offset = offset;
+            return this;
+        }
+
+        public Builder consumeTimes(int consumeTimes) {
+            messageExt.consumeTimes = consumeTimes;
             return this;
         }
 
@@ -119,5 +126,13 @@ public class FlatMessageExt {
 
     public long originalQueueOffset() {
         return message.systemProperties().originalQueueOffset();
+    }
+
+    public void setConsumeTimes(int consumeTimes) {
+        this.consumeTimes = consumeTimes;
+    }
+
+    public int consumeTimes() {
+        return consumeTimes;
     }
 }

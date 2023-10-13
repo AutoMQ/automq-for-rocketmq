@@ -52,8 +52,8 @@ public interface MessageStateMachine {
     CompletableFuture<Boolean> isLocked(long consumerGroupId, long offset);
 
     class ReplayPopResult {
-        private final long popTimes;
-        private ReplayPopResult(long popTimes) {
+        private final int popTimes;
+        private ReplayPopResult(int popTimes) {
             this.popTimes = popTimes;
         }
 
@@ -61,11 +61,11 @@ public interface MessageStateMachine {
             return new ReplayPopResult(-1);
         }
 
-        public static ReplayPopResult of(long popTimes) {
+        public static ReplayPopResult of(int popTimes) {
             return new ReplayPopResult(popTimes);
         }
 
-        public long getPopTimes() {
+        public int getPopTimes() {
             return popTimes;
         }
     }
