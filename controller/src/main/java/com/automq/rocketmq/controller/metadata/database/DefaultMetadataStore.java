@@ -1587,6 +1587,7 @@ public class DefaultMetadataStore implements MetadataStore {
                         s3WALObject.setObjectId(objectId);
                         s3WALObject.setObjectSize(walObject.getObjectSize());
                         s3WALObject.setBaseDataTimestamp(dataTs);
+                        s3WALObject.setCommittedTimestamp(System.currentTimeMillis());
                         s3WALObject.setNodeId(brokerId);
                         s3WALObject.setSequenceId(walObject.getSequenceId());
                         s3WALObject.setSubStreams(gson.toJson(walObject.getSubStreamsMap()));
@@ -1618,6 +1619,9 @@ public class DefaultMetadataStore implements MetadataStore {
                     }
 
                     // generate compacted objects' remove record ...
+                    if (!Objects.isNull(compactedObjects) && !compactedObjects.isEmpty()) {
+                        compactedObjects.forEach(id -> s3WALObjectMapper.delete(id, null, null));
+                    }
                     session.commit();
                     LOGGER.info("broker[broke-id={}] commit wal object[object-id={}] success, compacted objects[{}], stream objects[{}]",
                         brokerId, walObject.getObjectId(), compactedObjects, streamObjects);
@@ -1694,6 +1698,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     S3StreamObject newS3StreamObj = new S3StreamObject();
                     newS3StreamObj.setStreamId(streamObject.getStreamId());
                     newS3StreamObj.setObjectId(streamObject.getObjectId());
+                    newS3StreamObj.setObjectSize(streamObject.getObjectSize());
                     newS3StreamObj.setStartOffset(streamObject.getStartOffset());
                     newS3StreamObj.setEndOffset(streamObject.getEndOffset());
                     newS3StreamObj.setBaseDataTimestamp(dataTs);
