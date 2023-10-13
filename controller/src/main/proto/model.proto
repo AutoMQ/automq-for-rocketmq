@@ -190,18 +190,12 @@ message S3Object {
 enum S3ObjectState {
   // The object state is unspecified.
   BOS_UNSPECIFIED = 0;
-  // The object is in the un initial state.
-  BOS_UNINITIALIZED = 1;
   // The object is prepared.
-  BOS_PREPARED = 2;
+  BOS_PREPARED = 1;
   // The object is committed.
-  BOS_COMMITTED = 3;
-  // The object is expired.
-  BOS_EXPIRED = 4;
+  BOS_COMMITTED = 2;
   // The object is marked for deletion.
-  BOS_MARKED_FOR_DELETION = 5;
-  // The object is deleted.
-  BOS_DELETED = 6;
+  BOS_WILL_DELETE = 3;
 }
 
 message S3StreamObject {

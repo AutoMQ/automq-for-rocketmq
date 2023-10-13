@@ -24,6 +24,7 @@ import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.store.api.LogicQueue;
 import com.automq.rocketmq.store.api.MessageStore;
+import com.automq.rocketmq.store.api.S3ObjectOperator;
 import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.rocketmq.store.api.TopicQueueManager;
 import com.automq.rocketmq.store.mock.MockStoreMetadataService;
@@ -38,6 +39,7 @@ import com.automq.rocketmq.store.service.SnapshotService;
 import com.automq.rocketmq.store.service.StreamOperationLogService;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.service.api.OperationLogService;
+import com.automq.stream.s3.operator.MemoryS3Operator;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -55,7 +57,7 @@ import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class MessageStoreTest {
-    private static final String PATH = "/tmp/ros/topic_queue_test/";
+    private static final String PATH = "/tmp/ros/message_store_test/";
     private static final long TOPIC_ID = 1313;
     private static final int QUEUE_ID = 13;
     private static final long CONSUMER_GROUP_ID = 131313;
@@ -81,7 +83,8 @@ public class MessageStoreTest {
         OperationLogService operationLogService = new StreamOperationLogService(streamStore, snapshotService, config);
         topicQueueManager = new DefaultLogicQueueManager(config, streamStore, kvService, metadataService, operationLogService, inflightService);
         reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, KV_NAMESPACE_TIMER_TAG, kvService, metadataService, inflightService, topicQueueManager);
-        messageStore = new MessageStoreImpl(config, streamStore, metadataService, kvService, inflightService, snapshotService, topicQueueManager, reviveService);
+        S3ObjectOperator operator = new S3ObjectOperatorImpl(new MemoryS3Operator());
+        messageStore = new MessageStoreImpl(config, streamStore, metadataService, kvService, inflightService, snapshotService, topicQueueManager, reviveService, operator);
         messageStore.start();
     }
 
@@ -101,7 +104,7 @@ public class MessageStoreTest {
         }
         List<String> receiptHandles = new ArrayList<>();
         // 2. pop 3 message
-        int invisibleDuration = 800 * 1000 * 1000;
+        int invisibleDuration = 800;
         PopResult popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, invisibleDuration).join();
         assertEquals(3, popResult.messageList().size());
         for (FlatMessageExt message : popResult.messageList()) {
@@ -125,7 +128,7 @@ public class MessageStoreTest {
         assertEquals(PopResult.Status.END_OF_QUEUE, popResult.status());
 
         // 6. after 1100ms, pop again
-        long reviveTimestamp = System.nanoTime() + invisibleDuration;
+        long reviveTimestamp = System.currentTimeMillis() + invisibleDuration;
         await().until(() -> reviveService.reviveTimestamp() >= reviveTimestamp);
         popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, invisibleDuration).join();
         assertEquals(PopResult.Status.END_OF_QUEUE, popResult.status());
@@ -143,7 +146,7 @@ public class MessageStoreTest {
         assertEquals(2, popResult.messageList().get(2).deliveryAttempts());
 
         // 7. after 1100ms, pop again
-        long reviveTimestamp1 = System.nanoTime() + invisibleDuration;
+        long reviveTimestamp1 = System.currentTimeMillis() + invisibleDuration;
         await().until(() -> reviveService.reviveTimestamp() >= reviveTimestamp1);
 
         popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, invisibleDuration).join();
@@ -171,7 +174,7 @@ public class MessageStoreTest {
         }
         List<String> receiptHandles = new ArrayList<>();
         // 2. pop 3 message
-        int invisibleDuration = 800 * 1000 * 1000;
+        int invisibleDuration = 800;
         PopResult popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, true, false, invisibleDuration).join();
         assertEquals(3, popResult.messageList().size());
         for (FlatMessageExt message : popResult.messageList()) {
@@ -213,7 +216,7 @@ public class MessageStoreTest {
         assertEquals(PopResult.Status.LOCKED, popResult.status());
 
         // 11. after 1100ms, pop again
-        long reviveTimestamp = System.nanoTime() + invisibleDuration;
+        long reviveTimestamp = System.currentTimeMillis() + invisibleDuration;
         await().until(() -> reviveService.reviveTimestamp() >= reviveTimestamp);
 
         popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, true, false, invisibleDuration).join();
@@ -236,7 +239,7 @@ public class MessageStoreTest {
         }
         List<String> receiptHandles = new ArrayList<>();
         // 2. pop 3 message
-        int invisibleDuration = 800 * 1000 * 1000;
+        int invisibleDuration = 800;
         PopResult popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, invisibleDuration).join();
         assertEquals(3, popResult.messageList().size());
         for (FlatMessageExt message : popResult.messageList()) {
@@ -269,7 +272,7 @@ public class MessageStoreTest {
         assertEquals(1, streamStore.nextOffset(snapshotStream.getStreamId()));
 
         // 6. after 1100ms, pop again
-        long reviveTimestamp = System.nanoTime() + invisibleDuration;
+        long reviveTimestamp = System.currentTimeMillis() + invisibleDuration;
         await().until(() -> reviveService.reviveTimestamp() >= reviveTimestamp);
 
         popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, invisibleDuration).join();
@@ -313,7 +316,7 @@ public class MessageStoreTest {
         }
         List<String> receiptHandles = new ArrayList<>();
         // 2. pop 3 message
-        PopResult popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, 800 * 1000 * 1000).join();
+        PopResult popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, 800).join();
         assertEquals(3, popResult.messageList().size());
         for (FlatMessageExt message : popResult.messageList()) {
             receiptHandles.add(message.receiptHandle().get());
@@ -324,16 +327,16 @@ public class MessageStoreTest {
         messageStore.ack(receiptHandles.get(2)).join();
 
         // 4. pop 3 message
-        popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, 800 * 1000 * 1000).join();
+        popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, 800).join();
         assertEquals(2, popResult.messageList().size());
         for (FlatMessageExt message : popResult.messageList()) {
             receiptHandles.add(message.receiptHandle().get());
         }
 
         // 5. pop again
-        popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, 800 * 1000 * 1000).join();
+        popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, 800).join();
         assertEquals(PopResult.Status.END_OF_QUEUE, popResult.status());
-        popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, true, 800 * 1000 * 1000).join();
+        popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, true, 800).join();
         assertEquals(PopResult.Status.END_OF_QUEUE, popResult.status());
 
         // 6. after 500ms, check if snapshot is taken
@@ -363,9 +366,9 @@ public class MessageStoreTest {
 
         // 8. after 1100ms, pop again
         Thread.sleep(1100);
-        popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, 800 * 1000 * 1000).join();
+        popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, 800).join();
         assertEquals(PopResult.Status.END_OF_QUEUE, popResult.status());
-        popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, true, 800 * 1000 * 1000).join();
+        popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, true, 800).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(3, popResult.messageList().size());
         assertEquals(0, popResult.messageList().get(0).offset());

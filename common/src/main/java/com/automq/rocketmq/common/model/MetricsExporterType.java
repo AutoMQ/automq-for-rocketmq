@@ -15,20 +15,38 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.metadata.database.tasks;
+package com.automq.rocketmq.common.model;
 
-import com.automq.rocketmq.controller.metadata.MetadataStore;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+public enum MetricsExporterType {
+    DISABLE(0),
+    OTLP_GRPC(1),
+    PROM(2),
+    LOG(3);
 
-public abstract class ControllerTask implements Runnable {
-    protected static final Logger LOGGER = LoggerFactory.getLogger(LeaseTask.class);
+    private final int value;
 
-    protected final MetadataStore metadataStore;
-
-    public ControllerTask(MetadataStore metadataStore) {
-        this.metadataStore = metadataStore;
+    MetricsExporterType(int value) {
+        this.value = value;
     }
 
+    public int getValue() {
+        return value;
+    }
 
+    public static MetricsExporterType valueOf(int value) {
+        switch (value) {
+            case 1:
+                return OTLP_GRPC;
+            case 2:
+                return PROM;
+            case 3:
+                return LOG;
+            default:
+                return DISABLE;
+        }
+    }
+
+    public boolean isEnable() {
+        return this.value > 0;
+    }
 }

@@ -70,8 +70,8 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
     private final Map<Long/*consumerGroup*/, AckCommitter> retryAckCommitterMap = new HashMap<>();
     private long currentOperationOffset = -1;
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
-    private final Lock readLock = lock.readLock();
-    private final Lock writeLock = lock.writeLock();
+    private final Lock reentrantLock = lock.readLock();
+    private final Lock exclusiveLock = lock.writeLock();
     private final KVService kvService;
     private final String identity;
 
@@ -95,7 +95,7 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
 
     @Override
     public CompletableFuture<Void> replayPopOperation(long operationOffset, PopOperation operation) {
-        writeLock.lock();
+        reentrantLock.lock();
         try {
             this.currentOperationOffset = operationOffset;
             switch (operation.popOperationType()) {
@@ -113,7 +113,7 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
             LOGGER.error("{}: Replay pop operation failed", identity, cause);
             return CompletableFuture.failedFuture(cause);
         } finally {
-            writeLock.unlock();
+            reentrantLock.unlock();
         }
     }
 
@@ -127,6 +127,10 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
         long operationTimestamp = operation.operationTimestamp();
         long nextVisibleTimestamp = operation.operationTimestamp() + operation.invisibleDuration();
         int count = operation.count();
+
+        LOGGER.trace("Replay pop operation: topicId={}, queueId={}, offset={}, consumerGroupId={}, operationId={}, operationTimestamp={}, nextVisibleTimestamp={}",
+            topicId, queueId, offset, consumerGroupId, operationId, operationTimestamp, nextVisibleTimestamp);
+
         // update consume offset, data or retry stream
         ConsumerGroupMetadata metadata = this.consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId));
         if (metadata.getConsumeOffset() < offset + 1) {
@@ -170,6 +174,10 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
         long operationTimestamp = operation.operationTimestamp();
         long nextVisibleTimestamp = operation.operationTimestamp() + operation.invisibleDuration();
         int count = operation.count();
+
+        LOGGER.trace("Replay pop retry operation: topicId={}, queueId={}, offset={}, consumerGroupId={}, operationId={}, operationTimestamp={}, nextVisibleTimestamp={}",
+            topicId, queueId, offset, consumerGroupId, operationId, operationTimestamp, nextVisibleTimestamp);
+
         // update consume offset, data or retry stream
         ConsumerGroupMetadata metadata = this.consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId));
         if (metadata.getRetryConsumeOffset() < offset + 1) {
@@ -214,6 +222,10 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
         long nextVisibleTimestamp = operation.operationTimestamp() + operation.invisibleDuration();
 
         int count = operation.count();
+
+        LOGGER.trace("Replay pop fifo operation: topicId={}, queueId={}, offset={}, consumerGroupId={}, operationId={}, operationTimestamp={}, nextVisibleTimestamp={}",
+            topicId, queueId, offset, consumerGroupId, operationId, operationTimestamp, nextVisibleTimestamp);
+
         // update consume offset
         ConsumerGroupMetadata metadata = this.consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId));
         if (metadata.getConsumeOffset() < offset + 1) {
@@ -280,7 +292,11 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
         int queueId = operation.queueId();
         long operationId = operation.operationId();
         AckOperation.AckOperationType type = operation.ackOperationType();
-        writeLock.lock();
+
+        LOGGER.trace("Replay ack operation: topicId={}, queueId={}, operationId={}, type={}",
+            topicId, queueId, operationId, type);
+
+        reentrantLock.lock();
         try {
             currentOperationOffset = operationOffset;
             // check if ck exists
@@ -324,7 +340,7 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
             LOGGER.error("{}: Replay ack operation failed", identity, e);
             return CompletableFuture.failedFuture(e);
         } finally {
-            writeLock.unlock();
+            reentrantLock.unlock();
         }
         return CompletableFuture.completedFuture(null);
     }
@@ -338,7 +354,11 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
         int queue = operation.queueId();
         long operationId = operation.operationId();
         long nextInvisibleTimestamp = operationTimestamp + invisibleDuration;
-        writeLock.lock();
+
+        LOGGER.trace("Replay change invisible duration operation: topicId={}, queueId={}, operationId={}, invisibleDuration={}, operationTimestamp={}, nextInvisibleTimestamp={}",
+            topic, queue, operationId, invisibleDuration, operationTimestamp, nextInvisibleTimestamp);
+
+        reentrantLock.lock();
         try {
             currentOperationOffset = operationOffset;
             // Check if check point exists.
@@ -367,14 +387,14 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
             LOGGER.error("{}: Replay change invisible duration operation failed", identity, e);
             return CompletableFuture.failedFuture(e);
         } finally {
-            writeLock.unlock();
+            reentrantLock.unlock();
         }
         return CompletableFuture.completedFuture(null);
     }
 
     @Override
     public CompletableFuture<OperationSnapshot> takeSnapshot() {
-        readLock.lock();
+        exclusiveLock.lock();
         try {
             List<OperationSnapshot.ConsumerGroupMetadataSnapshot> metadataSnapshots = consumerGroupMetadataMap.values().stream().map(metadata -> {
                 try {
@@ -394,13 +414,13 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
             LOGGER.error("{}: Take snapshot failed", identity, cause);
             return CompletableFuture.failedFuture(e);
         } finally {
-            readLock.unlock();
+            exclusiveLock.unlock();
         }
     }
 
     @Override
     public CompletableFuture<Void> loadSnapshot(OperationSnapshot snapshot) {
-        writeLock.lock();
+        exclusiveLock.lock();
         try {
             this.consumerGroupMetadataMap = snapshot.getConsumerGroupMetadataList().stream().collect(Collectors.toMap(
                 ConsumerGroupMetadata::getConsumerGroupId, metadataSnapshot ->
@@ -452,14 +472,14 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
             LOGGER.error("{}: Load snapshot:{} failed", identity, snapshot, cause);
             return CompletableFuture.failedFuture(e);
         } finally {
-            writeLock.unlock();
+            exclusiveLock.unlock();
         }
         return CompletableFuture.completedFuture(null);
     }
 
     @Override
     public CompletableFuture<Void> clear() {
-        writeLock.lock();
+        exclusiveLock.lock();
         try {
             this.consumerGroupMetadataMap.clear();
             this.ackCommitterMap.clear();
@@ -500,7 +520,7 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
             LOGGER.error("{}: Clear failed", identity, e);
             return CompletableFuture.failedFuture(e);
         } finally {
-            writeLock.unlock();
+            exclusiveLock.unlock();
         }
     }
 
@@ -526,14 +546,14 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
 
     @Override
     public CompletableFuture<Boolean> isLocked(long consumerGroupId, long offset) {
-        readLock.lock();
+        exclusiveLock.lock();
         try {
             byte[] lockKey = buildOrderIndexKey(consumerGroupId, topicId, queueId, offset);
             return CompletableFuture.completedFuture(kvService.get(KV_NAMESPACE_FIFO_INDEX, lockKey) != null);
         } catch (StoreException e) {
             return CompletableFuture.failedFuture(e);
         } finally {
-            readLock.unlock();
+            exclusiveLock.unlock();
         }
     }
 

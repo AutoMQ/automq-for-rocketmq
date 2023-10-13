@@ -531,9 +531,9 @@ public class LogicQueueTest {
         logicQueue.put(message);
 
         // 2. pop message
-        long popStartTimestamp = System.nanoTime();
+        long popStartTimestamp = System.currentTimeMillis();
         PopResult popResult = logicQueue.popNormal(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
-        long popEndTimestamp = System.nanoTime();
+        long popEndTimestamp = System.currentTimeMillis();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertFalse(popResult.messageList().isEmpty());
         assertEquals(1, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
@@ -551,9 +551,9 @@ public class LogicQueueTest {
         // 3. change invisible duration.
         FlatMessageExt messageExt = popResult.messageList().get(0);
         String receiptHandle = SerializeUtil.encodeReceiptHandle(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, handle.operationId());
-        long changeStartTimestamp = System.nanoTime();
+        long changeStartTimestamp = System.currentTimeMillis();
         logicQueue.changeInvisibleDuration(receiptHandle, 1000L).join();
-        long changeEndTimestamp = System.nanoTime();
+        long changeEndTimestamp = System.currentTimeMillis();
         assertEquals(1, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
 
         bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, checkPointKey);
@@ -737,13 +737,10 @@ public class LogicQueueTest {
     }
 
     private List<ReceiptHandle> scanAllTimerTag() {
-        byte[] start = ByteBuffer.allocate(8).putLong(0).array();
-        long endTimestamp = System.nanoTime() - 1;
-        byte[] end = ByteBuffer.allocate(8).putLong(endTimestamp).array();
         List<ReceiptHandle> receiptHandleList = new ArrayList<>();
         try {
             // Iterate timer tag until now to find messages need to reconsume.
-            kvService.iterate(MessageStoreImpl.KV_NAMESPACE_TIMER_TAG, null, start, end, (key, value) -> {
+            kvService.iterate(MessageStoreImpl.KV_NAMESPACE_TIMER_TAG, (key, value) -> {
                 ReceiptHandle receiptHandle = ReceiptHandle.getRootAsReceiptHandle(ByteBuffer.wrap(value));
                 receiptHandleList.add(receiptHandle);
             });

@@ -130,15 +130,14 @@ CREATE TABLE IF NOT EXISTS `range`
 
 CREATE TABLE IF NOT EXISTS s3object
 (
-    id                            BIGINT  NOT NULL PRIMARY KEY AUTO_INCREMENT,
-    object_size                   BIGINT  NOT NULL DEFAULT -1,
-    stream_id                     BIGINT  NOT NULL DEFAULT -1,
-    prepared_timestamp            BIGINT,
-    committed_timestamp           BIGINT,
-    expired_timestamp             BIGINT,
-    marked_for_deletion_timestamp BIGINT,
-    state                         TINYINT NOT NULL DEFAULT 0,
-    INDEX idx_s3_object_state_expired_timestamp (state, expired_timestamp)
+    id                            BIGINT  NOT NULL PRIMARY KEY,
+    object_size                   BIGINT,
+    stream_id                     BIGINT,
+    prepared_timestamp            TIMESTAMP(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    committed_timestamp           TIMESTAMP(3),
+    expired_timestamp             TIMESTAMP(3)  NOT NULL,
+    marked_for_deletion_timestamp TIMESTAMP(3),
+    state                         TINYINT NOT NULL DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS s3streamobject
@@ -167,3 +166,10 @@ CREATE TABLE IF NOT EXISTS s3walobject
     UNIQUE INDEX uk_s3_wal_object_node_sequence_id (node_id, sequence_id),
     INDEX idx_s3_wal_object_object_id (object_id)
 );
+
+CREATE TABLE IF NOT EXISTS sequence (
+    name VARCHAR(255) NOT NULL,
+    next BIGINT NOT NULL DEFAULT 1,
+    UNIQUE INDEX idx_name(name)
+);
+INSERT INTO sequence(name) VALUES ('S3_OBJECT_ID_SEQ');

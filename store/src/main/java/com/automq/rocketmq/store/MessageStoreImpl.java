@@ -22,6 +22,7 @@ import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.store.api.LogicQueue;
 import com.automq.rocketmq.store.api.MessageStore;
+import com.automq.rocketmq.store.api.S3ObjectOperator;
 import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.rocketmq.store.api.TopicQueueManager;
 import com.automq.rocketmq.store.model.generated.ReceiptHandle;
@@ -51,16 +52,16 @@ public class MessageStoreImpl implements MessageStore {
     private final StreamStore streamStore;
     private final StoreMetadataService metadataService;
     private final KVService kvService;
-
-    private ReviveService reviveService;
+    private final ReviveService reviveService;
     private final InflightService inflightService;
     private final SnapshotService snapshotService;
-
     private final TopicQueueManager topicQueueManager;
+    private final S3ObjectOperator s3ObjectOperator;
 
     public MessageStoreImpl(StoreConfig config, StreamStore streamStore,
         StoreMetadataService metadataService, KVService kvService, InflightService inflightService,
-        SnapshotService snapshotService, TopicQueueManager topicQueueManager, ReviveService reviveService) {
+        SnapshotService snapshotService, TopicQueueManager topicQueueManager, ReviveService reviveService,
+        S3ObjectOperator s3ObjectOperator) {
         this.config = config;
         this.streamStore = streamStore;
         this.metadataService = metadataService;
@@ -69,6 +70,20 @@ public class MessageStoreImpl implements MessageStore {
         this.snapshotService = snapshotService;
         this.topicQueueManager = topicQueueManager;
         this.reviveService = reviveService;
+        this.s3ObjectOperator = s3ObjectOperator;
+    }
+
+    @Override
+    public TopicQueueManager getTopicQueueManager() {
+        return topicQueueManager;
+    }
+
+    /**
+     * @return {@link S3ObjectOperator} instance
+     */
+    @Override
+    public S3ObjectOperator getS3ObjectOperator() {
+        return s3ObjectOperator;
     }
 
     @Override

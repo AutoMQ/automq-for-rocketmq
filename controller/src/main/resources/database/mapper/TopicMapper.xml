@@ -63,6 +63,12 @@
         </if>
     </delete>
 
+    <delete id="recycle">
+        DELETE FROM topic
+        WHERE status = #{status}
+        AND #{updateTime} >= update_time
+    </delete>
+
     <select id="get" resultType="Topic">
         SELECT id, name, queue_num, status, create_time, update_time, accept_message_types
         FROM topic

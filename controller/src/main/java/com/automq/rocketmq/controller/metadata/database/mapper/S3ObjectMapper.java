@@ -17,27 +17,30 @@
 
 package com.automq.rocketmq.controller.metadata.database.mapper;
 
+import apache.rocketmq.controller.v1.S3ObjectState;
 import com.automq.rocketmq.controller.metadata.database.dao.S3Object;
+import java.util.Date;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
 public interface S3ObjectMapper {
 
-    int create(S3Object s3Object);
+    String SEQUENCE_NAME = "S3_OBJECT_ID_SEQ";
 
     S3Object getById(long id);
 
-    int expired(S3Object s3Object);
-
     int commit(S3Object s3Object);
 
-    int delete(S3Object s3Object);
+    int markToDelete(@Param("id") long id, @Param("time") Date time);
 
-    int deleteDangerous();
+    int delete(@Param("id") Long id);
 
-    List<S3Object> list(@Param("state") String state,
-        @Param("expiredTimestamp") Long expiredTimestamp);
+    int batchDelete(@Param("ids") List<Long> ids);
+
+    List<S3Object> list(@Param("state") S3ObjectState state, @Param("streamId") Long streamId);
 
     int prepare(S3Object s3Object);
+
+    int rollback(@Param("current")Date current);
 }

@@ -37,6 +37,7 @@ import com.automq.rocketmq.store.queue.StreamLogicQueue;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.service.api.OperationLogService;
 import com.automq.rocketmq.store.util.SerializeUtil;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -84,7 +85,7 @@ class ReviveServiceTest {
         logicQueue = new StreamLogicQueue(new StoreConfig(), TOPIC_ID, QUEUE_ID,
             metadataService, stateMachine, streamStore, operationLogService, inflightService);
         TopicQueueManager manager = Mockito.mock(TopicQueueManager.class);
-        Mockito.when(manager.getOrCreate(TOPIC_ID, QUEUE_ID)).thenReturn(CompletableFuture.completedFuture(logicQueue));
+        Mockito.when(manager.get(TOPIC_ID, QUEUE_ID)).thenReturn(CompletableFuture.completedFuture(Optional.of(logicQueue)));
         reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, KV_NAMESPACE_TIMER_TAG, kvService, metadataService, inflightService, manager);
         logicQueue.open().join();
     }
@@ -100,7 +101,7 @@ class ReviveServiceTest {
         FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
         logicQueue.put(message).join();
         // pop message
-        int invisibleDuration = 1000 * 1000 * 1000;
+        int invisibleDuration = 1000;
         PopResult popResult = logicQueue.popNormal(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
         assertEquals(1, popResult.messageList().size());
         // check ck exist
@@ -113,10 +114,10 @@ class ReviveServiceTest {
         ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.operationId()));
         assertNotNull(ckValue);
         // after 1s revive can clear ck
-        long reviveTimestamp = System.nanoTime() + invisibleDuration;
+        long reviveTimestamp = System.currentTimeMillis() + invisibleDuration;
         await().until(() -> {
             reviveService.tryRevive();
-            return reviveService.reviveTimestamp() >= reviveTimestamp;
+            return reviveService.reviveTimestamp() >= reviveTimestamp && reviveService.inflightReviveCount() == 0;
         });
 
         ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.operationId()));

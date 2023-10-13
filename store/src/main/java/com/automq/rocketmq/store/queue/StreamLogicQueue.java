@@ -20,7 +20,6 @@ package com.automq.rocketmq.store.queue;
 import com.automq.rocketmq.common.config.StoreConfig;
 import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.model.generated.FlatMessage;
-import com.automq.rocketmq.common.util.Pair;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.store.api.LogicQueue;
 import com.automq.rocketmq.store.api.MessageStateMachine;
@@ -48,6 +47,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.commons.lang3.tuple.Pair;
 
 import static com.automq.rocketmq.store.util.SerializeUtil.decodeReceiptHandle;
 
@@ -209,7 +209,7 @@ public class StreamLogicQueue extends LogicQueue {
             fetchBatchSize = batchSize;
         }
         FilterFetchResult fetchResult = new FilterFetchResult(startOffset);
-        long operationTimestamp = System.nanoTime();
+        long operationTimestamp = System.currentTimeMillis();
         // fetch messages
         CompletableFuture<FilterFetchResult> fetchCf = fetchAndFilterMessages(streamId, startOffset, batchSize,
             fetchBatchSize, filter, fetchResult, 0, 0, operationTimestamp);
@@ -283,10 +283,10 @@ public class StreamLogicQueue extends LogicQueue {
         }
         CompletableFuture<Long> retryStreamIdCf = retryStreamId(consumerGroupId);
         CompletableFuture<Long> retryOffsetCf = stateMachine.retryConsumeOffset(consumerGroupId);
-        return retryStreamIdCf.thenCombine(retryOffsetCf, Pair::new)
+        return retryStreamIdCf.thenCombine(retryOffsetCf, Pair::of)
             .thenCompose(pair -> {
-                Long retryStreamId = pair.left();
-                Long startOffset = pair.right();
+                Long retryStreamId = pair.getLeft();
+                Long startOffset = pair.getRight();
                 return pop(consumerGroupId, retryStreamId, startOffset, PopOperation.PopOperationType.POP_RETRY, filter, batchSize, invisibleDuration);
             });
     }
@@ -352,7 +352,7 @@ public class StreamLogicQueue extends LogicQueue {
                     .reduce(0L, Long::sum);
                 boolean notExceedLimit = newFetchCount < config.maxFetchCount() &&
                     newFetchBytes < config.maxFetchBytes() &&
-                    System.nanoTime() - operationTimestamp < config.maxFetchTimeNanos();
+                    System.currentTimeMillis() - operationTimestamp < config.maxFetchTimeMillis();
 
                 if (needToFetch && hasMoreMessages && notExceedLimit) {
                     return fetchAndFilterMessages(streamId, offset + fetchResult.size(), batchSize, fetchBatchSize, filter,
@@ -398,7 +398,7 @@ public class StreamLogicQueue extends LogicQueue {
         }
         ReceiptHandle handle = decodeReceiptHandle(receiptHandle);
         AckOperation operation = new AckOperation(handle.topicId(), handle.queueId(), operationStreamId,
-            snapshotStreamId, stateMachine, handle.consumerGroupId(), handle.operationId(), System.nanoTime(),
+            snapshotStreamId, stateMachine, handle.consumerGroupId(), handle.operationId(), System.currentTimeMillis(),
             AckOperation.AckOperationType.ACK_NORMAL);
         return operationLogService.logAckOperation(operation).thenApply(nil -> {
             inflightService.decreaseInflightCount(handle.consumerGroupId(), handle.topicId(), handle.queueId(), 1);
@@ -413,7 +413,7 @@ public class StreamLogicQueue extends LogicQueue {
         }
         ReceiptHandle handle = decodeReceiptHandle(receiptHandle);
         AckOperation operation = new AckOperation(handle.topicId(), handle.queueId(), operationStreamId,
-            snapshotStreamId, stateMachine, handle.consumerGroupId(), handle.operationId(), System.nanoTime(),
+            snapshotStreamId, stateMachine, handle.consumerGroupId(), handle.operationId(), System.currentTimeMillis(),
             AckOperation.AckOperationType.ACK_TIMEOUT);
         return operationLogService.logAckOperation(operation).thenApply(nil -> {
             inflightService.decreaseInflightCount(handle.consumerGroupId(), handle.topicId(), handle.queueId(), 1);
@@ -430,7 +430,7 @@ public class StreamLogicQueue extends LogicQueue {
         ReceiptHandle handle = decodeReceiptHandle(receiptHandle);
         ChangeInvisibleDurationOperation operation = new ChangeInvisibleDurationOperation(handle.topicId(),
             handle.queueId(), operationStreamId, snapshotStreamId, stateMachine, handle.consumerGroupId(),
-            handle.operationId(), System.nanoTime(), invisibleDuration);
+            handle.operationId(), invisibleDuration, System.currentTimeMillis());
         return operationLogService.logChangeInvisibleDurationOperation(operation).thenApply(nil ->
                 new ChangeInvisibleDurationResult(ChangeInvisibleDurationResult.Status.SUCCESS))
             .exceptionally(throwable -> new ChangeInvisibleDurationResult(ChangeInvisibleDurationResult.Status.ERROR));
@@ -466,7 +466,7 @@ public class StreamLogicQueue extends LogicQueue {
             fetchBatchSize = batchSize;
         }
         FilterFetchResult fetchResult = new FilterFetchResult(startOffset);
-        long operationTimestamp = System.nanoTime();
+        long operationTimestamp = System.currentTimeMillis();
         CompletableFuture<FilterFetchResult> fetchCf = fetchAndFilterMessages(streamId, startOffset, batchSize,
             fetchBatchSize, filter, fetchResult, 0, 0, operationTimestamp);
         return fetchCf.thenApply(filterFetchResult -> {

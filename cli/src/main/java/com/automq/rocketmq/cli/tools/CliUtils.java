@@ -15,22 +15,18 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.common.util;
+package com.automq.rocketmq.cli.tools;
 
-public class Pair<L/*left element*/, R/*right element*/> {
-    private final L left;
-    private final R right;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 
-    public Pair(L left, R right) {
-        this.left = left;
-        this.right = right;
-    }
-
-    public L left() {
-        return left;
-    }
-
-    public R right() {
-        return right;
+public class CliUtils {
+    public static Throwable getRealException(Throwable throwable) {
+        if (throwable instanceof CompletionException || throwable instanceof ExecutionException) {
+            if (throwable.getCause() != null) {
+                throwable = throwable.getCause();
+            }
+        }
+        return throwable;
     }
 }

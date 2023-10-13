@@ -15,26 +15,29 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.metadata.database.tasks;
+package com.automq.rocketmq.controller.metadata.database.mapper;
 
-import com.automq.rocketmq.controller.metadata.MetadataStore;
+import org.apache.ibatis.annotations.Param;
 
-public class KeepAliveTask extends ControllerTask {
-    public KeepAliveTask(MetadataStore metadataStore) {
-        super(metadataStore);
-    }
+public interface SequenceMapper {
 
-    @Override
-    public void run() {
-        LOGGER.debug("Keep-alive task starts");
-        try {
-            int nodeId = metadataStore.config().nodeId();
-            if (!metadataStore.isLeader()) {
-                metadataStore.keepAlive(nodeId, metadataStore.config().epoch(), false);
-            }
-        } catch (Throwable e) {
-            LOGGER.error("Unexpected exception raised while keeping node alive", e);
-        }
-        LOGGER.debug("Keep-alive completed");
-    }
+    /**
+     * Create a new sequence
+     *
+     * @param name The sequence name
+     * @param next initial next value
+     * @return rows affected
+     */
+    int create(@Param("name") String name, @Param("next") long next);
+
+    /**
+     * Get the next value of the sequence with write lock held.
+     * See <a href="https://dev.mysql.com/doc/refman/8.0/en/innodb-locking-reads.html">Locking Reads</a>
+     *
+     * @param name Sequence name
+     * @return Next value of the given sequence name
+     */
+    long next(@Param("name") String name);
+
+    int update(@Param("name") String name, @Param("next") long next);
 }

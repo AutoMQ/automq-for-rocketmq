@@ -26,24 +26,32 @@ import com.automq.rocketmq.store.exception.StoreErrorCode;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.generated.CheckPoint;
 import com.automq.rocketmq.store.model.generated.ReceiptHandle;
+import com.automq.rocketmq.store.model.message.AckResult;
 import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PullResult;
 import com.automq.rocketmq.store.model.operation.PopOperation;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.util.SerializeUtil;
 import com.automq.stream.utils.FutureUtil;
+import com.automq.stream.utils.ThreadUtils;
 import java.nio.ByteBuffer;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.tuple.Triple;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class ReviveService implements Runnable, Lifecycle {
     private static final Logger LOGGER = LoggerFactory.getLogger(ReviveService.class);
-    private Thread thread;
     private final AtomicBoolean started = new AtomicBoolean(false);
-
-    protected volatile boolean stopped = false;
-
     private final String checkPointNamespace;
     private final String timerTagNamespace;
     private final KVService kvService;
@@ -53,6 +61,9 @@ public class ReviveService implements Runnable, Lifecycle {
     // Indicate the timestamp that the revive service has reached.
     private long reviveTimestamp = 0;
     private final String identity = "[ReviveService]";
+    private final ConcurrentMap<Long/*operationId*/, CompletableFuture<Void>> inflightRevive;
+    private final ScheduledExecutorService mainExecutor;
+    private final ExecutorService backgroundExecutor;
 
     public ReviveService(String checkPointNamespace, String timerTagNamespace, KVService kvService,
         StoreMetadataService metadataService, InflightService inflightService,
@@ -63,10 +74,11 @@ public class ReviveService implements Runnable, Lifecycle {
         this.metadataService = metadataService;
         this.inflightService = inflightService;
         this.topicQueueManager = topicQueueManager;
-    }
-
-    public String getServiceName() {
-        return "ReviveService";
+        this.inflightRevive = new ConcurrentHashMap<>();
+        this.mainExecutor = Executors.newSingleThreadScheduledExecutor(
+            ThreadUtils.createThreadFactory("revive-service-main", false));
+        this.backgroundExecutor = Executors.newSingleThreadExecutor(
+            ThreadUtils.createThreadFactory("revive-service-background", false));
     }
 
     @Override
@@ -74,47 +86,45 @@ public class ReviveService implements Runnable, Lifecycle {
         if (!started.compareAndSet(false, true)) {
             return;
         }
-        stopped = false;
-        this.thread = new Thread(this, getServiceName());
-        this.thread.setDaemon(true);
-        this.thread.start();
+        this.mainExecutor.scheduleWithFixedDelay(this, 0, 1000, TimeUnit.MILLISECONDS);
     }
 
     @Override
     public void shutdown() {
-        this.stopped = true;
-        this.thread.interrupt();
+        if (!started.compareAndSet(true, false)) {
+            return;
+        }
+        this.mainExecutor.shutdown();
     }
 
     @Override
     public void run() {
-        while (!stopped) {
-            try {
-                tryRevive();
-                Thread.sleep(1000);
-            } catch (InterruptedException ignored) {
-            } catch (Exception e) {
-                Throwable cause = FutureUtil.cause(e);
-                LOGGER.error("{}: Failed to revive", identity, cause);
-            }
+        try {
+            tryRevive();
+        } catch (Exception e) {
+            Throwable cause = FutureUtil.cause(e);
+            LOGGER.error("{}: Failed to revive", identity, cause);
         }
     }
 
     protected void tryRevive() throws StoreException {
         byte[] start = ByteBuffer.allocate(8).putLong(0).array();
-        long endTimestamp = System.nanoTime() - 1;
+        long endTimestamp = System.currentTimeMillis() - 1;
         byte[] end = ByteBuffer.allocate(8).putLong(endTimestamp).array();
 
         // Iterate timer tag until now to find messages need to reconsume.
         kvService.iterate(timerTagNamespace, null, start, end, (key, value) -> {
             // Fetch the origin message from stream store.
-            // TODO: async revive retry message
             ReceiptHandle receiptHandle = ReceiptHandle.getRootAsReceiptHandle(ByteBuffer.wrap(value));
             long consumerGroupId = receiptHandle.consumerGroupId();
             long topicId = receiptHandle.topicId();
             int queueId = receiptHandle.queueId();
             long operationId = receiptHandle.operationId();
             byte[] ckKey = SerializeUtil.buildCheckPointKey(topicId, queueId, operationId);
+            if (inflightRevive.containsKey(operationId)) {
+                LOGGER.trace("{}: Inflight revive operation: {}", identity, operationId);
+                return;
+            }
             try {
                 byte[] ckValue = kvService.get(checkPointNamespace, ckKey);
                 if (ckValue == null) {
@@ -122,36 +132,62 @@ public class ReviveService implements Runnable, Lifecycle {
                 }
                 CheckPoint checkPoint = SerializeUtil.decodeCheckPoint(ByteBuffer.wrap(ckValue));
                 PopOperation.PopOperationType operationType = PopOperation.PopOperationType.valueOf(checkPoint.popOperationType());
-                LogicQueue logicQueue = topicQueueManager.getOrCreate(topicId, queueId).join();
-
-                // TODO: async
-                PullResult pullResult;
-                if (operationType == PopOperation.PopOperationType.POP_RETRY) {
-                    pullResult = logicQueue.pullRetry(consumerGroupId, Filter.DEFAULT_FILTER, checkPoint.messageOffset(), 1).join();
-                } else {
-                    pullResult = logicQueue.pullNormal(consumerGroupId, Filter.DEFAULT_FILTER, checkPoint.messageOffset(), 1).join();
-                }
-                assert pullResult.messageList().size() <= 1;
-                // Message has already been deleted.
-                if (pullResult.messageList().isEmpty()) {
-                    throw new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "Not found need retry message");
-                }
-                // Build the retry message and append it to retry stream or dead letter stream.
-                FlatMessageExt messageExt = pullResult.messageList().get(0);
-                messageExt.setOriginalQueueOffset(messageExt.originalOffset());
-                messageExt.setDeliveryAttempts(messageExt.deliveryAttempts() + 1);
-                if (operationType != PopOperation.PopOperationType.POP_ORDER) {
-                    if (messageExt.deliveryAttempts() <= metadataService.maxDeliveryAttemptsOf(consumerGroupId).join()) {
-                        logicQueue.putRetry(consumerGroupId, messageExt.message()).join();
-                    } else {
-                        // TODO: dead letter
+                CompletableFuture<Pair<LogicQueue, PullResult>> pullMsgCf = topicQueueManager.get(topicId, queueId).thenComposeAsync(optionalLogicQueue -> {
+                    if (!optionalLogicQueue.isPresent()) {
+                        throw new CompletionException(new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "Queue not found"));
                     }
-                }
+                    LogicQueue queue = optionalLogicQueue.get();
+                    CompletableFuture<PullResult> pullCf;
+                    if (operationType == PopOperation.PopOperationType.POP_RETRY) {
+                        pullCf = queue.pullRetry(consumerGroupId, Filter.DEFAULT_FILTER, checkPoint.messageOffset(), 1);
+                    } else {
+                        pullCf = queue.pullNormal(consumerGroupId, Filter.DEFAULT_FILTER, checkPoint.messageOffset(), 1);
+                    }
+                    return pullCf.thenApply(result -> Pair.of(queue, result));
+                }, backgroundExecutor);
+                CompletableFuture<Triple<LogicQueue, FlatMessageExt, Integer>> cf = pullMsgCf.thenCombineAsync(metadataService.maxDeliveryAttemptsOf(consumerGroupId), (pair, maxDeliveryAttempts) -> {
+                    LogicQueue logicQueue = pair.getLeft();
+                    PullResult pullResult = pair.getRight();
+                    if (pullResult.messageList().size() != 1) {
+                        throw new CompletionException(new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "Revive message not found"));
+                    }
+                    // Build the retry message and append it to retry stream or dead letter stream.
+                    FlatMessageExt messageExt = pullResult.messageList().get(0);
+                    messageExt.setOriginalQueueOffset(messageExt.originalOffset());
+                    messageExt.setDeliveryAttempts(messageExt.deliveryAttempts() + 1);
+                    return Triple.of(logicQueue, messageExt, maxDeliveryAttempts);
+                }, backgroundExecutor);
+                CompletableFuture<LogicQueue> resendCf = cf.thenCompose(triple -> {
+                    LogicQueue logicQueue = triple.getLeft();
+                    FlatMessageExt messageExt = triple.getMiddle();
+                    int maxDeliveryAttempts = triple.getRight();
 
-                logicQueue.ackTimeout(SerializeUtil.encodeReceiptHandle(receiptHandle)).join();
-            } catch (Exception e) {
-                Throwable cause = FutureUtil.cause(e);
-                LOGGER.error("{}: Failed to revive message", identity, cause);
+                    if (operationType != PopOperation.PopOperationType.POP_ORDER) {
+                        if (messageExt.deliveryAttempts() <= maxDeliveryAttempts) {
+                            return logicQueue.putRetry(consumerGroupId, messageExt.message())
+                                .thenApply(nil -> logicQueue);
+                        } else {
+                            // TODO: dead letter
+                            return CompletableFuture.completedFuture(logicQueue);
+                        }
+                    }
+                    return CompletableFuture.completedFuture(logicQueue);
+                });
+                CompletableFuture<AckResult> ackCf = resendCf.thenComposeAsync(queue -> {
+                    // ack timeout
+                    return queue.ackTimeout(SerializeUtil.encodeReceiptHandle(receiptHandle));
+                }, backgroundExecutor);
+
+                inflightRevive.putIfAbsent(operationId, ackCf.thenAccept(nil -> {
+                    inflightRevive.remove(operationId);
+                }).exceptionally(e -> {
+                    inflightRevive.remove(operationId);
+                    Throwable cause = FutureUtil.cause(e);
+                    LOGGER.error("{}: Failed to revive ck with operationId: {}", identity, operationId, cause);
+                    return null;
+                }));
+            } catch (StoreException e) {
+                LOGGER.error("{}: Failed to revive message", identity, e);
             }
         });
         this.reviveTimestamp = endTimestamp;
@@ -159,5 +195,9 @@ public class ReviveService implements Runnable, Lifecycle {
 
     public long reviveTimestamp() {
         return reviveTimestamp;
+    }
+
+    public int inflightReviveCount() {
+        return inflightRevive.size();
     }
 }

@@ -23,17 +23,26 @@ import picocli.CommandLine;
     mixinStandardHelpOptions = true,
     version = "S3RocketMQ 1.0",
     description = "Command line tools for S3RocketMQ",
+    showDefaultValues = true,
     subcommands = {
         CreateTopic.class,
-        CreateGroup.class
+        CreateGroup.class,
+        ProduceMessage.class,
+        ConsumeMessage.class
     }
 )
 public class MQAdmin implements Runnable {
     @CommandLine.Spec
     CommandLine.Model.CommandSpec spec;
 
-    @CommandLine.Option(names = {"-e", "--endpoint"}, description = "S3RocketMQ controller endpoint", required = true)
+    @CommandLine.Option(names = {"-e", "--endpoint"}, description = "The access endpoint of the server", required = true)
     String endpoint;
+
+    @CommandLine.Option(names = {"-a", "--access-key"}, description = "The authentication access key")
+    String accessKey = "";
+
+    @CommandLine.Option(names = {"-s", "--secret-key"}, description = "The authentication secret key")
+    String secretKey = "";
 
     public void run() {
         throw new CommandLine.ParameterException(spec.commandLine(), "Missing required subcommand");

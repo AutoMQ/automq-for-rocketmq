@@ -15,19 +15,12 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.metadata.database.tasks;
+package com.automq.rocketmq.broker;
 
-import com.automq.rocketmq.controller.metadata.MetadataStore;
-import java.util.Date;
-
-public abstract class ScanTask extends ControllerTask {
-
-    protected Date lastScanTime;
-
-    public ScanTask(MetadataStore metadataStore) {
-        super(metadataStore);
-    }
-
-
-
+public class MetricsConstant {
+    public static final String LABEL_AGGREGATION = "aggregation";
+    public static final String LABEL_NODE_NAME = "node_name";
+    public static final String LABEL_INSTANCE_ID = "instance_id";
+    public static final String AGGREGATION_DELTA = "delta";
+    public static final String AGGREGATION_CUMULATIVE = "cumulative";
 }

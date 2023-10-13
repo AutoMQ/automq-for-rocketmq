@@ -17,10 +17,21 @@
 
 package com.automq.rocketmq.store.api;
 
-import com.automq.rocketmq.common.StoreHandle;
 import com.automq.rocketmq.common.util.Lifecycle;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-public interface TopicQueueManager extends Lifecycle, StoreHandle {
+public interface TopicQueueManager extends Lifecycle {
+
     CompletableFuture<LogicQueue> getOrCreate(long topicId, int queueId);
+
+    /**
+     * Get the logic queue of the specified topic and queue id.
+     * @param topicId topic id
+     * @param queueId queue id
+     * @return {@link CompletableFuture} of {@link Optional<LogicQueue>} which contains the logic queue if exists
+     */
+    CompletableFuture<Optional<LogicQueue>> get(long topicId, int queueId);
+
+    CompletableFuture<Void> close(long topicId, int queueId);
 }

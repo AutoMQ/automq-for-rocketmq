@@ -20,6 +20,7 @@ package com.automq.rocketmq.controller.metadata.database.dao;
 
 import apache.rocketmq.controller.v1.S3ObjectState;
 
+import java.util.Date;
 import java.util.Objects;
 
 public class S3Object {
@@ -30,15 +31,18 @@ public class S3Object {
 
     Long streamId;
     
-    Long preparedTimestamp;
+    Date preparedTimestamp = new Date();
 
-    Long committedTimestamp;
+    Date committedTimestamp;
 
-    Long expiredTimestamp;
+    Date expiredTimestamp;
 
-    Long markedForDeletionTimestamp;
+    Date markedForDeletionTimestamp;
 
-    S3ObjectState state;
+    S3ObjectState state = S3ObjectState.BOS_PREPARED;
+
+    public S3Object() {
+    }
 
     public Long getId() {
         return id;
@@ -64,35 +68,35 @@ public class S3Object {
         this.streamId = streamId;
     }
 
-    public Long getPreparedTimestamp() {
+    public Date getPreparedTimestamp() {
         return preparedTimestamp;
     }
 
-    public void setPreparedTimestamp(Long preparedTimestamp) {
+    public void setPreparedTimestamp(Date preparedTimestamp) {
         this.preparedTimestamp = preparedTimestamp;
     }
 
-    public Long getCommittedTimestamp() {
+    public Date getCommittedTimestamp() {
         return committedTimestamp;
     }
 
-    public void setCommittedTimestamp(Long committedTimestamp) {
+    public void setCommittedTimestamp(Date committedTimestamp) {
         this.committedTimestamp = committedTimestamp;
     }
 
-    public Long getExpiredTimestamp() {
+    public Date getExpiredTimestamp() {
         return expiredTimestamp;
     }
 
-    public void setExpiredTimestamp(Long expiredTimestamp) {
+    public void setExpiredTimestamp(Date expiredTimestamp) {
         this.expiredTimestamp = expiredTimestamp;
     }
 
-    public Long getMarkedForDeletionTimestamp() {
+    public Date getMarkedForDeletionTimestamp() {
         return markedForDeletionTimestamp;
     }
 
-    public void setMarkedForDeletionTimestamp(Long markedForDeletionTimestamp) {
+    public void setMarkedForDeletionTimestamp(Date markedForDeletionTimestamp) {
         this.markedForDeletionTimestamp = markedForDeletionTimestamp;
     }
 
@@ -106,14 +110,16 @@ public class S3Object {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o)
+            return true;
+        if (o == null || getClass() != o.getClass())
+            return false;
         S3Object s3Object = (S3Object) o;
-        return Objects.equals(id, s3Object.id) && Objects.equals(objectSize, s3Object.objectSize) && Objects.equals(streamId, s3Object.streamId) && Objects.equals(preparedTimestamp, s3Object.preparedTimestamp) && Objects.equals(committedTimestamp, s3Object.committedTimestamp) && Objects.equals(expiredTimestamp, s3Object.expiredTimestamp) && Objects.equals(markedForDeletionTimestamp, s3Object.markedForDeletionTimestamp) && state == s3Object.state;
+        return Objects.equals(id, s3Object.id) && Objects.equals(objectSize, s3Object.objectSize) && Objects.equals(streamId, s3Object.streamId) && state == s3Object.state;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, objectSize, streamId, preparedTimestamp, committedTimestamp, expiredTimestamp, markedForDeletionTimestamp, state);
+        return Objects.hash(id, objectSize, streamId, state);
     }
 }

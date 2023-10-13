@@ -30,4 +30,9 @@ public record SQLFilter(String expression) implements Filter {
     public List<FlatMessageExt> doFilter(List<FlatMessageExt> messageList) {
         return messageList;
     }
+
+    @Override
+    public boolean doFilter(String tag) {
+        return true;
+    }
 }

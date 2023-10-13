@@ -58,6 +58,7 @@ import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletionException;
@@ -75,7 +76,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 class DefaultMetadataStoreTest extends DatabaseTestBase {
-
     ControllerClient client;
 
     public DefaultMetadataStoreTest() {
@@ -85,10 +85,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     @Test
     void testRegisterNode() throws IOException, ExecutionException, InterruptedException {
         int nodeId;
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.nodeId()).thenReturn(1);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().atMost(10, TimeUnit.SECONDS)
@@ -112,10 +108,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
     @Test
     void testRegisterBroker_badArguments() throws IOException {
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.nodeId()).thenReturn(1);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().atMost(10, TimeUnit.SECONDS)
@@ -146,10 +138,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
     @Test
     void testIsLeader() throws IOException {
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.nodeId()).thenReturn(1);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
         try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await()
@@ -173,12 +161,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             nodeId = node.getId();
             session.commit();
         }
-
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.nodeId()).thenReturn(nodeId);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
@@ -201,10 +184,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
     @Test
     void testLeaderAddress_NoLeader() throws IOException {
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.nodeId()).thenReturn(1);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
         try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertThrows(ControllerException.class, metadataStore::leaderAddress);
         }
@@ -212,10 +191,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
     @Test
     void testLeaderAddress_NoLeaderNode() throws IOException {
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.nodeId()).thenReturn(1);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
         try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await()
@@ -241,12 +216,8 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             nodeId = node.getId();
             session.commit();
         }
-
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.nodeId()).thenReturn(nodeId);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
+
         long topicId;
         int queueNum = 4;
         String topicName = "t1";
@@ -300,12 +271,8 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             nodeId = node.getId();
             session.commit();
         }
-
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.nodeId()).thenReturn(nodeId);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
+
         long topicId;
         int queueNum = 4;
         String topicName = "t1";
@@ -372,7 +339,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             session.commit();
         }
 
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
         try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             List<QueueAssignment> assignmentList = metadataStore.listAssignments(null, null, null, null).get();
             Assertions.assertEquals(1, assignmentList.size());
@@ -409,12 +375,8 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             topicId = topic.getId();
             session.commit();
         }
-
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.nodeId()).thenReturn(nodeId);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
+
         try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().atMost(10, TimeUnit.SECONDS).pollInterval(100, TimeUnit.MILLISECONDS)
@@ -433,10 +395,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
     @Test
     public void testDeleteTopic_NotFound() throws IOException {
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.nodeId()).thenReturn(1);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
         try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().atMost(10, TimeUnit.SECONDS).pollInterval(100, TimeUnit.MILLISECONDS)
@@ -480,10 +438,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             session.commit();
         }
 
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.nodeId()).thenReturn(1);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
         try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().atMost(10, TimeUnit.SECONDS).pollInterval(100, TimeUnit.MILLISECONDS)
@@ -508,10 +462,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             session.commit();
         }
 
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.nodeId()).thenReturn(1);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
         try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().atMost(10, TimeUnit.SECONDS).pollInterval(100, TimeUnit.MILLISECONDS)
@@ -550,11 +500,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             session.commit();
         }
 
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-
-        Mockito.when(config.nodeId()).thenReturn(1);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             List<S3StreamObject> s3StreamObjects = metadataStore.listStreamObjects(streamId, startOffset, endOffset, limit).get();
             S3StreamObject s3StreamObject = s3StreamObjects.get(0);
@@ -628,12 +573,10 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
                 "startOffset_": 0,
                 "endOffset_": 10
               }}""";
-        Map<Long, SubStream> subStreams = gson.fromJson(new String(expectSubStream.getBytes(StandardCharsets.UTF_8)), new TypeToken<Map<Long, SubStream>>() {
-        }.getType());
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.nodeId()).thenReturn(1);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
+
+        Map<Long, SubStream> subStreams = gson.fromJson(new String(expectSubStream.getBytes(StandardCharsets.UTF_8)),
+            new TypeToken<Map<Long, SubStream>>() {
+            }.getType());
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertNull(metadataStore.getLease());
@@ -700,10 +643,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         }
         Map<Long, SubStream> subStreams = gson.fromJson(new String(subStreamsJson.getBytes(StandardCharsets.UTF_8)), new TypeToken<Map<Long, SubStream>>() {
         }.getType());
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.nodeId()).thenReturn(1);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertNull(metadataStore.getLease());
@@ -894,10 +833,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
               }}""";
         Map<Long, SubStream> subStreams = gson.fromJson(new String(expectSubStream.getBytes(StandardCharsets.UTF_8)), new TypeToken<Map<Long, SubStream>>() {
         }.getType());
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.nodeId()).thenReturn(1);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertNull(metadataStore.getLease());
@@ -992,10 +927,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
               }}""";
         Map<Long, SubStream> subStreams = gson.fromJson(new String(expectSubStream.getBytes(StandardCharsets.UTF_8)), new TypeToken<Map<Long, SubStream>>() {
         }.getType());
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.nodeId()).thenReturn(1);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertNull(metadataStore.getLease());
@@ -1049,10 +980,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             session.commit();
         }
         long targetStreamEpoch = streamEpoch + 1;
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.nodeId()).thenReturn(1);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertNull(metadataStore.getLease());
@@ -1127,10 +1054,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             session.commit();
         }
         long targetStreamEpoch = streamEpoch + 1;
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.nodeId()).thenReturn(1);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertNull(metadataStore.getLease());
@@ -1204,10 +1127,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         }
 
         long targetStreamEpoch = streamEpoch + 1;
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.nodeId()).thenReturn(1);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertNull(metadataStore.getLease());
@@ -1300,10 +1219,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         }
 
         long targetStreamEpoch = streamEpoch + 1;
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.nodeId()).thenReturn(1);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertNull(metadataStore.getLease());
@@ -1395,10 +1310,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         }
 
         long targetStreamEpoch = streamEpoch + 1;
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.nodeId()).thenReturn(1);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertNull(metadataStore.getLease());
@@ -1493,11 +1404,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             session.commit();
         }
 
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.nodeId()).thenReturn(1);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
-
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             long streamId = metadataStore.getStream(1, 2, null, StreamRole.STREAM_ROLE_DATA)
                 .get().getStreamId();
@@ -1526,11 +1432,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             session.commit();
         }
 
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.nodeId()).thenReturn(1);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
         try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             ConsumerGroup got = metadataStore.describeConsumerGroup(groupId, null).get();
             Assertions.assertEquals(5, got.getMaxDeliveryAttempt());
@@ -1559,11 +1460,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             session.commit();
         }
 
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.nodeId()).thenReturn(4);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(null, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().atMost(3, TimeUnit.SECONDS).pollInterval(100, TimeUnit.MILLISECONDS)
@@ -1604,11 +1500,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             session.commit();
         }
 
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.nodeId()).thenReturn(nodeId);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
         try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().atMost(10, TimeUnit.SECONDS).pollInterval(100, TimeUnit.MILLISECONDS)
@@ -1666,12 +1557,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             session.commit();
         }
 
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.nodeId()).thenReturn(nodeId);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
-
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertNull(metadataStore.getLease());
             Lease lease = new Lease();
@@ -1727,12 +1612,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             session.commit();
         }
 
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.nodeId()).thenReturn(nodeId);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
-
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertNull(metadataStore.getLease());
             Lease lease = new Lease();
@@ -1756,12 +1635,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         long objectId;
         int nodeId = 1;
 
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.nodeId()).thenReturn(nodeId);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
-        long time = System.currentTimeMillis();
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertNull(metadataStore.getLease());
             Lease lease = new Lease();
@@ -1778,12 +1651,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             for (long index = objectId; index < objectId + 3; index++) {
                 S3Object object = s3ObjectMapper.getById(index);
                 Assertions.assertEquals(S3ObjectState.BOS_PREPARED, object.getState());
-                if (object.getPreparedTimestamp() - time > 5 * 60) {
-                    Assertions.fail();
-                }
-                if (object.getExpiredTimestamp() - time - 5 * 60 * 1000 > 5 * 60) {
-                    Assertions.fail();
-                }
             }
         }
     }
@@ -1793,12 +1660,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     public void testCommitStreamObject() throws IOException, ControllerException {
         long objectId, streamId = 1;
         int nodeId = 1;
-
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.nodeId()).thenReturn(nodeId);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertNull(metadataStore.getLease());
@@ -1851,10 +1712,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
             for (long index = objectId; index < objectId + 2; index++) {
                 S3Object object = s3ObjectMapper.getById(index);
-                Assertions.assertEquals(S3ObjectState.BOS_DELETED, object.getState());
-                if (object.getMarkedForDeletionTimestamp() - time > 5 * 60) {
-                    Assertions.fail();
-                }
+                Assertions.assertEquals(S3ObjectState.BOS_WILL_DELETE, object.getState());
             }
 
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
@@ -1877,12 +1735,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         long streamId = 1;
         int nodeId = 1;
 
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.nodeId()).thenReturn(nodeId);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
-
         S3StreamObject s3StreamObject = S3StreamObject.newBuilder()
             .setObjectId(1)
             .setStreamId(streamId)
@@ -1891,7 +1743,8 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
         try (SqlSession session = this.getSessionFactory().openSession()) {
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
-            com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
+            com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object =
+                new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
             object.setObjectId(2L);
             object.setStreamId(streamId);
             object.setBaseDataTimestamp(1L);
@@ -1920,12 +1773,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         long streamId = 1;
         int nodeId = 1;
 
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.nodeId()).thenReturn(nodeId);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
-
         S3StreamObject s3StreamObject = S3StreamObject.newBuilder()
             .setObjectId(-1)
             .setStreamId(streamId)
@@ -1934,7 +1781,8 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
         try (SqlSession session = this.getSessionFactory().openSession()) {
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
-            com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
+            com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object =
+                new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
             object.setObjectId(2L);
             object.setStreamId(streamId);
             object.setBaseDataTimestamp(1L);
@@ -1962,12 +1810,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     public void testCommitWALObject() throws IOException, ExecutionException, InterruptedException {
         long objectId, streamId = 1;
         int nodeId = 1;
-
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.nodeId()).thenReturn(nodeId);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertNull(metadataStore.getLease());
@@ -2054,17 +1896,11 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             for (long index = objectId; index < objectId + 2; index++) {
                 S3Object object = s3ObjectMapper.getById(index);
                 Assertions.assertEquals(S3ObjectState.BOS_COMMITTED, object.getState());
-                if (object.getCommittedTimestamp() - time > 5 * 60) {
-                    Assertions.fail();
-                }
             }
 
             for (long index = objectId + 2; index < objectId + 4; index++) {
                 S3Object object = s3ObjectMapper.getById(index);
-                Assertions.assertEquals(S3ObjectState.BOS_DELETED, object.getState());
-                if (object.getMarkedForDeletionTimestamp() - time > 5 * 60) {
-                    Assertions.fail();
-                }
+                Assertions.assertEquals(S3ObjectState.BOS_WILL_DELETE, object.getState());
             }
 
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
@@ -2096,12 +1932,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         long streamId = 1;
         int nodeId = 1;
 
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.nodeId()).thenReturn(nodeId);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
-
         S3WALObject walObject = S3WALObject.newBuilder()
             .setObjectId(3)
             .setSequenceId(-1)
@@ -2110,7 +1940,8 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
         try (SqlSession session = this.getSessionFactory().openSession()) {
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
-            com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
+            com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object =
+                new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
             object.setObjectId(2L);
             object.setStreamId(streamId);
             object.setBaseDataTimestamp(1L);
@@ -2142,12 +1973,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         int nodeId = 1;
         long objectId;
 
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.nodeId()).thenReturn(nodeId);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(config.nodeAliveIntervalInSecs()).thenReturn(10);
-
         S3WALObject walObject = S3WALObject.newBuilder()
             .setObjectId(-1)
             .setSequenceId(-1)
@@ -2177,12 +2002,14 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
             S3ObjectMapper objectMapper = session.getMapper(S3ObjectMapper.class);
             S3Object s3Object = new S3Object();
+            s3Object.setId(nextS3ObjectId());
             s3Object.setState(S3ObjectState.BOS_PREPARED);
             s3Object.setStreamId(streamId);
             s3Object.setObjectSize(2139L);
-            s3Object.setPreparedTimestamp(System.currentTimeMillis());
-            s3Object.setExpiredTimestamp(System.currentTimeMillis() + TimeUnit.HOURS.toMillis(1));
-            objectMapper.create(s3Object);
+            Calendar calendar = Calendar.getInstance();
+            calendar.add(Calendar.HOUR, 1);
+            s3Object.setExpiredTimestamp(calendar.getTime());
+            objectMapper.prepare(s3Object);
             objectId = s3Object.getId();
 
             session.commit();
@@ -2216,7 +2043,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
             S3ObjectMapper objectMapper = session.getMapper(S3ObjectMapper.class);
             S3Object s3Object = objectMapper.getById(objectId);
-            Assertions.assertTrue(s3Object.getCommittedTimestamp() > 0);
+            Assertions.assertNotNull(s3Object.getCommittedTimestamp());
 
             RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
             Range range = rangeMapper.get(1, streamId, null);
@@ -2229,10 +2056,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     public void testConsumerOffset() throws IOException, ExecutionException, InterruptedException {
         long groupId = 2, topicId = 1;
         int queueId = 4;
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.nodeId()).thenReturn(1);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
         try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().atMost(10, TimeUnit.SECONDS).pollInterval(100, TimeUnit.MILLISECONDS)
