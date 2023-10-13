@@ -1344,6 +1344,78 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
         }
 
     }
+
+    @Test
+    public void test3StreamObjects_2PC_duplicate() throws IOException, ExecutionException, InterruptedException {
+        ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
+        long objectId, streamId = 1;
+
+        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), config)) {
+            metadataStore.start();
+            Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
+                .atMost(10, TimeUnit.SECONDS)
+                .until(metadataStore::isLeader);
+
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
+                 ControllerClient client = new GrpcControllerClient()
+            ) {
+                testServer.start();
+                int port = testServer.getPort();
+                PrepareS3ObjectsRequest request = PrepareS3ObjectsRequest.newBuilder()
+                    .setPreparedCount(3)
+                    .setTimeToLiveMinutes(5)
+                    .build();
+
+                PrepareS3ObjectsReply reply = client.prepareS3Objects(String.format("localhost:%d", port), request).get();
+                objectId = reply.getFirstObjectId();
+            }
+
+
+            apache.rocketmq.controller.v1.S3StreamObject s3StreamObject = apache.rocketmq.controller.v1.S3StreamObject.newBuilder()
+                .setObjectId(objectId + 2)
+                .setStreamId(streamId)
+                .setObjectSize(111L)
+                .build();
+
+
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
+                 ControllerClient client = new GrpcControllerClient()
+            ) {
+                testServer.start();
+                int port = testServer.getPort();
+
+                CommitStreamObjectRequest request1 = CommitStreamObjectRequest.newBuilder()
+                    .setS3StreamObject(s3StreamObject)
+                    .addAllCompactedObjectIds(Collections.emptyList())
+                    .build();
+
+                client.commitStreamObject(String.format("localhost:%d", port), request1).get();
+
+                client.commitStreamObject(String.format("localhost:%d", port), request1).get();
+            }
+
+            long time = System.currentTimeMillis();
+            try (SqlSession session = getSessionFactory().openSession()) {
+                S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
+                S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
+                S3Object s3Object = s3ObjectMapper.getById(objectId + 2);
+                Assertions.assertEquals(S3ObjectState.BOS_COMMITTED, s3Object.getState());
+
+                com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = s3StreamObjectMapper.getByObjectId(objectId + 2);
+                Assertions.assertTrue(object.getBaseDataTimestamp() > 1);
+                if (object.getBaseDataTimestamp() - time > 5 * 60) {
+                    Assertions.fail();
+                }
+                Assertions.assertNotNull(object.getCommittedTimestamp());
+                Assertions.assertTrue(object.getCommittedTimestamp() > 0);
+                if (object.getCommittedTimestamp() - time > 5 * 60) {
+                    Assertions.fail();
+                }
+            }
+        }
+
+    }
+
     @Test
     public void test3WALObjects_2PC_NoS3Stream() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
@@ -1519,6 +1591,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
     }
 
+
     @Test
     public void test3WALObjects_2PC() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
@@ -1623,6 +1696,147 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                     .addAllCompactedObjectIds(compactedObjects)
                     .build();
 
+                client.commitWALObject(String.format("localhost:%d", port), request).get();
+            }
+
+            try (SqlSession session = getSessionFactory().openSession()) {
+                S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
+                for (long index = objectId; index < objectId + 2; index++) {
+                    S3Object object = s3ObjectMapper.getById(index);
+                    Assertions.assertEquals(S3ObjectState.BOS_COMMITTED, object.getState());
+                }
+
+                for (long index = objectId + 2; index < objectId + 4; index++) {
+                    S3Object object = s3ObjectMapper.getById(index);
+                    Assertions.assertEquals(S3ObjectState.BOS_WILL_DELETE, object.getState());
+                }
+
+                S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
+                for (long index = objectId; index < objectId + 2; index++) {
+                    com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = s3StreamObjectMapper.getByObjectId(index);
+                    if (object.getCommittedTimestamp() - time > 5 * 60) {
+                        Assertions.fail();
+                    }
+                }
+
+                long baseTime = 3;
+                S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
+
+                S3WalObject object = s3WALObjectMapper.getByObjectId(objectId + 4);
+                Assertions.assertEquals(baseTime, object.getBaseDataTimestamp());
+                if (object.getCommittedTimestamp() - time > 5 * 60) {
+                    Assertions.fail();
+                }
+            }
+        }
+
+    }
+
+    @Test
+    public void test3WALObjects_2PC_duplicate() throws IOException, ExecutionException, InterruptedException {
+        ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
+        long objectId, streamId = 1;
+        int nodeId = 2;
+
+        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), config)) {
+            metadataStore.start();
+            Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
+                .atMost(10, TimeUnit.SECONDS)
+                .until(metadataStore::isLeader);
+
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
+                 ControllerClient client = new GrpcControllerClient()
+            ) {
+                testServer.start();
+                int port = testServer.getPort();
+                PrepareS3ObjectsRequest request = PrepareS3ObjectsRequest.newBuilder()
+                    .setPreparedCount(5)
+                    .setTimeToLiveMinutes(5)
+                    .build();
+
+                PrepareS3ObjectsReply reply = client.prepareS3Objects(String.format("localhost:%d", port), request).get();
+                objectId = reply.getFirstObjectId();
+            }
+
+            String expectSubStream = """
+            {
+              "1234567890": {
+                "streamId_": 1234567890,
+                "startOffset_": 0,
+                "endOffset_": 10
+              }}""";
+
+            try (SqlSession session = this.getSessionFactory().openSession()) {
+                S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
+                S3WalObject s3WALObject = new S3WalObject();
+                s3WALObject.setObjectId(objectId + 2);
+                s3WALObject.setObjectSize(333L);
+                s3WALObject.setBaseDataTimestamp(3);
+                s3WALObject.setSequenceId(1L);
+                s3WALObject.setNodeId(nodeId);
+                s3WALObject.setSubStreams(expectSubStream.replace("1234567890", String.valueOf(streamId)));
+                s3WALObjectMapper.create(s3WALObject);
+
+                S3WalObject s3WalObject1 = new S3WalObject();
+                s3WalObject1.setObjectId(objectId + 3);
+                s3WalObject1.setObjectSize(444L);
+                s3WalObject1.setBaseDataTimestamp(4);
+                s3WalObject1.setSequenceId(2L);
+                s3WalObject1.setNodeId(nodeId);
+                s3WalObject1.setSubStreams(expectSubStream.replace("1234567890", String.valueOf(streamId)));
+                s3WALObjectMapper.create(s3WalObject1);
+
+                session.commit();
+            }
+
+            apache.rocketmq.controller.v1.S3StreamObject s3StreamObject = apache.rocketmq.controller.v1.S3StreamObject.newBuilder()
+                .setObjectId(objectId)
+                .setStreamId(streamId)
+                .setObjectSize(111L)
+                .setBaseDataTimestamp(1L)
+                .setStartOffset(111L)
+                .setEndOffset(222L)
+                .build();
+
+
+            apache.rocketmq.controller.v1.S3StreamObject s3StreamObject1 = apache.rocketmq.controller.v1.S3StreamObject.newBuilder()
+                .setObjectId(objectId + 1)
+                .setStreamId(streamId)
+                .setObjectSize(222L)
+                .setBaseDataTimestamp(2L)
+                .setStartOffset(222L)
+                .setEndOffset(333L)
+                .build();
+
+            List<apache.rocketmq.controller.v1.S3StreamObject> s3StreamObjects = new ArrayList<>();
+            s3StreamObjects.add(s3StreamObject);
+            s3StreamObjects.add(s3StreamObject1);
+
+            apache.rocketmq.controller.v1.S3WALObject walObject = apache.rocketmq.controller.v1.S3WALObject.newBuilder()
+                .setObjectId(objectId + 4)
+                .setSequenceId(11)
+                .setObjectSize(222L)
+                .setBrokerId(nodeId)
+                .build();
+
+            long time = System.currentTimeMillis();
+            List<Long> compactedObjects = new ArrayList<>();
+            compactedObjects.add(objectId + 2);
+            compactedObjects.add(objectId + 3);
+
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
+                 ControllerClient client = new GrpcControllerClient()
+            ) {
+                testServer.start();
+                int port = testServer.getPort();
+
+                CommitWALObjectRequest request = CommitWALObjectRequest.newBuilder()
+                    .setS3WalObject(walObject)
+                    .addAllS3StreamObjects(s3StreamObjects)
+                    .addAllCompactedObjectIds(compactedObjects)
+                    .build();
+
+                client.commitWALObject(String.format("localhost:%d", port), request).get();
                 client.commitWALObject(String.format("localhost:%d", port), request).get();
             }
 
