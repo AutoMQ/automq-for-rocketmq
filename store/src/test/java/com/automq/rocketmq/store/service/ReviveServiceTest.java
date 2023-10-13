@@ -154,5 +154,72 @@ class ReviveServiceTest {
 
         // check if this message has been sent to DLQ
         Mockito.verify(dlqSender, Mockito.times(1)).send(Mockito.any(FlatMessageExt.class));
+        PopResult popResult1 = logicQueue.popRetry(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
+        assertEquals(0, popResult1.messageList().size());
+    }
+
+    @Test
+    void tryRevive_fifo() throws StoreException {
+        // mock max delivery attempts
+        Mockito.doReturn(CompletableFuture.completedFuture(2))
+            .when(metadataService).maxDeliveryAttemptsOf(Mockito.anyLong());
+        // Append mock message.
+        for (int i = 0; i < 2; i++) {
+            FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
+            logicQueue.put(message).join();
+        }
+        // pop message
+        int invisibleDuration = 1000;
+        PopResult popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
+        assertEquals(1, popResult.messageList().size());
+        // check ck exist
+        ReceiptHandle handle = SerializeUtil.decodeReceiptHandle(popResult.messageList().get(0).receiptHandle().get());
+        byte[] bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.operationId()));
+        byte[] ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.operationId()));
+        assertNotNull(ckValue);
+        // now revive but can't clear ck
+        reviveService.tryRevive();
+        ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.operationId()));
+        assertNotNull(ckValue);
+        // after 1s revive can clear ck
+        long reviveTimestamp = System.currentTimeMillis() + invisibleDuration;
+        await().until(() -> {
+            reviveService.tryRevive();
+            return reviveService.reviveTimestamp() >= reviveTimestamp && reviveService.inflightReviveCount() == 0;
+        });
+
+        ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.operationId()));
+        assertNull(ckValue);
+
+        // pop again
+        PopResult retryPopResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
+        assertEquals(1, retryPopResult.messageList().size());
+        FlatMessageExt msg = retryPopResult.messageList().get(0);
+        assertEquals(2, msg.consumeTimes());
+        assertEquals(0, msg.offset());
+
+        long reviveTimestamp1 = System.currentTimeMillis() + invisibleDuration;
+        Mockito.doAnswer(ink -> {
+            FlatMessageExt flatMessageExt = ink.getArgument(0);
+            assertNotNull(flatMessageExt);
+            return CompletableFuture.completedFuture(null);
+        }).when(dlqSender).send(Mockito.any(FlatMessageExt.class));
+        // after 1s
+        await().until(() -> {
+            reviveService.tryRevive();
+            return reviveService.reviveTimestamp() >= reviveTimestamp1 && reviveService.inflightReviveCount() == 0;
+        });
+
+        // check if this message has been sent to DLQ
+        Mockito.verify(dlqSender, Mockito.times(1)).send(Mockito.any(FlatMessageExt.class));
+
+        assertEquals(1, logicQueue.getAckOffset(CONSUMER_GROUP_ID).join());
+
+        // pop again
+        PopResult retryPopResult1 = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
+        assertEquals(1, retryPopResult1.messageList().size());
+        FlatMessageExt msg1 = retryPopResult1.messageList().get(0);
+        assertEquals(1, msg1.consumeTimes());
+        assertEquals(1, msg1.offset());
     }
 }
