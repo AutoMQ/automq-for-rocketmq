@@ -1915,7 +1915,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     .toList();
 
                 List<S3WALObject> walObjects = new ArrayList<>();
-                s3WalObjectMapper.list(config.nodeId(), null)
+                s3WalObjectMapper.list(null, null)
                     .parallelStream()
                     .map(s3WalObject -> {
                         TypeToken<Map<Long, SubStream>> typeToken = new TypeToken<>() {
