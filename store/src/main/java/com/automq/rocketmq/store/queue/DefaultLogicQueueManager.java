@@ -44,7 +44,7 @@ public class DefaultLogicQueueManager implements TopicQueueManager {
     private final StoreMetadataService metadataService;
     private final OperationLogService operationLogService;
     private final InflightService inflightService;
-    private final Map<TopicQueueId, CompletableFuture<LogicQueue>> topicQueueMap;
+    private final Map<TopicQueueId, CompletableFuture<Optional<LogicQueue>>> topicQueueMap;
 
     public DefaultLogicQueueManager(StoreConfig storeConfig, StreamStore streamStore,
         KVService kvService, StoreMetadataService metadataService, OperationLogService operationLogService,
@@ -75,40 +75,41 @@ public class DefaultLogicQueueManager implements TopicQueueManager {
     @Override
     public CompletableFuture<Optional<LogicQueue>> getOrCreate(long topicId, int queueId) {
         TopicQueueId key = new TopicQueueId(topicId, queueId);
-        CompletableFuture<LogicQueue> future = topicQueueMap.get(key);
+        CompletableFuture<Optional<LogicQueue>> future = topicQueueMap.get(key);
 
         if (future != null) {
-            return future.thenApply(Optional::of);
+            return future;
         }
 
         // Prevent concurrent create.
         synchronized (this) {
             future = topicQueueMap.get(key);
             if (future != null) {
-                return future.thenApply(Optional::of);
+                return future;
             }
 
             // Create and open the topic queue.
-            future = createAndOpen(topicId, queueId);
-
-            // Put the future into the map to serve next request.
+            future = new CompletableFuture<Optional<LogicQueue>>();
             topicQueueMap.put(key, future);
-            return future.thenApply(Optional::of)
+            CompletableFuture<Optional<LogicQueue>> cf = createAndOpen(topicId, queueId)
+                .thenApply(Optional::of)
                 .exceptionally(ex -> {
                     Throwable cause = FutureUtil.cause(ex);
                     LOGGER.error("Create logic queue failed: topic: {} queue: {}", topicId, queueId, cause);
                     topicQueueMap.remove(key);
                     return Optional.empty();
                 });
+            FutureUtil.propagate(cf, future);
+            return future;
         }
     }
 
     @Override
     public CompletableFuture<Optional<LogicQueue>> get(long topicId, int queueId) {
         TopicQueueId key = new TopicQueueId(topicId, queueId);
-        CompletableFuture<LogicQueue> future = topicQueueMap.get(key);
+        CompletableFuture<Optional<LogicQueue>> future = topicQueueMap.get(key);
         if (future != null) {
-            return future.thenApply(Optional::of);
+            return future;
         }
         return CompletableFuture.completedFuture(Optional.empty());
     }
@@ -117,9 +118,9 @@ public class DefaultLogicQueueManager implements TopicQueueManager {
     public CompletableFuture<Void> close(long topicId, int queueId) {
         LOGGER.info("Close logic queue: {} queue: {}", topicId, queueId);
         TopicQueueId key = new TopicQueueId(topicId, queueId);
-        CompletableFuture<LogicQueue> future = topicQueueMap.remove(key);
+        CompletableFuture<Optional<LogicQueue>> future = topicQueueMap.remove(key);
         if (future != null) {
-            return future.thenCompose(LogicQueue::close);
+            return future.thenCompose(opt -> opt.map(LogicQueue::close).orElse(CompletableFuture.completedFuture(null)));
         }
         return CompletableFuture.completedFuture(null);
     }
