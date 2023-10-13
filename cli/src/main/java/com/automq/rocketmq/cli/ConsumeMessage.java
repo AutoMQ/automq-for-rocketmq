@@ -133,7 +133,6 @@ public class ConsumeMessage implements Callable<Void> {
                     if (messageViews != null) {
                         for (MessageView messageView : messageViews) {
                             consumeMeter.mark();
-                            rateLimiter.acquire();
                             selectedConsumer.ackAsync(messageView).whenComplete((ackReceipt, ackThrowable) -> {
                                 if (ackThrowable != null) {
                                     System.out.println("Failed to ack message: " + ackThrowable.getMessage());
