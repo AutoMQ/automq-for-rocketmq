@@ -69,12 +69,7 @@ public class StreamOperationLogService implements OperationLogService {
             snapshotFetch = streamStore.fetch(snapshotStreamId, snapEndOffset - 1, 1)
                 .thenApply(result -> SerializeUtil.decodeOperationSnapshot(result.recordBatchList().get(0).rawPayload()))
                 .thenApply(snapshot -> {
-                    try {
-                        stateMachine.loadSnapshot(snapshot);
-                    } catch (Exception e) {
-                        // TODO: handle exception
-                        throw new RuntimeException(e);
-                    }
+                    stateMachine.loadSnapshot(snapshot);
                     return snapshot.getSnapshotEndOffset() + 1;
                 });
         }
@@ -91,6 +86,7 @@ public class StreamOperationLogService implements OperationLogService {
                         // TODO: operation may be null
                         replay(batchWithContext.baseOffset(), operation);
                     } catch (StoreException e) {
+                        LOGGER.error("Topic {}, queue: {}: Replay operation:{} failed when recover", stateMachine.topicId(), stateMachine.queueId(), operation, e);
                         throw new CompletionException(e);
                     }
                 }
