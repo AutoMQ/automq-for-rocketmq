@@ -149,7 +149,9 @@ class ReviveServiceTest {
         // after 1s
         await().until(() -> {
             reviveService.tryRevive();
-            return reviveService.reviveTimestamp() >= reviveTimestamp1 && reviveService.inflightReviveCount() == 0;
+            long ts0 = reviveService.reviveTimestamp();
+            int reviveCount = reviveService.inflightReviveCount();
+            return ts0 >= reviveTimestamp1 && reviveCount == 0;
         });
 
         // check if this message has been sent to DLQ
@@ -207,7 +209,9 @@ class ReviveServiceTest {
         // after 1s
         await().until(() -> {
             reviveService.tryRevive();
-            return reviveService.reviveTimestamp() >= reviveTimestamp1 && reviveService.inflightReviveCount() == 0;
+            long ts0 = reviveService.reviveTimestamp();
+            int reviveCount = reviveService.inflightReviveCount();
+            return ts0 >= reviveTimestamp1 && reviveCount == 0;
         });
 
         // check if this message has been sent to DLQ
