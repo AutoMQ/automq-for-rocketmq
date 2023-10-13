@@ -36,6 +36,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -49,6 +50,7 @@ import software.amazon.awssdk.auth.credentials.AwsCredentialsProviderChain;
 import software.amazon.awssdk.auth.credentials.InstanceProfileCredentialsProvider;
 import software.amazon.awssdk.core.async.AsyncRequestBody;
 import software.amazon.awssdk.core.async.AsyncResponseTransformer;
+import software.amazon.awssdk.core.client.config.ClientAsyncConfiguration;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.S3AsyncClientBuilder;
@@ -83,6 +85,8 @@ public class DefaultS3Operator implements S3Operator {
     private static final AtomicLong LAST_LOG_TIMESTAMP = new AtomicLong(System.currentTimeMillis());
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(
             ThreadUtils.createThreadFactory("s3operator", true));
+    // TODO: config & async semaphore & acquire larger than max size
+    private final Semaphore s3InflightReadLimiter = new Semaphore(50 * 1024 * 1024);
 
     public DefaultS3Operator(String endpoint, String region, String bucket, boolean forcePathStyle,
         String accessKey, String secretKey) {
@@ -120,10 +124,17 @@ public class DefaultS3Operator implements S3Operator {
 
     @Override
     public CompletableFuture<ByteBuf> rangeRead(String path, long start, long end, ByteBufAllocator alloc) {
+        int size = (int)(end - start);
+        try {
+            s3InflightReadLimiter.acquire(size);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
         end = end - 1;
         CompletableFuture<ByteBuf> cf = new CompletableFuture<>();
         ByteBuf buf = alloc.directBuffer((int) (end - start));
         rangeRead0(path, start, end, buf, cf);
+        cf.whenComplete((rst, ex) -> s3InflightReadLimiter.release(size));
         return cf;
     }
 
