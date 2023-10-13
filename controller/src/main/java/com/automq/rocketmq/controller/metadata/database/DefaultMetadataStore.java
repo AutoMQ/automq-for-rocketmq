@@ -1860,7 +1860,14 @@ public class DefaultMetadataStore implements MetadataStore {
             LOGGER.error("object[object-id={}] is not prepared but try to commit", objectId);
             return false;
         }
-        s3Object.setCommittedTimestamp(new Date());
+
+        Date commitData = new Date();
+        if (s3Object.getExpiredTimestamp().getTime() < commitData.getTime()) {
+            LOGGER.error("object[object-id={}] is expired", objectId);
+            return false;
+        }
+
+        s3Object.setCommittedTimestamp(commitData);
         s3Object.setState(S3ObjectState.BOS_COMMITTED);
         s3ObjectMapper.commit(s3Object);
         return true;
