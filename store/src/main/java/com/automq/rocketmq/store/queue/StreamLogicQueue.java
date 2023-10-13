@@ -518,4 +518,9 @@ public class StreamLogicQueue extends LogicQueue {
     public CompletableFuture<State> getState() {
         return CompletableFuture.completedFuture(state.get());
     }
+
+    @Override
+    public CompletableFuture<Integer> getConsumeTimes(long consumerGroupId, long offset) {
+        return stateMachine.consumeTimes(consumerGroupId, offset);
+    }
 }

@@ -18,9 +18,11 @@
 package com.automq.rocketmq.store.service;
 
 import com.automq.rocketmq.common.config.StoreConfig;
+import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.store.MessageStoreImpl;
+import com.automq.rocketmq.store.api.DLQSender;
 import com.automq.rocketmq.store.api.LogicQueue;
 import com.automq.rocketmq.store.api.MessageStateMachine;
 import com.automq.rocketmq.store.api.StreamStore;
@@ -68,12 +70,13 @@ class ReviveServiceTest {
     private InflightService inflightService;
     private ReviveService reviveService;
     private MessageStateMachine stateMachine;
+    private DLQSender dlqSender;
     private LogicQueue logicQueue;
 
     @BeforeEach
     public void setUp() throws StoreException {
         kvService = new RocksDBKVService(PATH);
-        metadataService = new MockStoreMetadataService();
+        metadataService = Mockito.spy(new MockStoreMetadataService());
         streamStore = new MockStreamStore();
         inflightService = new InflightService();
         streamStore = new MockStreamStore();
@@ -85,7 +88,9 @@ class ReviveServiceTest {
             metadataService, stateMachine, streamStore, operationLogService, inflightService);
         TopicQueueManager manager = Mockito.mock(TopicQueueManager.class);
         Mockito.when(manager.getOrCreate(TOPIC_ID, QUEUE_ID)).thenReturn(CompletableFuture.completedFuture(logicQueue));
-        reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, KV_NAMESPACE_TIMER_TAG, kvService, metadataService, inflightService, manager);
+        dlqSender = Mockito.mock(DLQSender.class);
+        reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, KV_NAMESPACE_TIMER_TAG, kvService, metadataService, inflightService,
+            manager, dlqSender);
         logicQueue.open().join();
     }
 
@@ -95,7 +100,10 @@ class ReviveServiceTest {
     }
 
     @Test
-    void tryRevive() throws StoreException {
+    void tryRevive_normal() throws StoreException {
+        // mock max delivery attempts
+        Mockito.doReturn(CompletableFuture.completedFuture(2))
+            .when(metadataService).maxDeliveryAttemptsOf(Mockito.anyLong());
         // Append mock message.
         FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
         logicQueue.put(message).join();
@@ -125,5 +133,26 @@ class ReviveServiceTest {
         // check if this message has been appended to retry stream
         PullResult retryPullResult = logicQueue.pullRetry(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 0, 100).join();
         assertEquals(1, retryPullResult.messageList().size());
+
+        // pop retry
+        PopResult retryPopResult = logicQueue.popRetry(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
+        assertEquals(1, retryPopResult.messageList().size());
+        FlatMessageExt msg = retryPopResult.messageList().get(0);
+        assertEquals(2, msg.deliveryAttempts());
+
+        long reviveTimestamp1 = System.currentTimeMillis() + invisibleDuration;
+        Mockito.doAnswer(ink -> {
+            FlatMessageExt flatMessageExt = ink.getArgument(0);
+            assertNotNull(flatMessageExt);
+            return CompletableFuture.completedFuture(null);
+        }).when(dlqSender).send(Mockito.any(FlatMessageExt.class));
+        // after 1s
+        await().until(() -> {
+            reviveService.tryRevive();
+            return reviveService.reviveTimestamp() >= reviveTimestamp1 && reviveService.inflightReviveCount() == 0;
+        });
+
+        // check if this message has been sent to DLQ
+        Mockito.verify(dlqSender, Mockito.times(1)).send(Mockito.any(FlatMessageExt.class));
     }
 }

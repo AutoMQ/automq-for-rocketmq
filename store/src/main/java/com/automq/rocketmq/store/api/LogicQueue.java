@@ -89,6 +89,8 @@ public abstract class LogicQueue {
 
     public abstract CompletableFuture<State> getState();
 
+    public abstract CompletableFuture<Integer> getConsumeTimes(long consumerGroupId, long offset);
+
     public enum State {
         INIT,
         OPENING,
