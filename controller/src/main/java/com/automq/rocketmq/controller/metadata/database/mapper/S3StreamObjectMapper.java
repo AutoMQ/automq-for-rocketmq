@@ -45,4 +45,6 @@ public interface S3StreamObjectMapper {
     int delete(@Param("id") Long id, @Param("streamId") Long streamId, @Param("objectId") Long objectId);
 
     S3StreamObject getByObjectId(long objectId);
+
+    int batchDelete(@Param("objectIds") List<Long> objectIds);
 }

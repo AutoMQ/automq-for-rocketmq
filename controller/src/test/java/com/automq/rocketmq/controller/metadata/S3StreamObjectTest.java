@@ -73,7 +73,6 @@ public class S3StreamObjectTest extends DatabaseTestBase {
             Assertions.assertEquals(1234, s3StreamObjects.get(0).getStartOffset());
             Assertions.assertEquals(2345, s3StreamObjects.get(0).getEndOffset());
 
-
             // test listByStreamId
             List<S3StreamObject> s3StreamObjects1 = s3StreamObjectMapper.listByStreamId(s3StreamObject.getStreamId());
             Assertions.assertNotNull(s3StreamObjects);
@@ -120,6 +119,28 @@ public class S3StreamObjectTest extends DatabaseTestBase {
             s3StreamObjectMapper.delete(null, s3StreamObject2.getStreamId(), s3StreamObject2.getObjectId());
             List<S3StreamObject> s3StreamObjects = s3StreamObjectMapper.list(s3StreamObject.getObjectId(), null, null, null, null);
             Assertions.assertTrue(s3StreamObjects.isEmpty());
+        }
+    }
+
+    @Test
+    public void testBatchDelete() throws IOException {
+        try (SqlSession session = this.getSessionFactory().openSession()) {
+            S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
+            S3StreamObject s3StreamObject = new S3StreamObject();
+            s3StreamObject.setObjectId(11L);
+            s3StreamObject.setObjectSize(123L);
+            s3StreamObject.setStreamId(111L);
+            s3StreamObject.setStartOffset(1234L);
+            s3StreamObject.setEndOffset(2345L);
+
+            Calendar calendar = Calendar.getInstance();
+            calendar.add(Calendar.SECOND, 30);
+            long time = calendar.getTime().getTime();
+
+            s3StreamObject.setCommittedTimestamp(time);
+            s3StreamObjectMapper.commit(s3StreamObject);
+            s3StreamObjectMapper.batchDelete(List.of(11L));
+            Assertions.assertTrue(s3StreamObjectMapper.list(null, null, null, null, null).isEmpty());
         }
     }
 }

@@ -23,6 +23,7 @@ import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.dao.S3Object;
 import com.automq.rocketmq.controller.metadata.database.mapper.S3ObjectMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.S3StreamObjectMapper;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -45,17 +46,20 @@ public class ReclaimS3ObjectTask extends ControllerTask {
                 return;
             }
 
-            S3ObjectMapper mapper = session.getMapper(S3ObjectMapper.class);
-            int rows = mapper.rollback(new Date());
+            S3StreamObjectMapper streamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
+
+            S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
+            int rows = s3ObjectMapper.rollback(new Date());
             if (rows > 0) {
                 LOGGER.info("Rollback {} expired prepared S3 Object rows", rows);
             }
-            List<S3Object> s3Objects = mapper.list(S3ObjectState.BOS_WILL_DELETE, null);
+            List<S3Object> s3Objects = s3ObjectMapper.list(S3ObjectState.BOS_WILL_DELETE, null);
             List<Long> ids = s3Objects.stream().mapToLong(S3Object::getId).boxed().toList();
             if (!ids.isEmpty()) {
                 List<Long> result = metadataStore.getDataStore().batchDeleteS3Objects(ids).get();
                 if (null != result && !result.isEmpty()) {
-                    mapper.batchDelete(result);
+                    s3ObjectMapper.batchDelete(result);
+                    streamObjectMapper.batchDelete(result);
                 }
             }
             session.commit();
