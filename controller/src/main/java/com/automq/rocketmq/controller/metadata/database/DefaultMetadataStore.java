@@ -49,6 +49,7 @@ import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.common.PrefixThreadFactory;
 import com.automq.rocketmq.common.api.DataStore;
 import com.automq.rocketmq.common.system.S3Constants;
+import com.automq.rocketmq.common.system.StreamConstants;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.BrokerNode;
 import com.automq.rocketmq.controller.metadata.ControllerClient;
@@ -1556,7 +1557,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     }
 
                     // commit S3 object
-                    if (objectId != S3Constants.NOOP_OBJECT_ID && !commitObject(objectId, session)) {
+                    if (objectId != S3Constants.NOOP_OBJECT_ID && !commitObject(objectId, StreamConstants.NOOP_STREAM_ID, walObject.getObjectSize(), session)) {
                         ControllerException e = new ControllerException(Code.ILLEGAL_STATE_VALUE,
                             String.format("S3WALObject[object-id=%d] is not ready for commit", walObject.getObjectId()));
                         future.completeExceptionally(e);
@@ -1598,7 +1599,9 @@ public class DefaultMetadataStore implements MetadataStore {
                     if (!Objects.isNull(streamObjects) && !streamObjects.isEmpty()) {
                         for (apache.rocketmq.controller.v1.S3StreamObject s3StreamObject : streamObjects) {
                             long oId = s3StreamObject.getObjectId();
-                            if (!commitObject(oId, session)) {
+                            long objectSize = s3StreamObject.getObjectSize();
+                            long streamId = s3StreamObject.getStreamId();
+                            if (!commitObject(oId, streamId, objectSize, session)) {
                                 ControllerException e = new ControllerException(Code.ILLEGAL_STATE_VALUE, String.format("S3StreamObject[object-id=%d] is not ready for commit", oId));
                                 future.completeExceptionally(e);
                                 return future;
@@ -1673,7 +1676,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
 
                     // commit object
-                    if (!commitObject(streamObject.getObjectId(), session)) {
+                    if (!commitObject(streamObject.getObjectId(), streamObject.getStreamId(), streamObject.getObjectSize(), session)) {
                         ControllerException e = new ControllerException(Code.ILLEGAL_STATE_VALUE, String.format("S3StreamObject[object-id=%d] is not ready for commit", streamObject.getObjectId()));
                         future.completeExceptionally(e);
                         return future;
@@ -1844,7 +1847,7 @@ public class DefaultMetadataStore implements MetadataStore {
             .build();
     }
 
-    private boolean commitObject(Long objectId, SqlSession session) {
+    private boolean commitObject(Long objectId, long streamId, long objectSize, SqlSession session) {
         S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
         S3Object s3Object = s3ObjectMapper.getById(objectId);
         if (Objects.isNull(s3Object)) {
@@ -1868,6 +1871,8 @@ public class DefaultMetadataStore implements MetadataStore {
         }
 
         s3Object.setCommittedTimestamp(commitData);
+        s3Object.setStreamId(streamId);
+        s3Object.setObjectSize(objectSize);
         s3Object.setState(S3ObjectState.BOS_COMMITTED);
         s3ObjectMapper.commit(s3Object);
         return true;

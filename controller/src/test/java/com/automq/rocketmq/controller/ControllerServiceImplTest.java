@@ -52,6 +52,7 @@ import apache.rocketmq.controller.v1.TopicStatus;
 import apache.rocketmq.controller.v1.TrimStreamRequest;
 import apache.rocketmq.controller.v1.UpdateTopicReply;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
+import com.automq.rocketmq.common.system.StreamConstants;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.ControllerClient;
 import com.automq.rocketmq.controller.metadata.DatabaseTestBase;
@@ -1402,6 +1403,8 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
                 S3Object s3Object = s3ObjectMapper.getById(objectId + 2);
                 Assertions.assertEquals(S3ObjectState.BOS_COMMITTED, s3Object.getState());
+                Assertions.assertEquals(111L, s3Object.getObjectSize());
+                Assertions.assertEquals(streamId, s3Object.getStreamId());
 
                 com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = s3StreamObjectMapper.getByObjectId(objectId + 2);
                 Assertions.assertTrue(object.getBaseDataTimestamp() > 1);
@@ -1647,6 +1650,8 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
                 S3Object s3Object = s3ObjectMapper.getById(objectId + 4);
                 Assertions.assertEquals(S3ObjectState.BOS_COMMITTED, s3Object.getState());
+                Assertions.assertEquals(222L, s3Object.getObjectSize());
+                Assertions.assertEquals(StreamConstants.NOOP_STREAM_ID, s3Object.getStreamId());
 
                 S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
                 S3WalObject object = s3WALObjectMapper.getByObjectId(objectId + 4);
@@ -1902,9 +1907,12 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                     }
                 }
 
+                S3Object s3Object = s3ObjectMapper.getById(objectId + 4);
+                Assertions.assertEquals(222L, s3Object.getObjectSize());
+                Assertions.assertEquals(StreamConstants.NOOP_STREAM_ID, s3Object.getStreamId());
+
                 long baseTime = 3;
                 S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
-
                 S3WalObject object = s3WALObjectMapper.getByObjectId(objectId + 4);
                 Assertions.assertEquals(baseTime, object.getBaseDataTimestamp());
                 if (object.getCommittedTimestamp() - time > 5 * 60) {
@@ -2043,9 +2051,12 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                     }
                 }
 
+                S3Object s3Object = s3ObjectMapper.getById(objectId + 4);
+                Assertions.assertEquals(222L, s3Object.getObjectSize());
+                Assertions.assertEquals(StreamConstants.NOOP_STREAM_ID, s3Object.getStreamId());
+
                 long baseTime = 3;
                 S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
-
                 S3WalObject object = s3WALObjectMapper.getByObjectId(objectId + 4);
                 Assertions.assertEquals(baseTime, object.getBaseDataTimestamp());
                 if (object.getCommittedTimestamp() - time > 5 * 60) {
