@@ -153,27 +153,41 @@ public class ReviveService implements Runnable, Lifecycle {
                     }
                     // Build the retry message and append it to retry stream or dead letter stream.
                     FlatMessageExt messageExt = pullResult.messageList().get(0);
-                    messageExt.setOriginalQueueOffset(messageExt.originalOffset());
-                    messageExt.setDeliveryAttempts(messageExt.deliveryAttempts() + 1);
                     return Triple.of(logicQueue, messageExt, maxDeliveryAttempts);
                 }, backgroundExecutor);
-                CompletableFuture<LogicQueue> resendCf = cf.thenCompose(triple -> {
+                CompletableFuture<Pair<Boolean, LogicQueue>> resendCf = cf.thenCompose(triple -> {
                     LogicQueue logicQueue = triple.getLeft();
                     FlatMessageExt messageExt = triple.getMiddle();
                     int maxDeliveryAttempts = triple.getRight();
-                    if (messageExt.deliveryAttempts() <= maxDeliveryAttempts) {
-                        // normal message and retry message can be resent as retry message.
-                        if (operationType != PopOperation.PopOperationType.POP_ORDER) {
-                            return logicQueue.putRetry(consumerGroupId, messageExt.message())
-                                .thenApply(nil -> logicQueue);
-                        }
-                    }
-                    // send as DLQ
-                    return dlqSender.send(messageExt)
-                        .thenApply(nil -> logicQueue);
 
+                    if (operationType == PopOperation.PopOperationType.POP_ORDER) {
+                        return logicQueue.getConsumeTimes(consumerGroupId, messageExt.offset())
+                            .thenCompose(consumeTimes -> {
+                                if (consumeTimes >= maxDeliveryAttempts) {
+                                    // send as DLQ
+                                    return dlqSender.send(messageExt)
+                                        .thenApply(nil -> Pair.of(true, logicQueue));
+                                }
+                                return CompletableFuture.completedFuture(Pair.of(false, logicQueue));
+                            });
+                    }
+                    if (messageExt.deliveryAttempts() >= maxDeliveryAttempts) {
+                        // send as DLQ
+                        return dlqSender.send(messageExt)
+                            .thenApply(nil -> Pair.of(true, logicQueue));
+                    }
+                    messageExt.setOriginalQueueOffset(messageExt.originalOffset());
+                    messageExt.setDeliveryAttempts(messageExt.deliveryAttempts() + 1);
+                    return logicQueue.putRetry(consumerGroupId, messageExt.message())
+                        .thenApply(nil -> Pair.of(false, logicQueue));
                 });
-                CompletableFuture<AckResult> ackCf = resendCf.thenComposeAsync(queue -> {
+                CompletableFuture<AckResult> ackCf = resendCf.thenComposeAsync(pair -> {
+                    boolean sendDLQ = pair.getLeft();
+                    LogicQueue queue = pair.getRight();
+                    if (sendDLQ) {
+                        // regard sending to DLQ as ack
+                        return queue.ack(SerializeUtil.encodeReceiptHandle(receiptHandle));
+                    }
                     // ack timeout
                     return queue.ackTimeout(SerializeUtil.encodeReceiptHandle(receiptHandle));
                 }, backgroundExecutor);

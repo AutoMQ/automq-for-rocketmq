@@ -157,8 +157,8 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
         requestList.add(writeTimerTagRequest);
 
         Integer currentConsumeTimes = metadata.getConsumeTimes().getOrDefault(offset, 0);
-        Integer newConsumeTimes = currentConsumeTimes++;
-        metadata.getConsumeTimes().put(offset, currentConsumeTimes + 1);
+        Integer newConsumeTimes = currentConsumeTimes + 1;
+        metadata.getConsumeTimes().put(offset, newConsumeTimes);
 
         kvService.batch(requestList.toArray(new BatchRequest[0]));
         return ReplayPopResult.of(newConsumeTimes);
@@ -265,8 +265,8 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
         }
 
         Integer currentConsumeTimes = metadata.getConsumeTimes().getOrDefault(offset, 0);
-        Integer newConsumeTimes = currentConsumeTimes++;
-        metadata.getConsumeTimes().put(offset, currentConsumeTimes + 1);
+        Integer newConsumeTimes = currentConsumeTimes + 1;
+        metadata.getConsumeTimes().put(offset, newConsumeTimes);
 
         kvService.batch(requestList.toArray(new BatchRequest[0]));
         return ReplayPopResult.of(newConsumeTimes);
