@@ -30,6 +30,7 @@ import com.automq.rocketmq.metadata.api.ProxyMetadataService;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.proxy.config.ProxyConfiguration;
 import com.automq.rocketmq.proxy.processor.ExtendMessagingProcessor;
+import com.automq.rocketmq.proxy.service.DLQService;
 import com.automq.rocketmq.proxy.service.DefaultServiceManager;
 import com.automq.rocketmq.store.DataStoreFacade;
 import com.automq.rocketmq.store.MessageStoreBuilder;
@@ -47,6 +48,7 @@ public class BrokerController implements Lifecycle {
     private final ProxyMetadataService proxyMetadataService;
     private final MessagingProcessor messagingProcessor;
     private final MetricsExporter metricsExporter;
+    private final DLQService dlqService;
 
     public BrokerController(BrokerConfig brokerConfig) throws Exception {
         this.brokerConfig = brokerConfig;
@@ -59,13 +61,15 @@ public class BrokerController implements Lifecycle {
         proxyMetadataService = new DefaultProxyMetadataService(metadataStore);
         storeMetadataService = new DefaultStoreMetadataService(metadataStore);
 
-        messageStore = MessageStoreBuilder.build(brokerConfig.store(), brokerConfig.s3Stream(), storeMetadataService);
+        dlqService = new DLQService();
+
+        messageStore = MessageStoreBuilder.build(brokerConfig.store(), brokerConfig.s3Stream(), storeMetadataService, dlqService);
 
         DataStore dataStore = new DataStoreFacade(messageStore.getS3ObjectOperator(), messageStore.getTopicQueueManager());
         metadataStore.setDataStore(dataStore);
 
 
-        serviceManager = new DefaultServiceManager(brokerConfig.proxy(), proxyMetadataService, messageStore);
+        serviceManager = new DefaultServiceManager(brokerConfig.proxy(), proxyMetadataService, dlqService, messageStore);
         messagingProcessor = ExtendMessagingProcessor.createForS3RocketMQ(serviceManager);
 
         // TODO: Split controller to a separate port

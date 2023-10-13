@@ -60,7 +60,7 @@ public class ReviveService implements Runnable, Lifecycle {
     private final InflightService inflightService;
     private final TopicQueueManager topicQueueManager;
     // Indicate the timestamp that the revive service has reached.
-    private long reviveTimestamp = 0;
+    private volatile long reviveTimestamp = 0;
     private final String identity = "[ReviveService]";
     private final ConcurrentMap<Long/*operationId*/, CompletableFuture<Void>> inflightRevive;
     private final ScheduledExecutorService mainExecutor;
