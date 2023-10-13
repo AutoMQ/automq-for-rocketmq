@@ -22,14 +22,15 @@
 
     <insert id="create" parameterType="S3StreamObject" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
         INSERT INTO
-        s3streamobject (object_id, object_size, stream_id, start_offset, end_offset, base_data_timestamp)
+        s3streamobject (object_id, object_size, stream_id, start_offset, end_offset, base_data_timestamp, committed_timestamp)
         VALUES (
         #{objectId},
         #{objectSize},
         #{streamId},
         #{startOffset},
         #{endOffset},
-        #{baseDataTimestamp}
+        #{baseDataTimestamp},
+        #{committedTimestamp}
         )
     </insert>
 

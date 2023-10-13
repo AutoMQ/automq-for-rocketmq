@@ -59,6 +59,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletionException;
@@ -71,7 +72,6 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.ibatis.session.SqlSession;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
@@ -1633,7 +1633,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     @Test
     public void testPrepareS3Objects() throws IOException {
         long objectId;
-        int nodeId = 1;
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertNull(metadataStore.getLease());
@@ -1656,10 +1655,8 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    @Disabled
     public void testCommitStreamObject() throws IOException, ControllerException {
         long objectId, streamId = 1;
-        int nodeId = 1;
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertNull(metadataStore.getLease());
@@ -1672,7 +1669,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             throw new RuntimeException(e);
         }
 
-        S3StreamObject s3StreamObject = S3StreamObject.newBuilder()
+        S3StreamObject news3StreamObject = S3StreamObject.newBuilder()
             .setObjectId(objectId + 2)
             .setStreamId(streamId)
             .setObjectSize(111L)
@@ -1682,22 +1679,27 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
             com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
             object.setObjectId(objectId);
+            object.setObjectSize(222L);
             object.setStreamId(streamId);
             object.setBaseDataTimestamp(1L);
+            object.setStartOffset(1234L);
+            object.setEndOffset(2345L);
             s3StreamObjectMapper.create(object);
 
             com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object1 = new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
             object1.setObjectId(objectId + 1);
+            object1.setObjectSize(333L);
             object1.setStreamId(streamId);
             object1.setBaseDataTimestamp(2L);
+            object1.setStartOffset(2345L);
+            object1.setEndOffset(3456L);
             s3StreamObjectMapper.create(object1);
 
             session.commit();
         }
+
         long time = System.currentTimeMillis();
-        List<Long> compactedObjects = new ArrayList<>();
-        compactedObjects.add(objectId);
-        compactedObjects.add(objectId + 1);
+
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertNull(metadataStore.getLease());
             Lease lease = new Lease();
@@ -1705,7 +1707,10 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             metadataStore.setLease(lease);
             metadataStore.setRole(Role.Leader);
 
-            metadataStore.commitStreamObject(s3StreamObject, compactedObjects);
+            List<Long> compactedObjects = new ArrayList<>();
+            compactedObjects.add(objectId);
+            compactedObjects.add(objectId + 1);
+            metadataStore.commitStreamObject(news3StreamObject, compactedObjects);
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -1730,7 +1735,59 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    @Disabled
+    public void testCommitStreamObject_NoCompacted() throws IOException, ControllerException {
+        long objectId, streamId = 1;
+
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            Assertions.assertNull(metadataStore.getLease());
+            Lease lease = new Lease();
+            lease.setNodeId(config.nodeId());
+            metadataStore.setLease(lease);
+            metadataStore.setRole(Role.Leader);
+            objectId = metadataStore.prepareS3Objects(3, 5).get();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+        S3StreamObject news3StreamObject = S3StreamObject.newBuilder()
+            .setObjectId(objectId + 2)
+            .setStreamId(streamId)
+            .setObjectSize(111L)
+            .build();
+
+        long time = System.currentTimeMillis();
+
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            Assertions.assertNull(metadataStore.getLease());
+            Lease lease = new Lease();
+            lease.setNodeId(config.nodeId());
+            metadataStore.setLease(lease);
+            metadataStore.setLease(lease);
+            metadataStore.setRole(Role.Leader);
+
+            metadataStore.commitStreamObject(news3StreamObject, Collections.emptyList());
+        }
+
+        try (SqlSession session = getSessionFactory().openSession()) {
+            S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
+            S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
+            S3Object s3Object = s3ObjectMapper.getById(objectId + 2);
+            Assertions.assertEquals(S3ObjectState.BOS_COMMITTED, s3Object.getState());
+
+            com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = s3StreamObjectMapper.getByObjectId(objectId + 2);
+            Assertions.assertTrue(object.getBaseDataTimestamp() > 1);
+            if (object.getBaseDataTimestamp() - time > 5 * 60) {
+                Assertions.fail();
+            }
+            Assertions.assertNotNull(object.getCommittedTimestamp());
+            Assertions.assertTrue(object.getCommittedTimestamp() > 0);
+            if (object.getCommittedTimestamp() - time > 5 * 60) {
+                Assertions.fail();
+            }
+        }
+    }
+
+    @Test
     public void testCommitStreamObject_ObjectNotExist() throws IOException {
         long streamId = 1;
         int nodeId = 1;
@@ -1762,16 +1819,14 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             metadataStore.setLease(lease);
             metadataStore.setRole(Role.Leader);
 
-            Assertions.assertThrows(CompletionException.class, () -> metadataStore.commitStreamObject(s3StreamObject, compactedObjects).join());
+            Assertions.assertThrows(ExecutionException.class, () -> metadataStore.commitStreamObject(s3StreamObject, compactedObjects).get());
         }
 
     }
 
     @Test
-    @Disabled
     public void testCommitStreamObject_StreamNotExist() throws IOException {
         long streamId = 1;
-        int nodeId = 1;
 
         S3StreamObject s3StreamObject = S3StreamObject.newBuilder()
             .setObjectId(-1)
@@ -1800,13 +1855,12 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             metadataStore.setLease(lease);
             metadataStore.setRole(Role.Leader);
 
-            Assertions.assertThrows(CompletionException.class, () -> metadataStore.commitStreamObject(s3StreamObject, compactedObjects).join());
+            Assertions.assertThrows(ExecutionException.class, () -> metadataStore.commitStreamObject(s3StreamObject, compactedObjects).get());
         }
 
     }
 
     @Test
-    @Disabled
     public void testCommitWALObject() throws IOException, ExecutionException, InterruptedException {
         long objectId, streamId = 1;
         int nodeId = 1;
@@ -1838,29 +1892,13 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
               }}""";
 
         try (SqlSession session = this.getSessionFactory().openSession()) {
-            S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
-            com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
-            object.setObjectId(objectId);
-            object.setStreamId(streamId);
-            object.setBaseDataTimestamp(1L);
-            object.setStartOffset(111L);
-            object.setEndOffset(222L);
-            s3StreamObjectMapper.create(object);
-
-            com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object1 = new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
-            object1.setObjectId(objectId + 1);
-            object1.setStreamId(streamId);
-            object1.setBaseDataTimestamp(2L);
-            object1.setStartOffset(222L);
-            object1.setEndOffset(333L);
-            s3StreamObjectMapper.create(object1);
-
             S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
             S3WalObject s3WALObject = new S3WalObject();
             s3WALObject.setObjectId(objectId + 2);
             s3WALObject.setObjectSize(333L);
             s3WALObject.setBaseDataTimestamp(3);
             s3WALObject.setSequenceId(1L);
+            s3WALObject.setNodeId(nodeId);
             s3WALObject.setSubStreams(expectSubStream.replace("1234567890", String.valueOf(streamId)));
             s3WALObjectMapper.create(s3WALObject);
 
@@ -1868,7 +1906,8 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             s3WalObject1.setObjectId(objectId + 3);
             s3WalObject1.setObjectSize(444L);
             s3WalObject1.setBaseDataTimestamp(4);
-            s3WALObject.setSequenceId(2L);
+            s3WalObject1.setSequenceId(2L);
+            s3WalObject1.setNodeId(nodeId);
             s3WalObject1.setSubStreams(expectSubStream.replace("1234567890", String.valueOf(streamId)));
             s3WALObjectMapper.create(s3WalObject1);
 
@@ -1879,6 +1918,31 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         List<Long> compactedObjects = new ArrayList<>();
         compactedObjects.add(objectId + 2);
         compactedObjects.add(objectId + 3);
+
+
+        S3StreamObject s3StreamObject = S3StreamObject.newBuilder()
+            .setObjectId(objectId)
+            .setStreamId(streamId)
+            .setObjectSize(111L)
+            .setBaseDataTimestamp(1L)
+            .setStartOffset(111L)
+            .setEndOffset(222L)
+            .build();
+
+
+        S3StreamObject s3StreamObject1 = S3StreamObject.newBuilder()
+            .setObjectId(objectId + 1)
+            .setStreamId(streamId)
+            .setObjectSize(222L)
+            .setBaseDataTimestamp(2L)
+            .setStartOffset(222L)
+            .setEndOffset(333L)
+            .build();
+
+        List<S3StreamObject> s3StreamObjects = new ArrayList<>();
+        s3StreamObjects.add(s3StreamObject);
+        s3StreamObjects.add(s3StreamObject1);
+
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertNull(metadataStore.getLease());
             Lease lease = new Lease();
@@ -1886,9 +1950,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             metadataStore.setLease(lease);
             metadataStore.setRole(Role.Leader);
 
-            List<S3StreamObject> s3StreamObjects = metadataStore.listStreamObjects(streamId, 111, 334, 2).get();
-
-            metadataStore.commitWalObject(walObject, s3StreamObjects, compactedObjects);
+            metadataStore.commitWalObject(walObject, s3StreamObjects, compactedObjects).get();
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -1911,13 +1973,8 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
                 }
             }
 
-            long baseTime = time;
+            long baseTime = 3;
             S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
-            for (long index = objectId + 2; index < objectId + 4; index++) {
-                S3WalObject s3WALObject = s3WALObjectMapper.getByObjectId(index);
-                baseTime = Math.min(baseTime, s3WALObject.getBaseDataTimestamp());
-            }
-
             S3WalObject object = s3WALObjectMapper.getByObjectId(objectId + 4);
             Assertions.assertEquals(baseTime, object.getBaseDataTimestamp());
             if (object.getCommittedTimestamp() - time > 5 * 60) {
@@ -1927,10 +1984,8 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    @Disabled
     public void testCommitWalObject_ObjectNotExist() throws IOException, ExecutionException, InterruptedException {
         long streamId = 1;
-        int nodeId = 1;
 
         S3WALObject walObject = S3WALObject.newBuilder()
             .setObjectId(3)
@@ -1961,13 +2016,12 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
             List<S3StreamObject> s3StreamObjects = metadataStore.listStreamObjects(streamId, 0, 334, 2).get();
 
-            Assertions.assertThrows(CompletionException.class, () -> metadataStore.commitWalObject(walObject, s3StreamObjects, compactedObjects).join());
+            Assertions.assertThrows(ExecutionException.class, () -> metadataStore.commitWalObject(walObject, s3StreamObjects, compactedObjects).get());
         }
 
     }
 
     @Test
-    @Disabled
     public void testCommitWalObject_WalNotExist() throws IOException, ExecutionException, InterruptedException {
         long streamId;
         int nodeId = 1;
@@ -2036,14 +2090,17 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             List<S3StreamObject> s3StreamObjects = new ArrayList<>();
             s3StreamObjects.add(streamObject);
             metadataStore.commitWalObject(walObject, s3StreamObjects, compactedObjects).get();
+        }
 
+        try (SqlSession session = getSessionFactory().openSession()) {
             S3StreamObjectMapper mapper = session.getMapper(S3StreamObjectMapper.class);
-            com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = mapper.getByObjectId(objectId);
-            Assertions.assertTrue(object.getCommittedTimestamp() > 0);
+            com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject s3StreamObject = mapper.getByObjectId(objectId);
+            Assertions.assertTrue(s3StreamObject.getCommittedTimestamp() > 0);
 
             S3ObjectMapper objectMapper = session.getMapper(S3ObjectMapper.class);
             S3Object s3Object = objectMapper.getById(objectId);
             Assertions.assertNotNull(s3Object.getCommittedTimestamp());
+            Assertions.assertEquals(S3ObjectState.BOS_COMMITTED, s3Object.getState());
 
             RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
             Range range = rangeMapper.get(1, streamId, null);

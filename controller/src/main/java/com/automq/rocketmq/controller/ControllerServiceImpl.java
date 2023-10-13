@@ -549,7 +549,17 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
         metadataStore.commitWalObject(request.getS3WalObject(), request.getS3StreamObjectsList(), request.getCompactedObjectIdsList())
             .whenComplete((res, e) -> {
                 if (null != e) {
-                    responseObserver.onError(e);
+                    if (e instanceof ControllerException ex) {
+                        CommitWALObjectReply reply = CommitWALObjectReply.newBuilder()
+                            .setStatus(Status.newBuilder()
+                                .setCode(Code.forNumber(ex.getErrorCode()))
+                                .setMessage(e.getMessage()).build())
+                            .build();
+                        responseObserver.onNext(reply);
+                        responseObserver.onCompleted();
+                    } else {
+                        responseObserver.onError(e);
+                    }
                 } else {
                     CommitWALObjectReply reply = CommitWALObjectReply.newBuilder()
                         .setStatus(Status.newBuilder().setCode(Code.OK).build())
@@ -569,7 +579,17 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
             metadataStore.commitStreamObject(request.getS3StreamObject(), request.getCompactedObjectIdsList())
                 .whenComplete((res, e) -> {
                     if (null != e) {
-                        responseObserver.onError(e);
+                        if (e instanceof ControllerException ex) {
+                            CommitStreamObjectReply reply = CommitStreamObjectReply.newBuilder()
+                                .setStatus(Status.newBuilder()
+                                    .setCode(Code.forNumber(ex.getErrorCode()))
+                                    .setMessage(e.getMessage()).build())
+                                .build();
+                            responseObserver.onNext(reply);
+                            responseObserver.onCompleted();
+                        } else {
+                            responseObserver.onError(e);
+                        }
                     } else {
                         CommitStreamObjectReply reply = CommitStreamObjectReply.newBuilder()
                             .setStatus(Status.newBuilder().setCode(Code.OK).build())

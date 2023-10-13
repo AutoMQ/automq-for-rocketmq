@@ -1558,7 +1558,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     // commit S3 object
                     if (objectId != S3Constants.NOOP_OBJECT_ID && !commitObject(objectId, session)) {
                         ControllerException e = new ControllerException(Code.ILLEGAL_STATE_VALUE,
-                            String.format("S3WALObject[object-id=%d] is not prepare", walObject.getObjectId()));
+                            String.format("S3WALObject[object-id=%d] is not ready for commit", walObject.getObjectId()));
                         future.completeExceptionally(e);
                         return future;
                     }
@@ -1587,6 +1587,7 @@ public class DefaultMetadataStore implements MetadataStore {
                         s3WALObject.setObjectId(objectId);
                         s3WALObject.setObjectSize(walObject.getObjectSize());
                         s3WALObject.setBaseDataTimestamp(dataTs);
+                        s3WALObject.setCommittedTimestamp(System.currentTimeMillis());
                         s3WALObject.setNodeId(brokerId);
                         s3WALObject.setSequenceId(walObject.getSequenceId());
                         s3WALObject.setSubStreams(gson.toJson(walObject.getSubStreamsMap()));
@@ -1598,7 +1599,7 @@ public class DefaultMetadataStore implements MetadataStore {
                         for (apache.rocketmq.controller.v1.S3StreamObject s3StreamObject : streamObjects) {
                             long oId = s3StreamObject.getObjectId();
                             if (!commitObject(oId, session)) {
-                                ControllerException e = new ControllerException(Code.ILLEGAL_STATE_VALUE, String.format("S3StreamObject[object-id=%d] is not prepare", oId));
+                                ControllerException e = new ControllerException(Code.ILLEGAL_STATE_VALUE, String.format("S3StreamObject[object-id=%d] is not ready for commit", oId));
                                 future.completeExceptionally(e);
                                 return future;
                             }
@@ -1618,6 +1619,9 @@ public class DefaultMetadataStore implements MetadataStore {
                     }
 
                     // generate compacted objects' remove record ...
+                    if (!Objects.isNull(compactedObjects) && !compactedObjects.isEmpty()) {
+                        compactedObjects.forEach(id -> s3WALObjectMapper.delete(id, null, null));
+                    }
                     session.commit();
                     LOGGER.info("broker[broke-id={}] commit wal object[object-id={}] success, compacted objects[{}], stream objects[{}]",
                         brokerId, walObject.getObjectId(), compactedObjects, streamObjects);
@@ -1670,7 +1674,7 @@ public class DefaultMetadataStore implements MetadataStore {
 
                     // commit object
                     if (!commitObject(streamObject.getObjectId(), session)) {
-                        ControllerException e = new ControllerException(Code.ILLEGAL_STATE_VALUE, String.format("S3StreamObject[object-id=%d] is not prepare", streamObject.getObjectId()));
+                        ControllerException e = new ControllerException(Code.ILLEGAL_STATE_VALUE, String.format("S3StreamObject[object-id=%d] is not ready for commit", streamObject.getObjectId()));
                         future.completeExceptionally(e);
                         return future;
                     }
@@ -1691,14 +1695,17 @@ public class DefaultMetadataStore implements MetadataStore {
                             .min(Long::compareTo).get();
                     }
                     // create a new S3StreamObject to replace committed ones
-                    S3StreamObject newS3StreamObj = new S3StreamObject();
-                    newS3StreamObj.setStreamId(streamObject.getStreamId());
-                    newS3StreamObj.setObjectId(streamObject.getObjectId());
-                    newS3StreamObj.setStartOffset(streamObject.getStartOffset());
-                    newS3StreamObj.setEndOffset(streamObject.getEndOffset());
-                    newS3StreamObj.setBaseDataTimestamp(dataTs);
-                    newS3StreamObj.setCommittedTimestamp(committedTs);
-                    s3StreamObjectMapper.create(newS3StreamObj);
+                    if (streamObject.getObjectId() != S3Constants.NOOP_OBJECT_ID) {
+                        S3StreamObject newS3StreamObj = new S3StreamObject();
+                        newS3StreamObj.setStreamId(streamObject.getStreamId());
+                        newS3StreamObj.setObjectId(streamObject.getObjectId());
+                        newS3StreamObj.setObjectSize(streamObject.getObjectSize());
+                        newS3StreamObj.setStartOffset(streamObject.getStartOffset());
+                        newS3StreamObj.setEndOffset(streamObject.getEndOffset());
+                        newS3StreamObj.setBaseDataTimestamp(dataTs);
+                        newS3StreamObj.setCommittedTimestamp(committedTs);
+                        s3StreamObjectMapper.create(newS3StreamObj);
+                    }
 
                     // delete the compactedObjects of S3Stream
                     if (!Objects.isNull(compactedObjects) && !compactedObjects.isEmpty()) {
