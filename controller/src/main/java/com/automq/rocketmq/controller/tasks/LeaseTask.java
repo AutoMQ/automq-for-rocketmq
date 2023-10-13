@@ -82,9 +82,10 @@ public class LeaseTask extends ControllerTask {
                     this.metadataStore.setLease(update);
                     session.commit();
                     metadataStore.setRole(Role.Leader);
-                    LOGGER.info("Completes campaign and become controller leader");
+                    LOGGER.info("Node[node-id={}] completes campaign and becomes controller leader",
+                        metadataStore.config().nodeId());
                 } else {
-                    LOGGER.info("Another controller has taken the lease");
+                    LOGGER.info("An alternative controller has taken the lease");
                 }
             }
         }

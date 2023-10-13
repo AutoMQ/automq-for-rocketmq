@@ -32,7 +32,6 @@ public class HikariCPDataSourceFactory extends PooledDataSourceFactory {
             if (null == dataSource) {
                 HikariConfig config = new HikariConfig(properties);
                 config.setMaximumPoolSize(10);
-                config.setIdleTimeout(10000);
                 config.setLeakDetectionThreshold(20000);
                 config.setMaxLifetime(30000);
                 dataSource = new HikariDataSource(config);
