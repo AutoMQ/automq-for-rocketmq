@@ -963,6 +963,158 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
+    public void testListObjects_Both_DifferentNode() throws IOException, ExecutionException, InterruptedException {
+        long streamId, startOffset, endOffset;
+        streamId = 1;
+        startOffset = 0L;
+        endOffset = 50L;
+        int limit = 5;
+        Gson gson = new Gson();
+        String subStreamsJson1 = """
+            {
+              "1": {
+                "streamId_": 1,
+                "startOffset_": 10,
+                "endOffset_": 20
+              },
+              "2": {
+                "streamId_": 1,
+                "startOffset_": 20,
+                "endOffset_": 30
+              }
+            }""";
+
+        String subStreamsJson2 = """
+            {
+              "1": {
+                "streamId_": 1,
+                "startOffset_": 20,
+                "endOffset_": 40
+              },
+              "4": {
+                "streamId_": 2,
+                "startOffset_": 40,
+                "endOffset_": 50
+              }
+            }""";
+
+        try (SqlSession session = getSessionFactory().openSession()) {
+            S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
+            S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
+
+            S3WalObject s3WALObject = new S3WalObject();
+            s3WALObject.setObjectId(123L);
+            s3WALObject.setNodeId(1);
+            s3WALObject.setObjectSize(22L);
+            s3WALObject.setSequenceId(999L);
+            s3WALObject.setSubStreams(subStreamsJson1);
+            s3WALObject.setBaseDataTimestamp(System.currentTimeMillis());
+            s3WALObjectMapper.create(s3WALObject);
+
+            S3WalObject s3WALObject1 = new S3WalObject();
+            s3WALObject1.setObjectId(124L);
+            s3WALObject1.setNodeId(2);
+            s3WALObject1.setObjectSize(24L);
+            s3WALObject1.setSequenceId(1000L);
+            s3WALObject1.setSubStreams(subStreamsJson2);
+            s3WALObject1.setBaseDataTimestamp(System.currentTimeMillis());
+            s3WALObjectMapper.create(s3WALObject1);
+
+            com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject s3StreamObject = new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
+            s3StreamObject.setObjectId(121L);
+            s3StreamObject.setObjectSize(123L);
+            s3StreamObject.setStreamId(streamId);
+            s3StreamObject.setStartOffset(0L);
+            s3StreamObject.setEndOffset(10L);
+            s3StreamObject.setBaseDataTimestamp(System.currentTimeMillis());
+            s3StreamObjectMapper.create(s3StreamObject);
+
+            com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject s3StreamObject1 = new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
+            s3StreamObject.setObjectId(122L);
+            s3StreamObject.setObjectSize(124L);
+            s3StreamObject.setStreamId(streamId);
+            s3StreamObject.setStartOffset(40L);
+            s3StreamObject.setEndOffset(50L);
+            s3StreamObject.setBaseDataTimestamp(System.currentTimeMillis());
+            s3StreamObjectMapper.create(s3StreamObject);
+
+            session.commit();
+        }
+        String expectSubStream1 = """
+            {
+              "1": {
+                "streamId_": 1,
+                "startOffset_": 10,
+                "endOffset_": 20
+              }}""";
+        Map<Long, SubStream> subStreams1 = gson.fromJson(new String(expectSubStream1.getBytes(StandardCharsets.UTF_8)), new TypeToken<Map<Long, SubStream>>() {
+        }.getType());
+
+        String expectSubStream2 = """
+            {
+              "1": {
+                "streamId_": 1,
+                "startOffset_": 20,
+                "endOffset_": 40
+              }}""";
+        Map<Long, SubStream> subStreams2 = gson.fromJson(new String(expectSubStream2.getBytes(StandardCharsets.UTF_8)), new TypeToken<Map<Long, SubStream>>() {
+        }.getType());
+
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            Assertions.assertNull(metadataStore.getLease());
+            Lease lease = new Lease();
+            lease.setNodeId(config.nodeId());
+            metadataStore.setLease(lease);
+            Pair<List<S3StreamObject>, List<S3WALObject>> listPair = metadataStore.listObjects(streamId, startOffset, endOffset, limit).get();
+
+            Assertions.assertFalse(listPair.getLeft().isEmpty());
+            Assertions.assertFalse(listPair.getRight().isEmpty());
+            List<S3StreamObject> s3StreamObjects = listPair.getLeft();
+            Assertions.assertEquals(2, s3StreamObjects.size());
+            S3StreamObject s3StreamObject = s3StreamObjects.get(0);
+
+            Assertions.assertEquals(121, s3StreamObject.getObjectId());
+            Assertions.assertEquals(123, s3StreamObject.getObjectSize());
+            Assertions.assertEquals(streamId, s3StreamObject.getStreamId());
+            Assertions.assertEquals(0, s3StreamObject.getStartOffset());
+            Assertions.assertEquals(10, s3StreamObject.getEndOffset());
+
+            S3StreamObject s3StreamObject1 = s3StreamObjects.get(1);
+            Assertions.assertEquals(122, s3StreamObject1.getObjectId());
+            Assertions.assertEquals(124, s3StreamObject1.getObjectSize());
+            Assertions.assertEquals(streamId, s3StreamObject1.getStreamId());
+            Assertions.assertEquals(40, s3StreamObject1.getStartOffset());
+            Assertions.assertEquals(50, s3StreamObject1.getEndOffset());
+
+            List<S3WALObject> s3WALObjects = listPair.getRight();
+            Assertions.assertEquals(2, s3WALObjects.size());
+            S3WALObject s3WALObject = s3WALObjects.get(0);
+            Assertions.assertEquals(123, s3WALObject.getObjectId());
+            Assertions.assertEquals(22, s3WALObject.getObjectSize());
+            Assertions.assertEquals(1, s3WALObject.getBrokerId());
+            Assertions.assertEquals(999, s3WALObject.getSequenceId());
+            Assertions.assertEquals(subStreams1, s3WALObject.getSubStreamsMap());
+
+            S3WALObject s3WALObject1 = s3WALObjects.get(1);
+            Assertions.assertEquals(124, s3WALObject1.getObjectId());
+            Assertions.assertEquals(24, s3WALObject1.getObjectSize());
+            Assertions.assertEquals(2, s3WALObject1.getBrokerId());
+            Assertions.assertEquals(1000, s3WALObject1.getSequenceId());
+            Assertions.assertEquals(subStreams2, s3WALObject1.getSubStreamsMap());
+        }
+
+        try (SqlSession session = getSessionFactory().openSession()) {
+            S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
+            s3WALObjectMapper.delete(123L, 1, null);
+            s3WALObjectMapper.delete(124L, 2, null);
+
+            S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
+            s3StreamObjectMapper.delete(null, streamId, 122L);
+            session.commit();
+        }
+    }
+
+    @Test
     public void testOpenStream_WithCloseStream_AtStart() throws IOException, ExecutionException,
         InterruptedException {
         long streamEpoch, streamId;
