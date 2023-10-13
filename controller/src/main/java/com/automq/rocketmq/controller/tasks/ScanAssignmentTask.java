@@ -20,9 +20,7 @@ package com.automq.rocketmq.controller.tasks;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
-import com.automq.rocketmq.controller.metadata.database.dao.Topic;
 import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper;
-import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 import java.util.List;
 import org.apache.ibatis.session.SqlSession;
 
