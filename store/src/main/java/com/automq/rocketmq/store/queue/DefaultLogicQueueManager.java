@@ -17,12 +17,16 @@
 
 package com.automq.rocketmq.store.queue;
 
+import apache.rocketmq.controller.v1.Code;
 import com.automq.rocketmq.common.config.StoreConfig;
+import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.store.api.LogicQueue;
 import com.automq.rocketmq.store.api.MessageStateMachine;
 import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.rocketmq.store.api.TopicQueueManager;
+import com.automq.rocketmq.store.exception.StoreErrorCode;
+import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.message.TopicQueueId;
 import com.automq.rocketmq.store.service.InflightService;
 import com.automq.rocketmq.store.service.api.KVService;
@@ -31,9 +35,11 @@ import com.automq.stream.utils.FutureUtil;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 public class DefaultLogicQueueManager implements TopicQueueManager {
     protected static final Logger LOGGER = LoggerFactory.getLogger(DefaultLogicQueueManager.class);
@@ -44,7 +50,8 @@ public class DefaultLogicQueueManager implements TopicQueueManager {
     private final StoreMetadataService metadataService;
     private final OperationLogService operationLogService;
     private final InflightService inflightService;
-    private final Map<TopicQueueId, CompletableFuture<Optional<LogicQueue>>> topicQueueMap;
+    private final Map<TopicQueueId, CompletableFuture<LogicQueue>> topicQueueMap;
+    private final String identity = "[DefaultLogicQueueManager]";
 
     public DefaultLogicQueueManager(StoreConfig storeConfig, StreamStore streamStore,
         KVService kvService, StoreMetadataService metadataService, OperationLogService operationLogService,
@@ -73,9 +80,9 @@ public class DefaultLogicQueueManager implements TopicQueueManager {
     }
 
     @Override
-    public CompletableFuture<Optional<LogicQueue>> getOrCreate(long topicId, int queueId) {
+    public CompletableFuture<LogicQueue> getOrCreate(long topicId, int queueId) {
         TopicQueueId key = new TopicQueueId(topicId, queueId);
-        CompletableFuture<Optional<LogicQueue>> future = topicQueueMap.get(key);
+        CompletableFuture<LogicQueue> future = topicQueueMap.get(key);
 
         if (future != null) {
             return future;
@@ -89,17 +96,14 @@ public class DefaultLogicQueueManager implements TopicQueueManager {
             }
 
             // Create and open the topic queue.
-            future = new CompletableFuture<Optional<LogicQueue>>();
+            future = createAndOpen(topicId, queueId);
             topicQueueMap.put(key, future);
-            CompletableFuture<Optional<LogicQueue>> cf = createAndOpen(topicId, queueId)
-                .thenApply(Optional::of)
-                .exceptionally(ex -> {
-                    Throwable cause = FutureUtil.cause(ex);
-                    LOGGER.error("Create logic queue failed: topic: {} queue: {}", topicId, queueId, cause);
-                    topicQueueMap.remove(key);
-                    return Optional.empty();
-                });
-            FutureUtil.propagate(cf, future);
+            future.exceptionally(ex -> {
+                Throwable cause = FutureUtil.cause(ex);
+                LOGGER.error("{}: Create logic queue failed: topic: {} queue: {}", identity, topicId, queueId, cause);
+                topicQueueMap.remove(key);
+                return null;
+            });
             return future;
         }
     }
@@ -107,20 +111,20 @@ public class DefaultLogicQueueManager implements TopicQueueManager {
     @Override
     public CompletableFuture<Optional<LogicQueue>> get(long topicId, int queueId) {
         TopicQueueId key = new TopicQueueId(topicId, queueId);
-        CompletableFuture<Optional<LogicQueue>> future = topicQueueMap.get(key);
+        CompletableFuture<LogicQueue> future = topicQueueMap.get(key);
         if (future != null) {
-            return future;
+            return future.thenApply(Optional::of);
         }
         return CompletableFuture.completedFuture(Optional.empty());
     }
 
     @Override
     public CompletableFuture<Void> close(long topicId, int queueId) {
-        LOGGER.info("Close logic queue: {} queue: {}", topicId, queueId);
+        LOGGER.info("{}: Close logic queue: {} queue: {}", identity, topicId, queueId);
         TopicQueueId key = new TopicQueueId(topicId, queueId);
-        CompletableFuture<Optional<LogicQueue>> future = topicQueueMap.remove(key);
+        CompletableFuture<LogicQueue> future = topicQueueMap.remove(key);
         if (future != null) {
-            return future.thenCompose(opt -> opt.map(LogicQueue::close).orElse(CompletableFuture.completedFuture(null)));
+            return future.thenCompose(LogicQueue::close);
         }
         return CompletableFuture.completedFuture(null);
     }
@@ -135,10 +139,25 @@ public class DefaultLogicQueueManager implements TopicQueueManager {
         LogicQueue logicQueue = new StreamLogicQueue(storeConfig, topicId, queueId,
             metadataService, stateMachine, streamStore, operationLogService, inflightService);
 
-        // TODO: handle exception when open topic queue failed.
-        LOGGER.info("Create and open logic queue success: topic: {} queue: {}", topicId, queueId);
+        LOGGER.info("{}: Create and open logic queue success: topic: {} queue: {}", identity, topicId, queueId);
         return logicQueue.open()
-            .thenApply(nil -> logicQueue);
+            .thenApply(nil -> logicQueue)
+            .exceptionally(ex -> {
+                Throwable cause = FutureUtil.cause(ex);
+                LOGGER.error("{}: Open logic queue failed: topic: {} queue: {}", identity, topicId, queueId, cause);
+                if (cause instanceof ControllerException) {
+                    ControllerException controllerException = (ControllerException) cause;
+                    switch (controllerException.getErrorCode()) {
+                        case Code.FENCED_VALUE -> throw new CompletionException(new StoreException(StoreErrorCode.QUEUE_FENCED, cause.getMessage()));
+                        case Code.NOT_FOUND_VALUE -> throw new CompletionException(new StoreException(StoreErrorCode.QUEUE_NOT_FOUND, cause.getMessage()));
+                        default -> throw new CompletionException(new StoreException(StoreErrorCode.INNER_ERROR, cause.getMessage()));
+                    }
+                } else if (cause instanceof StoreException) {
+                    throw new CompletionException(cause);
+                } else {
+                    throw new CompletionException(new StoreException(StoreErrorCode.INNER_ERROR, cause.getMessage()));
+                }
+            });
     }
 
 }

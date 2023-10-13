@@ -29,14 +29,12 @@ import com.automq.rocketmq.store.queue.DefaultLogicQueueManager;
 import com.automq.rocketmq.store.service.InflightService;
 import com.automq.rocketmq.store.service.RocksDBKVService;
 import com.automq.rocketmq.store.service.api.KVService;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DefaultLogicQueueManagerTest {
@@ -69,16 +67,15 @@ class DefaultLogicQueueManagerTest {
     @Test
     void getOrCreate() {
         // Create new TopicQueue
-        CompletableFuture<Optional<LogicQueue>> future = topicQueueManager.getOrCreate(TOPIC_ID, QUEUE_ID);
+        CompletableFuture<LogicQueue> future = topicQueueManager.getOrCreate(TOPIC_ID, QUEUE_ID);
         assertEquals(topicQueueManager.size(), 1);
         assertTrue(future.isDone());
-        assertTrue(future.join().isPresent());
 
         // Get existing TopicQueue
         future = topicQueueManager.getOrCreate(TOPIC_ID, QUEUE_ID);
         assertEquals(topicQueueManager.size(), 1);
         assertTrue(future.isDone());
-        LogicQueue logicQueue = future.join().get();
+        LogicQueue logicQueue = future.join();
         assertEquals(TOPIC_ID, logicQueue.topicId());
         assertEquals(QUEUE_ID, logicQueue.queueId());
     }
@@ -87,9 +84,8 @@ class DefaultLogicQueueManagerTest {
     void getOrCreate_exception() {
         operationLogService.setRecoverFailed(true);
 
-        CompletableFuture<Optional<LogicQueue>> future = topicQueueManager.getOrCreate(TOPIC_ID, QUEUE_ID);
+        CompletableFuture<LogicQueue> future = topicQueueManager.getOrCreate(TOPIC_ID, QUEUE_ID);
         assertTrue(future.isDone());
-        assertFalse(future.join().isPresent());
         assertEquals(topicQueueManager.size(), 0);
     }
 

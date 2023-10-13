@@ -134,7 +134,7 @@ public class StreamLogicQueue extends LogicQueue {
     @Override
     public CompletableFuture<PutResult> put(FlatMessage flatMessage) {
         if (state.get() != State.OPENED) {
-            return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.TOPIC_QUEUE_NOT_OPENED, "Topic queue not opened"));
+            return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.QUEUE_NOT_OPENED, "Topic queue not opened"));
         }
         return streamStore.append(dataStreamId, new SingleRecord(flatMessage.getByteBuffer()))
             .thenApply(appendResult -> new PutResult(PutResult.Status.PUT_OK, appendResult.baseOffset()));
@@ -143,7 +143,7 @@ public class StreamLogicQueue extends LogicQueue {
     @Override
     public CompletableFuture<PutResult> putRetry(long consumerGroupId, FlatMessage flatMessage) {
         if (state.get() != State.OPENED) {
-            return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.TOPIC_QUEUE_NOT_OPENED, "Topic queue not opened"));
+            return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.QUEUE_NOT_OPENED, "Topic queue not opened"));
         }
         CompletableFuture<Long> retryStreamIdCf = retryStreamId(consumerGroupId);
         return retryStreamIdCf.thenCompose(streamId ->
@@ -179,7 +179,7 @@ public class StreamLogicQueue extends LogicQueue {
         long invisibleDuration) {
         // start from consume offset
         if (state.get() != State.OPENED) {
-            return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.TOPIC_QUEUE_NOT_OPENED, "Topic queue not opened"));
+            return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.QUEUE_NOT_OPENED, "Topic queue not opened"));
         }
         return stateMachine
             .consumeOffset(consumerGroup)
@@ -261,7 +261,7 @@ public class StreamLogicQueue extends LogicQueue {
     public CompletableFuture<PopResult> popFifo(long consumerGroup, Filter filter, int batchSize,
         long invisibleDuration) {
         if (state.get() != State.OPENED) {
-            return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.TOPIC_QUEUE_NOT_OPENED, "Topic queue not opened"));
+            return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.QUEUE_NOT_OPENED, "Topic queue not opened"));
         }
         // start from ack offset
         return stateMachine.ackOffset(consumerGroup).thenCompose(offset ->
@@ -279,7 +279,7 @@ public class StreamLogicQueue extends LogicQueue {
     public CompletableFuture<PopResult> popRetry(long consumerGroupId, Filter filter, int batchSize,
         long invisibleDuration) {
         if (state.get() != State.OPENED) {
-            return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.TOPIC_QUEUE_NOT_OPENED, "Topic queue not opened"));
+            return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.QUEUE_NOT_OPENED, "Topic queue not opened"));
         }
         CompletableFuture<Long> retryStreamIdCf = retryStreamId(consumerGroupId);
         CompletableFuture<Long> retryOffsetCf = stateMachine.retryConsumeOffset(consumerGroupId);
@@ -394,7 +394,7 @@ public class StreamLogicQueue extends LogicQueue {
     @Override
     public CompletableFuture<AckResult> ack(String receiptHandle) {
         if (state.get() != State.OPENED) {
-            return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.TOPIC_QUEUE_NOT_OPENED, "Topic queue not opened"));
+            return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.QUEUE_NOT_OPENED, "Topic queue not opened"));
         }
         ReceiptHandle handle = decodeReceiptHandle(receiptHandle);
         AckOperation operation = new AckOperation(handle.topicId(), handle.queueId(), operationStreamId,
@@ -409,7 +409,7 @@ public class StreamLogicQueue extends LogicQueue {
     @Override
     public CompletableFuture<AckResult> ackTimeout(String receiptHandle) {
         if (state.get() != State.OPENED) {
-            return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.TOPIC_QUEUE_NOT_OPENED, "Topic queue not opened"));
+            return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.QUEUE_NOT_OPENED, "Topic queue not opened"));
         }
         ReceiptHandle handle = decodeReceiptHandle(receiptHandle);
         AckOperation operation = new AckOperation(handle.topicId(), handle.queueId(), operationStreamId,
@@ -425,7 +425,7 @@ public class StreamLogicQueue extends LogicQueue {
     public CompletableFuture<ChangeInvisibleDurationResult> changeInvisibleDuration(String receiptHandle,
         long invisibleDuration) {
         if (state.get() != State.OPENED) {
-            return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.TOPIC_QUEUE_NOT_OPENED, "Topic queue not opened"));
+            return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.QUEUE_NOT_OPENED, "Topic queue not opened"));
         }
         ReceiptHandle handle = decodeReceiptHandle(receiptHandle);
         ChangeInvisibleDurationOperation operation = new ChangeInvisibleDurationOperation(handle.topicId(),
@@ -450,7 +450,7 @@ public class StreamLogicQueue extends LogicQueue {
     public CompletableFuture<PullResult> pullNormal(long consumerGroupId, Filter filter, long startOffset,
         int batchSize) {
         if (state.get() != State.OPENED) {
-            return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.TOPIC_QUEUE_NOT_OPENED, "Topic queue not opened"));
+            return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.QUEUE_NOT_OPENED, "Topic queue not opened"));
         }
         return pull(dataStreamId, consumerGroupId, filter, startOffset, batchSize);
     }
@@ -486,7 +486,7 @@ public class StreamLogicQueue extends LogicQueue {
     public CompletableFuture<PullResult> pullRetry(long consumerGroupId, Filter filter, long startOffset,
         int batchSize) {
         if (state.get() != State.OPENED) {
-            return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.TOPIC_QUEUE_NOT_OPENED, "Topic queue not opened"));
+            return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.QUEUE_NOT_OPENED, "Topic queue not opened"));
         }
         CompletableFuture<Long> retryStreamIdCf = retryStreamId(consumerGroupId);
         return retryStreamIdCf.thenCompose(streamId -> pull(streamId, consumerGroupId, filter, startOffset, batchSize));
