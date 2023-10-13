@@ -132,19 +132,19 @@ public class ReviveService implements Runnable, Lifecycle {
                 }
                 CheckPoint checkPoint = SerializeUtil.decodeCheckPoint(ByteBuffer.wrap(ckValue));
                 PopOperation.PopOperationType operationType = PopOperation.PopOperationType.valueOf(checkPoint.popOperationType());
-                CompletableFuture<Pair<LogicQueue, PullResult>> pullMsgCf = topicQueueManager.get(topicId, queueId).thenComposeAsync(optionalLogicQueue -> {
-                    if (!optionalLogicQueue.isPresent()) {
-                        throw new CompletionException(new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "Queue not found"));
-                    }
-                    LogicQueue queue = optionalLogicQueue.get();
-                    CompletableFuture<PullResult> pullCf;
-                    if (operationType == PopOperation.PopOperationType.POP_RETRY) {
-                        pullCf = queue.pullRetry(consumerGroupId, Filter.DEFAULT_FILTER, checkPoint.messageOffset(), 1);
-                    } else {
-                        pullCf = queue.pullNormal(consumerGroupId, Filter.DEFAULT_FILTER, checkPoint.messageOffset(), 1);
-                    }
-                    return pullCf.thenApply(result -> Pair.of(queue, result));
-                }, backgroundExecutor);
+                CompletableFuture<Pair<LogicQueue, PullResult>> pullMsgCf = topicQueueManager.getOrCreate(topicId, queueId)
+                    .thenComposeAsync(queue -> {
+                        if (!queue.isPresent()) {
+                            throw new CompletionException(new StoreException(StoreErrorCode.TOPIC_QUEUE_NOT_OPENED, "Topic queue not opened"));
+                        }
+                        CompletableFuture<PullResult> pullCf;
+                        if (operationType == PopOperation.PopOperationType.POP_RETRY) {
+                            pullCf = queue.get().pullRetry(consumerGroupId, Filter.DEFAULT_FILTER, checkPoint.messageOffset(), 1);
+                        } else {
+                            pullCf = queue.get().pullNormal(consumerGroupId, Filter.DEFAULT_FILTER, checkPoint.messageOffset(), 1);
+                        }
+                        return pullCf.thenApply(result -> Pair.of(queue.get(), result));
+                    }, backgroundExecutor);
                 CompletableFuture<Triple<LogicQueue, FlatMessageExt, Integer>> cf = pullMsgCf.thenCombineAsync(metadataService.maxDeliveryAttemptsOf(consumerGroupId), (pair, maxDeliveryAttempts) -> {
                     LogicQueue logicQueue = pair.getLeft();
                     PullResult pullResult = pair.getRight();

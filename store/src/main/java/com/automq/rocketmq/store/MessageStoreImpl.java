@@ -25,6 +25,8 @@ import com.automq.rocketmq.store.api.MessageStore;
 import com.automq.rocketmq.store.api.S3ObjectOperator;
 import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.rocketmq.store.api.TopicQueueManager;
+import com.automq.rocketmq.store.exception.StoreErrorCode;
+import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.generated.ReceiptHandle;
 import com.automq.rocketmq.store.model.message.AckResult;
 import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
@@ -116,20 +118,28 @@ public class MessageStoreImpl implements MessageStore {
         }
         return topicQueueManager.getOrCreate(topicId, queueId)
             .thenCompose(topicQueue -> {
+                if (!topicQueue.isPresent()) {
+                    return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.TOPIC_QUEUE_NOT_OPENED, "Topic queue not opened"));
+                }
                 if (fifo) {
-                    return topicQueue.popFifo(consumerGroupId, filter, batchSize, invisibleDuration);
+                    return topicQueue.get().popFifo(consumerGroupId, filter, batchSize, invisibleDuration);
                 }
                 if (retry) {
-                    return topicQueue.popRetry(consumerGroupId, filter, batchSize, invisibleDuration);
+                    return topicQueue.get().popRetry(consumerGroupId, filter, batchSize, invisibleDuration);
                 }
-                return topicQueue.popNormal(consumerGroupId, filter, batchSize, invisibleDuration);
+                return topicQueue.get().popNormal(consumerGroupId, filter, batchSize, invisibleDuration);
             });
     }
 
     @Override
     public CompletableFuture<PutResult> put(FlatMessage message) {
         return topicQueueManager.getOrCreate(message.topicId(), message.queueId())
-            .thenCompose(topicQueue -> topicQueue.put(message));
+            .thenCompose(topicQueue -> {
+                if (!topicQueue.isPresent()) {
+                    return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.TOPIC_QUEUE_NOT_OPENED, "Topic queue not opened"));
+                }
+                return topicQueue.get().put(message);
+            });
     }
 
     @Override
@@ -138,7 +148,12 @@ public class MessageStoreImpl implements MessageStore {
         // Operation id should be monotonically increasing for each queue
         ReceiptHandle handle = decodeReceiptHandle(receiptHandle);
         return topicQueueManager.getOrCreate(handle.topicId(), handle.queueId())
-            .thenCompose(topicQueue -> topicQueue.ack(receiptHandle));
+            .thenCompose(topicQueue -> {
+                if (!topicQueue.isPresent()) {
+                    return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.TOPIC_QUEUE_NOT_OPENED, "Topic queue not opened"));
+                }
+                return topicQueue.get().ack(receiptHandle);
+            });
     }
 
     @Override
@@ -148,7 +163,12 @@ public class MessageStoreImpl implements MessageStore {
         // Operation id should be monotonically increasing for each queue
         ReceiptHandle handle = decodeReceiptHandle(receiptHandle);
         return topicQueueManager.getOrCreate(handle.topicId(), handle.queueId())
-            .thenCompose(topicQueue -> topicQueue.changeInvisibleDuration(receiptHandle, invisibleDuration));
+            .thenCompose(topicQueue -> {
+                if (!topicQueue.isPresent()) {
+                    return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.TOPIC_QUEUE_NOT_OPENED, "Topic queue not opened"));
+                }
+                return topicQueue.get().changeInvisibleDuration(receiptHandle, invisibleDuration);
+            });
     }
 
     @Override
@@ -160,18 +180,33 @@ public class MessageStoreImpl implements MessageStore {
     public CompletableFuture<Integer> getInflightStats(long consumerGroupId, long topicId, int queueId) {
         // Get check point count of specified consumer, topic and queue.
         return topicQueueManager.getOrCreate(topicId, queueId)
-            .thenCompose(topicQueue -> topicQueue.getInflightStats(consumerGroupId));
+            .thenCompose(topicQueue -> {
+                if (!topicQueue.isPresent()) {
+                    return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.TOPIC_QUEUE_NOT_OPENED, "Topic queue not opened"));
+                }
+                return topicQueue.get().getInflightStats(consumerGroupId);
+            });
     }
 
     @Override
     public CompletableFuture<LogicQueue.QueueOffsetRange> getOffsetRange(long topicId, int queueId) {
         return topicQueueManager.getOrCreate(topicId, queueId)
-            .thenCompose(LogicQueue::getOffsetRange);
+            .thenCompose(topicQueue -> {
+                if (!topicQueue.isPresent()) {
+                    return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.TOPIC_QUEUE_NOT_OPENED, "Topic queue not opened"));
+                }
+                return topicQueue.get().getOffsetRange();
+            });
     }
 
     @Override
     public CompletableFuture<Long> getConsumeOffset(long consumerGroupId, long topicId, int queueId) {
         return topicQueueManager.getOrCreate(topicId, queueId)
-            .thenCompose(topicQueue -> topicQueue.getConsumeOffset(consumerGroupId));
+            .thenCompose(topicQueue -> {
+                if (!topicQueue.isPresent()) {
+                    return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.TOPIC_QUEUE_NOT_OPENED, "Topic queue not opened"));
+                }
+                return topicQueue.get().getConsumeOffset(consumerGroupId);
+            });
     }
 }

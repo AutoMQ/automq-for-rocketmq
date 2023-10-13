@@ -23,7 +23,13 @@ import java.util.concurrent.CompletableFuture;
 
 public interface TopicQueueManager extends Lifecycle {
 
-    CompletableFuture<LogicQueue> getOrCreate(long topicId, int queueId);
+    /**
+     * Get or create the logic queue of the specified topic and queue id.
+     * @param topicId topic id
+     * @param queueId queue id
+     * @return {@link CompletableFuture} of {@link Optional<LogicQueue>} which contains the logic queue if exists, return {@link Optional#empty()} if the logic queue create and open failed
+     */
+    CompletableFuture<Optional<LogicQueue>> getOrCreate(long topicId, int queueId);
 
     /**
      * Get the logic queue of the specified topic and queue id.

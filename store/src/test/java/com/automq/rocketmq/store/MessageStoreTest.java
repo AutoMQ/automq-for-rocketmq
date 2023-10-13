@@ -290,7 +290,7 @@ public class MessageStoreTest {
         assertEquals(4, popResult.messageList().get(2).originalOffset());
         assertEquals(2, popResult.messageList().get(2).deliveryAttempts());
 
-        LogicQueue logicQueue = topicQueueManager.getOrCreate(TOPIC_ID, QUEUE_ID).join();
+        LogicQueue logicQueue = topicQueueManager.getOrCreate(TOPIC_ID, QUEUE_ID).join().get();
 
         assertEquals(5, logicQueue.getConsumeOffset(CONSUMER_GROUP_ID).join());
         assertEquals(5, logicQueue.getAckOffset(CONSUMER_GROUP_ID).join());
@@ -381,7 +381,7 @@ public class MessageStoreTest {
         assertEquals(4, popResult.messageList().get(2).originalOffset());
         assertEquals(2, popResult.messageList().get(2).deliveryAttempts());
 
-        LogicQueue logicQueue = topicQueueManager.getOrCreate(TOPIC_ID, QUEUE_ID).join();
+        LogicQueue logicQueue = topicQueueManager.getOrCreate(TOPIC_ID, QUEUE_ID).join().get();
 
         assertEquals(5, logicQueue.getConsumeOffset(CONSUMER_GROUP_ID).join());
         assertEquals(5, logicQueue.getAckOffset(CONSUMER_GROUP_ID).join());
