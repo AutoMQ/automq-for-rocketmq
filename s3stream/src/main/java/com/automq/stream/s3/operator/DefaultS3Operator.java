@@ -21,6 +21,7 @@ import com.automq.stream.metrics.Counter;
 import com.automq.stream.metrics.Timer;
 import com.automq.stream.s3.ByteBufAlloc;
 import com.automq.stream.s3.compact.AsyncTokenBucketThrottle;
+import com.automq.stream.utils.FutureUtil;
 import com.automq.stream.utils.ThreadUtils;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
@@ -50,7 +51,6 @@ import software.amazon.awssdk.auth.credentials.AwsCredentialsProviderChain;
 import software.amazon.awssdk.auth.credentials.InstanceProfileCredentialsProvider;
 import software.amazon.awssdk.core.async.AsyncRequestBody;
 import software.amazon.awssdk.core.async.AsyncResponseTransformer;
-import software.amazon.awssdk.core.client.config.ClientAsyncConfiguration;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.S3AsyncClientBuilder;
@@ -128,7 +128,7 @@ public class DefaultS3Operator implements S3Operator {
         try {
             s3InflightReadLimiter.acquire(size);
         } catch (InterruptedException e) {
-            throw new RuntimeException(e);
+            return FutureUtil.failedFuture(e);
         }
         end = end - 1;
         CompletableFuture<ByteBuf> cf = new CompletableFuture<>();
