@@ -51,6 +51,8 @@ public interface MessageStateMachine {
 
     CompletableFuture<Boolean> isLocked(long consumerGroupId, long offset);
 
+    CompletableFuture<Integer> consumeTimes(long consumerGroupId, long offset);
+
     class ReplayPopResult {
         private final int popTimes;
         private ReplayPopResult(int popTimes) {

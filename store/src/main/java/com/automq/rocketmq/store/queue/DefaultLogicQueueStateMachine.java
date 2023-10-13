@@ -562,6 +562,11 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
         }
     }
 
+    @Override
+    public CompletableFuture<Integer> consumeTimes(long consumerGroupId, long offset) {
+        return CompletableFuture.completedFuture(consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId)).getConsumeTimes().getOrDefault(offset, 0));
+    }
+
     static class AckCommitter {
         private long ackOffset;
         private RoaringBitmap bitmap;

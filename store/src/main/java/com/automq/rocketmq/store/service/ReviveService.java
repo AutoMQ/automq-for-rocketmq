@@ -20,6 +20,7 @@ package com.automq.rocketmq.store.service;
 import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.util.Lifecycle;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
+import com.automq.rocketmq.store.api.DLQSender;
 import com.automq.rocketmq.store.api.LogicQueue;
 import com.automq.rocketmq.store.api.TopicQueueManager;
 import com.automq.rocketmq.store.exception.StoreErrorCode;
@@ -64,10 +65,11 @@ public class ReviveService implements Runnable, Lifecycle {
     private final ConcurrentMap<Long/*operationId*/, CompletableFuture<Void>> inflightRevive;
     private final ScheduledExecutorService mainExecutor;
     private final ExecutorService backgroundExecutor;
+    private final DLQSender dlqSender;
 
     public ReviveService(String checkPointNamespace, String timerTagNamespace, KVService kvService,
         StoreMetadataService metadataService, InflightService inflightService,
-        TopicQueueManager topicQueueManager) {
+        TopicQueueManager topicQueueManager, DLQSender dlqSender) {
         this.checkPointNamespace = checkPointNamespace;
         this.timerTagNamespace = timerTagNamespace;
         this.kvService = kvService;
@@ -75,6 +77,7 @@ public class ReviveService implements Runnable, Lifecycle {
         this.inflightService = inflightService;
         this.topicQueueManager = topicQueueManager;
         this.inflightRevive = new ConcurrentHashMap<>();
+        this.dlqSender = dlqSender;
         this.mainExecutor = Executors.newSingleThreadScheduledExecutor(
             ThreadUtils.createThreadFactory("revive-service-main", false));
         this.backgroundExecutor = Executors.newSingleThreadExecutor(
@@ -158,17 +161,17 @@ public class ReviveService implements Runnable, Lifecycle {
                     LogicQueue logicQueue = triple.getLeft();
                     FlatMessageExt messageExt = triple.getMiddle();
                     int maxDeliveryAttempts = triple.getRight();
-
-                    if (operationType != PopOperation.PopOperationType.POP_ORDER) {
-                        if (messageExt.deliveryAttempts() <= maxDeliveryAttempts) {
+                    if (messageExt.deliveryAttempts() <= maxDeliveryAttempts) {
+                        // normal message and retry message can be resent as retry message.
+                        if (operationType != PopOperation.PopOperationType.POP_ORDER) {
                             return logicQueue.putRetry(consumerGroupId, messageExt.message())
                                 .thenApply(nil -> logicQueue);
-                        } else {
-                            // TODO: dead letter
-                            return CompletableFuture.completedFuture(logicQueue);
                         }
                     }
-                    return CompletableFuture.completedFuture(logicQueue);
+                    // send as DLQ
+                    return dlqSender.send(messageExt)
+                        .thenApply(nil -> logicQueue);
+
                 });
                 CompletableFuture<AckResult> ackCf = resendCf.thenComposeAsync(queue -> {
                     // ack timeout
