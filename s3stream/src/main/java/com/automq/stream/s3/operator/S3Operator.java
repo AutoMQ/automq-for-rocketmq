@@ -17,10 +17,8 @@
 
 package com.automq.stream.s3.operator;
 
-import com.automq.stream.s3.ByteBufAlloc;
 import com.automq.stream.s3.compact.AsyncTokenBucketThrottle;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
