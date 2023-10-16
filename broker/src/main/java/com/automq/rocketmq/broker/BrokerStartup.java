@@ -18,6 +18,7 @@
 package com.automq.rocketmq.broker;
 
 import com.automq.rocketmq.common.config.BrokerConfig;
+import com.google.common.base.Strings;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -26,6 +27,7 @@ import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
+import org.apache.rocketmq.logging.ch.qos.logback.classic.ClassicConstants;
 import org.apache.rocketmq.srvutil.ServerUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,6 +38,11 @@ public class BrokerStartup {
     private static final Logger LOGGER = LoggerFactory.getLogger(BrokerStartup.class);
 
     public static void main(String[] args) throws Exception {
+        LOGGER.info("Starting broker...");
+        long start = System.currentTimeMillis();
+
+        configKernelLogger();
+
         Options options = buildCommandlineOptions();
 
         CommandLine commandLine = ServerUtil.parseCmdLine(
@@ -62,6 +69,7 @@ public class BrokerStartup {
         }
 
         start(buildBrokerController(brokerConfig));
+        LOGGER.info("Broker started, costs {} ms", System.currentTimeMillis() - start);
     }
 
     private static void start(BrokerController controller) {
@@ -83,6 +91,18 @@ public class BrokerStartup {
         Yaml yaml = new Yaml();
         yaml.setBeanAccess(BeanAccess.FIELD);
         return yaml.loadAs(configStr, BrokerConfig.class);
+    }
+
+    private static void configKernelLogger() {
+        String logConfig = System.getProperty(ClassicConstants.CONFIG_FILE_PROPERTY);
+
+        String defaultLogConfigFile = "rmq.proxy.logback.xml";
+        if (Strings.isNullOrEmpty(logConfig)) {
+            LOGGER.info("Load the default logback config for the kernel of rocketmq from classpath: {}", defaultLogConfigFile);
+            System.setProperty(ClassicConstants.CONFIG_FILE_PROPERTY, defaultLogConfigFile);
+        } else {
+            LOGGER.info("Load the logback config for the kernel of rocketmq from the specific file: {}", logConfig);
+        }
     }
 
     private static Options buildCommandlineOptions() {
