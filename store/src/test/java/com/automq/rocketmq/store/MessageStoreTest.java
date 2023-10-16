@@ -145,13 +145,13 @@ public class MessageStoreTest {
         assertEquals(3, popResult.messageList().size());
         assertEquals(0, popResult.messageList().get(0).offset());
         assertEquals(0, popResult.messageList().get(0).originalOffset());
-        assertEquals(2, popResult.messageList().get(0).consumeTimes());
+        assertEquals(2, popResult.messageList().get(0).deliveryAttempts());
         assertEquals(1, popResult.messageList().get(1).offset());
         assertEquals(1, popResult.messageList().get(1).originalOffset());
-        assertEquals(2, popResult.messageList().get(1).consumeTimes());
+        assertEquals(2, popResult.messageList().get(1).deliveryAttempts());
         assertEquals(2, popResult.messageList().get(2).offset());
         assertEquals(4, popResult.messageList().get(2).originalOffset());
-        assertEquals(2, popResult.messageList().get(2).consumeTimes());
+        assertEquals(2, popResult.messageList().get(2).deliveryAttempts());
 
         // 7. after 1100ms, pop again
         long reviveTimestamp1 = System.currentTimeMillis() + invisibleDuration;
@@ -164,13 +164,13 @@ public class MessageStoreTest {
         assertEquals(3, popResult.messageList().size());
         assertEquals(3, popResult.messageList().get(0).offset());
         assertEquals(0, popResult.messageList().get(0).originalOffset());
-        assertEquals(3, popResult.messageList().get(0).consumeTimes());
+        assertEquals(3, popResult.messageList().get(0).deliveryAttempts());
         assertEquals(4, popResult.messageList().get(1).offset());
         assertEquals(1, popResult.messageList().get(1).originalOffset());
-        assertEquals(3, popResult.messageList().get(1).consumeTimes());
+        assertEquals(3, popResult.messageList().get(1).deliveryAttempts());
         assertEquals(5, popResult.messageList().get(2).offset());
         assertEquals(4, popResult.messageList().get(2).originalOffset());
-        assertEquals(3, popResult.messageList().get(2).consumeTimes());
+        assertEquals(3, popResult.messageList().get(2).deliveryAttempts());
     }
 
     @Test
@@ -231,9 +231,9 @@ public class MessageStoreTest {
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(2, popResult.messageList().size());
         assertEquals(3, popResult.messageList().get(0).offset());
-        assertEquals(2, popResult.messageList().get(0).consumeTimes());
+        assertEquals(2, popResult.messageList().get(0).deliveryAttempts());
         assertEquals(4, popResult.messageList().get(1).offset());
-        assertEquals(2, popResult.messageList().get(1).consumeTimes());
+        assertEquals(2, popResult.messageList().get(1).deliveryAttempts());
     }
 
     @Test
@@ -290,13 +290,13 @@ public class MessageStoreTest {
         assertEquals(3, popResult.messageList().size());
         assertEquals(0, popResult.messageList().get(0).offset());
         assertEquals(0, popResult.messageList().get(0).originalOffset());
-        assertEquals(2, popResult.messageList().get(0).consumeTimes());
+        assertEquals(2, popResult.messageList().get(0).deliveryAttempts());
         assertEquals(1, popResult.messageList().get(1).offset());
         assertEquals(3, popResult.messageList().get(1).originalOffset());
-        assertEquals(2, popResult.messageList().get(1).consumeTimes());
+        assertEquals(2, popResult.messageList().get(1).deliveryAttempts());
         assertEquals(2, popResult.messageList().get(2).offset());
         assertEquals(4, popResult.messageList().get(2).originalOffset());
-        assertEquals(2, popResult.messageList().get(2).consumeTimes());
+        assertEquals(2, popResult.messageList().get(2).deliveryAttempts());
 
         LogicQueue logicQueue = topicQueueManager.getOrCreate(TOPIC_ID, QUEUE_ID).join();
 
@@ -381,13 +381,13 @@ public class MessageStoreTest {
         assertEquals(3, popResult.messageList().size());
         assertEquals(0, popResult.messageList().get(0).offset());
         assertEquals(0, popResult.messageList().get(0).originalOffset());
-        assertEquals(2, popResult.messageList().get(0).consumeTimes());
+        assertEquals(2, popResult.messageList().get(0).deliveryAttempts());
         assertEquals(1, popResult.messageList().get(1).offset());
         assertEquals(3, popResult.messageList().get(1).originalOffset());
-        assertEquals(2, popResult.messageList().get(1).consumeTimes());
+        assertEquals(2, popResult.messageList().get(1).deliveryAttempts());
         assertEquals(2, popResult.messageList().get(2).offset());
         assertEquals(4, popResult.messageList().get(2).originalOffset());
-        assertEquals(2, popResult.messageList().get(2).consumeTimes());
+        assertEquals(2, popResult.messageList().get(2).deliveryAttempts());
 
         LogicQueue logicQueue = topicQueueManager.getOrCreate(TOPIC_ID, QUEUE_ID).join();
 

@@ -202,7 +202,7 @@ class ReviveServiceTest {
         PopResult retryPopResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
         assertEquals(1, retryPopResult.messageList().size());
         FlatMessageExt msg = retryPopResult.messageList().get(0);
-        assertEquals(2, msg.consumeTimes());
+        assertEquals(2, msg.deliveryAttempts());
         assertEquals(0, msg.offset());
 
         long reviveTimestamp1 = System.currentTimeMillis() + invisibleDuration;
@@ -223,7 +223,7 @@ class ReviveServiceTest {
         PopResult retryPopResult1 = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
         assertEquals(1, retryPopResult1.messageList().size());
         FlatMessageExt msg1 = retryPopResult1.messageList().get(0);
-        assertEquals(1, msg1.consumeTimes());
+        assertEquals(1, msg1.deliveryAttempts());
         assertEquals(1, msg1.offset());
     }
 }

@@ -230,7 +230,9 @@ public class StreamLogicQueue extends LogicQueue {
                     .thenApply(logResult -> {
                         long operationId = logResult.getOperationOffset();
                         messageExt.setReceiptHandle(SerializeUtil.encodeReceiptHandle(consumerGroupId, topicId, queueId, operationId));
-                        messageExt.setConsumeTimes(logResult.getPopTimes());
+                        if (!messageExt.isRetryMessage()) {
+                            messageExt.setDeliveryAttempts(logResult.getPopTimes());
+                        }
                         return logResult;
                     }));
             }
