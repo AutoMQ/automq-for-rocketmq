@@ -1935,7 +1935,7 @@ public class DefaultMetadataStore implements MetadataStore {
                 S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
                 S3WalObjectMapper s3WalObjectMapper = session.getMapper(S3WalObjectMapper.class);
                 List<apache.rocketmq.controller.v1.S3StreamObject> s3StreamObjects = s3StreamObjectMapper.list(null, streamId, startOffset, endOffset, limit)
-                    .parallelStream()
+                    .stream()
                     .map(streamObject -> apache.rocketmq.controller.v1.S3StreamObject.newBuilder()
                         .setStreamId(streamObject.getStreamId())
                         .setObjectSize(streamObject.getObjectSize())
@@ -1949,7 +1949,7 @@ public class DefaultMetadataStore implements MetadataStore {
 
                 List<S3WALObject> walObjects = new ArrayList<>();
                 s3WalObjectMapper.list(null, null)
-                    .parallelStream()
+                    .stream()
                     .map(s3WalObject -> {
                         TypeToken<Map<Long, SubStream>> typeToken = new TypeToken<>() {
                         };

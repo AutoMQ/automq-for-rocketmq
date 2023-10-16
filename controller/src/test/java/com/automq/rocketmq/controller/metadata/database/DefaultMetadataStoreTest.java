@@ -1111,6 +1111,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
             s3StreamObjectMapper.delete(null, streamId, 122L);
+            s3StreamObjectMapper.delete(null, streamId, 121L);
             session.commit();
         }
     }
@@ -1257,6 +1258,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
             s3StreamObjectMapper.delete(null, streamId, 122L);
+            s3StreamObjectMapper.delete(null, streamId, 121L);
             session.commit();
         }
     }
@@ -2160,6 +2162,12 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             metadataStore.setRole(Role.Leader);
 
             Assertions.assertThrows(ExecutionException.class, () -> metadataStore.commitStreamObject(s3StreamObject, compactedObjects).get());
+        }
+
+        try (SqlSession session = getSessionFactory().openSession()) {
+            S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
+            s3StreamObjectMapper.delete(null, null, 2L);
+            session.commit();
         }
 
     }
