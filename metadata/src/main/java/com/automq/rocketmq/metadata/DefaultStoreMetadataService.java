@@ -29,7 +29,6 @@ import com.automq.rocketmq.metadata.api.StoreMetadataService;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,56 +41,6 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
 
     public DefaultStoreMetadataService(MetadataStore metadataStore) {
         this.metadataStore = metadataStore;
-    }
-
-    @Override
-    public long getStreamId(long topicId, int queueId) {
-        try {
-            return metadataStore.getStream(topicId, queueId, null, StreamRole.STREAM_ROLE_DATA)
-                .get()
-                .getStreamId();
-        } catch (ExecutionException | InterruptedException e) {
-            LOGGER.error("Failed to acquire data stream-id for topic-id={}, queue-id={}", topicId, queueId);
-            return -1L;
-        }
-    }
-
-    @Override
-    public long getOperationLogStreamId(long topicId, int queueId) {
-        try {
-            return metadataStore.getStream(topicId, queueId, null, StreamRole.STREAM_ROLE_OPS).get()
-                .getStreamId();
-        } catch (ExecutionException | InterruptedException e) {
-            LOGGER.error("Failed to acquire data stream-id for topic-id={}, queue-id={}", topicId, queueId);
-            return -1L;
-        }
-    }
-
-    @Override
-    public long getRetryStreamId(long consumerGroupId, long topicId, int queueId) {
-        try {
-            return metadataStore.getStream(topicId, queueId, consumerGroupId, StreamRole.STREAM_ROLE_RETRY).get()
-                .getStreamId();
-        } catch (ExecutionException | InterruptedException e) {
-            LOGGER.error("Failed to acquire data stream-id for topic-id={}, queue-id={}", topicId, queueId);
-            return -1L;
-        }
-    }
-
-    @Override
-    public long getDeadLetterStreamId(long consumerGroupId, long topicId, int queueId) {
-        throw new RuntimeException("Unsupported operation");
-    }
-
-    @Override
-    public int getMaxDeliveryAttempts(long consumerGroupId) {
-        try {
-            ConsumerGroup group = metadataStore.describeConsumerGroup(consumerGroupId, null).get();
-            return group.getMaxDeliveryAttempt();
-        } catch (ExecutionException | InterruptedException e) {
-            LOGGER.error("Exception raised while retrieving group for {}", consumerGroupId, e);
-            return -1;
-        }
     }
 
     @Override

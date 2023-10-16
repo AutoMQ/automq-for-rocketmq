@@ -198,15 +198,4 @@ public interface StoreMetadataService {
      * @return nodeId
      */
     int getNodeId();
-
-    @Deprecated
-    long getStreamId(long topicId, int queueId);
-    @Deprecated
-    long getOperationLogStreamId(long topicId, int queueId);
-    @Deprecated
-    long getRetryStreamId(long consumerGroupId, long topicId, int queueId);
-    @Deprecated
-    long getDeadLetterStreamId(long consumerGroupId, long topicId, int queueId);
-    @Deprecated
-    int getMaxDeliveryAttempts(long consumerGroupId);
 }
