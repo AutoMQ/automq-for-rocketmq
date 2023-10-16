@@ -164,6 +164,7 @@ public class ReviveService implements Runnable, Lifecycle {
                         return logicQueue.getConsumeTimes(consumerGroupId, messageExt.offset())
                             .thenCompose(consumeTimes -> {
                                 if (consumeTimes >= maxDeliveryAttempts) {
+                                    messageExt.setDeliveryAttempts(consumeTimes);
                                     // send as DLQ
                                     return dlqSender.send(messageExt)
                                         .thenApply(nil -> Pair.of(true, logicQueue));
