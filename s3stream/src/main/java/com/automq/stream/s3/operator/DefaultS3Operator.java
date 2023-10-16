@@ -652,6 +652,9 @@ public class DefaultS3Operator implements S3Operator {
         }
 
         boolean tryMerge(ReadTask readTask) {
+            if (!path.equals(readTask.path)) {
+                return false;
+            }
             long newStart = Math.min(start, readTask.start);
             long newEnd = Math.max(end, readTask.end);
             boolean merge = newEnd - newStart <= MAX_MERGE_READ_SIZE;
