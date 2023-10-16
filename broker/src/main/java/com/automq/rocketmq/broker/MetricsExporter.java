@@ -46,7 +46,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.rocketmq.common.Pair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.rocketmq.common.metrics.MetricsExporterType;
 import org.apache.rocketmq.logging.org.slf4j.Logger;
 import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
@@ -64,13 +64,14 @@ public class MetricsExporter implements Lifecycle {
     private final BrokerConfig brokerConfig;
     private final MetricsConfig metricsConfig;
     private final MessageStore messageStore;
-    private final ExtendMessagingProcessor messagingProcessor;
     private final static Map<String, String> LABEL_MAP = new HashMap<>();
     private OtlpGrpcMetricExporter metricExporter;
     private PeriodicMetricReader periodicMetricReader;
     private PrometheusHttpServer prometheusHttpServer;
     private LoggingMetricExporter loggingMetricExporter;
     private Meter brokerMeter;
+
+    private final ProxyMetricsManager proxyMetricsManager;
 
     public static Supplier<AttributesBuilder> attributesBuilderSupplier = Attributes::builder;
 
@@ -79,7 +80,7 @@ public class MetricsExporter implements Lifecycle {
         this.brokerConfig = brokerConfig;
         this.metricsConfig = brokerConfig.metrics();
         this.messageStore = messageStore;
-        this.messagingProcessor = messagingProcessor;
+        proxyMetricsManager = new ProxyMetricsManager(messagingProcessor);
     }
 
     public static AttributesBuilder newAttributesBuilder() {
@@ -101,15 +102,11 @@ public class MetricsExporter implements Lifecycle {
             return false;
         }
 
-        switch (exporterType) {
-            case OTLP_GRPC:
-                return StringUtils.isNotBlank(metricsConfig.grpcExporterHeader());
-            case PROM:
-                return true;
-            case LOG:
-                return true;
-        }
-        return false;
+        return switch (exporterType) {
+            case OTLP_GRPC -> StringUtils.isNotBlank(metricsConfig.grpcExporterHeader());
+            case PROM, LOG -> true;
+            default -> false;
+        };
     }
 
     @Override
@@ -219,12 +216,12 @@ public class MetricsExporter implements Lifecycle {
 
     private void registerMetricsView(SdkMeterProviderBuilder providerBuilder) {
         for (Pair<InstrumentSelector, View> selectorViewPair : ProxyMetricsManager.getMetricsView()) {
-            providerBuilder.registerView(selectorViewPair.getObject1(), selectorViewPair.getObject2());
+            providerBuilder.registerView(selectorViewPair.getLeft(), selectorViewPair.getRight());
         }
     }
 
     private void initMetrics() {
-        ProxyMetricsManager.initMetrics(brokerMeter, MetricsExporter::newAttributesBuilder);
+        proxyMetricsManager.initMetrics(brokerMeter, MetricsExporter::newAttributesBuilder);
     }
 
     @Override

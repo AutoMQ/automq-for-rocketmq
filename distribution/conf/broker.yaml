@@ -13,3 +13,14 @@ db:
   url: "jdbc:mysql://localhost:3306/metadata"
   userName: "root"
   password: "password"
+metrics:
+  exporterType: "PROM"
+  grpcExporterTarget: ""
+  grpcExporterHeader: ""
+  grpcExporterTimeOutInMills: 31000
+  grpcExporterIntervalInMills: 60000
+  promExporterPort: 5557
+  promExporterHost: "localhost"
+  loggingExporterIntervalInMills: 10000
+  labels: ""
+  exportInDelta: false

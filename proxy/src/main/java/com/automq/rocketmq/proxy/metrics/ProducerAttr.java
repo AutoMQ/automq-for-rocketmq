@@ -14,28 +14,32 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.automq.rocketmq.proxy.metrics;
 
-package com.automq.rocketmq.proxy.processor;
+import com.google.common.base.Objects;
+import org.apache.rocketmq.remoting.protocol.LanguageCode;
 
-import org.apache.rocketmq.broker.client.ConsumerManager;
-import org.apache.rocketmq.broker.client.ProducerManager;
-import org.apache.rocketmq.proxy.processor.DefaultMessagingProcessor;
-import org.apache.rocketmq.proxy.service.ServiceManager;
+public class ProducerAttr {
+    LanguageCode language;
+    int version;
 
-public class ExtendMessagingProcessor extends DefaultMessagingProcessor {
-    protected ExtendMessagingProcessor(ServiceManager serviceManager) {
-        super(serviceManager);
+    public ProducerAttr(LanguageCode language, int version) {
+        this.language = language;
+        this.version = version;
     }
 
-    public static ExtendMessagingProcessor createForS3RocketMQ(ServiceManager serviceManager) {
-        return new ExtendMessagingProcessor(serviceManager);
+    @Override
+    public boolean equals(Object o) {
+        if (this == o)
+            return true;
+        if (o == null || getClass() != o.getClass())
+            return false;
+        ProducerAttr attr = (ProducerAttr) o;
+        return version == attr.version && language == attr.language;
     }
 
-    public ProducerManager producerManager() {
-        return serviceManager.getProducerManager();
-    }
-
-    public ConsumerManager consumerManager() {
-        return serviceManager.getConsumerManager();
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(language, version);
     }
 }
