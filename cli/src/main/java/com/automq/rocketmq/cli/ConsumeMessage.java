@@ -39,7 +39,6 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
@@ -114,8 +113,8 @@ public class ConsumeMessage implements Callable<Void> {
 
         executor.submit(() -> {
             RateLimiter rateLimiter = RateLimiter.create(messageRate);
-            Semaphore inflightSemaphore = new Semaphore(inflightMessageNums);
             AtomicInteger messageReceived = new AtomicInteger();
+            AtomicInteger currentInflightMessages = new AtomicInteger();
             int index = 0;
             while (true) {
                 if (System.currentTimeMillis() - startTimestamp > durationInSeconds * 1000L) {
@@ -123,6 +122,14 @@ public class ConsumeMessage implements Callable<Void> {
                 }
                 if (messageReceived.get() >= numMessages) {
                     break;
+                }
+
+                if (currentInflightMessages.get() >= inflightMessageNums) {
+                    try {
+                        TimeUnit.MILLISECONDS.sleep(1);
+                    } catch (InterruptedException ignored) {
+                    }
+                    continue;
                 }
 
                 rateLimiter.acquire();
@@ -139,7 +146,7 @@ public class ConsumeMessage implements Callable<Void> {
                         for (MessageView messageView : messageViews) {
                             consumeMeter.mark();
                             selectedConsumer.ackAsync(messageView).whenComplete((ackReceipt, ackThrowable) -> {
-                                inflightSemaphore.release();
+                                currentInflightMessages.decrementAndGet();
                                 if (ackThrowable != null) {
                                     System.out.println("Failed to ack message: " + ackThrowable.getMessage());
                                 } else {
@@ -147,11 +154,7 @@ public class ConsumeMessage implements Callable<Void> {
                                 }
                             });
                         }
-                        try {
-                            inflightSemaphore.acquire(messageViews.size());
-                        } catch (InterruptedException e) {
-                            System.out.println("Failed to acquire semaphore: " + e.getMessage());
-                        }
+                        currentInflightMessages.addAndGet(messageViews.size());
                         messageReceived.addAndGet(messageViews.size());
                     }
                 });
