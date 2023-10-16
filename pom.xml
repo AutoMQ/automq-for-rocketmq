@@ -46,7 +46,6 @@
         <rocksdb.version>8.5.3</rocksdb.version>
         <guava.version>32.0.1-jre</guava.version>
         <slf4j.version>2.0.9</slf4j.version>
-        <logback.version>1.4.11</logback.version>
         <snakeyaml.version>2.2</snakeyaml.version>
         <s3stream.version>0.1.6-SNAPSHOT</s3stream.version>
 
@@ -141,11 +140,6 @@
                 <artifactId>netty-all</artifactId>
                 <version>4.1.100.Final</version>
             </dependency>
-            <dependency>
-                <groupId>ch.qos.logback</groupId>
-                <artifactId>logback-core</artifactId>
-                <version>${logback.version}</version>
-            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -155,12 +149,6 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
             <version>${slf4j.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>ch.qos.logback</groupId>
-            <artifactId>logback-classic</artifactId>
-            <version>${logback.version}</version>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>

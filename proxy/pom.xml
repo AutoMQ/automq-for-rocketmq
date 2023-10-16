@@ -53,8 +53,8 @@
                     <artifactId>commons-collections</artifactId>
                 </exclusion>
                 <exclusion>
-                    <groupId>ch.qos.logback</groupId>
-                    <artifactId>logback-classic</artifactId>
+                    <groupId>io.github.aliyunmq</groupId>
+                    <artifactId>rocketmq-shaded-slf4j-api-bridge</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
