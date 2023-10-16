@@ -21,7 +21,6 @@ import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.Topic;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 public interface ProxyMetadataService {
@@ -76,21 +75,4 @@ public interface ProxyMetadataService {
      * @return {@link CompletableFuture} of {@link Void}
      */
     CompletableFuture<Void> updateConsumerOffset(long consumerGroupId, long topicId, int queueId, long newOffset);
-
-    @Deprecated
-    long queryTopicId(String name);
-
-    @Deprecated
-    Set<Integer> queryAssignmentQueueSet(long topicId);
-
-    @Deprecated
-    long queryConsumerGroupId(String name);
-
-    @Deprecated
-    long queryConsumerOffset(long consumerGroupId, long topicId, int queueId);
-
-    @Deprecated
-    // Each time pop will advance the consumer offset by batch size.
-    // Metadata service will cache the consumer offset in memory, and periodically commit to Controller.
-    void updateConsumerOffset(long consumerGroupId, long topicId, int queueId, long offset, boolean retry);
 }

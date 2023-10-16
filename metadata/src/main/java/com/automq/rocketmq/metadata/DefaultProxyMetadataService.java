@@ -23,7 +23,6 @@ import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.metadata.api.ProxyMetadataService;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 public class DefaultProxyMetadataService implements ProxyMetadataService {
@@ -65,30 +64,5 @@ public class DefaultProxyMetadataService implements ProxyMetadataService {
     public CompletableFuture<Void> updateConsumerOffset(long consumerGroupId, long topicId, int queueId,
         long newOffset) {
         return metadataStore.commitOffset(consumerGroupId, topicId, queueId, newOffset);
-    }
-
-    @Override
-    public long queryTopicId(String name) {
-        return 0;
-    }
-
-    @Override
-    public Set<Integer> queryAssignmentQueueSet(long topicId) {
-        return null;
-    }
-
-    @Override
-    public long queryConsumerGroupId(String name) {
-        return 0;
-    }
-
-    @Override
-    public long queryConsumerOffset(long consumerGroupId, long topicId, int queueId) {
-        return 0;
-    }
-
-    @Override
-    public void updateConsumerOffset(long consumerGroupId, long topicId, int queueId, long offset, boolean retry) {
-
     }
 }
