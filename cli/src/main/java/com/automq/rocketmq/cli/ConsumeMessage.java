@@ -39,6 +39,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
@@ -54,7 +55,7 @@ import picocli.CommandLine;
 
 @CommandLine.Command(name = "consumeMessage", mixinStandardHelpOptions = true, showDefaultValues = true)
 public class ConsumeMessage implements Callable<Void> {
-    @CommandLine.Option(names = {"-tn", "--topicNums"}, description = "Number of topics")
+    @CommandLine.Option(names = {"-t", "--topicNums"}, description = "Number of topics")
     int topicNums = 1;
 
     @CommandLine.Option(names = {"-r", "--rate"}, description = "Consume message rate per second across all topics")
@@ -78,7 +79,7 @@ public class ConsumeMessage implements Callable<Void> {
     @CommandLine.Option(names = {"-g", "--groupName"}, description = "Group name")
     String groupName = "Benchmark_Group";
 
-    @CommandLine.Option(names = {"-t", "--groupType"}, description = "Group type")
+    @CommandLine.Option(names = {"-gt", "--groupType"}, description = "Group type")
     GroupType groupType = GroupType.GROUP_TYPE_STANDARD;
 
     @CommandLine.Option(names = {"-lt", "--longPollingTimeoutInSeconds"}, description = "Long polling timeout in seconds")
@@ -86,6 +87,9 @@ public class ConsumeMessage implements Callable<Void> {
 
     @CommandLine.Option(names = {"-bs", "--batchSize"}, description = "Batch size per receive request")
     int batchSize = 32;
+
+    @CommandLine.Option(names = {"-im", "--inflightMessageNums"}, description = "Inflight message number")
+    int inflightMessageNums = 100;
 
     @CommandLine.ParentCommand
     MQAdmin mqAdmin;
@@ -110,6 +114,7 @@ public class ConsumeMessage implements Callable<Void> {
 
         executor.submit(() -> {
             RateLimiter rateLimiter = RateLimiter.create(messageRate);
+            Semaphore inflightSemaphore = new Semaphore(inflightMessageNums);
             AtomicInteger messageReceived = new AtomicInteger();
             int index = 0;
             while (true) {
@@ -134,12 +139,18 @@ public class ConsumeMessage implements Callable<Void> {
                         for (MessageView messageView : messageViews) {
                             consumeMeter.mark();
                             selectedConsumer.ackAsync(messageView).whenComplete((ackReceipt, ackThrowable) -> {
+                                inflightSemaphore.release();
                                 if (ackThrowable != null) {
                                     System.out.println("Failed to ack message: " + ackThrowable.getMessage());
                                 } else {
                                     ackMeter.mark();
                                 }
                             });
+                        }
+                        try {
+                            inflightSemaphore.acquire(messageViews.size());
+                        } catch (InterruptedException e) {
+                            System.out.println("Failed to acquire semaphore: " + e.getMessage());
                         }
                         messageReceived.addAndGet(messageViews.size());
                     }
