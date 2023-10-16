@@ -79,7 +79,6 @@ public class DefaultS3Operator implements S3Operator {
     private static final Logger LOGGER = LoggerFactory.getLogger(DefaultS3Operator.class);
     private final String bucket;
     private final S3AsyncClient s3;
-    private static final AtomicLong LAST_LOG_TIMESTAMP = new AtomicLong(System.currentTimeMillis());
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(
             ThreadUtils.createThreadFactory("s3operator", true));
 
@@ -119,7 +118,6 @@ public class DefaultS3Operator implements S3Operator {
 
     @Override
     public CompletableFuture<ByteBuf> rangeRead(String path, long start, long end, ByteBufAllocator alloc) {
-        int size = (int)(end - start);
         end = end - 1;
         CompletableFuture<ByteBuf> cf = new CompletableFuture<>();
         ByteBuf buf = alloc.directBuffer((int) (end - start));
@@ -290,8 +288,6 @@ public class DefaultS3Operator implements S3Operator {
         private ObjectPart objectPart = null;
         private final TimerUtil timerUtil = new TimerUtil();
         private final AsyncTokenBucketThrottle readThrottle;
-        private final AtomicInteger totalParts = new AtomicInteger(0);
-        private final AtomicLong totalUploadPartTime = new AtomicLong(0L);
         private final AtomicLong totalWriteSize = new AtomicLong(0L);
 
         public DefaultWriter(String path, String logIdent, AsyncTokenBucketThrottle readThrottle) {
@@ -363,8 +359,6 @@ public class DefaultS3Operator implements S3Operator {
             uploadPartCf.thenAccept(uploadPartResponse -> {
                 OperationMetricsStats.getOrCreateOperationMetrics(S3Operation.UPLOAD_PART).operationCount.inc();
                 OperationMetricsStats.getOrCreateOperationMetrics(S3Operation.UPLOAD_PART).operationTime.update(timerUtil.elapsed());
-                totalParts.incrementAndGet();
-                totalUploadPartTime.addAndGet(timerUtil.elapsed());
                 CompletedPart completedPart = CompletedPart.builder().partNumber(partNumber).eTag(uploadPartResponse.eTag()).build();
                 partCf.complete(completedPart);
             }).exceptionally(ex -> {
@@ -413,8 +407,6 @@ public class DefaultS3Operator implements S3Operator {
             s3.uploadPartCopy(request).thenAccept(uploadPartCopyResponse -> {
                 OperationMetricsStats.getOrCreateOperationMetrics(S3Operation.UPLOAD_PART_COPY).operationCount.inc();
                 OperationMetricsStats.getOrCreateOperationMetrics(S3Operation.UPLOAD_PART_COPY).operationTime.update(timerUtil.elapsed());
-                totalParts.incrementAndGet();
-                totalUploadPartTime.addAndGet(timerUtil.elapsed());
                 CompletedPart completedPart = CompletedPart.builder().partNumber(partNumber)
                         .eTag(uploadPartCopyResponse.copyPartResult().eTag()).build();
                 partCf.complete(completedPart);
@@ -440,7 +432,6 @@ public class DefaultS3Operator implements S3Operator {
             }
 
             S3ObjectMetricsStats.getOrCreateS3ObjectMetrics(S3ObjectStage.READY_CLOSE).update(timerUtil.elapsed());
-            long readyCloseTime = timerUtil.elapsed();
             closeCf = new CompletableFuture<>();
             CompletableFuture<Void> uploadDoneCf = uploadIdCf.thenCompose(uploadId -> CompletableFuture.allOf(parts.toArray(new CompletableFuture[0])));
             uploadDoneCf.thenAccept(nil -> {
@@ -452,18 +443,6 @@ public class DefaultS3Operator implements S3Operator {
                 S3ObjectMetricsStats.getOrCreateS3ObjectMetrics(S3ObjectStage.TOTAL).update(timerUtil.elapsed());
                 S3ObjectMetricsStats.S3_OBJECT_COUNT.inc();
                 S3ObjectMetricsStats.S3_OBJECT_SIZE.update(totalWriteSize.get());
-                long totalUploadTime = timerUtil.elapsed();
-                long now = System.currentTimeMillis();
-                if (now - LAST_LOG_TIMESTAMP.get() > 10000) {
-                    LAST_LOG_TIMESTAMP.set(now);
-                    LOGGER.info("{} upload s3 metrics: total_parts: {}, upload_part_time_avg: {}, ready_close_time {}, total_upload_time {}, total_upload_size {}",
-                            logIdent,
-                            totalParts.get(),
-                            (double) totalUploadPartTime.get() / totalParts.get(),
-                            readyCloseTime,
-                            totalUploadTime,
-                            totalWriteSize.get());
-                }
             });
             return closeCf;
         }
