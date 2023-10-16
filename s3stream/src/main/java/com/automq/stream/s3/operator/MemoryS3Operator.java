@@ -35,7 +35,7 @@ public class MemoryS3Operator implements S3Operator {
     }
 
     @Override
-    public CompletableFuture<ByteBuf> rangeRead(String path, long start, long end, ByteBufAllocator alloc) {
+    public CompletableFuture<ByteBuf> rangeRead(String path, long start, long end) {
         ByteBuf value = storage.get(path);
         if (value == null) {
             return FutureUtil.failedFuture(new IllegalArgumentException("object not exist"));
