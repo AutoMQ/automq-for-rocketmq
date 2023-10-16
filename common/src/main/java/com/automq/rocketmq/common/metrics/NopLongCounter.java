@@ -14,28 +14,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.automq.rocketmq.common.metrics;
 
-package com.automq.rocketmq.proxy.processor;
+import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.api.metrics.LongCounter;
+import io.opentelemetry.context.Context;
 
-import org.apache.rocketmq.broker.client.ConsumerManager;
-import org.apache.rocketmq.broker.client.ProducerManager;
-import org.apache.rocketmq.proxy.processor.DefaultMessagingProcessor;
-import org.apache.rocketmq.proxy.service.ServiceManager;
+public class NopLongCounter implements LongCounter {
+    @Override
+    public void add(long l) {
 
-public class ExtendMessagingProcessor extends DefaultMessagingProcessor {
-    protected ExtendMessagingProcessor(ServiceManager serviceManager) {
-        super(serviceManager);
     }
 
-    public static ExtendMessagingProcessor createForS3RocketMQ(ServiceManager serviceManager) {
-        return new ExtendMessagingProcessor(serviceManager);
+    @Override
+    public void add(long l, Attributes attributes) {
+
     }
 
-    public ProducerManager producerManager() {
-        return serviceManager.getProducerManager();
-    }
+    @Override
+    public void add(long l, Attributes attributes, Context context) {
 
-    public ConsumerManager consumerManager() {
-        return serviceManager.getConsumerManager();
     }
 }

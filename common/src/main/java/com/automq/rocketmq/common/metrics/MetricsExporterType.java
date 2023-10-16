@@ -15,27 +15,38 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.proxy.processor;
+package com.automq.rocketmq.common.metrics;
 
-import org.apache.rocketmq.broker.client.ConsumerManager;
-import org.apache.rocketmq.broker.client.ProducerManager;
-import org.apache.rocketmq.proxy.processor.DefaultMessagingProcessor;
-import org.apache.rocketmq.proxy.service.ServiceManager;
+public enum MetricsExporterType {
+    DISABLE(0),
+    OTLP_GRPC(1),
+    PROM(2),
+    LOG(3);
 
-public class ExtendMessagingProcessor extends DefaultMessagingProcessor {
-    protected ExtendMessagingProcessor(ServiceManager serviceManager) {
-        super(serviceManager);
+    private final int value;
+
+    MetricsExporterType(int value) {
+        this.value = value;
     }
 
-    public static ExtendMessagingProcessor createForS3RocketMQ(ServiceManager serviceManager) {
-        return new ExtendMessagingProcessor(serviceManager);
+    public int getValue() {
+        return value;
     }
 
-    public ProducerManager producerManager() {
-        return serviceManager.getProducerManager();
+    public static MetricsExporterType valueOf(int value) {
+        switch (value) {
+            case 1:
+                return OTLP_GRPC;
+            case 2:
+                return PROM;
+            case 3:
+                return LOG;
+            default:
+                return DISABLE;
+        }
     }
 
-    public ConsumerManager consumerManager() {
-        return serviceManager.getConsumerManager();
+    public boolean isEnable() {
+        return this.value > 0;
     }
 }
