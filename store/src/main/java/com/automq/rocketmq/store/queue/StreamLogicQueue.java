@@ -44,14 +44,18 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicReference;
-import org.apache.commons.lang3.tuple.Pair;
+import org.apache.rocketmq.logging.org.slf4j.Logger;
+import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
 
 import static com.automq.rocketmq.store.util.SerializeUtil.decodeReceiptHandle;
 
 public class StreamLogicQueue extends LogicQueue {
+    protected static final Logger LOGGER = LoggerFactory.getLogger(StreamLogicQueue.class);
+
     private final StoreMetadataService metadataService;
     private final MessageStateMachine stateMachine;
     private long dataStreamId;
@@ -78,6 +82,14 @@ public class StreamLogicQueue extends LogicQueue {
         this.state = new AtomicReference<>(State.INIT);
     }
 
+    public long dataStreamId() {
+        return dataStreamId;
+    }
+
+    public ConcurrentMap<Long, CompletableFuture<Long>> retryStreamIdMap() {
+        return retryStreamIdMap;
+    }
+
     @Override
     public CompletableFuture<Void> open() {
         if (state.compareAndSet(State.INIT, State.OPENING)) {
@@ -99,8 +111,15 @@ public class StreamLogicQueue extends LogicQueue {
                 });
 
             return CompletableFuture.allOf(openDataStreamFuture, openOperationStreamFuture, openSnapshotStreamFuture)
-                .thenCompose(nil -> stateMachine.clear())
-                .thenAccept(nil -> inflightService.clearInflightCount(topicId, queueId))
+                .thenAccept(nil -> {
+                    try {
+                        stateMachine.clear();
+                        inflightService.clearInflightCount(topicId, queueId);
+                    } catch (StoreException e) {
+                        LOGGER.error("Failed to clear state machine", e);
+                        throw new CompletionException(e);
+                    }
+                })
                 // recover from operation log
                 .thenCompose(nil -> operationLogService.recover(stateMachine, operationStreamId, snapshotStreamId))
                 .thenAccept(nil -> state.set(State.OPENED));
@@ -124,8 +143,15 @@ public class StreamLogicQueue extends LogicQueue {
             streamIdList.addAll(retryStreamIdList);
 
             return streamStore.close(streamIdList)
-                .thenCompose(nil -> stateMachine.clear())
-                .thenAccept(nil -> inflightService.clearInflightCount(topicId, queueId))
+                .thenAccept(nil -> {
+                    try {
+                        stateMachine.clear();
+                        inflightService.clearInflightCount(topicId, queueId);
+                    } catch (StoreException e) {
+                        LOGGER.error("Failed to clear state machine", e);
+                        throw new CompletionException(e);
+                    }
+                })
                 .thenAccept(nil -> state.set(State.CLOSED));
         }
         return CompletableFuture.completedFuture(null);
@@ -181,10 +207,8 @@ public class StreamLogicQueue extends LogicQueue {
         if (state.get() != State.OPENED) {
             return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.QUEUE_NOT_OPENED, "Topic queue not opened"));
         }
-        return stateMachine
-            .consumeOffset(consumerGroup)
-            .thenCompose(offset -> pop(consumerGroup, dataStreamId, offset,
-                PopOperation.PopOperationType.POP_NORMAL, filter, batchSize, invisibleDuration));
+        long offset = stateMachine.consumeOffset(consumerGroup);
+        return pop(consumerGroup, dataStreamId, offset, PopOperation.PopOperationType.POP_NORMAL, filter, batchSize, invisibleDuration);
     }
 
     private CompletableFuture<PopResult> pop(long consumerGroupId, long streamId, long startOffset,
@@ -198,7 +222,6 @@ public class StreamLogicQueue extends LogicQueue {
         if (startOffset > confirmOffset) {
             return CompletableFuture.completedFuture(new PopResult(PopResult.Status.ILLEGAL_OFFSET, 0, Collections.emptyList()));
         }
-
 
         int fetchBatchSize;
         if (filter.needApply()) {
@@ -268,15 +291,18 @@ public class StreamLogicQueue extends LogicQueue {
             return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.QUEUE_NOT_OPENED, "Topic queue not opened"));
         }
         // start from ack offset
-        return stateMachine.ackOffset(consumerGroup).thenCompose(offset ->
-            stateMachine.isLocked(consumerGroup, offset)
-                .thenCompose(isLocked -> {
-                    if (isLocked) {
-                        return CompletableFuture.completedFuture(new PopResult(PopResult.Status.LOCKED, 0, Collections.emptyList()));
-                    } else {
-                        return pop(consumerGroup, dataStreamId, offset, PopOperation.PopOperationType.POP_ORDER, filter, batchSize, invisibleDuration);
-                    }
-                }));
+        try {
+            long offset = stateMachine.ackOffset(consumerGroup);
+            boolean isLocked = stateMachine.isLocked(consumerGroup, offset);
+            if (isLocked) {
+                return CompletableFuture.completedFuture(new PopResult(PopResult.Status.LOCKED, 0, Collections.emptyList()));
+            } else {
+                return pop(consumerGroup, dataStreamId, offset, PopOperation.PopOperationType.POP_ORDER, filter, batchSize, invisibleDuration);
+            }
+        } catch (StoreException e) {
+
+            return CompletableFuture.completedFuture(new PopResult(PopResult.Status.ERROR, 0, Collections.emptyList()));
+        }
     }
 
     @Override
@@ -285,14 +311,9 @@ public class StreamLogicQueue extends LogicQueue {
         if (state.get() != State.OPENED) {
             return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.QUEUE_NOT_OPENED, "Topic queue not opened"));
         }
-        CompletableFuture<Long> retryStreamIdCf = retryStreamId(consumerGroupId);
-        CompletableFuture<Long> retryOffsetCf = stateMachine.retryConsumeOffset(consumerGroupId);
-        return retryStreamIdCf.thenCombine(retryOffsetCf, Pair::of)
-            .thenCompose(pair -> {
-                Long retryStreamId = pair.getLeft();
-                Long startOffset = pair.getRight();
-                return pop(consumerGroupId, retryStreamId, startOffset, PopOperation.PopOperationType.POP_RETRY, filter, batchSize, invisibleDuration);
-            });
+        long offset = stateMachine.retryConsumeOffset(consumerGroupId);
+        CompletableFuture<Long> retryStreamIdFuture = retryStreamId(consumerGroupId);
+        return retryStreamIdFuture.thenCompose(retryStreamId -> pop(consumerGroupId, retryStreamId, offset, PopOperation.PopOperationType.POP_RETRY, filter, batchSize, invisibleDuration));
     }
 
     private CompletableFuture<List<FlatMessageExt>> fetchMessages(long streamId, long offset, int batchSize) {
@@ -446,8 +467,8 @@ public class StreamLogicQueue extends LogicQueue {
     }
 
     @Override
-    public CompletableFuture<Integer> getInflightStats(long consumerGroupId) {
-        return CompletableFuture.completedFuture(inflightService.getInflightCount(consumerGroupId, topicId, queueId));
+    public int getInflightStats(long consumerGroupId) {
+        return inflightService.getInflightCount(consumerGroupId, topicId, queueId);
     }
 
     @Override
@@ -497,32 +518,32 @@ public class StreamLogicQueue extends LogicQueue {
     }
 
     @Override
-    public CompletableFuture<Long> getConsumeOffset(long consumerGroupId) {
+    public long getConsumeOffset(long consumerGroupId) {
         return stateMachine.consumeOffset(consumerGroupId);
     }
 
     @Override
-    public CompletableFuture<Long> getAckOffset(long consumerGroupId) {
+    public long getAckOffset(long consumerGroupId) {
         return stateMachine.ackOffset(consumerGroupId);
     }
 
     @Override
-    public CompletableFuture<Long> getRetryConsumeOffset(long consumerGroupId) {
+    public long getRetryConsumeOffset(long consumerGroupId) {
         return stateMachine.retryConsumeOffset(consumerGroupId);
     }
 
     @Override
-    public CompletableFuture<Long> getRetryAckOffset(long consumerGroupId) {
+    public long getRetryAckOffset(long consumerGroupId) {
         return stateMachine.retryAckOffset(consumerGroupId);
     }
 
     @Override
-    public CompletableFuture<State> getState() {
-        return CompletableFuture.completedFuture(state.get());
+    public State getState() {
+        return state.get();
     }
 
     @Override
-    public CompletableFuture<Integer> getConsumeTimes(long consumerGroupId, long offset) {
+    public int getConsumeTimes(long consumerGroupId, long offset) {
         return stateMachine.consumeTimes(consumerGroupId, offset);
     }
 }

@@ -27,9 +27,7 @@ import com.automq.rocketmq.store.model.message.PutResult;
 import java.util.concurrent.CompletableFuture;
 
 public abstract class LogicQueue {
-
     protected long topicId;
-
     protected int queueId;
 
     protected LogicQueue(long topicId, int queueId) {
@@ -71,7 +69,7 @@ public abstract class LogicQueue {
 
     public abstract CompletableFuture<QueueOffsetRange> getOffsetRange();
 
-    public abstract CompletableFuture<Integer> getInflightStats(long consumerGroupId);
+    public abstract int getInflightStats(long consumerGroupId);
 
     public abstract CompletableFuture<PullResult> pullNormal(long consumerGroupId, Filter filter, long startOffset,
         int batchSize);
@@ -79,17 +77,17 @@ public abstract class LogicQueue {
     public abstract CompletableFuture<PullResult> pullRetry(long consumerGroupId, Filter filter, long startOffset,
         int batchSize);
 
-    public abstract CompletableFuture<Long> getConsumeOffset(long consumerGroupId);
+    public abstract long getConsumeOffset(long consumerGroupId);
 
-    public abstract CompletableFuture<Long> getAckOffset(long consumerGroupId);
+    public abstract long getAckOffset(long consumerGroupId);
 
-    public abstract CompletableFuture<Long> getRetryConsumeOffset(long consumerGroupId);
+    public abstract long getRetryConsumeOffset(long consumerGroupId);
 
-    public abstract CompletableFuture<Long> getRetryAckOffset(long consumerGroupId);
+    public abstract long getRetryAckOffset(long consumerGroupId);
 
-    public abstract CompletableFuture<State> getState();
+    public abstract State getState();
 
-    public abstract CompletableFuture<Integer> getConsumeTimes(long consumerGroupId, long offset);
+    public abstract int getConsumeTimes(long consumerGroupId, long offset);
 
     public enum State {
         INIT,

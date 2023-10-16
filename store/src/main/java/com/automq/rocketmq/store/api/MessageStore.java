@@ -28,7 +28,7 @@ import java.util.concurrent.CompletableFuture;
 
 public interface MessageStore extends Lifecycle {
 
-    TopicQueueManager getTopicQueueManager();
+    LogicQueueManager getTopicQueueManager();
 
     S3ObjectOperator getS3ObjectOperator();
 

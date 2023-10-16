@@ -21,7 +21,7 @@ import com.automq.rocketmq.common.util.Lifecycle;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-public interface TopicQueueManager extends Lifecycle {
+public interface LogicQueueManager extends Lifecycle {
 
     /**
      * Get or create the logic queue of the specified topic and queue id.

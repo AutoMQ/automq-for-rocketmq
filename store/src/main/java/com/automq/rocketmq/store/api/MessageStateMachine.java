@@ -22,7 +22,6 @@ import com.automq.rocketmq.store.model.operation.AckOperation;
 import com.automq.rocketmq.store.model.operation.ChangeInvisibleDurationOperation;
 import com.automq.rocketmq.store.model.operation.OperationSnapshot;
 import com.automq.rocketmq.store.model.operation.PopOperation;
-import java.util.concurrent.CompletableFuture;
 
 public interface MessageStateMachine {
     long topicId();
@@ -31,27 +30,27 @@ public interface MessageStateMachine {
 
     ReplayPopResult replayPopOperation(long operationOffset, PopOperation operation) throws StoreException;
 
-    CompletableFuture<Void> replayAckOperation(long operationOffset, AckOperation operation);
+    void replayAckOperation(long operationOffset, AckOperation operation) throws StoreException;
 
-    CompletableFuture<Void> replayChangeInvisibleDurationOperation(long operationOffset, ChangeInvisibleDurationOperation operation);
+    void replayChangeInvisibleDurationOperation(long operationOffset, ChangeInvisibleDurationOperation operation);
 
-    CompletableFuture<OperationSnapshot> takeSnapshot();
+    OperationSnapshot takeSnapshot() throws StoreException;
 
-    CompletableFuture<Void> loadSnapshot(OperationSnapshot snapshot);
+    void loadSnapshot(OperationSnapshot snapshot);
 
-    CompletableFuture<Void> clear();
+    void clear() throws StoreException;
 
-    CompletableFuture<Long> consumeOffset(long consumerGroupId);
+    long consumeOffset(long consumerGroupId);
 
-    CompletableFuture<Long> ackOffset(long consumerGroupId);
+    long ackOffset(long consumerGroupId);
 
-    CompletableFuture<Long> retryConsumeOffset(long consumerGroupId);
+    long retryConsumeOffset(long consumerGroupId);
 
-    CompletableFuture<Long> retryAckOffset(long consumerGroupId);
+    long retryAckOffset(long consumerGroupId);
 
-    CompletableFuture<Boolean> isLocked(long consumerGroupId, long offset);
+    boolean isLocked(long consumerGroupId, long offset) throws StoreException;
 
-    CompletableFuture<Integer> consumeTimes(long consumerGroupId, long offset);
+    int consumeTimes(long consumerGroupId, long offset);
 
     class ReplayPopResult {
         private final int popTimes;

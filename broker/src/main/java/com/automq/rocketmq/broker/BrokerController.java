@@ -34,6 +34,7 @@ import com.automq.rocketmq.proxy.service.DLQService;
 import com.automq.rocketmq.proxy.service.DefaultServiceManager;
 import com.automq.rocketmq.store.DataStoreFacade;
 import com.automq.rocketmq.store.MessageStoreBuilder;
+import com.automq.rocketmq.store.MessageStoreImpl;
 import com.automq.rocketmq.store.api.MessageStore;
 import org.apache.rocketmq.proxy.processor.MessagingProcessor;
 import org.apache.rocketmq.proxy.service.ServiceManager;
@@ -63,7 +64,8 @@ public class BrokerController implements Lifecycle {
 
         dlqService = new DLQService();
 
-        messageStore = MessageStoreBuilder.build(brokerConfig.store(), brokerConfig.s3Stream(), storeMetadataService, dlqService);
+        MessageStoreImpl messageStore = MessageStoreBuilder.build(brokerConfig.store(), brokerConfig.s3Stream(), storeMetadataService, dlqService);
+        this.messageStore = messageStore;
 
         DataStore dataStore = new DataStoreFacade(messageStore.getS3ObjectOperator(), messageStore.getTopicQueueManager());
         metadataStore.setDataStore(dataStore);
