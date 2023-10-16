@@ -107,8 +107,8 @@ public class TopicRouteServiceImpl extends TopicRouteService {
 
     private TopicRouteData routeDataFrom(List<MessageQueueAssignment> assignments) {
         TopicRouteData topicRouteData = new TopicRouteData();
-        List<QueueData> queueDatas = new ArrayList<>();
-        List<BrokerData> brokerDatas = new ArrayList<>();
+        List<QueueData> queueDataList = new ArrayList<>();
+        List<BrokerData> brokerDataList = new ArrayList<>();
 
         Map<Integer, String> addressMap = new HashMap<>();
         Set<Integer> nodeIdSet = assignments.stream().map(MessageQueueAssignment::getNodeId).collect(Collectors.toSet());
@@ -131,7 +131,7 @@ public class TopicRouteServiceImpl extends TopicRouteService {
             queueData.setReadQueueNums(1);
             queueData.setWriteQueueNums(1);
             queueData.setPerm(PermName.PERM_READ | PermName.PERM_WRITE);
-            queueDatas.add(queueData);
+            queueDataList.add(queueData);
 
             // Each MessageQueue has a virtual broker binding to it.
             BrokerData brokerData = new BrokerData();
@@ -140,11 +140,11 @@ public class TopicRouteServiceImpl extends TopicRouteService {
             HashMap<Long, String> brokerAddrs = new HashMap<>();
             brokerAddrs.put(0L, addressMap.get(assignment.getNodeId()));
             brokerData.setBrokerAddrs(brokerAddrs);
-            brokerDatas.add(brokerData);
+            brokerDataList.add(brokerData);
         });
 
-        topicRouteData.setBrokerDatas(brokerDatas);
-        topicRouteData.setQueueDatas(queueDatas);
+        topicRouteData.setBrokerDatas(brokerDataList);
+        topicRouteData.setQueueDatas(queueDataList);
 
         return topicRouteData;
     }
