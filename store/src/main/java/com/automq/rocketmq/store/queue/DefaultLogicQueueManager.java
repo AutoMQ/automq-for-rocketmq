@@ -22,9 +22,9 @@ import com.automq.rocketmq.common.config.StoreConfig;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.store.api.LogicQueue;
+import com.automq.rocketmq.store.api.LogicQueueManager;
 import com.automq.rocketmq.store.api.MessageStateMachine;
 import com.automq.rocketmq.store.api.StreamStore;
-import com.automq.rocketmq.store.api.TopicQueueManager;
 import com.automq.rocketmq.store.exception.StoreErrorCode;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.message.TopicQueueId;
@@ -32,16 +32,15 @@ import com.automq.rocketmq.store.service.InflightService;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.service.api.OperationLogService;
 import com.automq.stream.utils.FutureUtil;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
-public class DefaultLogicQueueManager implements TopicQueueManager {
+public class DefaultLogicQueueManager implements LogicQueueManager {
     protected static final Logger LOGGER = LoggerFactory.getLogger(DefaultLogicQueueManager.class);
 
     private final StoreConfig storeConfig;
@@ -50,7 +49,7 @@ public class DefaultLogicQueueManager implements TopicQueueManager {
     private final StoreMetadataService metadataService;
     private final OperationLogService operationLogService;
     private final InflightService inflightService;
-    private final Map<TopicQueueId, CompletableFuture<LogicQueue>> topicQueueMap;
+    private final ConcurrentMap<TopicQueueId, CompletableFuture<LogicQueue>> logicQueueMap;
     private final String identity = "[DefaultLogicQueueManager]";
 
     public DefaultLogicQueueManager(StoreConfig storeConfig, StreamStore streamStore,
@@ -62,7 +61,7 @@ public class DefaultLogicQueueManager implements TopicQueueManager {
         this.metadataService = metadataService;
         this.operationLogService = operationLogService;
         this.inflightService = inflightService;
-        this.topicQueueMap = new ConcurrentHashMap<>();
+        this.logicQueueMap = new ConcurrentHashMap<>();
     }
 
     @Override
@@ -75,14 +74,18 @@ public class DefaultLogicQueueManager implements TopicQueueManager {
 
     }
 
+    public ConcurrentMap<TopicQueueId, CompletableFuture<LogicQueue>> logicQueueMap() {
+        return logicQueueMap;
+    }
+
     public int size() {
-        return topicQueueMap.size();
+        return logicQueueMap.size();
     }
 
     @Override
     public CompletableFuture<LogicQueue> getOrCreate(long topicId, int queueId) {
         TopicQueueId key = new TopicQueueId(topicId, queueId);
-        CompletableFuture<LogicQueue> future = topicQueueMap.get(key);
+        CompletableFuture<LogicQueue> future = logicQueueMap.get(key);
 
         if (future != null) {
             return future;
@@ -90,18 +93,18 @@ public class DefaultLogicQueueManager implements TopicQueueManager {
 
         // Prevent concurrent create.
         synchronized (this) {
-            future = topicQueueMap.get(key);
+            future = logicQueueMap.get(key);
             if (future != null) {
                 return future;
             }
 
             // Create and open the topic queue.
             future = createAndOpen(topicId, queueId);
-            topicQueueMap.put(key, future);
+            logicQueueMap.put(key, future);
             future.exceptionally(ex -> {
                 Throwable cause = FutureUtil.cause(ex);
                 LOGGER.error("{}: Create logic queue failed: topic: {} queue: {}", identity, topicId, queueId, cause);
-                topicQueueMap.remove(key);
+                logicQueueMap.remove(key);
                 return null;
             });
             return future;
@@ -111,7 +114,7 @@ public class DefaultLogicQueueManager implements TopicQueueManager {
     @Override
     public CompletableFuture<Optional<LogicQueue>> get(long topicId, int queueId) {
         TopicQueueId key = new TopicQueueId(topicId, queueId);
-        CompletableFuture<LogicQueue> future = topicQueueMap.get(key);
+        CompletableFuture<LogicQueue> future = logicQueueMap.get(key);
         if (future != null) {
             return future.thenApply(Optional::of);
         }
@@ -122,7 +125,7 @@ public class DefaultLogicQueueManager implements TopicQueueManager {
     public CompletableFuture<Void> close(long topicId, int queueId) {
         LOGGER.info("{}: Close logic queue: {} queue: {}", identity, topicId, queueId);
         TopicQueueId key = new TopicQueueId(topicId, queueId);
-        CompletableFuture<LogicQueue> future = topicQueueMap.remove(key);
+        CompletableFuture<LogicQueue> future = logicQueueMap.remove(key);
         if (future != null) {
             return future.thenCompose(LogicQueue::close);
         }
@@ -131,7 +134,7 @@ public class DefaultLogicQueueManager implements TopicQueueManager {
 
     public CompletableFuture<LogicQueue> createAndOpen(long topicId, int queueId) {
         TopicQueueId id = new TopicQueueId(topicId, queueId);
-        if (topicQueueMap.containsKey(id)) {
+        if (logicQueueMap.containsKey(id)) {
             return CompletableFuture.completedFuture(null);
         }
 

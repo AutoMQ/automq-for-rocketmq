@@ -22,7 +22,7 @@ import com.automq.rocketmq.common.util.Lifecycle;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.store.api.DLQSender;
 import com.automq.rocketmq.store.api.LogicQueue;
-import com.automq.rocketmq.store.api.TopicQueueManager;
+import com.automq.rocketmq.store.api.LogicQueueManager;
 import com.automq.rocketmq.store.exception.StoreErrorCode;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.generated.CheckPoint;
@@ -58,7 +58,7 @@ public class ReviveService implements Runnable, Lifecycle {
     private final KVService kvService;
     private final StoreMetadataService metadataService;
     private final InflightService inflightService;
-    private final TopicQueueManager topicQueueManager;
+    private final LogicQueueManager logicQueueManager;
     // Indicate the timestamp that the revive service has reached.
     private volatile long reviveTimestamp = 0;
     private final String identity = "[ReviveService]";
@@ -69,13 +69,13 @@ public class ReviveService implements Runnable, Lifecycle {
 
     public ReviveService(String checkPointNamespace, String timerTagNamespace, KVService kvService,
         StoreMetadataService metadataService, InflightService inflightService,
-        TopicQueueManager topicQueueManager, DLQSender dlqSender) {
+        LogicQueueManager logicQueueManager, DLQSender dlqSender) {
         this.checkPointNamespace = checkPointNamespace;
         this.timerTagNamespace = timerTagNamespace;
         this.kvService = kvService;
         this.metadataService = metadataService;
         this.inflightService = inflightService;
-        this.topicQueueManager = topicQueueManager;
+        this.logicQueueManager = logicQueueManager;
         this.inflightRevive = new ConcurrentHashMap<>();
         this.dlqSender = dlqSender;
         this.mainExecutor = Executors.newSingleThreadScheduledExecutor(
@@ -135,7 +135,7 @@ public class ReviveService implements Runnable, Lifecycle {
                 }
                 CheckPoint checkPoint = SerializeUtil.decodeCheckPoint(ByteBuffer.wrap(ckValue));
                 PopOperation.PopOperationType operationType = PopOperation.PopOperationType.valueOf(checkPoint.popOperationType());
-                CompletableFuture<Pair<LogicQueue, PullResult>> pullMsgCf = topicQueueManager.getOrCreate(topicId, queueId)
+                CompletableFuture<Pair<LogicQueue, PullResult>> pullMsgCf = logicQueueManager.getOrCreate(topicId, queueId)
                     .thenComposeAsync(queue -> {
                         CompletableFuture<PullResult> pullCf;
                         if (operationType == PopOperation.PopOperationType.POP_RETRY) {
@@ -161,16 +161,14 @@ public class ReviveService implements Runnable, Lifecycle {
                     int maxDeliveryAttempts = triple.getRight();
 
                     if (operationType == PopOperation.PopOperationType.POP_ORDER) {
-                        return logicQueue.getConsumeTimes(consumerGroupId, messageExt.offset())
-                            .thenCompose(consumeTimes -> {
-                                if (consumeTimes >= maxDeliveryAttempts) {
-                                    messageExt.setDeliveryAttempts(consumeTimes);
-                                    // send as DLQ
-                                    return dlqSender.send(messageExt)
-                                        .thenApply(nil -> Pair.of(true, logicQueue));
-                                }
-                                return CompletableFuture.completedFuture(Pair.of(false, logicQueue));
-                            });
+                        int consumeTimes = logicQueue.getConsumeTimes(consumerGroupId, messageExt.offset());
+                        if (consumeTimes >= maxDeliveryAttempts) {
+                            messageExt.setDeliveryAttempts(consumeTimes);
+                            // send as DLQ
+                            return dlqSender.send(messageExt)
+                                .thenApply(nil -> Pair.of(true, logicQueue));
+                        }
+                        return CompletableFuture.completedFuture(Pair.of(false, logicQueue));
                     }
                     if (messageExt.deliveryAttempts() >= maxDeliveryAttempts) {
                         // send as DLQ

@@ -24,10 +24,10 @@ import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.store.api.DLQSender;
 import com.automq.rocketmq.store.api.LogicQueue;
+import com.automq.rocketmq.store.api.LogicQueueManager;
 import com.automq.rocketmq.store.api.MessageStore;
 import com.automq.rocketmq.store.api.S3ObjectOperator;
 import com.automq.rocketmq.store.api.StreamStore;
-import com.automq.rocketmq.store.api.TopicQueueManager;
 import com.automq.rocketmq.store.mock.MockStoreMetadataService;
 import com.automq.rocketmq.store.mock.MockStreamStore;
 import com.automq.rocketmq.store.model.message.Filter;
@@ -71,7 +71,7 @@ public class MessageStoreTest {
     private InflightService inflightService;
     private MessageStore messageStore;
     private StoreConfig config;
-    private TopicQueueManager topicQueueManager;
+    private LogicQueueManager logicQueueManager;
     private DLQSender dlqSender;
     private ReviveService reviveService;
 
@@ -85,14 +85,14 @@ public class MessageStoreTest {
         config = new StoreConfig();
         SnapshotService snapshotService = new SnapshotService(streamStore, kvService);
         OperationLogService operationLogService = new StreamOperationLogService(streamStore, snapshotService, config);
-        topicQueueManager = new DefaultLogicQueueManager(config, streamStore, kvService, metadataService, operationLogService, inflightService);
+        logicQueueManager = new DefaultLogicQueueManager(config, streamStore, kvService, metadataService, operationLogService, inflightService);
         dlqSender = Mockito.mock(DLQSender.class);
         Mockito.doReturn(CompletableFuture.completedFuture(null))
             .when(dlqSender).send(Mockito.any(FlatMessageExt.class));
         reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, KV_NAMESPACE_TIMER_TAG, kvService, metadataService, inflightService,
-            topicQueueManager, dlqSender);
+            logicQueueManager, dlqSender);
         S3ObjectOperator operator = new S3ObjectOperatorImpl(new MemoryS3Operator());
-        messageStore = new MessageStoreImpl(config, streamStore, metadataService, kvService, inflightService, snapshotService, topicQueueManager, reviveService, operator);
+        messageStore = new MessageStoreImpl(config, streamStore, metadataService, kvService, inflightService, snapshotService, logicQueueManager, reviveService, operator);
         messageStore.start();
     }
 
@@ -298,19 +298,19 @@ public class MessageStoreTest {
         assertEquals(4, popResult.messageList().get(2).originalOffset());
         assertEquals(2, popResult.messageList().get(2).deliveryAttempts());
 
-        LogicQueue logicQueue = topicQueueManager.getOrCreate(TOPIC_ID, QUEUE_ID).join();
+        LogicQueue logicQueue = logicQueueManager.getOrCreate(TOPIC_ID, QUEUE_ID).join();
 
-        assertEquals(5, logicQueue.getConsumeOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(5, logicQueue.getAckOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(3, logicQueue.getRetryConsumeOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(0, logicQueue.getRetryAckOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(5, logicQueue.getConsumeOffset(CONSUMER_GROUP_ID));
+        assertEquals(5, logicQueue.getAckOffset(CONSUMER_GROUP_ID));
+        assertEquals(3, logicQueue.getRetryConsumeOffset(CONSUMER_GROUP_ID));
+        assertEquals(0, logicQueue.getRetryAckOffset(CONSUMER_GROUP_ID));
 
         // 7. ack msg_0, msg_3, msg_4
         messageStore.ack(popResult.messageList().get(0).receiptHandle().get()).join();
         messageStore.ack(popResult.messageList().get(1).receiptHandle().get()).join();
         messageStore.ack(popResult.messageList().get(2).receiptHandle().get()).join();
 
-        assertEquals(3, logicQueue.getRetryAckOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(3, logicQueue.getRetryAckOffset(CONSUMER_GROUP_ID));
     }
 
     @Test
@@ -355,7 +355,7 @@ public class MessageStoreTest {
         assertEquals(0, streamStore.startOffset(snapshotStream.getStreamId()));
         assertEquals(1, streamStore.nextOffset(snapshotStream.getStreamId()));
         // 7. close and reopen
-        topicQueueManager.close(TOPIC_ID, QUEUE_ID).join();
+        logicQueueManager.close(TOPIC_ID, QUEUE_ID).join();
 
         // check if all tq related data is cleared
         byte[] tqPrefix = ByteBuffer.allocate(12)
@@ -366,7 +366,7 @@ public class MessageStoreTest {
             (key, value) -> Assertions.fail("check point should be cleared"));
 
         // check if all ck have been recovered
-        topicQueueManager.getOrCreate(TOPIC_ID, QUEUE_ID).join();
+        logicQueueManager.getOrCreate(TOPIC_ID, QUEUE_ID).join();
         AtomicInteger ckNum = new AtomicInteger();
         kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, tqPrefix, null, null,
             (key, value) -> ckNum.getAndIncrement());
@@ -389,18 +389,18 @@ public class MessageStoreTest {
         assertEquals(4, popResult.messageList().get(2).originalOffset());
         assertEquals(2, popResult.messageList().get(2).deliveryAttempts());
 
-        LogicQueue logicQueue = topicQueueManager.getOrCreate(TOPIC_ID, QUEUE_ID).join();
+        LogicQueue logicQueue = logicQueueManager.getOrCreate(TOPIC_ID, QUEUE_ID).join();
 
-        assertEquals(5, logicQueue.getConsumeOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(5, logicQueue.getAckOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(3, logicQueue.getRetryConsumeOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(0, logicQueue.getRetryAckOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(5, logicQueue.getConsumeOffset(CONSUMER_GROUP_ID));
+        assertEquals(5, logicQueue.getAckOffset(CONSUMER_GROUP_ID));
+        assertEquals(3, logicQueue.getRetryConsumeOffset(CONSUMER_GROUP_ID));
+        assertEquals(0, logicQueue.getRetryAckOffset(CONSUMER_GROUP_ID));
 
         // 7. ack msg_0, msg_3, msg_4
         messageStore.ack(popResult.messageList().get(0).receiptHandle().get()).join();
         messageStore.ack(popResult.messageList().get(1).receiptHandle().get()).join();
         messageStore.ack(popResult.messageList().get(2).receiptHandle().get()).join();
 
-        assertEquals(3, logicQueue.getRetryAckOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(3, logicQueue.getRetryAckOffset(CONSUMER_GROUP_ID));
     }
 }

@@ -28,7 +28,6 @@ import com.automq.rocketmq.store.model.operation.OperationSnapshot;
 import com.automq.rocketmq.store.model.stream.SingleRecord;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.util.SerializeUtil;
-import com.automq.stream.api.AppendResult;
 import com.automq.stream.utils.FutureUtil;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -42,7 +41,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -136,49 +134,53 @@ public class SnapshotService implements Lifecycle, Runnable {
             task.abort();
             return CompletableFuture.completedFuture(null);
         }
-        CompletableFuture<OperationSnapshot> snapshotFuture = task.snapshotSupplier.get();
+        OperationSnapshot snapshot;
+        try {
+            snapshot = task.snapshotSupplier.get();
+        } catch (StoreException e) {
+            LOGGER.error("Take snapshot failed: topicId: {}, queueId: {}", task.topicId, task.queueId, e);
+            return CompletableFuture.failedFuture(e);
+        }
         long topicId = task.topicId;
         int queueId = task.queueId;
         long operationStreamId = task.operationStreamId;
         long snapshotStreamId = task.snapshotStreamId;
-        CompletableFuture<byte[]> snapshotDataCf = snapshotFuture.thenApply(snapshot -> {
-            long version = snapshot.getKvServiceSnapshotVersion();
-            KVReadOptions readOptions = new KVReadOptions();
-            readOptions.setSnapshotVersion(version);
 
-            // get queue related checkpoints from kv service
-            byte[] tqPrefix = SerializeUtil.buildCheckPointPrefix(topicId, queueId);
-            List<CheckPoint> checkPointList = new ArrayList<>();
+        long version = snapshot.getKvServiceSnapshotVersion();
+        KVReadOptions readOptions = new KVReadOptions();
+        readOptions.setSnapshotVersion(version);
+
+        // get queue related checkpoints from kv service
+        byte[] tqPrefix = SerializeUtil.buildCheckPointPrefix(topicId, queueId);
+        List<CheckPoint> checkPointList = new ArrayList<>();
+        try {
+            kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, tqPrefix, null, null, (key, value) -> {
+                CheckPoint checkPoint = SerializeUtil.decodeCheckPoint(ByteBuffer.wrap(value));
+                checkPointList.add(checkPoint);
+            }, readOptions);
+        } catch (StoreException e) {
+            throw new CompletionException(e);
+        } finally {
+            // release snapshot
             try {
-                kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, tqPrefix, null, null, (key, value) -> {
-                    CheckPoint checkPoint = SerializeUtil.decodeCheckPoint(ByteBuffer.wrap(value));
-                    checkPointList.add(checkPoint);
-                }, readOptions);
+                kvService.releaseSnapshot(snapshot.getKvServiceSnapshotVersion());
             } catch (StoreException e) {
-                throw new CompletionException(e);
-            } finally {
-                // release snapshot
-                try {
-                    kvService.releaseSnapshot(snapshot.getKvServiceSnapshotVersion());
-                } catch (StoreException e) {
-                    LOGGER.error("Release snapshot:{} failed", snapshot, e);
-                }
+                LOGGER.error("Release snapshot: {} failed", snapshot, e);
             }
-            snapshot.setCheckPoints(checkPointList);
-            return SerializeUtil.encodeOperationSnapshot(snapshot);
-        });
-        CompletableFuture<AppendResult> snapshotAppendCf = snapshotDataCf.thenCompose(snapshotData -> {
-            // append snapshot to snapshot stream
-            return streamStore.append(snapshotStreamId, new SingleRecord(ByteBuffer.wrap(snapshotData)));
-        });
-        return snapshotAppendCf.thenCombine(snapshotFuture, (appendResult, snapshot) -> snapshot).thenCompose(snapshot -> {
-            // trim operation stream
-            return streamStore.trim(operationStreamId, snapshot.getSnapshotEndOffset() + 1)
-                .thenAccept(nil -> {
-                    // complete snapshot task
-                    task.completeSuccess(snapshot.getSnapshotEndOffset() + 1);
-                });
-        });
+        }
+        snapshot.setCheckPoints(checkPointList);
+        byte[] snapshotData = SerializeUtil.encodeOperationSnapshot(snapshot);
+
+        // append snapshot to snapshot stream
+        return streamStore.append(snapshotStreamId, new SingleRecord(ByteBuffer.wrap(snapshotData)))
+            .thenCompose(appendResult -> {
+                // trim operation stream
+                return streamStore.trim(operationStreamId, snapshot.getSnapshotEndOffset() + 1)
+                    .thenAccept(nil -> {
+                        // complete snapshot task
+                        task.completeSuccess(snapshot.getSnapshotEndOffset() + 1);
+                    });
+            });
     }
 
     CompletableFuture<TakeSnapshotResult> addSnapshotTask(SnapshotTask task) {
@@ -193,12 +195,16 @@ public class SnapshotService implements Lifecycle, Runnable {
         private final int queueId;
         private final long operationStreamId;
         private final long snapshotStreamId;
-        private final Supplier<CompletableFuture<OperationSnapshot>> snapshotSupplier;
+        private final Supplier<OperationSnapshot> snapshotSupplier;
 
         private CompletableFuture<TakeSnapshotResult> cf;
 
+        public interface Supplier<T> {
+            T get() throws StoreException;
+        }
+
         public SnapshotTask(long topicId, int queueId, long operationStreamId, long snapshotStreamId,
-            Supplier<CompletableFuture<OperationSnapshot>> snapshotSupplier) {
+            Supplier<OperationSnapshot> snapshotSupplier) {
             this.topicId = topicId;
             this.queueId = queueId;
             this.operationStreamId = operationStreamId;

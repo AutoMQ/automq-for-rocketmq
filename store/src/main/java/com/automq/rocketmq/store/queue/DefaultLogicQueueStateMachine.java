@@ -98,16 +98,11 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
         reentrantLock.lock();
         try {
             this.currentOperationOffset = operationOffset;
-            switch (operation.popOperationType()) {
-                case POP_NORMAL:
-                    return replayPopNormalOperation(operationOffset, operation);
-                case POP_ORDER:
-                    return replayPopFifoOperation(operationOffset, operation);
-                case POP_RETRY:
-                    return replayPopRetryOperation(operationOffset, operation);
-                default:
-                    throw new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "Unknown pop operation type");
-            }
+            return switch (operation.popOperationType()) {
+                case POP_NORMAL -> replayPopNormalOperation(operationOffset, operation);
+                case POP_ORDER -> replayPopFifoOperation(operationOffset, operation);
+                case POP_RETRY -> replayPopRetryOperation(operationOffset, operation);
+            };
         } finally {
             reentrantLock.unlock();
         }
@@ -265,7 +260,7 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
         }
 
         Integer currentConsumeTimes = metadata.getConsumeTimes().getOrDefault(offset, 0);
-        Integer newConsumeTimes = currentConsumeTimes + 1;
+        int newConsumeTimes = currentConsumeTimes + 1;
         metadata.getConsumeTimes().put(offset, newConsumeTimes);
 
         kvService.batch(requestList.toArray(new BatchRequest[0]));
@@ -291,7 +286,7 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
     }
 
     @Override
-    public CompletableFuture<Void> replayAckOperation(long operationOffset, AckOperation operation) {
+    public void replayAckOperation(long operationOffset, AckOperation operation) throws StoreException {
         long topicId = operation.topicId();
         int queueId = operation.queueId();
         long operationId = operation.operationId();
@@ -340,17 +335,13 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
             }
 
             kvService.batch(requestList.toArray(new BatchRequest[0]));
-        } catch (StoreException e) {
-            LOGGER.error("{}: Replay ack operation failed", identity, e);
-            return CompletableFuture.failedFuture(e);
         } finally {
             reentrantLock.unlock();
         }
-        return CompletableFuture.completedFuture(null);
     }
 
     @Override
-    public CompletableFuture<Void> replayChangeInvisibleDurationOperation(long operationOffset,
+    public void replayChangeInvisibleDurationOperation(long operationOffset,
         ChangeInvisibleDurationOperation operation) {
         long invisibleDuration = operation.invisibleDuration();
         long operationTimestamp = operation.operationTimestamp();
@@ -389,15 +380,16 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
             kvService.batch(deleteLastTimerTagRequest, writeCheckPointRequest, writeTimerTagRequest);
         } catch (StoreException e) {
             LOGGER.error("{}: Replay change invisible duration operation failed", identity, e);
-            return CompletableFuture.failedFuture(e);
+            CompletableFuture.failedFuture(e);
+            return;
         } finally {
             reentrantLock.unlock();
         }
-        return CompletableFuture.completedFuture(null);
+        CompletableFuture.completedFuture(null);
     }
 
     @Override
-    public CompletableFuture<OperationSnapshot> takeSnapshot() {
+    public OperationSnapshot takeSnapshot() throws StoreException {
         exclusiveLock.lock();
         try {
             List<OperationSnapshot.ConsumerGroupMetadataSnapshot> metadataSnapshots = consumerGroupMetadataMap.values().stream().map(metadata -> {
@@ -413,18 +405,14 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
             }).collect(Collectors.toList());
             long snapshotVersion = kvService.takeSnapshot();
             OperationSnapshot snapshot = new OperationSnapshot(currentOperationOffset, snapshotVersion, metadataSnapshots);
-            return CompletableFuture.completedFuture(snapshot);
-        } catch (Exception e) {
-            Throwable cause = FutureUtil.cause(e);
-            LOGGER.error("{}: Take snapshot failed", identity, cause);
-            return CompletableFuture.failedFuture(e);
+            return snapshot;
         } finally {
             exclusiveLock.unlock();
         }
     }
 
     @Override
-    public CompletableFuture<Void> loadSnapshot(OperationSnapshot snapshot) {
+    public void loadSnapshot(OperationSnapshot snapshot) {
         exclusiveLock.lock();
         try {
             this.consumerGroupMetadataMap = snapshot.getConsumerGroupMetadataList().stream().collect(Collectors.toMap(
@@ -475,15 +463,16 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
         } catch (Exception e) {
             Throwable cause = FutureUtil.cause(e);
             LOGGER.error("{}: Load snapshot:{} failed", identity, snapshot, cause);
-            return CompletableFuture.failedFuture(e);
+            CompletableFuture.failedFuture(e);
+            return;
         } finally {
             exclusiveLock.unlock();
         }
-        return CompletableFuture.completedFuture(null);
+        CompletableFuture.completedFuture(null);
     }
 
     @Override
-    public CompletableFuture<Void> clear() {
+    public void clear() throws StoreException {
         exclusiveLock.lock();
         try {
             this.consumerGroupMetadataMap.clear();
@@ -520,58 +509,58 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
             if (!requestList.isEmpty()) {
                 kvService.batch(requestList.toArray(new BatchRequest[0]));
             }
-            return CompletableFuture.completedFuture(null);
-        } catch (StoreException e) {
-            LOGGER.error("{}: Clear failed", identity, e);
-            return CompletableFuture.failedFuture(e);
         } finally {
             exclusiveLock.unlock();
         }
     }
 
     @Override
-    public CompletableFuture<Long> consumeOffset(long consumerGroupId) {
-        return CompletableFuture.completedFuture(consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId)).getConsumeOffset());
+    public long consumeOffset(long consumerGroupId) {
+        return consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId))
+            .getConsumeOffset();
     }
 
     @Override
-    public CompletableFuture<Long> ackOffset(long consumerGroupId) {
-        return CompletableFuture.completedFuture(consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId)).getAckOffset());
+    public long ackOffset(long consumerGroupId) {
+        return consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId))
+            .getAckOffset();
     }
 
     @Override
-    public CompletableFuture<Long> retryConsumeOffset(long consumerGroupId) {
-        return CompletableFuture.completedFuture(consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId)).getRetryConsumeOffset());
+    public long retryConsumeOffset(long consumerGroupId) {
+        return consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId))
+            .getRetryConsumeOffset();
     }
 
     @Override
-    public CompletableFuture<Long> retryAckOffset(long consumerGroupId) {
-        return CompletableFuture.completedFuture(consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId)).getRetryAckOffset());
+    public long retryAckOffset(long consumerGroupId) {
+        return consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId))
+            .getRetryAckOffset();
     }
 
     @Override
-    public CompletableFuture<Boolean> isLocked(long consumerGroupId, long offset) {
+    public boolean isLocked(long consumerGroupId, long offset) throws StoreException {
         exclusiveLock.lock();
         try {
             byte[] lockKey = buildOrderIndexKey(consumerGroupId, topicId, queueId, offset);
-            return CompletableFuture.completedFuture(kvService.get(KV_NAMESPACE_FIFO_INDEX, lockKey) != null);
-        } catch (StoreException e) {
-            return CompletableFuture.failedFuture(e);
+            return kvService.get(KV_NAMESPACE_FIFO_INDEX, lockKey) != null;
         } finally {
             exclusiveLock.unlock();
         }
     }
 
     @Override
-    public CompletableFuture<Integer> consumeTimes(long consumerGroupId, long offset) {
-        return CompletableFuture.completedFuture(consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId)).getConsumeTimes().getOrDefault(offset, 0));
+    public int consumeTimes(long consumerGroupId, long offset) {
+        return consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId))
+            .getConsumeTimes()
+            .getOrDefault(offset, 0);
     }
 
     static class AckCommitter {
         private long ackOffset;
-        private RoaringBitmap bitmap;
-        private Consumer<Long> ackAdvanceFn;
-        private long baseOffset;
+        private final RoaringBitmap bitmap;
+        private final Consumer<Long> ackAdvanceFn;
+        private final long baseOffset;
 
         public AckCommitter(long ackOffset, Consumer<Long> ackAdvanceFn) {
             this(ackOffset, ackAdvanceFn, new RoaringBitmap());

@@ -20,9 +20,9 @@ package com.automq.rocketmq.proxy.mock;
 import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.store.api.LogicQueue;
+import com.automq.rocketmq.store.api.LogicQueueManager;
 import com.automq.rocketmq.store.api.MessageStore;
 import com.automq.rocketmq.store.api.S3ObjectOperator;
-import com.automq.rocketmq.store.api.TopicQueueManager;
 import com.automq.rocketmq.store.model.message.AckResult;
 import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
 import com.automq.rocketmq.store.model.message.Filter;
@@ -63,7 +63,7 @@ public class MockMessageStore implements MessageStore {
     }
 
     @Override
-    public TopicQueueManager getTopicQueueManager() {
+    public LogicQueueManager getTopicQueueManager() {
         throw new NotImplementedException();
     }
 

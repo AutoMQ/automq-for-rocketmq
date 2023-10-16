@@ -24,9 +24,9 @@ import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.store.MessageStoreImpl;
 import com.automq.rocketmq.store.api.DLQSender;
 import com.automq.rocketmq.store.api.LogicQueue;
+import com.automq.rocketmq.store.api.LogicQueueManager;
 import com.automq.rocketmq.store.api.MessageStateMachine;
 import com.automq.rocketmq.store.api.StreamStore;
-import com.automq.rocketmq.store.api.TopicQueueManager;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.mock.MockStoreMetadataService;
 import com.automq.rocketmq.store.mock.MockStreamStore;
@@ -86,7 +86,7 @@ class ReviveServiceTest {
         OperationLogService operationLogService = new StreamOperationLogService(streamStore, snapshotService, new StoreConfig());
         logicQueue = new StreamLogicQueue(new StoreConfig(), TOPIC_ID, QUEUE_ID,
             metadataService, stateMachine, streamStore, operationLogService, inflightService);
-        TopicQueueManager manager = Mockito.mock(TopicQueueManager.class);
+        LogicQueueManager manager = Mockito.mock(LogicQueueManager.class);
         Mockito.when(manager.getOrCreate(TOPIC_ID, QUEUE_ID)).thenReturn(CompletableFuture.completedFuture(logicQueue));
         dlqSender = Mockito.mock(DLQSender.class);
         reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, KV_NAMESPACE_TIMER_TAG, kvService, metadataService, inflightService,
@@ -217,7 +217,7 @@ class ReviveServiceTest {
         // check if this message has been sent to DLQ
         Mockito.verify(dlqSender, Mockito.times(1)).send(Mockito.any(FlatMessageExt.class));
 
-        assertEquals(1, logicQueue.getAckOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(1, logicQueue.getAckOffset(CONSUMER_GROUP_ID));
 
         // pop again
         PopResult retryPopResult1 = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();

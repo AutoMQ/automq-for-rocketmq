@@ -78,10 +78,8 @@ public class SnapshotServiceTest {
             streamStore.append(OP_STREAM_ID, buildRecord());
         }
 
-        SnapshotService.SnapshotTask task = new SnapshotService.SnapshotTask(TOPIC_ID, QUEUE_ID, OP_STREAM_ID, SNAPSHOT_STREAM_ID, () -> {
-            OperationSnapshot operationSnapshot = new OperationSnapshot(88, 0, Collections.emptyList());
-            return CompletableFuture.completedFuture(operationSnapshot);
-        });
+        SnapshotService.SnapshotTask task = new SnapshotService.SnapshotTask(TOPIC_ID, QUEUE_ID, OP_STREAM_ID, SNAPSHOT_STREAM_ID,
+            () -> new OperationSnapshot(88, 0, Collections.emptyList()));
 
         // 2. add task
         CompletableFuture<SnapshotService.TakeSnapshotResult> taskCf = snapshotService.addSnapshotTask(task);
@@ -105,7 +103,9 @@ public class SnapshotServiceTest {
         }
 
         SnapshotService.SnapshotTask task = new SnapshotService.SnapshotTask(TOPIC_ID, QUEUE_ID, OP_STREAM_ID, SNAPSHOT_STREAM_ID,
-            () -> CompletableFuture.failedFuture(new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "test")));
+            () -> {
+                throw new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "test");
+            });
 
         // 2. add task
         CompletableFuture<SnapshotService.TakeSnapshotResult> taskCf = snapshotService.addSnapshotTask(task);
@@ -137,18 +137,15 @@ public class SnapshotServiceTest {
             } catch (InterruptedException e) {
                 Assertions.fail(e);
             }
-            OperationSnapshot operationSnapshot = new OperationSnapshot(88, 0, Collections.emptyList());
-            return CompletableFuture.completedFuture(operationSnapshot);
+            return new OperationSnapshot(88, 0, Collections.emptyList());
         });
 
         // 2. add task
         CompletableFuture<SnapshotService.TakeSnapshotResult> taskCf0 = snapshotService.addSnapshotTask(task0);
 
         // 3. add another task
-        SnapshotService.SnapshotTask task1 = new SnapshotService.SnapshotTask(TOPIC_ID, QUEUE_ID, OP_STREAM_ID, SNAPSHOT_STREAM_ID, () -> {
-            OperationSnapshot operationSnapshot = new OperationSnapshot(99, 0, Collections.emptyList());
-            return CompletableFuture.completedFuture(operationSnapshot);
-        });
+        SnapshotService.SnapshotTask task1 = new SnapshotService.SnapshotTask(TOPIC_ID, QUEUE_ID, OP_STREAM_ID, SNAPSHOT_STREAM_ID,
+            () -> new OperationSnapshot(99, 0, Collections.emptyList()));
         latch1.await();
         CompletableFuture<SnapshotService.TakeSnapshotResult> taskCf1 = snapshotService.addSnapshotTask(task1);
         // 4. shutdown snapshot service

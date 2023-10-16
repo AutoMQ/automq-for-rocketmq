@@ -105,7 +105,7 @@ public class LogicQueueTest {
         PopResult popResult = logicQueue.popNormal(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertFalse(popResult.messageList().isEmpty());
-        assertEquals(popResult.messageList().size(), logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
+        assertEquals(popResult.messageList().size(), logicQueue.getInflightStats(CONSUMER_GROUP_ID));
 
         FlatMessageExt messageExt = popResult.messageList().get(0);
         assertEquals(message.topicId(), messageExt.message().topicId());
@@ -126,9 +126,9 @@ public class LogicQueueTest {
         PopResult popResult = logicQueue.popNormal(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 2, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(2, popResult.messageList().size());
-        assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
+        assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
 
-        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID));
 
         List<CheckPoint> allCheckPointList = new ArrayList<>();
         kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, (key, value) ->
@@ -145,7 +145,7 @@ public class LogicQueueTest {
         popResult = logicQueue.popNormal(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 4, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(3, popResult.messageList().size());
-        assertEquals(5, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
+        assertEquals(5, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
         allCheckPointList.clear();
         kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, (key, value) ->
             allCheckPointList.add(CheckPoint.getRootAsCheckPoint(ByteBuffer.wrap(value))));
@@ -157,8 +157,8 @@ public class LogicQueueTest {
             assertEquals(QUEUE_ID, point.queueId());
         }
 
-        assertEquals(5, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
-        assertEquals(5, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(5, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
+        assertEquals(5, stateMachine.consumeOffset(CONSUMER_GROUP_ID));
     }
 
     @Test
@@ -173,9 +173,9 @@ public class LogicQueueTest {
         PopResult popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 2, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(2, popResult.messageList().size());
-        assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
+        assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
 
-        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID));
 
         List<CheckPoint> allCheckPointList = new ArrayList<>();
         kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, (key, value) ->
@@ -191,8 +191,8 @@ public class LogicQueueTest {
         // pop 4 messages
         popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 4, 100).join();
         assertEquals(PopResult.Status.LOCKED, popResult.status());
-        assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
-        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
+        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID));
     }
 
     @Test
@@ -210,22 +210,22 @@ public class LogicQueueTest {
         PopResult popResult = logicQueue.popNormal(group0, Filter.DEFAULT_FILTER, 2, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(2, popResult.messageList().size());
-        assertEquals(2, logicQueue.getInflightStats(group0).join());
-        assertEquals(2, stateMachine.consumeOffset(group0).join());
+        assertEquals(2, logicQueue.getInflightStats(group0));
+        assertEquals(2, stateMachine.consumeOffset(group0));
 
         // 3. group1 pop 4 messages
         popResult = logicQueue.popNormal(group1, Filter.DEFAULT_FILTER, 4, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(4, popResult.messageList().size());
-        assertEquals(4, logicQueue.getInflightStats(group1).join());
-        assertEquals(4, stateMachine.consumeOffset(group1).join());
+        assertEquals(4, logicQueue.getInflightStats(group1));
+        assertEquals(4, stateMachine.consumeOffset(group1));
 
         // 4. group0 pop 4 messages
         popResult = logicQueue.popNormal(group0, Filter.DEFAULT_FILTER, 4, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(3, popResult.messageList().size());
-        assertEquals(5, logicQueue.getInflightStats(group0).join());
-        assertEquals(5, stateMachine.consumeOffset(group0).join());
+        assertEquals(5, logicQueue.getInflightStats(group0));
+        assertEquals(5, stateMachine.consumeOffset(group0));
     }
 
     @Test
@@ -243,15 +243,15 @@ public class LogicQueueTest {
         PopResult popResult = logicQueue.popFifo(group0, Filter.DEFAULT_FILTER, 2, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(2, popResult.messageList().size());
-        assertEquals(2, logicQueue.getInflightStats(group0).join());
-        assertEquals(2, stateMachine.consumeOffset(group0).join());
+        assertEquals(2, logicQueue.getInflightStats(group0));
+        assertEquals(2, stateMachine.consumeOffset(group0));
 
         // 3. group1 pop 4 messages
         popResult = logicQueue.popFifo(group1, Filter.DEFAULT_FILTER, 4, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(4, popResult.messageList().size());
-        assertEquals(4, logicQueue.getInflightStats(group1).join());
-        assertEquals(4, stateMachine.consumeOffset(group1).join());
+        assertEquals(4, logicQueue.getInflightStats(group1));
+        assertEquals(4, stateMachine.consumeOffset(group1));
 
         // 4. group0 pop 4 messages
         popResult = logicQueue.popFifo(group0, Filter.DEFAULT_FILTER, 4, 100).join();
@@ -271,8 +271,8 @@ public class LogicQueueTest {
         PopResult popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 2, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(2, popResult.messageList().size());
-        assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
-        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
+        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID));
         String receiptHandle0 = popResult.messageList().get(0).receiptHandle().get();
         String receiptHandle1 = popResult.messageList().get(1).receiptHandle().get();
 
@@ -283,9 +283,9 @@ public class LogicQueueTest {
         // 3. ack 1 message
         AckResult ackResult = logicQueue.ack(receiptHandle0).join();
         assertEquals(AckResult.Status.SUCCESS, ackResult.status());
-        assertEquals(1, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
-        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(1, stateMachine.ackOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(1, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
+        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID));
+        assertEquals(1, stateMachine.ackOffset(CONSUMER_GROUP_ID));
 
         // 4. check ck
         ReceiptHandle handle0 = SerializeUtil.decodeReceiptHandle(receiptHandle0);
@@ -299,17 +299,17 @@ public class LogicQueueTest {
         // 6. ack 1 message
         ackResult = logicQueue.ack(receiptHandle1).join();
         assertEquals(AckResult.Status.SUCCESS, ackResult.status());
-        assertEquals(0, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
-        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(2, stateMachine.ackOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(0, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
+        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID));
+        assertEquals(2, stateMachine.ackOffset(CONSUMER_GROUP_ID));
 
         // 7. pop 1 message
         popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(1, popResult.messageList().size());
-        assertEquals(1, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
-        assertEquals(3, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(2, stateMachine.ackOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(1, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
+        assertEquals(3, stateMachine.consumeOffset(CONSUMER_GROUP_ID));
+        assertEquals(2, stateMachine.ackOffset(CONSUMER_GROUP_ID));
 
     }
 
@@ -325,8 +325,8 @@ public class LogicQueueTest {
         PopResult popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 2, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(2, popResult.messageList().size());
-        assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
-        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
+        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID));
         String receiptHandle0 = popResult.messageList().get(0).receiptHandle().get();
         String receiptHandle1 = popResult.messageList().get(1).receiptHandle().get();
 
@@ -337,9 +337,9 @@ public class LogicQueueTest {
         // 3. ack 1 message
         AckResult ackResult = logicQueue.ack(receiptHandle0).join();
         assertEquals(AckResult.Status.SUCCESS, ackResult.status());
-        assertEquals(1, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
-        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(1, stateMachine.ackOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(1, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
+        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID));
+        assertEquals(1, stateMachine.ackOffset(CONSUMER_GROUP_ID));
 
         // 4. check ck
         ReceiptHandle handle0 = SerializeUtil.decodeReceiptHandle(receiptHandle0);
@@ -353,17 +353,17 @@ public class LogicQueueTest {
         // 6. ack 1 message with timeout
         ackResult = logicQueue.ackTimeout(receiptHandle1).join();
         assertEquals(AckResult.Status.SUCCESS, ackResult.status());
-        assertEquals(0, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
-        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(1, stateMachine.ackOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(0, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
+        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID));
+        assertEquals(1, stateMachine.ackOffset(CONSUMER_GROUP_ID));
 
         // 7. pop 1 message
         popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(1, popResult.messageList().size());
-        assertEquals(1, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
-        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(1, stateMachine.ackOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(1, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
+        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID));
+        assertEquals(1, stateMachine.ackOffset(CONSUMER_GROUP_ID));
     }
 
     @Test
@@ -378,8 +378,8 @@ public class LogicQueueTest {
         PopResult popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 2, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(2, popResult.messageList().size());
-        assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
-        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
+        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID));
         String receiptHandle0 = popResult.messageList().get(0).receiptHandle().get();
         String receiptHandle1 = popResult.messageList().get(1).receiptHandle().get();
 
@@ -390,9 +390,9 @@ public class LogicQueueTest {
         // 3. ack offset_1
         AckResult ackResult = logicQueue.ack(receiptHandle1).join();
         assertEquals(AckResult.Status.SUCCESS, ackResult.status());
-        assertEquals(1, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
-        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(0, stateMachine.ackOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(1, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
+        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID));
+        assertEquals(0, stateMachine.ackOffset(CONSUMER_GROUP_ID));
 
         // 4. check ck
         ReceiptHandle handle1 = SerializeUtil.decodeReceiptHandle(receiptHandle1);
@@ -406,17 +406,17 @@ public class LogicQueueTest {
         // 6. ack offset_0
         ackResult = logicQueue.ack(receiptHandle0).join();
         assertEquals(AckResult.Status.SUCCESS, ackResult.status());
-        assertEquals(0, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
-        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(2, stateMachine.ackOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(0, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
+        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID));
+        assertEquals(2, stateMachine.ackOffset(CONSUMER_GROUP_ID));
 
         // 7. pop 1 message
         popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(1, popResult.messageList().size());
-        assertEquals(1, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
-        assertEquals(3, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(2, stateMachine.ackOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(1, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
+        assertEquals(3, stateMachine.consumeOffset(CONSUMER_GROUP_ID));
+        assertEquals(2, stateMachine.ackOffset(CONSUMER_GROUP_ID));
     }
 
     @Test
@@ -449,16 +449,16 @@ public class LogicQueueTest {
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(6, popResult.messageList().size());
         popResult.messageList().forEach(messageExt -> assertEquals("TagA", messageExt.message().tag()));
-        assertEquals(6, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
-        assertEquals(8, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(6, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
+        assertEquals(8, stateMachine.consumeOffset(CONSUMER_GROUP_ID));
 
         // 5. pop 3 messages with tagB
         popResult = logicQueue.popNormal(CONSUMER_GROUP_ID, new TagFilter("TagB"), 3, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(2, popResult.messageList().size());
         popResult.messageList().forEach(messageExt -> assertEquals("TagB", messageExt.message().tag()));
-        assertEquals(8, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
-        assertEquals(12, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(8, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
+        assertEquals(12, stateMachine.consumeOffset(CONSUMER_GROUP_ID));
     }
 
     @Test
@@ -491,8 +491,8 @@ public class LogicQueueTest {
         List<FlatMessageExt> popMessageList = popResult.messageList();
         assertEquals(2, popMessageList.size());
         popResult.messageList().forEach(messageExt -> assertEquals("TagB", messageExt.message().tag()));
-        assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
-        assertEquals(9, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
+        assertEquals(9, stateMachine.consumeOffset(CONSUMER_GROUP_ID));
 
         // 2. append 1 message with TagB
         FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagB"));
@@ -505,7 +505,7 @@ public class LogicQueueTest {
         // 3. ack second message in result
         AckResult ackResult = logicQueue.ack(popMessageList.get(1).receiptHandle().get()).join();
         assertEquals(AckResult.Status.SUCCESS, ackResult.status());
-        assertEquals(0, stateMachine.ackOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(0, stateMachine.ackOffset(CONSUMER_GROUP_ID));
 
         // 4. pop fifo again
         popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, new TagFilter("TagB"), 1, 100).join();
@@ -514,14 +514,14 @@ public class LogicQueueTest {
         // 5. ack first message in result
         ackResult = logicQueue.ack(popMessageList.get(0).receiptHandle().get()).join();
         assertEquals(AckResult.Status.SUCCESS, ackResult.status());
-        assertEquals(9, stateMachine.ackOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(9, stateMachine.ackOffset(CONSUMER_GROUP_ID));
 
         // 6. pop fifo again
         popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, new TagFilter("TagB"), 1, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(1, popResult.messageList().size());
-        assertEquals(1, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
-        assertEquals(10, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(1, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
+        assertEquals(10, stateMachine.consumeOffset(CONSUMER_GROUP_ID));
     }
 
     @Test
@@ -536,7 +536,7 @@ public class LogicQueueTest {
         long popEndTimestamp = System.currentTimeMillis();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertFalse(popResult.messageList().isEmpty());
-        assertEquals(1, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
+        assertEquals(1, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
         ReceiptHandle handle = SerializeUtil.decodeReceiptHandle(popResult.messageList().get(0).receiptHandle().get());
         byte[] checkPointKey = SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.operationId());
         byte[] bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, checkPointKey);
@@ -554,7 +554,7 @@ public class LogicQueueTest {
         long changeStartTimestamp = System.currentTimeMillis();
         logicQueue.changeInvisibleDuration(receiptHandle, 1000L).join();
         long changeEndTimestamp = System.currentTimeMillis();
-        assertEquals(1, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
+        assertEquals(1, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
 
         bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, checkPointKey);
         assertNotNull(bytes);
@@ -577,11 +577,11 @@ public class LogicQueueTest {
         PopResult popResult = logicQueue.popRetry(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 2, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(2, popResult.messageList().size());
-        assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
-        assertEquals(0, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(0, stateMachine.ackOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(2, stateMachine.retryConsumeOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(0, stateMachine.retryAckOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
+        assertEquals(0, stateMachine.consumeOffset(CONSUMER_GROUP_ID));
+        assertEquals(0, stateMachine.ackOffset(CONSUMER_GROUP_ID));
+        assertEquals(2, stateMachine.retryConsumeOffset(CONSUMER_GROUP_ID));
+        assertEquals(0, stateMachine.retryAckOffset(CONSUMER_GROUP_ID));
         String receiptHandle0 = popResult.messageList().get(0).receiptHandle().get();
         String receiptHandle1 = popResult.messageList().get(1).receiptHandle().get();
 
@@ -589,41 +589,41 @@ public class LogicQueueTest {
         popResult = logicQueue.popRetry(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(1, popResult.messageList().size());
-        assertEquals(3, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
-        assertEquals(0, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(0, stateMachine.ackOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(3, stateMachine.retryConsumeOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(0, stateMachine.retryAckOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(3, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
+        assertEquals(0, stateMachine.consumeOffset(CONSUMER_GROUP_ID));
+        assertEquals(0, stateMachine.ackOffset(CONSUMER_GROUP_ID));
+        assertEquals(3, stateMachine.retryConsumeOffset(CONSUMER_GROUP_ID));
+        assertEquals(0, stateMachine.retryAckOffset(CONSUMER_GROUP_ID));
         String receiptHandle2 = popResult.messageList().get(0).receiptHandle().get();
 
         // 3. ack msg_0
         AckResult ackResult = logicQueue.ack(receiptHandle0).join();
         assertEquals(AckResult.Status.SUCCESS, ackResult.status());
-        assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
-        assertEquals(0, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(0, stateMachine.ackOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(3, stateMachine.retryConsumeOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(1, stateMachine.retryAckOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
+        assertEquals(0, stateMachine.consumeOffset(CONSUMER_GROUP_ID));
+        assertEquals(0, stateMachine.ackOffset(CONSUMER_GROUP_ID));
+        assertEquals(3, stateMachine.retryConsumeOffset(CONSUMER_GROUP_ID));
+        assertEquals(1, stateMachine.retryAckOffset(CONSUMER_GROUP_ID));
 
         // 4. check ck
 
         // 5. ack msg_2 timeout
         ackResult = logicQueue.ackTimeout(receiptHandle2).join();
         assertEquals(AckResult.Status.SUCCESS, ackResult.status());
-        assertEquals(1, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
-        assertEquals(0, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(0, stateMachine.ackOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(3, stateMachine.retryConsumeOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(1, stateMachine.retryAckOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(1, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
+        assertEquals(0, stateMachine.consumeOffset(CONSUMER_GROUP_ID));
+        assertEquals(0, stateMachine.ackOffset(CONSUMER_GROUP_ID));
+        assertEquals(3, stateMachine.retryConsumeOffset(CONSUMER_GROUP_ID));
+        assertEquals(1, stateMachine.retryAckOffset(CONSUMER_GROUP_ID));
 
         // 6. ack msg_1
         ackResult = logicQueue.ack(receiptHandle1).join();
         assertEquals(AckResult.Status.SUCCESS, ackResult.status());
-        assertEquals(0, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
-        assertEquals(0, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(0, stateMachine.ackOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(3, stateMachine.retryConsumeOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(3, stateMachine.retryAckOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(0, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
+        assertEquals(0, stateMachine.consumeOffset(CONSUMER_GROUP_ID));
+        assertEquals(0, stateMachine.ackOffset(CONSUMER_GROUP_ID));
+        assertEquals(3, stateMachine.retryConsumeOffset(CONSUMER_GROUP_ID));
+        assertEquals(3, stateMachine.retryAckOffset(CONSUMER_GROUP_ID));
     }
 
     @Test
@@ -638,8 +638,8 @@ public class LogicQueueTest {
         PopResult popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 2, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(2, popResult.messageList().size());
-        assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
-        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
+        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID));
         String receiptHandle0 = popResult.messageList().get(0).receiptHandle().get();
         String receiptHandle1 = popResult.messageList().get(1).receiptHandle().get();
 
@@ -665,12 +665,12 @@ public class LogicQueueTest {
         checkCkExist(receiptHandle0, true);
         checkCkExist(receiptHandle1, true);
         assertEquals(2, scanAllTimerTag().size());
-        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(0, stateMachine.ackOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID));
+        assertEquals(0, stateMachine.ackOffset(CONSUMER_GROUP_ID));
     }
 
     @Test
-    void open_close_ungracefully() {
+    void open_close_ungracefully() throws StoreException {
         // 1. append 5 messages
         for (int i = 0; i < 5; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
@@ -681,9 +681,9 @@ public class LogicQueueTest {
         PopResult popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 2, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(2, popResult.messageList().size());
-        assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID).join());
-        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(0, stateMachine.ackOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
+        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID));
+        assertEquals(0, stateMachine.ackOffset(CONSUMER_GROUP_ID));
         String receiptHandle0 = popResult.messageList().get(0).receiptHandle().get();
         String receiptHandle1 = popResult.messageList().get(1).receiptHandle().get();
 
@@ -693,7 +693,7 @@ public class LogicQueueTest {
         assertEquals(2, scanAllTimerTag().size());
 
         // 4. mock that close ungracefully, stream closed but states is not cleaned
-        Mockito.doReturn(CompletableFuture.completedFuture(null)).when(stateMachine).clear();
+        Mockito.doNothing().when(stateMachine).clear();
         logicQueue.close().join();
 
         // 5. check ck exist
@@ -718,8 +718,8 @@ public class LogicQueueTest {
         checkCkExist(receiptHandle0, true);
         checkCkExist(receiptHandle1, true);
         assertEquals(2, scanAllTimerTag().size());
-        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID).join());
-        assertEquals(0, stateMachine.ackOffset(CONSUMER_GROUP_ID).join());
+        assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID));
+        assertEquals(0, stateMachine.ackOffset(CONSUMER_GROUP_ID));
     }
 
     private void checkCkExist(String receiptHandle, boolean expectExist) {

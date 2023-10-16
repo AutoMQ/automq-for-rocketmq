@@ -21,10 +21,9 @@ import com.automq.rocketmq.common.config.S3StreamConfig;
 import com.automq.rocketmq.common.config.StoreConfig;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.store.api.DLQSender;
-import com.automq.rocketmq.store.api.MessageStore;
+import com.automq.rocketmq.store.api.LogicQueueManager;
 import com.automq.rocketmq.store.api.S3ObjectOperator;
 import com.automq.rocketmq.store.api.StreamStore;
-import com.automq.rocketmq.store.api.TopicQueueManager;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.queue.DefaultLogicQueueManager;
 import com.automq.rocketmq.store.service.InflightService;
@@ -41,7 +40,7 @@ import static com.automq.rocketmq.store.MessageStoreImpl.KV_NAMESPACE_CHECK_POIN
 import static com.automq.rocketmq.store.MessageStoreImpl.KV_NAMESPACE_TIMER_TAG;
 
 public class MessageStoreBuilder {
-    public static MessageStore build(StoreConfig storeConfig, S3StreamConfig s3StreamConfig,
+    public static MessageStoreImpl build(StoreConfig storeConfig, S3StreamConfig s3StreamConfig,
         StoreMetadataService metadataService, DLQSender dlqSender) throws StoreException {
         S3Operator operator = new DefaultS3Operator(s3StreamConfig.s3Endpoint(), s3StreamConfig.s3Region(), s3StreamConfig.s3Bucket(),
             s3StreamConfig.s3ForcePathStyle(), s3StreamConfig.s3AccessKey(), s3StreamConfig.s3SecretKey());
@@ -50,12 +49,12 @@ public class MessageStoreBuilder {
         InflightService inflightService = new InflightService();
         SnapshotService snapshotService = new SnapshotService(streamStore, kvService);
         OperationLogService operationLogService = new StreamOperationLogService(streamStore, snapshotService, storeConfig);
-        TopicQueueManager topicQueueManager = new DefaultLogicQueueManager(storeConfig, streamStore, kvService,
+        LogicQueueManager logicQueueManager = new DefaultLogicQueueManager(storeConfig, streamStore, kvService,
             metadataService, operationLogService, inflightService);
         ReviveService reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, KV_NAMESPACE_TIMER_TAG,
-            kvService, metadataService, inflightService, topicQueueManager, dlqSender);
+            kvService, metadataService, inflightService, logicQueueManager, dlqSender);
         S3ObjectOperator objectOperator = new S3ObjectOperatorImpl(operator);
 
-        return new MessageStoreImpl(storeConfig, streamStore, metadataService, kvService, inflightService, snapshotService, topicQueueManager, reviveService, objectOperator);
+        return new MessageStoreImpl(storeConfig, streamStore, metadataService, kvService, inflightService, snapshotService, logicQueueManager, reviveService, objectOperator);
     }
 }

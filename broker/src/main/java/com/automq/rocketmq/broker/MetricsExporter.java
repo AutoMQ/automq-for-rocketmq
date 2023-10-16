@@ -22,7 +22,8 @@ import com.automq.rocketmq.common.config.MetricsConfig;
 import com.automq.rocketmq.common.util.Lifecycle;
 import com.automq.rocketmq.proxy.metrics.ProxyMetricsManager;
 import com.automq.rocketmq.proxy.processor.ExtendMessagingProcessor;
-import com.automq.rocketmq.store.api.MessageStore;
+import com.automq.rocketmq.store.MessageStoreImpl;
+import com.automq.rocketmq.store.metrics.StoreMetricsManager;
 import com.google.common.base.Splitter;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.common.AttributesBuilder;
@@ -63,7 +64,6 @@ public class MetricsExporter implements Lifecycle {
 
     private final BrokerConfig brokerConfig;
     private final MetricsConfig metricsConfig;
-    private final MessageStore messageStore;
     private final static Map<String, String> LABEL_MAP = new HashMap<>();
     private OtlpGrpcMetricExporter metricExporter;
     private PeriodicMetricReader periodicMetricReader;
@@ -72,15 +72,16 @@ public class MetricsExporter implements Lifecycle {
     private Meter brokerMeter;
 
     private final ProxyMetricsManager proxyMetricsManager;
+    private final StoreMetricsManager storeMetricsManager;
 
     public static Supplier<AttributesBuilder> attributesBuilderSupplier = Attributes::builder;
 
-    public MetricsExporter(BrokerConfig brokerConfig, MessageStore messageStore,
+    public MetricsExporter(BrokerConfig brokerConfig, MessageStoreImpl messageStore,
         ExtendMessagingProcessor messagingProcessor) {
         this.brokerConfig = brokerConfig;
         this.metricsConfig = brokerConfig.metrics();
-        this.messageStore = messageStore;
-        proxyMetricsManager = new ProxyMetricsManager(messagingProcessor);
+        this.proxyMetricsManager = new ProxyMetricsManager(messagingProcessor);
+        this.storeMetricsManager = new StoreMetricsManager(messageStore);
     }
 
     public static AttributesBuilder newAttributesBuilder() {
@@ -218,10 +219,15 @@ public class MetricsExporter implements Lifecycle {
         for (Pair<InstrumentSelector, View> selectorViewPair : ProxyMetricsManager.getMetricsView()) {
             providerBuilder.registerView(selectorViewPair.getLeft(), selectorViewPair.getRight());
         }
+
+        for (Pair<InstrumentSelector, View> selectorViewPair : StoreMetricsManager.getMetricsView()) {
+            providerBuilder.registerView(selectorViewPair.getLeft(), selectorViewPair.getRight());
+        }
     }
 
     private void initMetrics() {
         proxyMetricsManager.initMetrics(brokerMeter, MetricsExporter::newAttributesBuilder);
+        storeMetricsManager.initMetrics(brokerMeter, MetricsExporter::newAttributesBuilder);
     }
 
     @Override
