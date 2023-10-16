@@ -30,6 +30,7 @@ import apache.rocketmq.controller.v1.StreamState;
 import apache.rocketmq.controller.v1.SubStream;
 import apache.rocketmq.controller.v1.TopicStatus;
 import apache.rocketmq.controller.v1.MessageType;
+import com.automq.rocketmq.common.system.StreamConstants;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.ControllerClient;
 import com.automq.rocketmq.common.config.ControllerConfig;
@@ -2012,10 +2013,12 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
         try (SqlSession session = getSessionFactory().openSession()) {
             S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
-            for (long index = objectId; index < objectId + 2; index++) {
-                S3Object object = s3ObjectMapper.getById(index);
-                Assertions.assertEquals(S3ObjectState.BOS_WILL_DELETE, object.getState());
-            }
+            S3Object s3Object = s3ObjectMapper.getById(objectId);
+            Assertions.assertEquals(S3ObjectState.BOS_WILL_DELETE, s3Object.getState());
+
+            S3Object s3Object1 = s3ObjectMapper.getById(objectId);
+            Assertions.assertEquals(S3ObjectState.BOS_WILL_DELETE, s3Object1.getState());
+
 
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
             for (long index = objectId; index < objectId + 2; index++) {
@@ -2024,6 +2027,8 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             }
 
             com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = s3StreamObjectMapper.getByObjectId(objectId + 2);
+            Assertions.assertEquals(111L, object.getObjectSize());
+            Assertions.assertEquals(streamId, object.getStreamId());
             Assertions.assertEquals(1L, object.getBaseDataTimestamp());
             if (object.getCommittedTimestamp() - time > 5 * 60) {
                 Assertions.fail();
@@ -2078,6 +2083,8 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             }
             Assertions.assertNotNull(object.getCommittedTimestamp());
             Assertions.assertTrue(object.getCommittedTimestamp() > 0);
+            Assertions.assertEquals(111L, object.getObjectSize());
+            Assertions.assertEquals(streamId, object.getStreamId());
             if (object.getCommittedTimestamp() - time > 5 * 60) {
                 Assertions.fail();
             }
@@ -2269,6 +2276,10 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
                     Assertions.fail();
                 }
             }
+
+            S3Object s3Object = s3ObjectMapper.getById(objectId + 4);
+            Assertions.assertEquals(222L, s3Object.getObjectSize());
+            Assertions.assertEquals(StreamConstants.NOOP_STREAM_ID, s3Object.getStreamId());
 
             long baseTime = 3;
             S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);

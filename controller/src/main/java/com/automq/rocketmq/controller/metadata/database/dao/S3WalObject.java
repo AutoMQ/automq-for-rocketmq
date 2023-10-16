@@ -36,6 +36,8 @@ public class S3WalObject {
 
     long committedTimestamp;
 
+    long createdTimestamp = System.currentTimeMillis();
+
     public Long getObjectId() {
         return objectId;
     }
@@ -90,6 +92,14 @@ public class S3WalObject {
 
     public void setCommittedTimestamp(long committedTimestamp) {
         this.committedTimestamp = committedTimestamp;
+    }
+
+    public long getCreatedTimestamp() {
+        return createdTimestamp;
+    }
+
+    public void setCreatedTimestamp(long createdTimestamp) {
+        this.createdTimestamp = createdTimestamp;
     }
 
     @Override

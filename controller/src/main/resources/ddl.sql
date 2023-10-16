@@ -150,6 +150,7 @@ CREATE TABLE IF NOT EXISTS s3streamobject
     object_size         BIGINT NOT NULL,
     base_data_timestamp BIGINT,
     committed_timestamp BIGINT,
+    created_timestamp   BIGINT,
     UNIQUE INDEX uk_s3_stream_object_object_id (object_id),
     INDEX idx_s3_stream_object_stream_id (stream_id, start_offset)
 );
@@ -163,6 +164,7 @@ CREATE TABLE IF NOT EXISTS s3walobject
     sub_streams         LONGTEXT NOT NULL, -- immutable
     base_data_timestamp BIGINT,
     committed_timestamp BIGINT,
+    created_timestamp   BIGINT,
     UNIQUE INDEX uk_s3_wal_object_node_sequence_id (node_id, sequence_id),
     INDEX idx_s3_wal_object_object_id (object_id)
 );

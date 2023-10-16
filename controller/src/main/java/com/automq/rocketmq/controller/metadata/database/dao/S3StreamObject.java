@@ -38,6 +38,8 @@ public class S3StreamObject {
 
     private long committedTimestamp;
 
+    private long createdTimestamp = System.currentTimeMillis();
+
     public Long getId() {
         return id;
     }
@@ -100,6 +102,14 @@ public class S3StreamObject {
 
     public void setCommittedTimestamp(long committedTimestamp) {
         this.committedTimestamp = committedTimestamp;
+    }
+
+    public long getCreatedTimestamp() {
+        return createdTimestamp;
+    }
+
+    public void setCreatedTimestamp(long createdTimestamp) {
+        this.createdTimestamp = createdTimestamp;
     }
 
     @Override
