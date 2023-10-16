@@ -1554,9 +1554,9 @@ public class DefaultMetadataStore implements MetadataStore {
                     }
 
                     long dataTs = System.currentTimeMillis();
+                    long sequenceId = objectId;
                     if (!Objects.isNull(compactedObjects) && !compactedObjects.isEmpty()) {
-                        // update dataTs to the min compacted object's dataTs
-                        dataTs = compactedObjects.stream()
+                        List<S3WalObject> s3WalObjects = compactedObjects.stream()
                             .map(id -> {
                                 // mark destroy compacted object
                                 S3Object object = s3ObjectMapper.getById(id);
@@ -1564,24 +1564,16 @@ public class DefaultMetadataStore implements MetadataStore {
                                 object.setMarkedForDeletionTimestamp(new Date());
                                 s3ObjectMapper.markToDelete(object.getId(), new Date());
 
-                                S3WalObject s3WALObject = s3WALObjectMapper.getByObjectId(id);
-                                return s3WALObject.getBaseDataTimestamp();
+                                return s3WALObjectMapper.getByObjectId(id);
                             })
-                            .min(Long::compareTo).get();
-                    }
+                            .toList();
 
-                    // update broker's wal object
-                    if (objectId != S3Constants.NOOP_OBJECT_ID) {
-                        // generate broker's wal object record
-                        S3WalObject s3WALObject = new S3WalObject();
-                        s3WALObject.setObjectId(objectId);
-                        s3WALObject.setObjectSize(walObject.getObjectSize());
-                        s3WALObject.setBaseDataTimestamp(dataTs);
-                        s3WALObject.setCommittedTimestamp(System.currentTimeMillis());
-                        s3WALObject.setNodeId(brokerId);
-                        s3WALObject.setSequenceId(walObject.getSequenceId());
-                        s3WALObject.setSubStreams(gson.toJson(walObject.getSubStreamsMap()));
-                        s3WALObjectMapper.create(s3WALObject);
+                        if (!Objects.isNull(s3WalObjects) && !s3WalObjects.isEmpty()) {
+                            // update dataTs to the min compacted object's dataTs
+                            dataTs = s3WalObjects.stream().mapToLong(S3WalObject::getBaseDataTimestamp).min().getAsLong();
+                            // update sequenceId to the min compacted object's sequenceId
+                            sequenceId = s3WalObjects.stream().mapToLong(S3WalObject::getSequenceId).min().getAsLong();
+                        }
                     }
 
                     // commit stream objects;
@@ -1614,6 +1606,21 @@ public class DefaultMetadataStore implements MetadataStore {
                     if (!Objects.isNull(compactedObjects) && !compactedObjects.isEmpty()) {
                         compactedObjects.forEach(id -> s3WALObjectMapper.delete(id, null, null));
                     }
+
+                    // update broker's wal object
+                    if (objectId != S3Constants.NOOP_OBJECT_ID) {
+                        // generate broker's wal object record
+                        S3WalObject s3WALObject = new S3WalObject();
+                        s3WALObject.setObjectId(objectId);
+                        s3WALObject.setObjectSize(walObject.getObjectSize());
+                        s3WALObject.setBaseDataTimestamp(dataTs);
+                        s3WALObject.setCommittedTimestamp(System.currentTimeMillis());
+                        s3WALObject.setNodeId(brokerId);
+                        s3WALObject.setSequenceId(sequenceId);
+                        s3WALObject.setSubStreams(gson.toJson(walObject.getSubStreamsMap()));
+                        s3WALObjectMapper.create(s3WALObject);
+                    }
+
                     session.commit();
                     LOGGER.info("broker[broke-id={}] commit wal object[object-id={}] success, compacted objects[{}], stream objects[{}]",
                         brokerId, walObject.getObjectId(), compactedObjects, streamObjects);

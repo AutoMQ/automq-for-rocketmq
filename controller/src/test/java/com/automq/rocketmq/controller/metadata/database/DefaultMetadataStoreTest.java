@@ -2182,7 +2182,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
         S3WALObject walObject = S3WALObject.newBuilder()
             .setObjectId(objectId + 4)
-            .setSequenceId(11)
             .setObjectSize(222L)
             .setBrokerId(nodeId)
             .build();
@@ -2284,6 +2283,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             long baseTime = 3;
             S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
             S3WalObject object = s3WALObjectMapper.getByObjectId(objectId + 4);
+            Assertions.assertEquals(1L, object.getSequenceId());
             Assertions.assertEquals(baseTime, object.getBaseDataTimestamp());
             if (object.getCommittedTimestamp() - time > 5 * 60) {
                 Assertions.fail();
@@ -2297,7 +2297,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
         S3WALObject walObject = S3WALObject.newBuilder()
             .setObjectId(3)
-            .setSequenceId(-1)
             .setBrokerId(-1)
             .build();
 

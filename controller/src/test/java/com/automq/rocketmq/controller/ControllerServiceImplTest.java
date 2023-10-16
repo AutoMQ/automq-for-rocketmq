@@ -1552,7 +1552,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
             apache.rocketmq.controller.v1.S3WALObject walObject = apache.rocketmq.controller.v1.S3WALObject.newBuilder()
                 .setObjectId(objectId + 4)
-                .setSequenceId(11)
                 .setObjectSize(222L)
                 .setBrokerId(nodeId)
                 .build();
@@ -1589,6 +1588,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
                 S3WalObject object = s3WALObjectMapper.getByObjectId(objectId + 4);
                 Assertions.assertEquals(baseTime, object.getBaseDataTimestamp());
+                Assertions.assertEquals(1L, object.getSequenceId());
                 if (object.getCommittedTimestamp() - time > 5 * 60) {
                     Assertions.fail();
                 }
@@ -1626,7 +1626,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             long time = System.currentTimeMillis();
             apache.rocketmq.controller.v1.S3WALObject walObject = apache.rocketmq.controller.v1.S3WALObject.newBuilder()
                 .setObjectId(objectId + 4)
-                .setSequenceId(11)
                 .setObjectSize(222L)
                 .setBrokerId(nodeId)
                 .build();
@@ -1655,6 +1654,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
                 S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
                 S3WalObject object = s3WALObjectMapper.getByObjectId(objectId + 4);
+                Assertions.assertEquals(objectId + 4, object.getSequenceId());
                 Assertions.assertTrue(object.getBaseDataTimestamp() > 1);
                 if (object.getBaseDataTimestamp() - time > 5 * 60) {
                     Assertions.fail();
@@ -1862,7 +1862,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
             apache.rocketmq.controller.v1.S3WALObject walObject = apache.rocketmq.controller.v1.S3WALObject.newBuilder()
                 .setObjectId(objectId + 4)
-                .setSequenceId(11)
                 .setObjectSize(222L)
                 .setBrokerId(nodeId)
                 .build();
@@ -1915,6 +1914,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
                 S3WalObject object = s3WALObjectMapper.getByObjectId(objectId + 4);
                 Assertions.assertEquals(baseTime, object.getBaseDataTimestamp());
+                Assertions.assertEquals(1L, object.getSequenceId());
                 if (object.getCommittedTimestamp() - time > 5 * 60) {
                     Assertions.fail();
                 }
@@ -2005,7 +2005,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
             apache.rocketmq.controller.v1.S3WALObject walObject = apache.rocketmq.controller.v1.S3WALObject.newBuilder()
                 .setObjectId(objectId + 4)
-                .setSequenceId(11)
                 .setObjectSize(222L)
                 .setBrokerId(nodeId)
                 .build();
@@ -2058,6 +2057,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 long baseTime = 3;
                 S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
                 S3WalObject object = s3WALObjectMapper.getByObjectId(objectId + 4);
+                Assertions.assertEquals(1L, object.getSequenceId());
                 Assertions.assertEquals(baseTime, object.getBaseDataTimestamp());
                 if (object.getCommittedTimestamp() - time > 5 * 60) {
                     Assertions.fail();
