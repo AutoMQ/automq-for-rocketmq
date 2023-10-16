@@ -2164,12 +2164,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Assertions.assertThrows(ExecutionException.class, () -> metadataStore.commitStreamObject(s3StreamObject, compactedObjects).get());
         }
 
-        try (SqlSession session = getSessionFactory().openSession()) {
-            S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
-            s3StreamObjectMapper.delete(null, null, 2L);
-            session.commit();
-        }
-
     }
 
     @Test
