@@ -87,7 +87,15 @@ import com.automq.rocketmq.controller.tasks.ScanYieldingQueueTask;
 import com.automq.rocketmq.controller.tasks.SchedulerTask;
 import com.automq.rocketmq.controller.tasks.ScanTopicTask;
 import com.google.common.base.Strings;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonPrimitive;
+import com.google.gson.JsonSerializationContext;
+import com.google.gson.JsonSerializer;
+import com.google.protobuf.util.JsonFormat;
 import java.io.IOException;
+import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -151,14 +159,26 @@ public class DefaultMetadataStore implements MetadataStore {
 
     private final AssignmentCache assignmentCache;
 
+    private static class SubStreamSerializer implements JsonSerializer<SubStream> {
+        @Override
+        public JsonElement serialize(SubStream stream, Type type, JsonSerializationContext context) {
+            JsonObject root = new JsonObject();
+            root.addProperty("streamId", stream.getStreamId());
+            root.addProperty("startOffset", stream.getStartOffset());
+            root.addProperty("endOffset", stream.getEndOffset());
+            return root;
+        }
+    }
+
     public DefaultMetadataStore(ControllerClient client, SqlSessionFactory sessionFactory, ControllerConfig config) {
         this.controllerClient = client;
         this.sessionFactory = sessionFactory;
         this.config = config;
-        // TODO: set leader here to bypass leader election, just for testing purpose.
-        this.role = Role.Leader;
+        this.role = Role.Follower;
         this.nodes = new ConcurrentHashMap<>();
-        this.gson = new Gson();
+        this.gson = new GsonBuilder()
+            .registerTypeAdapter(SubStream.class, new SubStreamSerializer())
+            .create();
         this.scheduledExecutorService = new ScheduledThreadPoolExecutor(Runtime.getRuntime().availableProcessors(),
             new PrefixThreadFactory("Controller"));
         this.asyncExecutorService = Executors.newFixedThreadPool(10, new PrefixThreadFactory("Controller-Async"));
@@ -1951,13 +1971,13 @@ public class DefaultMetadataStore implements MetadataStore {
                 // apply limit in whole.
                 Set<Long> objectIds = java.util.stream.Stream.concat(
                         s3StreamObjects.stream()
-                            .map(s3StreamObject -> new long[]{
+                            .map(s3StreamObject -> new long[] {
                                 s3StreamObject.getObjectId(),
                                 s3StreamObject.getStartOffset(),
                                 s3StreamObject.getEndOffset()
                             }),
                         walObjects.stream()
-                            .map(s3WALObject -> new long[]{
+                            .map(s3WALObject -> new long[] {
                                 s3WALObject.getObjectId(),
                                 s3WALObject.getSubStreamsMap().get(streamId).getStartOffset(),
                                 s3WALObject.getSubStreamsMap().get(streamId).getEndOffset()
@@ -1970,7 +1990,6 @@ public class DefaultMetadataStore implements MetadataStore {
                     }).limit(limit)
                     .map(offset -> offset[0])
                     .collect(Collectors.toSet());
-
 
                 List<apache.rocketmq.controller.v1.S3StreamObject> limitedStreamObjects = s3StreamObjects.stream()
                     .filter(s3StreamObject -> objectIds.contains(s3StreamObject.getObjectId()))
