@@ -107,6 +107,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import com.google.gson.Gson;
@@ -1935,8 +1936,39 @@ public class DefaultMetadataStore implements MetadataStore {
                     });
                 }
 
-                // TODO: apply limit in whole.
-                return new ImmutablePair<>(s3StreamObjects, walObjects);
+                // apply limit in whole.
+                Set<Long> objectIds = java.util.stream.Stream.concat(
+                        s3StreamObjects.stream()
+                            .map(s3StreamObject -> new long[]{
+                                s3StreamObject.getObjectId(),
+                                s3StreamObject.getStartOffset(),
+                                s3StreamObject.getEndOffset()
+                            }),
+                        walObjects.stream()
+                            .map(s3WALObject -> new long[]{
+                                s3WALObject.getObjectId(),
+                                s3WALObject.getSubStreamsMap().get(streamId).getStartOffset(),
+                                s3WALObject.getSubStreamsMap().get(streamId).getEndOffset()
+                            })
+                    ).sorted((l, r) -> {
+                        if (l[1] == r[1]) {
+                            return Long.compare(l[0], r[0]);
+                        }
+                        return Long.compare(l[1], r[1]);
+                    }).limit(limit)
+                    .map(offset -> offset[0])
+                    .collect(Collectors.toSet());
+
+
+                List<apache.rocketmq.controller.v1.S3StreamObject> limitedStreamObjects = s3StreamObjects.stream()
+                    .filter(s3StreamObject -> objectIds.contains(s3StreamObject.getObjectId()))
+                    .toList();
+
+                List<S3WALObject> limitedWalObjectList = walObjects.stream()
+                    .filter(s3WALObject -> objectIds.contains(s3WALObject.getObjectId()))
+                    .toList();
+
+                return new ImmutablePair<>(limitedStreamObjects, limitedWalObjectList);
             }
         }, asyncExecutorService);
     }
