@@ -108,9 +108,14 @@ public class TopicManager {
                     topic.setAcceptMessageTypes(gson.toJson(acceptMessageTypesList));
                     topicMapper.create(topic);
                     long topicId = topic.getId();
-                    createQueues(IntStream.range(0, queueNum), topicId, session);
+                    List<QueueAssignment> assignments = createQueues(IntStream.range(0, queueNum), topicId, session);
                     // Commit transaction
                     session.commit();
+
+                    // Cache new topic and queue assignments immediately
+                    topicCache.apply(List.of(topic));
+                    assignmentCache.apply(assignments);
+
                     future.complete(topicId);
                 }
             } else {
@@ -339,7 +344,7 @@ public class TopicManager {
         return future;
     }
 
-    private void createQueues(IntStream range, long topicId, SqlSession session) throws ControllerException {
+    private List<QueueAssignment> createQueues(IntStream range, long topicId, SqlSession session) throws ControllerException {
         QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
         StreamMapper streamMapper = session.getMapper(StreamMapper.class);
 
@@ -355,6 +360,8 @@ public class TopicManager {
             throw new ControllerException(Code.NODE_UNAVAILABLE_VALUE);
         }
 
+        List<QueueAssignment> assignments = new ArrayList<>();
+
         range.forEach(n -> {
             QueueAssignment assignment = new QueueAssignment();
             assignment.setTopicId(topicId);
@@ -365,6 +372,7 @@ public class TopicManager {
             assignment.setSrcNodeId(node.getId());
             assignment.setDstNodeId(node.getId());
             assignmentMapper.create(assignment);
+            assignments.add(assignment);
             // Create data stream
             long streamId = createStream(streamMapper, topicId, n, null, StreamRole.STREAM_ROLE_DATA, node.getId());
             LOGGER.debug("Create assignable data stream[stream-id={}] for topic-id={}, queue-id={}",
@@ -379,6 +387,7 @@ public class TopicManager {
             LOGGER.debug("Create assignable snapshot stream[stream-id={}] for topic-id={}, queue-id={}",
                 streamId, topicId, n);
         });
+        return assignments;
     }
 
     long createStream(StreamMapper streamMapper, long topicId, int queueId, Long groupId,
