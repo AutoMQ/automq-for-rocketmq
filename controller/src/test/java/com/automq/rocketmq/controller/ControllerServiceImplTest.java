@@ -937,9 +937,9 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
         String expectSubStream = """
             {
               "1234567890": {
-                "streamId_": 1234567890,
-                "startOffset_": 0,
-                "endOffset_": 10
+                "streamId": 1234567890,
+                "startOffset": 0,
+                "endOffset": 10
               }}""";
 
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -1482,7 +1482,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 if (object.getBaseDataTimestamp() - time > 5 * 60) {
                     Assertions.fail();
                 }
-                Assertions.assertNotNull(object.getCommittedTimestamp());
                 Assertions.assertTrue(object.getCommittedTimestamp() > 0);
                 if (object.getCommittedTimestamp() - time > 5 * 60) {
                     Assertions.fail();
@@ -1521,9 +1520,9 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             String expectSubStream = """
             {
               "1234567890": {
-                "streamId_": 1234567890,
-                "startOffset_": 0,
-                "endOffset_": 10
+                "streamId": 1234567890,
+                "startOffset": 0,
+                "endOffset": 10
               }}""";
 
             try (SqlSession session = this.getSessionFactory().openSession()) {
@@ -1698,9 +1697,9 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             String expectSubStream = """
             {
               "1234567890": {
-                "streamId_": 1234567890,
-                "startOffset_": 0,
-                "endOffset_": 10
+                "streamId": 1234567890,
+                "startOffset": 0,
+                "endOffset": 10
               }}""";
 
             try (SqlSession session = this.getSessionFactory().openSession()) {
@@ -1809,9 +1808,9 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             String expectSubStream = """
             {
               "1234567890": {
-                "streamId_": 1234567890,
-                "startOffset_": 0,
-                "endOffset_": 10
+                "streamId": 1234567890,
+                "startOffset": 0,
+                "endOffset": 10
               }}""";
 
             try (SqlSession session = this.getSessionFactory().openSession()) {
@@ -1952,9 +1951,9 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             String expectSubStream = """
             {
               "1234567890": {
-                "streamId_": 1234567890,
-                "startOffset_": 0,
-                "endOffset_": 10
+                "streamId": 1234567890,
+                "startOffset": 0,
+                "endOffset": 10
               }}""";
 
             try (SqlSession session = this.getSessionFactory().openSession()) {

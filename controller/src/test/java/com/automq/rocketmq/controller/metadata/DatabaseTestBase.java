@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.controller.metadata;
 
+import apache.rocketmq.controller.v1.SubStream;
 import com.automq.rocketmq.common.config.ControllerConfig;
 import com.automq.rocketmq.controller.metadata.database.dao.Lease;
 import com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper;
@@ -31,6 +32,10 @@ import com.automq.rocketmq.controller.metadata.database.mapper.S3WalObjectMapper
 import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 
+import com.automq.rocketmq.controller.metadata.database.serde.SubStreamDeserializer;
+import com.automq.rocketmq.controller.metadata.database.serde.SubStreamSerializer;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Calendar;
@@ -53,6 +58,8 @@ public class DatabaseTestBase {
 
     AtomicLong s3ObjectIdSequence;
 
+    protected Gson gson;
+
     public DatabaseTestBase() {
         this.s3ObjectIdSequence = new AtomicLong(1);
         config = Mockito.mock(ControllerConfig.class);
@@ -62,6 +69,10 @@ public class DatabaseTestBase {
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
         Mockito.when(config.deletedTopicLingersInSecs()).thenCallRealMethod();
         Mockito.when(config.deletedGroupLingersInSecs()).thenCallRealMethod();
+        gson = new GsonBuilder()
+            .registerTypeAdapter(SubStream.class, new SubStreamSerializer())
+            .registerTypeAdapter(SubStream.class, new SubStreamDeserializer())
+            .create();
     }
 
     protected long nextS3ObjectId() {
