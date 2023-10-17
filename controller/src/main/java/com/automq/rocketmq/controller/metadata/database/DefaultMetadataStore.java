@@ -92,6 +92,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
+import com.google.protobuf.TextFormat;
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
@@ -1530,6 +1531,13 @@ public class DefaultMetadataStore implements MetadataStore {
             return CompletableFuture.failedFuture(e);
         }
 
+        LOGGER.info("commitWalObject with walObject: {}, streamObjects: {}, compactedObjects: {}",
+            TextFormat.shortDebugString(walObject),
+            streamObjects.stream()
+                .map(TextFormat::shortDebugString)
+                .collect(Collectors.joining()), compactedObjects
+        );
+
         CompletableFuture<Void> future = new CompletableFuture<>();
         for (; ; ) {
             if (isLeader()) {
@@ -1586,7 +1594,7 @@ public class DefaultMetadataStore implements MetadataStore {
                             })
                             .toList();
 
-                        if (!Objects.isNull(s3WalObjects) && !s3WalObjects.isEmpty()) {
+                        if (!s3WalObjects.isEmpty()) {
                             // update dataTs to the min compacted object's dataTs
                             dataTs = s3WalObjects.stream().mapToLong(S3WalObject::getBaseDataTimestamp).min().getAsLong();
                             // update sequenceId to the min compacted object's sequenceId
@@ -1595,7 +1603,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     }
 
                     // commit stream objects;
-                    if (!Objects.isNull(streamObjects) && !streamObjects.isEmpty()) {
+                    if (!streamObjects.isEmpty()) {
                         for (apache.rocketmq.controller.v1.S3StreamObject s3StreamObject : streamObjects) {
                             long oId = s3StreamObject.getObjectId();
                             long objectSize = s3StreamObject.getObjectSize();
@@ -1670,6 +1678,10 @@ public class DefaultMetadataStore implements MetadataStore {
     @Override
     public CompletableFuture<Void> commitStreamObject(apache.rocketmq.controller.v1.S3StreamObject streamObject,
         List<Long> compactedObjects) throws ControllerException {
+
+        LOGGER.info("commitStreamObject with streamObject: {}, compactedObjects: {}", TextFormat.shortDebugString(streamObject),
+            compactedObjects);
+
         CompletableFuture<Void> future = new CompletableFuture<>();
         for (; ; ) {
             if (isLeader()) {
@@ -1677,8 +1689,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     if (!maintainLeadershipWithSharedLock(session)) {
                         continue;
                     }
-
-                    if (Objects.isNull(streamObject) || streamObject.getObjectId() == S3Constants.NOOP_OBJECT_ID) {
+                    if (streamObject.getObjectId() == S3Constants.NOOP_OBJECT_ID) {
                         LOGGER.error("S3StreamObject[object-id={}] is null or objectId is unavailable", streamObject.getObjectId());
                         ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE, String.format("S3StreamObject[object-id=%d] is null or objectId is unavailable", streamObject.getObjectId()));
                         future.completeExceptionally(e);
