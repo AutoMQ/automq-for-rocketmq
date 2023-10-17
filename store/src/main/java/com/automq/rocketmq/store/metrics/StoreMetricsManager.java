@@ -17,6 +17,8 @@
 
 package com.automq.rocketmq.store.metrics;
 
+import com.automq.rocketmq.common.MetricsManager;
+import com.automq.rocketmq.common.config.MetricsConfig;
 import com.automq.rocketmq.store.MessageStoreImpl;
 import com.automq.rocketmq.store.api.LogicQueue;
 import com.automq.rocketmq.store.api.StreamStore;
@@ -50,7 +52,7 @@ import static com.automq.rocketmq.store.metrics.StoreMetricsConstant.LABEL_CONSU
 import static com.automq.rocketmq.store.metrics.StoreMetricsConstant.LABEL_IS_RETRY;
 import static com.automq.rocketmq.store.metrics.StoreMetricsConstant.LABEL_TOPIC;
 
-public class StoreMetricsManager extends ServiceThread {
+public class StoreMetricsManager extends ServiceThread implements MetricsManager {
     protected static final Logger LOGGER = LoggerFactory.getLogger(StoreMetricsManager.class);
 
     public static ObservableLongGauge consumerLagMessages = new NopObservableLongGauge();
@@ -68,6 +70,7 @@ public class StoreMetricsManager extends ServiceThread {
 
     private static Supplier<AttributesBuilder> attributesBuilderSupplier;
 
+    private final MetricsConfig config;
     private final MessageStoreImpl messageStore;
     private static Set<LagRecord> lagRecordSet = Sets.newConcurrentHashSet();
 
@@ -78,7 +81,8 @@ public class StoreMetricsManager extends ServiceThread {
         return attributesBuilderSupplier.get();
     }
 
-    public StoreMetricsManager(MessageStoreImpl messageStore) {
+    public StoreMetricsManager(MetricsConfig config, MessageStoreImpl messageStore) {
+        this.config = config;
         this.messageStore = messageStore;
     }
 
@@ -90,7 +94,7 @@ public class StoreMetricsManager extends ServiceThread {
     @Override
     public void run() {
         while (!stopped) {
-            waitForRunning(30 * 1000);
+            waitForRunning(config.periodicExporterIntervalInMills());
 
             StreamStore streamStore = messageStore.streamStore();
             DefaultLogicQueueManager manager = (DefaultLogicQueueManager) messageStore.getTopicQueueManager();
@@ -130,6 +134,7 @@ public class StoreMetricsManager extends ServiceThread {
         return attributesBuilder.build();
     }
 
+    @Override
     public void initMetrics(Meter meter, Supplier<AttributesBuilder> attributesBuilderSupplier) {
         StoreMetricsManager.attributesBuilderSupplier = attributesBuilderSupplier;
         consumerLagMessages = meter.gaugeBuilder(GAUGE_CONSUMER_LAG_MESSAGES)

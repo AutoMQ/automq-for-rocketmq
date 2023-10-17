@@ -81,7 +81,7 @@ public class MetricsExporter implements Lifecycle {
         this.brokerConfig = brokerConfig;
         this.metricsConfig = brokerConfig.metrics();
         this.proxyMetricsManager = new ProxyMetricsManager(messagingProcessor);
-        this.storeMetricsManager = new StoreMetricsManager(messageStore);
+        this.storeMetricsManager = new StoreMetricsManager(metricsConfig, messageStore);
     }
 
     public static AttributesBuilder newAttributesBuilder() {
@@ -104,7 +104,7 @@ public class MetricsExporter implements Lifecycle {
         }
 
         return switch (exporterType) {
-            case OTLP_GRPC -> StringUtils.isNotBlank(metricsConfig.grpcExporterHeader());
+            case OTLP_GRPC -> StringUtils.isNotBlank(metricsConfig.grpcExporterTarget());
             case PROM, LOG -> true;
             default -> false;
         };
@@ -180,7 +180,7 @@ public class MetricsExporter implements Lifecycle {
             metricExporter = metricExporterBuilder.build();
 
             periodicMetricReader = PeriodicMetricReader.builder(metricExporter)
-                .setInterval(metricsConfig.grpcExporterIntervalInMills(), TimeUnit.MILLISECONDS)
+                .setInterval(metricsConfig.periodicExporterIntervalInMills(), TimeUnit.MILLISECONDS)
                 .build();
 
             providerBuilder.registerMetricReader(periodicMetricReader);
@@ -200,7 +200,7 @@ public class MetricsExporter implements Lifecycle {
             loggingMetricExporter = LoggingMetricExporter.create(metricsConfig.exportInDelta() ? AggregationTemporality.DELTA : AggregationTemporality.CUMULATIVE);
             java.util.logging.Logger.getLogger(LoggingMetricExporter.class.getName()).setLevel(java.util.logging.Level.FINEST);
             periodicMetricReader = PeriodicMetricReader.builder(loggingMetricExporter)
-                .setInterval(metricsConfig.loggingExporterIntervalInMills(), TimeUnit.MILLISECONDS)
+                .setInterval(metricsConfig.periodicExporterIntervalInMills(), TimeUnit.MILLISECONDS)
                 .build();
             providerBuilder.registerMetricReader(periodicMetricReader);
         }
@@ -228,8 +228,8 @@ public class MetricsExporter implements Lifecycle {
     private void initMetrics() {
         proxyMetricsManager.initMetrics(brokerMeter, MetricsExporter::newAttributesBuilder);
 
-        storeMetricsManager.start();
         storeMetricsManager.initMetrics(brokerMeter, MetricsExporter::newAttributesBuilder);
+        storeMetricsManager.start();
     }
 
     @Override
