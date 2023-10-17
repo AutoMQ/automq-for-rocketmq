@@ -77,6 +77,7 @@ public class DefaultS3BlockCache implements S3BlockCache {
             if (ex != null) {
                 LOGGER.error("read {} [{}, {}) from block cache fail", streamId, startOffset, endOffset, ex);
                 // TODO: release read records memory
+                return;
             }
 
             if (ret.isCacheHit()) {
