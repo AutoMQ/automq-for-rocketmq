@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.proxy.metrics;
 
+import com.automq.rocketmq.common.MetricsManager;
 import com.automq.rocketmq.common.metrics.NopLongCounter;
 import com.automq.rocketmq.common.metrics.NopLongHistogram;
 import com.automq.rocketmq.common.metrics.NopObservableLongGauge;
@@ -64,7 +65,7 @@ import static org.apache.rocketmq.broker.metrics.BrokerMetricsConstant.LABEL_TOP
 import static org.apache.rocketmq.broker.metrics.BrokerMetricsConstant.LABEL_VERSION;
 import static org.apache.rocketmq.remoting.metrics.RemotingMetricsConstant.HISTOGRAM_RPC_LATENCY;
 
-public class ProxyMetricsManager {
+public class ProxyMetricsManager implements MetricsManager {
     public static final String LABEL_PROTOCOL_TYPE = "protocol_type";
     public static final String LABEL_ACTION = "action";
     public static final String LABEL_RESULT = "result";
@@ -127,6 +128,7 @@ public class ProxyMetricsManager {
         return TopicValidator.isSystemTopic(topic) || isSystemGroup(group);
     }
 
+    @Override
     public void initMetrics(Meter meter, Supplier<AttributesBuilder> attributesBuilderSupplier) {
         ProxyMetricsManager.attributesBuilderSupplier = attributesBuilderSupplier;
         rpcLatency = meter.histogramBuilder(HISTOGRAM_RPC_LATENCY)

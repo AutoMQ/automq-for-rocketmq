@@ -14,13 +14,12 @@ db:
   userName: "root"
   password: "password"
 metrics:
-  exporterType: "PROM"
-  grpcExporterTarget: ""
+  exporterType: "OTLP_GRPC"
+  grpcExporterTarget: "http://10.129.63.127:4317"
   grpcExporterHeader: ""
   grpcExporterTimeOutInMills: 31000
-  grpcExporterIntervalInMills: 60000
+  periodicExporterIntervalInMills: 60000
   promExporterPort: 5557
   promExporterHost: "localhost"
-  loggingExporterIntervalInMills: 10000
   labels: ""
   exportInDelta: false

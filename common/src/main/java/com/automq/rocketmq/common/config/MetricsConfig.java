@@ -24,8 +24,7 @@ public class MetricsConfig {
     private String grpcExporterTarget = "";
     private String grpcExporterHeader = "";
     private long grpcExporterTimeOutInMills = 3 * 1000;
-    private long grpcExporterIntervalInMills = 60 * 1000;
-    private long loggingExporterIntervalInMills = 10 * 1000;
+    private long periodicExporterIntervalInMills = 60 * 1000;
 
     private int promExporterPort = 5557;
     private String promExporterHost = "localhost";
@@ -51,12 +50,8 @@ public class MetricsConfig {
         return grpcExporterTimeOutInMills;
     }
 
-    public long grpcExporterIntervalInMills() {
-        return grpcExporterIntervalInMills;
-    }
-
-    public long loggingExporterIntervalInMills() {
-        return loggingExporterIntervalInMills;
+    public long periodicExporterIntervalInMills() {
+        return periodicExporterIntervalInMills;
     }
 
     public int promExporterPort() {
