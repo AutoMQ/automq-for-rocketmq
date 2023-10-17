@@ -22,11 +22,17 @@ import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.metadata.api.ProxyMetadataService;
+import com.google.common.base.Stopwatch;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class DefaultProxyMetadataService implements ProxyMetadataService {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(DefaultProxyMetadataService.class);
+
     private final MetadataStore metadataStore;
 
     public DefaultProxyMetadataService(MetadataStore metadataStore) {
@@ -35,7 +41,16 @@ public class DefaultProxyMetadataService implements ProxyMetadataService {
 
     @Override
     public CompletableFuture<Topic> topicOf(String topicName) {
-        return metadataStore.describeTopic(null, topicName);
+        Stopwatch stopwatch = Stopwatch.createStarted();
+        return metadataStore.describeTopic(null, topicName).thenApplyAsync((topic -> {
+            long elapsed = stopwatch.elapsed().toMillis();
+            if (elapsed > 100) {
+                LOGGER.warn("It took {}ms to query topic {}", elapsed, topicName);
+            } else if (elapsed > 10) {
+                LOGGER.debug("It took {}ms to query topic {}", elapsed, topicName);
+            }
+            return topic;
+        }));
     }
 
     @Override
