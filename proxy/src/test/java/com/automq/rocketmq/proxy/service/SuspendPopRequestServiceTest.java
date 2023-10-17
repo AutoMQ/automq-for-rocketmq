@@ -19,6 +19,7 @@ package com.automq.rocketmq.proxy.service;
 
 import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.proxy.mock.MockMessageUtil;
+import com.automq.rocketmq.proxy.model.ProxyContextExt;
 import com.automq.rocketmq.store.model.message.TagFilter;
 import com.google.common.base.Supplier;
 import java.util.Collections;
@@ -53,7 +54,7 @@ class SuspendPopRequestServiceTest {
         Supplier<CompletableFuture<List<FlatMessageExt>>> supplier = () -> CompletableFuture.completedFuture(List.of(MockMessageUtil.buildMessage(0, 0, "tagA")));
 
         // Try to suspend request with zero polling time.
-        CompletableFuture<PopResult> future = suspendPopRequestService.suspendPopRequest(header, 0, 0,
+        CompletableFuture<PopResult> future = suspendPopRequestService.suspendPopRequest(ProxyContextExt.create(), header, 0, 0,
             new TagFilter("tagA"), supplier);
         assertEquals(0, suspendPopRequestService.suspendRequestCount());
         assertTrue(future.isDone());
@@ -64,7 +65,7 @@ class SuspendPopRequestServiceTest {
         // Try to suspend request with non-zero polling time.
         header.setBornTime(System.currentTimeMillis());
         header.setPollTime(100_000);
-        future = suspendPopRequestService.suspendPopRequest(header, 0, 0,
+        future = suspendPopRequestService.suspendPopRequest(ProxyContextExt.create(), header, 0, 0,
             new TagFilter("tagA"), supplier);
         assertEquals(1, suspendPopRequestService.suspendRequestCount());
         assertFalse(future.isDone());
@@ -95,7 +96,7 @@ class SuspendPopRequestServiceTest {
         header.setPollTime(100);
         header.setTopic("topic");
 
-        CompletableFuture<PopResult> future = suspendPopRequestService.suspendPopRequest(header, 0, 0,
+        CompletableFuture<PopResult> future = suspendPopRequestService.suspendPopRequest(ProxyContextExt.create(), header, 0, 0,
             new TagFilter("tagA"), () -> CompletableFuture.completedFuture(Collections.emptyList()));
         assertEquals(1, suspendPopRequestService.suspendRequestCount());
         assertFalse(future.isDone());
