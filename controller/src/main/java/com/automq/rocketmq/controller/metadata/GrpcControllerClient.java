@@ -265,10 +265,14 @@ public class GrpcControllerClient implements ControllerClient {
     }
 
     @Override
-    public CompletableFuture<Void> heartbeat(String target, int nodeId, long epoch,
-        boolean goingAway) throws ControllerException {
-        buildStubForTarget(target);
-        
+    public CompletableFuture<Void> heartbeat(String target, int nodeId, long epoch, boolean goingAway) {
+
+        try {
+            buildStubForTarget(target);
+        } catch (ControllerException e) {
+            return CompletableFuture.failedFuture(e);
+        }
+
         ControllerServiceGrpc.ControllerServiceFutureStub stub = stubs.get(target);
         HeartbeatRequest request = HeartbeatRequest
             .newBuilder()
@@ -330,7 +334,8 @@ public class GrpcControllerClient implements ControllerClient {
     }
 
     @Override
-    public CompletableFuture<Void> notifyQueueClose(String target, long topicId, int queueId) throws ControllerException {
+    public CompletableFuture<Void> notifyQueueClose(String target, long topicId,
+        int queueId) throws ControllerException {
         CompletableFuture<Void> future = new CompletableFuture<>();
 
         NotifyMessageQueuesAssignableRequest request = NotifyMessageQueuesAssignableRequest.newBuilder()
@@ -542,7 +547,8 @@ public class GrpcControllerClient implements ControllerClient {
     }
 
     @Override
-    public CompletableFuture<CommitStreamObjectReply> commitStreamObject(String target, CommitStreamObjectRequest request) {
+    public CompletableFuture<CommitStreamObjectReply> commitStreamObject(String target,
+        CommitStreamObjectRequest request) {
         CompletableFuture<CommitStreamObjectReply> future = new CompletableFuture<>();
         try {
             Futures.addCallback(this.buildStubForTarget(target).commitStreamObject(request), new FutureCallback<>() {

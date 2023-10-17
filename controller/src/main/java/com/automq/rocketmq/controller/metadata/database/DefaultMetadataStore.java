@@ -76,7 +76,7 @@ import com.automq.rocketmq.controller.metadata.database.mapper.RangeMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.SequenceMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
-import com.automq.rocketmq.controller.tasks.KeepAliveTask;
+import com.automq.rocketmq.controller.tasks.HeartbeatTask;
 import com.automq.rocketmq.controller.tasks.LeaseTask;
 import com.automq.rocketmq.controller.tasks.ReclaimS3ObjectTask;
 import com.automq.rocketmq.controller.tasks.RecycleGroupTask;
@@ -220,7 +220,7 @@ public class DefaultMetadataStore implements MetadataStore {
             config.scanIntervalInSecs(), TimeUnit.SECONDS);
         this.scheduledExecutorService.scheduleWithFixedDelay(new SchedulerTask(this), 1,
             config.scanIntervalInSecs(), TimeUnit.SECONDS);
-        this.scheduledExecutorService.scheduleAtFixedRate(new KeepAliveTask(this), 3,
+        this.scheduledExecutorService.scheduleAtFixedRate(new HeartbeatTask(this), 3,
             Math.max(config().nodeAliveIntervalInSecs() / 2, 10), TimeUnit.SECONDS);
         this.scheduledExecutorService.scheduleWithFixedDelay(new RecycleTopicTask(this), 1,
             config.deletedTopicLingersInSecs(), TimeUnit.SECONDS);
@@ -314,9 +314,34 @@ public class DefaultMetadataStore implements MetadataStore {
 
     @Override
     public void keepAlive(int nodeId, long epoch, boolean goingAway) {
+        if (!isLeader()) {
+            LOGGER.warn("Non-leader node cannot keep the node[node-id={}, epoch={}] alive", nodeId, epoch);
+            return;
+        }
         BrokerNode brokerNode = nodes.get(nodeId);
         if (null != brokerNode) {
             brokerNode.keepAlive(epoch, goingAway);
+        }
+    }
+
+    @Override
+    public void heartbeat() {
+        if (isLeader()) {
+            LOGGER.debug("Node of leader does not need to send heartbeat request");
+        }
+
+        try {
+            String target = leaderAddress();
+            controllerClient.heartbeat(target, config.nodeId(), config.epoch(), false)
+                .whenComplete((r, e) -> {
+                    if (null != e) {
+                        LOGGER.error("Failed to maintain heartbeat to {}", target);
+                        return;
+                    }
+                    LOGGER.debug("Heartbeat to {} OK", target);
+                });
+        } catch (ControllerException e) {
+            LOGGER.error("Failed to send heartbeat to leader node", e);
         }
     }
 
