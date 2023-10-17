@@ -59,7 +59,7 @@ public class ExtendGrpcMessagingApplication extends GrpcMessagingApplication {
         try {
             Method getStatus = response.getClass().getDeclaredMethod("getStatus");
             Status status = (Status) getStatus.invoke(response);
-            return status.getMessage();
+            return status.getCode().name().toLowerCase();
         } catch (Exception e) {
             return "unknown";
         }

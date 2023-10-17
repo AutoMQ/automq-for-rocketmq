@@ -21,6 +21,7 @@ import com.automq.rocketmq.common.config.ProxyConfig;
 import com.automq.rocketmq.metadata.api.ProxyMetadataService;
 import com.automq.rocketmq.proxy.mock.MockMessageStore;
 import com.automq.rocketmq.proxy.mock.MockProxyMetadataService;
+import com.automq.rocketmq.proxy.model.ProxyContextExt;
 import com.automq.rocketmq.proxy.model.VirtualQueue;
 import com.automq.rocketmq.proxy.util.FlatMessageUtil;
 import com.automq.rocketmq.proxy.util.ReceiptHandleUtil;
@@ -81,7 +82,7 @@ class MessageServiceImplTest {
 
         AddressableMessageQueue messageQueue = new AddressableMessageQueue(new MessageQueue(topicName, virtualQueue.brokerName(), 0), null);
 
-        List<SendResult> resultList = messageService.sendMessage(ProxyContext.create(), messageQueue, List.of(message), header, 0).join();
+        List<SendResult> resultList = messageService.sendMessage(ProxyContextExt.create(), messageQueue, List.of(message), header, 0).join();
         assertEquals(1, resultList.size());
 
         SendResult result = resultList.get(0);
@@ -108,7 +109,7 @@ class MessageServiceImplTest {
         VirtualQueue virtualQueue = new VirtualQueue(2, 0);
         AddressableMessageQueue messageQueue = new AddressableMessageQueue(new MessageQueue(topicName, virtualQueue.brokerName(), 0), null);
 
-        PopResult result = messageService.popMessage(ProxyContext.create(), messageQueue, header, 0L).join();
+        PopResult result = messageService.popMessage(ProxyContextExt.create(), messageQueue, header, 0L).join();
         assertEquals(PopStatus.NO_NEW_MSG, result.getPopStatus());
 
         header.setExpType(ExpressionType.TAG);
@@ -118,14 +119,14 @@ class MessageServiceImplTest {
         messageStore.put(FlatMessageUtil.convertTo(topicId, 0, "", new Message(topicName, "", new byte[] {})));
         messageStore.put(FlatMessageUtil.convertTo(topicId, 0, "", new Message(topicName, "", new byte[] {})));
 
-        result = messageService.popMessage(ProxyContext.create(), messageQueue, header, 0L).join();
+        result = messageService.popMessage(ProxyContextExt.create(), messageQueue, header, 0L).join();
         assertEquals(PopStatus.FOUND, result.getPopStatus());
         assertEquals(2, result.getMsgFoundList().size());
         // All messages in queue 0 has been consumed
         assertEquals(2, messageStore.getConsumeOffset(consumerGroupId, topicId, 0).join());
 
         // Pop again.
-        result = messageService.popMessage(ProxyContext.create(), messageQueue, header, 0L).join();
+        result = messageService.popMessage(ProxyContextExt.create(), messageQueue, header, 0L).join();
         assertEquals(PopStatus.NO_NEW_MSG, result.getPopStatus());
         assertEquals(0, result.getMsgFoundList().size());
     }
@@ -146,7 +147,7 @@ class MessageServiceImplTest {
         messageStore.put(FlatMessageUtil.convertTo(topicId, 0, "", new Message(topicName, "", new byte[] {})));
 
         // Pop message with client id "client1".
-        ProxyContext context = ProxyContext.create();
+        ProxyContext context = ProxyContextExt.create();
         context.setClientID("client1");
 
         VirtualQueue virtualQueue = new VirtualQueue(2, 0);
@@ -189,11 +190,11 @@ class MessageServiceImplTest {
         ChangeInvisibleTimeRequestHeader header = new ChangeInvisibleTimeRequestHeader();
         header.setExtraInfo(ReceiptHandleUtil.encodeReceiptHandle(RECEIPT_HANDLE, 0L));
         header.setInvisibleTime(100L);
-        AckResult ackResult = messageService.changeInvisibleTime(ProxyContext.create(), null, null, header, 0).join();
+        AckResult ackResult = messageService.changeInvisibleTime(ProxyContextExt.create(), null, null, header, 0).join();
         assertEquals(AckStatus.OK, ackResult.getStatus());
 
         header.setExtraInfo("");
-        ackResult = messageService.changeInvisibleTime(ProxyContext.create(), null, null, header, 0).join();
+        ackResult = messageService.changeInvisibleTime(ProxyContextExt.create(), null, null, header, 0).join();
         assertEquals(AckStatus.NO_EXIST, ackResult.getStatus());
     }
 
@@ -204,11 +205,11 @@ class MessageServiceImplTest {
         header.setTopic("topic");
         header.setQueueId(0);
         header.setConsumerGroup("group");
-        AckResult ackResult = messageService.ackMessage(ProxyContext.create(), null, null, header, 0).join();
+        AckResult ackResult = messageService.ackMessage(ProxyContextExt.create(), null, null, header, 0).join();
         assertEquals(AckStatus.OK, ackResult.getStatus());
 
         header.setExtraInfo("");
-        ackResult = messageService.ackMessage(ProxyContext.create(), null, null, header, 0).join();
+        ackResult = messageService.ackMessage(ProxyContextExt.create(), null, null, header, 0).join();
         assertEquals(AckStatus.NO_EXIST, ackResult.getStatus());
     }
 
@@ -219,13 +220,13 @@ class MessageServiceImplTest {
         updateConsumerOffsetRequestHeader.setTopic("topic");
         updateConsumerOffsetRequestHeader.setQueueId(0);
         updateConsumerOffsetRequestHeader.setCommitOffset(100L);
-        messageService.updateConsumerOffset(ProxyContext.create(), null, updateConsumerOffsetRequestHeader, 0).join();
+        messageService.updateConsumerOffset(ProxyContextExt.create(), null, updateConsumerOffsetRequestHeader, 0).join();
 
         QueryConsumerOffsetRequestHeader queryConsumerOffsetRequestHeader = new QueryConsumerOffsetRequestHeader();
         queryConsumerOffsetRequestHeader.setConsumerGroup("group");
         queryConsumerOffsetRequestHeader.setTopic("topic");
         queryConsumerOffsetRequestHeader.setQueueId(0);
-        Long offset = messageService.queryConsumerOffset(ProxyContext.create(), null, queryConsumerOffsetRequestHeader, 0).join();
+        Long offset = messageService.queryConsumerOffset(ProxyContextExt.create(), null, queryConsumerOffsetRequestHeader, 0).join();
         assertEquals(100L, offset);
     }
 }

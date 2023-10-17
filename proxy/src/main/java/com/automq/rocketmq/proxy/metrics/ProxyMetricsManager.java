@@ -69,6 +69,7 @@ public class ProxyMetricsManager implements MetricsManager {
     public static final String LABEL_PROTOCOL_TYPE = "protocol_type";
     public static final String LABEL_ACTION = "action";
     public static final String LABEL_RESULT = "result";
+    public static final String LABEL_SUSPENDED = "suspended";
     public static final String PROTOCOL_TYPE_GRPC = "grpc";
 
     private static LongHistogram rpcLatency = new NopLongHistogram();
@@ -233,15 +234,18 @@ public class ProxyMetricsManager implements MetricsManager {
         metricsViewList.add(Pair.of(messageSizeSelector, messageSizeViewBuilder.build()));
 
         List<Double> rpcCostTimeBuckets = Arrays.asList(
-            (double) Duration.ofMillis(1).toMillis(),
-            (double) Duration.ofMillis(3).toMillis(),
-            (double) Duration.ofMillis(5).toMillis(),
-            (double) Duration.ofMillis(7).toMillis(),
-            (double) Duration.ofMillis(10).toMillis(),
-            (double) Duration.ofMillis(100).toMillis(),
-            (double) Duration.ofSeconds(1).toMillis(),
-            (double) Duration.ofSeconds(2).toMillis(),
-            (double) Duration.ofSeconds(3).toMillis()
+            (double) Duration.ofNanos(100).toNanos(),
+            (double) Duration.ofNanos(1000).toNanos(),
+            (double) Duration.ofNanos(10_000).toNanos(),
+            (double) Duration.ofMillis(1).toNanos(),
+            (double) Duration.ofMillis(3).toNanos(),
+            (double) Duration.ofMillis(5).toNanos(),
+            (double) Duration.ofMillis(7).toNanos(),
+            (double) Duration.ofMillis(10).toNanos(),
+            (double) Duration.ofMillis(100).toNanos(),
+            (double) Duration.ofSeconds(1).toNanos(),
+            (double) Duration.ofSeconds(2).toNanos(),
+            (double) Duration.ofSeconds(3).toNanos()
         );
         InstrumentSelector selector = InstrumentSelector.builder()
             .setType(InstrumentType.HISTOGRAM)
@@ -255,12 +259,18 @@ public class ProxyMetricsManager implements MetricsManager {
         return metricsViewList;
     }
 
-    public static void recordRpcLatency(String protocolType, String action, String result, long costTimeMillis) {
+    public static void recordRpcLatency(String protocolType, String action, String result, long costTimeNanos) {
+        recordRpcLatency(protocolType, action, result, costTimeNanos, false);
+    }
+
+    public static void recordRpcLatency(String protocolType, String action, String result, long costTimeNanos,
+        boolean suspended) {
         AttributesBuilder attributesBuilder = newAttributesBuilder()
             .put(LABEL_PROTOCOL_TYPE, protocolType)
             .put(LABEL_ACTION, action)
-            .put(LABEL_RESULT, result);
-        rpcLatency.record(costTimeMillis, attributesBuilder.build());
+            .put(LABEL_RESULT, result)
+            .put(LABEL_SUSPENDED, suspended);
+        rpcLatency.record(costTimeNanos, attributesBuilder.build());
     }
 
     public static void recordIncomingMessages(String topic, TopicMessageType messageType, int count, long size) {

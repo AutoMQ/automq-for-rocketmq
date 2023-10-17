@@ -22,6 +22,19 @@ import org.apache.rocketmq.proxy.common.ProxyContext;
 
 public class ProxyContextExt extends ProxyContext {
     private final Stopwatch stopwatch = Stopwatch.createStarted();
+    private boolean suspended;
+
+    public static ProxyContext create() {
+        return new ProxyContextExt();
+    }
+
+    public boolean suspended() {
+        return suspended;
+    }
+
+    public void setSuspended(boolean suspended) {
+        this.suspended = suspended;
+    }
 
     public long getElapsedTimeNanos() {
         return stopwatch.elapsed().toNanos();

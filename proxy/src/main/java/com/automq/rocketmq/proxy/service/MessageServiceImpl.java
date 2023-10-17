@@ -265,7 +265,7 @@ public class MessageServiceImpl implements MessageService {
 
         return popMessageFuture.thenCompose(messageList -> {
             if (messageList.isEmpty()) {
-                return suspendPopRequestService.suspendPopRequest(requestHeader, topicReference.get().getTopicId(), virtualQueue.physicalQueueId(), filter,
+                return suspendPopRequestService.suspendPopRequest(ctx, requestHeader, topicReference.get().getTopicId(), virtualQueue.physicalQueueId(), filter,
                     () -> popSpecifiedQueue(consumerGroupReference.get(), clientId, topicReference.get(), virtualQueue.physicalQueueId(), filter,
                         requestHeader.getMaxMsgNums(), requestHeader.isOrder(), requestHeader.getInvisibleTime(), timeoutMillis));
             }

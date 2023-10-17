@@ -18,6 +18,7 @@
 package com.automq.rocketmq.proxy.service;
 
 import com.automq.rocketmq.common.model.FlatMessageExt;
+import com.automq.rocketmq.proxy.model.ProxyContextExt;
 import com.automq.rocketmq.proxy.util.FlatMessageUtil;
 import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.TopicQueueId;
@@ -34,6 +35,7 @@ import javax.annotation.Nonnull;
 import org.apache.rocketmq.client.consumer.PopResult;
 import org.apache.rocketmq.client.consumer.PopStatus;
 import org.apache.rocketmq.common.ServiceThread;
+import org.apache.rocketmq.proxy.common.ProxyContext;
 import org.apache.rocketmq.remoting.protocol.header.PopMessageRequestHeader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -124,8 +126,10 @@ public class SuspendPopRequestService extends ServiceThread {
         }
     }
 
-    public CompletableFuture<PopResult> suspendPopRequest(PopMessageRequestHeader requestHeader, long topicId,
-        int queueId, Filter filter, Supplier<CompletableFuture<List<FlatMessageExt>>> messageSupplier) {
+    public CompletableFuture<PopResult> suspendPopRequest(ProxyContext context, PopMessageRequestHeader requestHeader,
+        long topicId, int queueId, Filter filter, Supplier<CompletableFuture<List<FlatMessageExt>>> messageSupplier) {
+        ((ProxyContextExt) context).setSuspended(true);
+
         // Check if the request is already expired.
         if (requestHeader.getPollTime() <= 0) {
             return CompletableFuture.completedFuture(new PopResult(PopStatus.NO_NEW_MSG, Collections.emptyList()));
