@@ -30,6 +30,7 @@ import com.automq.rocketmq.store.api.S3ObjectOperator;
 import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.rocketmq.store.mock.MockStoreMetadataService;
 import com.automq.rocketmq.store.mock.MockStreamStore;
+import com.automq.rocketmq.store.model.generated.ReceiptHandle;
 import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PopResult;
 import com.automq.rocketmq.store.queue.DefaultLogicQueueManager;
@@ -58,6 +59,7 @@ import static com.automq.rocketmq.store.MessageStoreImpl.KV_NAMESPACE_TIMER_TAG;
 import static com.automq.rocketmq.store.mock.MockMessageUtil.buildMessage;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class MessageStoreTest {
     private static final String PATH = "/tmp/ros/message_store_test/";
@@ -78,7 +80,7 @@ public class MessageStoreTest {
     @BeforeEach
     public void setUp() throws Exception {
         UtilAll.deleteFile(new java.io.File(PATH));
-        kvService = new RocksDBKVService(PATH);
+        kvService = Mockito.spy(new RocksDBKVService(PATH));
         metadataService = new MockStoreMetadataService();
         streamStore = new MockStreamStore();
         inflightService = new InflightService();
@@ -402,5 +404,86 @@ public class MessageStoreTest {
         messageStore.ack(popResult.messageList().get(2).receiptHandle().get()).join();
 
         assertEquals(3, logicQueue.getRetryAckOffset(CONSUMER_GROUP_ID));
+    }
+
+    @Test
+    public void restart_normal() throws Exception {
+        // 1. append 5 message
+        for (int i = 0; i < 5; i++) {
+            FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
+            messageStore.put(message).join();
+        }
+        List<String> receiptHandles = new ArrayList<>();
+        // 2. pop 3 message
+        // regard as forever invisible
+        int invisibleDuration = 999999999;
+        PopResult popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, true, false, invisibleDuration).join();
+        assertEquals(3, popResult.messageList().size());
+        for (FlatMessageExt message : popResult.messageList()) {
+            receiptHandles.add(message.receiptHandle().get());
+        }
+
+        // verify rocksdb is not empty
+        assertTrue(!scanAllTimerTag().isEmpty());
+
+        // 3. normal shutdown
+        messageStore.shutdown();
+
+        // 4. restart
+        messageStore.start();
+
+        // 5. verify rocksdb is empty
+        assertTrue(scanAllTimerTag().isEmpty());
+    }
+
+    @Test
+    public void restart_force() throws Exception {
+        // 1. append 5 message
+        for (int i = 0; i < 5; i++) {
+            FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
+            messageStore.put(message).join();
+        }
+        List<String> receiptHandles = new ArrayList<>();
+        // 2. pop 3 message
+        // regard as forever invisible
+        int invisibleDuration = 999999999;
+        PopResult popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, true, false, invisibleDuration).join();
+        assertEquals(3, popResult.messageList().size());
+        for (FlatMessageExt message : popResult.messageList()) {
+            receiptHandles.add(message.receiptHandle().get());
+        }
+
+        // verify rocksdb is not empty
+        assertTrue(!scanAllTimerTag().isEmpty());
+
+        Mockito.doAnswer(ink -> {
+            kvService.close();
+            return null;
+        }).when(kvService).destroy();
+
+        // 3. shutdown but not clean data
+        messageStore.shutdown();
+
+        Mockito.doCallRealMethod().when(kvService).destroy();
+
+        // 4. restart
+        messageStore.start();
+
+        // 5. verify rocksdb is empty
+        assertTrue(scanAllTimerTag().isEmpty());
+    }
+
+    private List<ReceiptHandle> scanAllTimerTag() {
+        List<ReceiptHandle> receiptHandleList = new ArrayList<>();
+        try {
+            // Iterate timer tag until now to find messages need to reconsume.
+            kvService.iterate(MessageStoreImpl.KV_NAMESPACE_TIMER_TAG, (key, value) -> {
+                ReceiptHandle receiptHandle = ReceiptHandle.getRootAsReceiptHandle(ByteBuffer.wrap(value));
+                receiptHandleList.add(receiptHandle);
+            });
+        } catch (Exception e) {
+            Assertions.fail(e);
+        }
+        return receiptHandleList;
     }
 }
