@@ -36,11 +36,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static com.automq.stream.s3.TestUtils.random;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -83,7 +88,7 @@ public class WALObjectUploadTaskTest {
                 .s3ObjectBlockSize(16 * 1024 * 1024)
                 .s3ObjectPartSize(16 * 1024 * 1024)
                 .s3StreamSplitSize(1000);
-        walObjectUploadTask = new WALObjectUploadTask(config, map, objectManager, s3Operator, ForkJoinPool.commonPool());
+        walObjectUploadTask = WALObjectUploadTask.of(config, map, objectManager, s3Operator, ForkJoinPool.commonPool());
 
         walObjectUploadTask.prepare().get();
         walObjectUploadTask.upload().get();
@@ -160,7 +165,7 @@ public class WALObjectUploadTaskTest {
                 .s3ObjectBlockSize(16 * 1024 * 1024)
                 .s3ObjectPartSize(16 * 1024 * 1024)
                 .s3StreamSplitSize(16 * 1024 * 1024);
-        walObjectUploadTask = new WALObjectUploadTask(config, map, objectManager, s3Operator, ForkJoinPool.commonPool());
+        walObjectUploadTask = WALObjectUploadTask.of(config, map, objectManager, s3Operator, ForkJoinPool.commonPool());
 
         walObjectUploadTask.prepare().get();
         walObjectUploadTask.upload().get();
@@ -176,5 +181,27 @@ public class WALObjectUploadTaskTest {
         assertEquals(0, request.getObjectSize());
         assertEquals(0, request.getStreamRanges().size());
         assertEquals(1, request.getStreamObjects().size());
+    }
+
+    @Test
+    public void test_emptyWALData() throws ExecutionException, InterruptedException, TimeoutException {
+        AtomicLong objectIdAlloc = new AtomicLong(10);
+        doAnswer(invocation -> CompletableFuture.completedFuture(objectIdAlloc.getAndIncrement())).when(objectManager).prepareObject(anyInt(), anyLong());
+        when(objectManager.commitWALObject(any())).thenReturn(CompletableFuture.completedFuture(new CommitWALObjectResponse()));
+
+        Map<Long, List<StreamRecordBatch>> map = new HashMap<>();
+        map.put(233L, List.of(
+                new StreamRecordBatch(233, 0, 10, 2, random(512))
+        ));
+        map.put(234L, List.of(
+                new StreamRecordBatch(234, 0, 20, 2, random(128))
+        ));
+
+        Config config = new Config()
+                .s3ObjectBlockSize(16 * 1024 * 1024)
+                .s3ObjectPartSize(16 * 1024 * 1024)
+                .s3StreamSplitSize(64);
+        walObjectUploadTask = WALObjectUploadTask.of(config, map, objectManager, s3Operator, ForkJoinPool.commonPool());
+        assertTrue(walObjectUploadTask.forceSplit);
     }
 }
