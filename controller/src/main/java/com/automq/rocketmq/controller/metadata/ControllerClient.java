@@ -52,8 +52,7 @@ public interface ControllerClient extends Closeable {
 
     CompletableFuture<Topic> describeTopic(String target, Long topicId, String topicName);
 
-    CompletableFuture<Void> heartbeat(String target, int nodeId, long epoch,
-        boolean goingAway) throws ControllerException;
+    CompletableFuture<Void> heartbeat(String target, int nodeId, long epoch, boolean goingAway);
 
     CompletableFuture<Void> reassignMessageQueue(String target, long topicId, int queueId, int dstNodeId);
 

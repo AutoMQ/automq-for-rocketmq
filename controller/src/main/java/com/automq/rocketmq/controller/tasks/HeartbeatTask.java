@@ -20,16 +20,15 @@ package com.automq.rocketmq.controller.tasks;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 
-public class KeepAliveTask extends ControllerTask {
-    public KeepAliveTask(MetadataStore metadataStore) {
+public class HeartbeatTask extends ControllerTask {
+    public HeartbeatTask(MetadataStore metadataStore) {
         super(metadataStore);
     }
 
     @Override
     public void process() throws ControllerException {
-        int nodeId = metadataStore.config().nodeId();
         if (!metadataStore.isLeader()) {
-            metadataStore.keepAlive(nodeId, metadataStore.config().epoch(), false);
+            metadataStore.heartbeat();
         }
     }
 }

@@ -30,7 +30,7 @@
     </Appenders>
 
     <Loggers>
-        <Root level="info">
+        <Root level="debug">
             <AppenderRef ref="rollingFile"/>
         </Root>
     </Loggers>

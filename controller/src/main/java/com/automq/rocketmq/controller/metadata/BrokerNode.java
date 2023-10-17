@@ -20,11 +20,16 @@ package com.automq.rocketmq.controller.metadata;
 import com.automq.rocketmq.common.config.ControllerConfig;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import java.util.concurrent.TimeUnit;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Node with runtime information.
  */
 public class BrokerNode {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(BrokerNode.class);
+
     private final Node node;
 
     private long lastKeepAlive;
@@ -38,6 +43,7 @@ public class BrokerNode {
 
     public void keepAlive(long epoch, boolean goingAway) {
         if (epoch < node.getEpoch()) {
+            LOGGER.warn("Heartbeat epoch={} is deprecated, known epoch={}", epoch, node.getEpoch());
             return;
         }
 

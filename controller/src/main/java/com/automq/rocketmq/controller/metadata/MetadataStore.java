@@ -84,7 +84,20 @@ public interface MetadataStore extends Closeable {
      */
     void registerCurrentNode(String name, String address, String instanceId) throws ControllerException;
 
+    /**
+     * If the node is a leader, it should keep the sending node alive once it receives heartbeat requests
+     * from it.
+     *
+     * @param nodeId Heartbeat sender node-id
+     * @param epoch Epoch of the node
+     * @param goingAway Flag if the node is going away shortly
+     */
     void keepAlive(int nodeId, long epoch, boolean goingAway);
+
+    /**
+     * Send heartbeat request to leader to keep current node alive.
+     */
+    void heartbeat();
 
     CompletableFuture<Long> createTopic(String topicName, int queueNum,
         List<MessageType> acceptMessageTypesList) throws ControllerException;

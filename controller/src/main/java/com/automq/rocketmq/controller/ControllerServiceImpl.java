@@ -129,7 +129,7 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     @Override
     public void heartbeat(HeartbeatRequest request,
         StreamObserver<HeartbeatReply> responseObserver) {
-        LOGGER.trace("Received HeartbeatRequest {}", TextFormat.shortDebugString(request));
+        LOGGER.debug("Received HeartbeatRequest {}", TextFormat.shortDebugString(request));
 
         metadataStore.keepAlive(request.getId(), request.getEpoch(), request.getGoingAway());
 
