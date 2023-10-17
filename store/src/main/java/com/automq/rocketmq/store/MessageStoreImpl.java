@@ -95,6 +95,9 @@ public class MessageStoreImpl implements MessageStore {
         if (!started.compareAndSet(false, true)) {
             return;
         }
+        // clear all data in kv service
+        kvService.destroy();
+        kvService.open();
         streamStore.start();
         reviveService.start();
         snapshotService.start();
@@ -110,6 +113,7 @@ public class MessageStoreImpl implements MessageStore {
         snapshotService.shutdown();
         reviveService.shutdown();
         streamStore.shutdown();
+        kvService.destroy();
     }
 
     @Override

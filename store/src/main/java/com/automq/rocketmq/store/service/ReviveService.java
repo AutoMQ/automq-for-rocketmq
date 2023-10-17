@@ -43,7 +43,6 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
@@ -63,8 +62,8 @@ public class ReviveService implements Runnable, Lifecycle {
     private volatile long reviveTimestamp = 0;
     private final String identity = "[ReviveService]";
     private final ConcurrentMap<Long/*operationId*/, CompletableFuture<Void>> inflightRevive;
-    private final ScheduledExecutorService mainExecutor;
-    private final ExecutorService backgroundExecutor;
+    private ScheduledExecutorService mainExecutor;
+    private ExecutorService backgroundExecutor;
     private final DLQSender dlqSender;
 
     public ReviveService(String checkPointNamespace, String timerTagNamespace, KVService kvService,
@@ -78,8 +77,6 @@ public class ReviveService implements Runnable, Lifecycle {
         this.logicQueueManager = logicQueueManager;
         this.inflightRevive = new ConcurrentHashMap<>();
         this.dlqSender = dlqSender;
-        this.mainExecutor = Executors.newSingleThreadScheduledExecutor(
-            ThreadUtils.createThreadFactory("revive-service-main", false));
         this.backgroundExecutor = Executors.newSingleThreadExecutor(
             ThreadUtils.createThreadFactory("revive-service-background", false));
     }
@@ -89,7 +86,14 @@ public class ReviveService implements Runnable, Lifecycle {
         if (!started.compareAndSet(false, true)) {
             return;
         }
-        this.mainExecutor.scheduleWithFixedDelay(this, 0, 1000, TimeUnit.MILLISECONDS);
+        if (this.backgroundExecutor == null || this.backgroundExecutor.isShutdown()) {
+            this.backgroundExecutor = Executors.newSingleThreadExecutor(
+                ThreadUtils.createThreadFactory("revive-service-background", false));
+        }
+        if (this.mainExecutor == null || this.mainExecutor.isShutdown()) {
+            this.mainExecutor = Executors.newSingleThreadScheduledExecutor(
+                ThreadUtils.createThreadFactory("revive-service-main", false));
+        }
     }
 
     @Override
@@ -97,7 +101,14 @@ public class ReviveService implements Runnable, Lifecycle {
         if (!started.compareAndSet(true, false)) {
             return;
         }
-        this.mainExecutor.shutdown();
+        if (this.mainExecutor != null) {
+            this.mainExecutor.shutdown();
+            this.mainExecutor = null;
+        }
+        if (this.backgroundExecutor != null) {
+            this.backgroundExecutor.shutdown();
+            this.backgroundExecutor = null;
+        }
     }
 
     @Override
