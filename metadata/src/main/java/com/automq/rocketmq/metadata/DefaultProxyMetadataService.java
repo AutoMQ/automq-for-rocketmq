@@ -23,7 +23,6 @@ import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.metadata.api.ProxyMetadataService;
 import com.google.common.base.Stopwatch;
-import java.time.Duration;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
