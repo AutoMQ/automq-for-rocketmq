@@ -17,7 +17,8 @@
 
 package com.automq.stream.s3;
 
-import com.automq.stream.utils.CloseableIterator;
+import com.automq.stream.s3.metadata.S3ObjectMetadata;
+import com.automq.stream.s3.metadata.S3ObjectType;
 import com.automq.stream.s3.model.StreamRecordBatch;
 import com.automq.stream.s3.objects.CommitWALObjectRequest;
 import com.automq.stream.s3.objects.CommitWALObjectResponse;
@@ -25,8 +26,7 @@ import com.automq.stream.s3.objects.ObjectManager;
 import com.automq.stream.s3.objects.StreamObject;
 import com.automq.stream.s3.operator.MemoryS3Operator;
 import com.automq.stream.s3.operator.S3Operator;
-import com.automq.stream.s3.metadata.S3ObjectMetadata;
-import com.automq.stream.s3.metadata.S3ObjectType;
+import com.automq.stream.utils.CloseableIterator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -38,13 +38,11 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static com.automq.stream.s3.TestUtils.random;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;

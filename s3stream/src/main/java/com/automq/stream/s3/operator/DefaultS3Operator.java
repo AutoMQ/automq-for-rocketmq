@@ -316,6 +316,9 @@ public class DefaultS3Operator implements S3Operator {
 
     private static boolean isUnrecoverable(Throwable ex) {
         ex = cause(ex);
+        if (ex instanceof NoSuchKeyException || ex instanceof NoSuchBucketException ) {
+            return true;
+        }
         return ex instanceof NoSuchKeyException
                 || ex instanceof NoSuchBucketException
                 || (ex instanceof S3Exception && ((S3Exception) ex).statusCode() == 403);
