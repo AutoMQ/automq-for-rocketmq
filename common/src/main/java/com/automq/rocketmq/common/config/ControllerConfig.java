@@ -36,7 +36,7 @@ public interface ControllerConfig {
     void setEpoch(long epoch);
 
     default int scanIntervalInSecs() {
-        return 3;
+        return 30;
     }
 
     default int leaseLifeSpanInSecs() {
