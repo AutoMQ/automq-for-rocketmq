@@ -36,6 +36,9 @@ import com.automq.rocketmq.store.DataStoreFacade;
 import com.automq.rocketmq.store.MessageStoreBuilder;
 import com.automq.rocketmq.store.MessageStoreImpl;
 import com.automq.rocketmq.store.api.MessageStore;
+import org.apache.rocketmq.common.constant.LoggerName;
+import org.apache.rocketmq.common.thread.ThreadPoolMonitor;
+import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
 import org.apache.rocketmq.proxy.processor.MessagingProcessor;
 import org.apache.rocketmq.proxy.service.ServiceManager;
 
@@ -91,6 +94,8 @@ public class BrokerController implements Lifecycle {
         grpcServer.start();
         metadataStore.registerCurrentNode(brokerConfig.name(), brokerConfig.advertiseAddress(), brokerConfig.instanceId());
         metricsExporter.start();
+
+        startThreadPoolMonitor();
     }
 
     @Override
@@ -100,5 +105,17 @@ public class BrokerController implements Lifecycle {
         messageStore.shutdown();
         metadataStore.close();
         metricsExporter.shutdown();
+
+        // Shutdown the thread pool monitor.
+        ThreadPoolMonitor.shutdown();
+    }
+
+    private void startThreadPoolMonitor() {
+        ThreadPoolMonitor.config(
+            LoggerFactory.getLogger(LoggerName.PROXY_LOGGER_NAME),
+            LoggerFactory.getLogger(LoggerName.PROXY_WATER_MARK_LOGGER_NAME),
+            brokerConfig.proxy().enablePrintJstack(), brokerConfig.proxy().printJstackInMillis(),
+            brokerConfig.proxy().printThreadPoolStatusInMillis());
+        ThreadPoolMonitor.init();
     }
 }

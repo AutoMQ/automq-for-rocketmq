@@ -53,6 +53,9 @@ public class ProxyConfig extends BaseConfig {
     private int grpcWorkerLoopNum = PROCESSOR_NUMBER * 2;
     private boolean enableGrpcEpoll = false;
     private long channelExpiredTimeout = 1000 * 120;
+    private boolean enablePrintJstack = true;
+    private long printJstackInMillis = Duration.ofSeconds(60).toMillis();
+    private long printThreadPoolStatusInMillis = Duration.ofSeconds(3).toMillis();
 
     /**
      * gRPC max message size
@@ -118,5 +121,21 @@ public class ProxyConfig extends BaseConfig {
 
     public long channelExpiredTimeout() {
         return channelExpiredTimeout;
+    }
+
+    public int grpcListenPort() {
+        return grpcListenPort;
+    }
+
+    public boolean enablePrintJstack() {
+        return enablePrintJstack;
+    }
+
+    public long printJstackInMillis() {
+        return printJstackInMillis;
+    }
+
+    public long printThreadPoolStatusInMillis() {
+        return printThreadPoolStatusInMillis;
     }
 }
