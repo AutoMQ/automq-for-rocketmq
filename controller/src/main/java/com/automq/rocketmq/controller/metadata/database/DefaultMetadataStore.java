@@ -76,6 +76,8 @@ import com.automq.rocketmq.controller.metadata.database.mapper.RangeMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.SequenceMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
+import com.automq.rocketmq.controller.metadata.database.serde.SubStreamDeserializer;
+import com.automq.rocketmq.controller.metadata.database.serde.SubStreamSerializer;
 import com.automq.rocketmq.controller.tasks.HeartbeatTask;
 import com.automq.rocketmq.controller.tasks.LeaseTask;
 import com.automq.rocketmq.controller.tasks.ReclaimS3ObjectTask;
@@ -88,13 +90,8 @@ import com.automq.rocketmq.controller.tasks.SchedulerTask;
 import com.automq.rocketmq.controller.tasks.ScanTopicTask;
 import com.google.common.base.Strings;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonSerializationContext;
-import com.google.gson.JsonSerializer;
 import com.google.protobuf.TextFormat;
 import java.io.IOException;
-import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -158,17 +155,6 @@ public class DefaultMetadataStore implements MetadataStore {
 
     private final AssignmentCache assignmentCache;
 
-    private static class SubStreamSerializer implements JsonSerializer<SubStream> {
-        @Override
-        public JsonElement serialize(SubStream stream, Type type, JsonSerializationContext context) {
-            JsonObject root = new JsonObject();
-            root.addProperty("streamId", stream.getStreamId());
-            root.addProperty("startOffset", stream.getStartOffset());
-            root.addProperty("endOffset", stream.getEndOffset());
-            return root;
-        }
-    }
-
     public DefaultMetadataStore(ControllerClient client, SqlSessionFactory sessionFactory, ControllerConfig config) {
         this.controllerClient = client;
         this.sessionFactory = sessionFactory;
@@ -177,6 +163,7 @@ public class DefaultMetadataStore implements MetadataStore {
         this.nodes = new ConcurrentHashMap<>();
         this.gson = new GsonBuilder()
             .registerTypeAdapter(SubStream.class, new SubStreamSerializer())
+            .registerTypeAdapter(SubStream.class, new SubStreamDeserializer())
             .create();
         this.scheduledExecutorService = new ScheduledThreadPoolExecutor(Runtime.getRuntime().availableProcessors(),
             new PrefixThreadFactory("Controller"));
@@ -1177,8 +1164,9 @@ public class DefaultMetadataStore implements MetadataStore {
                     // remove wal object or remove sub-stream range in wal object
                     s3WALObjectMapper.list(stream.getDstNodeId(), null).stream()
                         .map(s3WALObject -> {
-                            Map<Long, SubStream> subStreams = gson.fromJson(new String(s3WALObject.getSubStreams().getBytes(StandardCharsets.UTF_8)), new TypeToken<Map<Long, SubStream>>() {
-                            }.getType());
+                            Map<Long, SubStream> subStreams = gson.fromJson(new String(s3WALObject.getSubStreams().getBytes(StandardCharsets.UTF_8)),
+                                new TypeToken<>() {
+                                });
                             return buildS3WALObject(s3WALObject, subStreams);
                         })
                         .filter(s3WALObject -> s3WALObject.getSubStreamsMap().containsKey(streamId))
@@ -1797,9 +1785,9 @@ public class DefaultMetadataStore implements MetadataStore {
             S3WalObjectMapper s3WalObjectMapper = session.getMapper(S3WalObjectMapper.class);
             List<S3WALObject> walObjects = s3WalObjectMapper.list(this.config.nodeId(), null).stream()
                 .map(s3WALObject -> {
-                    Map<Long, SubStream> subStreams = gson.fromJson(new String(s3WALObject.getSubStreams().getBytes(StandardCharsets.UTF_8)), new TypeToken<Map<Long, SubStream>>() {
-
-                    }.getType());
+                    Map<Long, SubStream> subStreams = gson.fromJson(new String(s3WALObject.getSubStreams().getBytes(StandardCharsets.UTF_8)),
+                        new TypeToken<>() {
+                        });
                     return buildS3WALObject(s3WALObject, subStreams);
                 })
                 .toList();
@@ -1831,7 +1819,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     .map(s3WalObject -> {
                         TypeToken<Map<Long, SubStream>> typeToken = new TypeToken<>() {
                         };
-                        Map<Long, SubStream> subStreams = gson.fromJson(new String(s3WalObject.getSubStreams().getBytes(StandardCharsets.UTF_8)), typeToken.getType());
+                        Map<Long, SubStream> subStreams = gson.fromJson(new String(s3WalObject.getSubStreams().getBytes(StandardCharsets.UTF_8)), typeToken);
                         Map<Long, SubStream> streamsRecords = new HashMap<>();
                         if (!Objects.isNull(subStreams) && subStreams.containsKey(streamId)) {
                             SubStream subStream = subStreams.get(streamId);
@@ -1989,7 +1977,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     .map(s3WalObject -> {
                         TypeToken<Map<Long, SubStream>> typeToken = new TypeToken<>() {
                         };
-                        Map<Long, SubStream> subStreams = gson.fromJson(new String(s3WalObject.getSubStreams().getBytes(StandardCharsets.UTF_8)), typeToken.getType());
+                        Map<Long, SubStream> subStreams = gson.fromJson(new String(s3WalObject.getSubStreams().getBytes(StandardCharsets.UTF_8)), typeToken);
                         Map<Long, SubStream> streamsRecords = new HashMap<>();
                         subStreams.entrySet().stream()
                             .filter(entry -> !Objects.isNull(entry) && entry.getKey().equals(streamId))

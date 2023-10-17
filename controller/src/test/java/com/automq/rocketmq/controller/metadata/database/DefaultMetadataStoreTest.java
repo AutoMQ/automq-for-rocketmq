@@ -67,7 +67,6 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
-import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.ibatis.session.SqlSession;
@@ -284,7 +283,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
                 add(MessageType.TRANSACTION);
             }
         };
-        Gson gson = new Gson();
         List<MessageType> updateMessageTypes = new ArrayList<>() {
             {
                 add(MessageType.NORMAL);
@@ -408,7 +406,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     public void testDescribeTopic() throws IOException, ExecutionException, InterruptedException {
         long topicId;
         String messageType = "[\"NORMAL\",\"DELAY\"]";
-        Gson gson = new Gson();
         try (SqlSession session = getSessionFactory().openSession()) {
 
             TopicMapper topicMapper = session.getMapper(TopicMapper.class);
@@ -519,28 +516,27 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         startOffset = 0L;
         endOffset = 9L;
         int limit = 1;
-        Gson gson = new Gson();
         String subStreamsJson = """
             {
               "1234567890": {
-                "streamId_": 1234567890,
-                "startOffset_": 0,
-                "endOffset_": 10
+                "streamId": 1234567890,
+                "startOffset": 0,
+                "endOffset": 10
               },
               "9876543210": {
-                "streamId_": 9876543210,
-                "startOffset_": 5,
-                "endOffset_": 15
+                "streamId": 9876543210,
+                "startOffset": 5,
+                "endOffset": 15
               },
               "5678901234": {
-                "streamId_": 5678901234,
-                "startOffset_": 2,
-                "endOffset_": 8
+                "streamId": 5678901234,
+                "startOffset": 2,
+                "endOffset": 8
               },
               "4321098765": {
-                "streamId_": 4321098765,
-                "startOffset_": 7,
-                "endOffset_": 12
+                "streamId": 4321098765,
+                "startOffset": 7,
+                "endOffset": 12
               }
             }""";
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -570,14 +566,14 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         String expectSubStream = """
             {
               "1234567890": {
-                "streamId_": 1234567890,
-                "startOffset_": 0,
-                "endOffset_": 10
+                "streamId": 1234567890,
+                "startOffset": 0,
+                "endOffset": 10
               }}""";
 
         Map<Long, SubStream> subStreams = gson.fromJson(new String(expectSubStream.getBytes(StandardCharsets.UTF_8)),
-            new TypeToken<Map<Long, SubStream>>() {
-            }.getType());
+            new TypeToken<>() {
+            });
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertNull(metadataStore.getLease());
@@ -604,28 +600,27 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
     @Test
     public void testListWALObjects_NotParams() throws IOException, ExecutionException, InterruptedException {
-        Gson gson = new Gson();
         String subStreamsJson = """
             {
               "1234567890": {
-                "streamId_": 1234567890,
-                "startOffset_": 0,
-                "endOffset_": 10
+                "streamId": 1234567890,
+                "startOffset": 0,
+                "endOffset": 10
               },
               "9876543210": {
-                "streamId_": 9876543210,
-                "startOffset_": 5,
-                "endOffset_": 15
+                "streamId": 9876543210,
+                "startOffset": 5,
+                "endOffset": 15
               },
               "5678901234": {
-                "streamId_": 5678901234,
-                "startOffset_": 2,
-                "endOffset_": 8
+                "streamId": 5678901234,
+                "startOffset": 2,
+                "endOffset": 8
               },
               "4321098765": {
-                "streamId_": 4321098765,
-                "startOffset_": 7,
-                "endOffset_": 12
+                "streamId": 4321098765,
+                "startOffset": 7,
+                "endOffset": 12
               }
             }""";
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -642,8 +637,9 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             s3WALObjectMapper.create(s3WALObject);
             session.commit();
         }
-        Map<Long, SubStream> subStreams = gson.fromJson(new String(subStreamsJson.getBytes(StandardCharsets.UTF_8)), new TypeToken<Map<Long, SubStream>>() {
-        }.getType());
+        Map<Long, SubStream> subStreams = gson.fromJson(new String(subStreamsJson.getBytes(StandardCharsets.UTF_8)),
+            new TypeToken<>() {
+            });
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertNull(metadataStore.getLease());
@@ -675,28 +671,27 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         startOffset = 0L;
         endOffset = 9L;
         int limit = 3;
-        Gson gson = new Gson();
         String subStreamsJson = """
             {
               "1": {
-                "streamId_": 1,
-                "startOffset_": 10,
-                "endOffset_": 20
+                "streamId": 1,
+                "startOffset": 10,
+                "endOffset": 20
               },
               "2": {
-                "streamId_": 1,
-                "startOffset_": 20,
-                "endOffset_": 30
+                "streamId": 1,
+                "startOffset": 20,
+                "endOffset": 30
               },
               "3": {
-                "streamId_": 1,
-                "startOffset_": 30,
-                "endOffset_": 40
+                "streamId": 1,
+                "startOffset": 30,
+                "endOffset": 40
               },
               "4": {
-                "streamId_": 2,
-                "startOffset_": 40,
-                "endOffset_": 50
+                "streamId": 2,
+                "startOffset": 40,
+                "endOffset": 50
               }
             }""";
 
@@ -730,12 +725,13 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         String expectSubStream = """
             {
               "1": {
-                "streamId_": 1,
-                "startOffset_": 10,
-                "endOffset_": 20
+                "streamId": 1,
+                "startOffset": 10,
+                "endOffset": 20
               }}""";
-        Map<Long, SubStream> subStreams = gson.fromJson(new String(expectSubStream.getBytes(StandardCharsets.UTF_8)), new TypeToken<Map<Long, SubStream>>() {
-        }.getType());
+        Map<Long, SubStream> subStreams = gson.fromJson(new String(expectSubStream.getBytes(StandardCharsets.UTF_8)),
+            new TypeToken<>() {
+            });
         ControllerConfig config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.nodeId()).thenReturn(1);
         Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
@@ -773,28 +769,27 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         startOffset = 11L;
         endOffset = 19L;
         int limit = 3;
-        Gson gson = new Gson();
         String subStreamsJson = """
             {
               "1": {
-                "streamId_": 1,
-                "startOffset_": 10,
-                "endOffset_": 20
+                "streamId": 1,
+                "startOffset": 10,
+                "endOffset": 20
               },
               "2": {
-                "streamId_": 1,
-                "startOffset_": 20,
-                "endOffset_": 30
+                "streamId": 1,
+                "startOffset": 20,
+                "endOffset": 30
               },
               "3": {
-                "streamId_": 1,
-                "startOffset_": 30,
-                "endOffset_": 40
+                "streamId": 1,
+                "startOffset": 30,
+                "endOffset": 40
               },
               "4": {
-                "streamId_": 2,
-                "startOffset_": 40,
-                "endOffset_": 50
+                "streamId": 2,
+                "startOffset": 40,
+                "endOffset": 50
               }
             }""";
 
@@ -828,12 +823,13 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         String expectSubStream = """
             {
               "1": {
-                "streamId_": 1,
-                "startOffset_": 10,
-                "endOffset_": 20
+                "streamId": 1,
+                "startOffset": 10,
+                "endOffset": 20
               }}""";
-        Map<Long, SubStream> subStreams = gson.fromJson(new String(expectSubStream.getBytes(StandardCharsets.UTF_8)), new TypeToken<Map<Long, SubStream>>() {
-        }.getType());
+        Map<Long, SubStream> subStreams = gson.fromJson(new String(expectSubStream.getBytes(StandardCharsets.UTF_8)),
+            new TypeToken<>() {
+            });
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertNull(metadataStore.getLease());
@@ -867,28 +863,27 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         startOffset = 0L;
         endOffset = 21L;
         int limit = 3;
-        Gson gson = new Gson();
         String subStreamsJson = """
             {
               "1": {
-                "streamId_": 1,
-                "startOffset_": 10,
-                "endOffset_": 20
+                "streamId": 1,
+                "startOffset": 10,
+                "endOffset": 20
               },
               "2": {
-                "streamId_": 1,
-                "startOffset_": 20,
-                "endOffset_": 30
+                "streamId": 1,
+                "startOffset": 20,
+                "endOffset": 30
               },
               "3": {
-                "streamId_": 1,
-                "startOffset_": 30,
-                "endOffset_": 40
+                "streamId": 1,
+                "startOffset": 30,
+                "endOffset": 40
               },
               "4": {
-                "streamId_": 2,
-                "startOffset_": 40,
-                "endOffset_": 50
+                "streamId": 2,
+                "startOffset": 40,
+                "endOffset": 50
               }
             }""";
 
@@ -922,12 +917,13 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         String expectSubStream = """
             {
               "1": {
-                "streamId_": 1,
-                "startOffset_": 10,
-                "endOffset_": 20
+                "streamId": 1,
+                "startOffset": 10,
+                "endOffset": 20
               }}""";
-        Map<Long, SubStream> subStreams = gson.fromJson(new String(expectSubStream.getBytes(StandardCharsets.UTF_8)), new TypeToken<Map<Long, SubStream>>() {
-        }.getType());
+        Map<Long, SubStream> subStreams = gson.fromJson(new String(expectSubStream.getBytes(StandardCharsets.UTF_8)),
+            new TypeToken<>() {
+            });
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertNull(metadataStore.getLease());
@@ -970,32 +966,31 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         startOffset = 0L;
         endOffset = 50L;
         int limit = 5;
-        Gson gson = new Gson();
         String subStreamsJson1 = """
             {
               "1": {
-                "streamId_": 1,
-                "startOffset_": 10,
-                "endOffset_": 20
+                "streamId": 1,
+                "startOffset": 10,
+                "endOffset": 20
               },
               "2": {
-                "streamId_": 1,
-                "startOffset_": 20,
-                "endOffset_": 30
+                "streamId": 1,
+                "startOffset": 20,
+                "endOffset": 30
               }
             }""";
 
         String subStreamsJson2 = """
             {
               "1": {
-                "streamId_": 1,
-                "startOffset_": 20,
-                "endOffset_": 40
+                "streamId": 1,
+                "startOffset": 20,
+                "endOffset": 40
               },
               "4": {
-                "streamId_": 2,
-                "startOffset_": 40,
-                "endOffset_": 50
+                "streamId": 2,
+                "startOffset": 40,
+                "endOffset": 50
               }
             }""";
 
@@ -1044,22 +1039,22 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         String expectSubStream1 = """
             {
               "1": {
-                "streamId_": 1,
-                "startOffset_": 10,
-                "endOffset_": 20
+                "streamId": 1,
+                "startOffset": 10,
+                "endOffset": 20
               }}""";
-        Map<Long, SubStream> subStreams1 = gson.fromJson(new String(expectSubStream1.getBytes(StandardCharsets.UTF_8)), new TypeToken<Map<Long, SubStream>>() {
-        }.getType());
+        Map<Long, SubStream> subStreams1 = gson.fromJson(new String(expectSubStream1.getBytes(StandardCharsets.UTF_8)), new TypeToken<>() {
+        });
 
         String expectSubStream2 = """
             {
               "1": {
-                "streamId_": 1,
-                "startOffset_": 20,
-                "endOffset_": 40
+                "streamId": 1,
+                "startOffset": 20,
+                "endOffset": 40
               }}""";
-        Map<Long, SubStream> subStreams2 = gson.fromJson(new String(expectSubStream2.getBytes(StandardCharsets.UTF_8)), new TypeToken<Map<Long, SubStream>>() {
-        }.getType());
+        Map<Long, SubStream> subStreams2 = gson.fromJson(new String(expectSubStream2.getBytes(StandardCharsets.UTF_8)), new TypeToken<>() {
+        });
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertNull(metadataStore.getLease());
@@ -1123,32 +1118,31 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         startOffset = 0L;
         endOffset = 40L;
         int limit = 3;
-        Gson gson = new Gson();
         String subStreamsJson1 = """
             {
               "1": {
-                "streamId_": 1,
-                "startOffset_": 0,
-                "endOffset_": 10
+                "streamId": 1,
+                "startOffset": 0,
+                "endOffset": 10
               },
               "2": {
-                "streamId_": 1,
-                "startOffset_": 20,
-                "endOffset_": 30
+                "streamId": 1,
+                "startOffset": 20,
+                "endOffset": 30
               }
             }""";
 
         String subStreamsJson2 = """
             {
               "1": {
-                "streamId_": 1,
-                "startOffset_": 20,
-                "endOffset_": 40
+                "streamId": 1,
+                "startOffset": 20,
+                "endOffset": 40
               },
               "4": {
-                "streamId_": 2,
-                "startOffset_": 40,
-                "endOffset_": 50
+                "streamId": 2,
+                "startOffset": 40,
+                "endOffset": 50
               }
             }""";
 
@@ -1197,22 +1191,24 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         String expectSubStream1 = """
             {
               "1": {
-                "streamId_": 1,
-                "startOffset_": 0,
-                "endOffset_": 10
+                "streamId": 1,
+                "startOffset": 0,
+                "endOffset": 10
               }}""";
-        Map<Long, SubStream> subStreams1 = gson.fromJson(new String(expectSubStream1.getBytes(StandardCharsets.UTF_8)), new TypeToken<Map<Long, SubStream>>() {
-        }.getType());
+        Map<Long, SubStream> subStreams1 = gson.fromJson(new String(expectSubStream1.getBytes(StandardCharsets.UTF_8)),
+            new TypeToken<>() {
+            });
 
         String expectSubStream2 = """
             {
               "1": {
-                "streamId_": 1,
-                "startOffset_": 20,
-                "endOffset_": 40
+                "streamId": 1,
+                "startOffset": 20,
+                "endOffset": 40
               }}""";
-        Map<Long, SubStream> subStreams2 = gson.fromJson(new String(expectSubStream2.getBytes(StandardCharsets.UTF_8)), new TypeToken<Map<Long, SubStream>>() {
-        }.getType());
+        Map<Long, SubStream> subStreams2 = gson.fromJson(new String(expectSubStream2.getBytes(StandardCharsets.UTF_8)),
+            new TypeToken<>() {
+            });
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertNull(metadataStore.getLease());
@@ -2191,9 +2187,9 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         String expectSubStream = """
             {
               "1234567890": {
-                "streamId_": 1234567890,
-                "startOffset_": 0,
-                "endOffset_": 10
+                "streamId": 1234567890,
+                "startOffset": 0,
+                "endOffset": 10
               }}""";
 
         try (SqlSession session = this.getSessionFactory().openSession()) {
