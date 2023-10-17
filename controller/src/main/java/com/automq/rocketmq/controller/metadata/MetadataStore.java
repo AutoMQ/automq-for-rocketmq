@@ -35,6 +35,7 @@ import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import java.io.Closeable;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentMap;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
@@ -72,14 +73,12 @@ public interface MetadataStore extends Closeable {
      * Register broker into metadata store and return broker epoch
      *
      * @return broker epoch
-     * @throws ControllerException If there is an I/O error.
      */
     CompletableFuture<Node> registerBrokerNode(String name, String address, String instanceId);
 
     /**
      * Register broker into metadata store and return broker epoch
      *
-     * @return broker epoch
      * @throws ControllerException If there is an I/O error.
      */
     void registerCurrentNode(String name, String address, String instanceId) throws ControllerException;
@@ -117,9 +116,8 @@ public interface MetadataStore extends Closeable {
      * Check if current controller is playing leader role
      *
      * @return true if leader; false otherwise
-     * @throws ControllerException If there is any I/O error
      */
-    boolean isLeader() throws ControllerException;
+    boolean isLeader();
 
     boolean hasAliveBrokerNodes();
 
@@ -191,5 +189,7 @@ public interface MetadataStore extends Closeable {
     void applyTopicChange(List<com.automq.rocketmq.controller.metadata.database.dao.Topic> topics);
 
     void applyAssignmentChange(List<QueueAssignment> assignments);
+
+    ConcurrentMap<Integer, BrokerNode> allNodes();
 
 }
