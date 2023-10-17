@@ -42,7 +42,7 @@ public class DefaultProxyMetadataService implements ProxyMetadataService {
     @Override
     public CompletableFuture<Topic> topicOf(String topicName) {
         Stopwatch stopwatch = Stopwatch.createStarted();
-        return metadataStore.describeTopic(null, topicName).thenApplyAsync((topic -> {
+        return metadataStore.describeTopic(null, topicName).thenApply((topic -> {
             long elapsed = stopwatch.elapsed().toMillis();
             if (elapsed > 100) {
                 LOGGER.warn("It took {}ms to query topic {}", elapsed, topicName);
@@ -63,6 +63,7 @@ public class DefaultProxyMetadataService implements ProxyMetadataService {
 
     @Override
     public CompletableFuture<String> addressOf(int nodeId) {
+        // TODO: Avoid use the ForkJoinPool.commonPool(), see the issue: https://github.com/AutoMQ/rocketmq-on-s3/issues/338
         return CompletableFuture.supplyAsync(() -> metadataStore.addressOfNode(nodeId));
     }
 
