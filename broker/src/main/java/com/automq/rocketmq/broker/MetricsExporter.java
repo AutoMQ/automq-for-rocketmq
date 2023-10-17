@@ -227,6 +227,8 @@ public class MetricsExporter implements Lifecycle {
 
     private void initMetrics() {
         proxyMetricsManager.initMetrics(brokerMeter, MetricsExporter::newAttributesBuilder);
+
+        storeMetricsManager.start();
         storeMetricsManager.initMetrics(brokerMeter, MetricsExporter::newAttributesBuilder);
     }
 
@@ -245,6 +247,7 @@ public class MetricsExporter implements Lifecycle {
             periodicMetricReader.shutdown();
             loggingMetricExporter.shutdown();
         }
+        storeMetricsManager.shutdown();
     }
 }
 
