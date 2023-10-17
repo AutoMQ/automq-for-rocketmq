@@ -493,8 +493,13 @@ public class DefaultS3Operator implements S3Operator {
             }).exceptionally(ex -> {
                 OperationMetricsStats.getOrCreateOperationMetrics(S3Operation.UPLOAD_PART_COPY_FAIL).operationCount.inc();
                 OperationMetricsStats.getOrCreateOperationMetrics(S3Operation.UPLOAD_PART_COPY_FAIL).operationTime.update(timerUtil.elapsed());
-                LOGGER.warn("{} UploadPartCopy for object {}-{} fail, retry later", logIdent, path, partNumber, ex);
-                scheduler.schedule(() -> copyWrite0(partNumber, request, partCf), 100, TimeUnit.MILLISECONDS);
+                if (isUnrecoverable(ex)) {
+                    LOGGER.warn("{} UploadPartCopy for object {}-{} fail", logIdent, path, partNumber, ex);
+                    partCf.completeExceptionally(ex);
+                } else {
+                    LOGGER.warn("{} UploadPartCopy for object {}-{} fail, retry later", logIdent, path, partNumber, ex);
+                    scheduler.schedule(() -> copyWrite0(partNumber, request, partCf), 100, TimeUnit.MILLISECONDS);
+                }
                 return null;
             });
         }
