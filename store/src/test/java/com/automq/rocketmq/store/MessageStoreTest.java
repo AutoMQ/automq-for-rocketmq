@@ -45,6 +45,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.rocketmq.common.UtilAll;
 import org.junit.jupiter.api.AfterEach;
@@ -54,10 +55,13 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import static com.automq.rocketmq.store.MessageStoreImpl.KV_NAMESPACE_CHECK_POINT;
+import static com.automq.rocketmq.store.MessageStoreImpl.KV_NAMESPACE_FIFO_INDEX;
 import static com.automq.rocketmq.store.MessageStoreImpl.KV_NAMESPACE_TIMER_TAG;
 import static com.automq.rocketmq.store.mock.MockMessageUtil.buildMessage;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class MessageStoreTest {
     private static final String PATH = "/tmp/ros/message_store_test/";
@@ -78,7 +82,7 @@ public class MessageStoreTest {
     @BeforeEach
     public void setUp() throws Exception {
         UtilAll.deleteFile(new java.io.File(PATH));
-        kvService = new RocksDBKVService(PATH);
+        kvService = Mockito.spy(new RocksDBKVService(PATH));
         metadataService = new MockStoreMetadataService();
         streamStore = new MockStreamStore();
         inflightService = new InflightService();
@@ -402,5 +406,103 @@ public class MessageStoreTest {
         messageStore.ack(popResult.messageList().get(2).receiptHandle().get()).join();
 
         assertEquals(3, logicQueue.getRetryAckOffset(CONSUMER_GROUP_ID));
+    }
+
+    @Test
+    public void restart_normal() throws Exception {
+        // 1. append 5 message
+        for (int i = 0; i < 5; i++) {
+            FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
+            messageStore.put(message).join();
+        }
+        List<String> receiptHandles = new ArrayList<>();
+        // 2. pop 3 message
+        // regard as forever invisible
+        int invisibleDuration = 999999999;
+        PopResult popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, true, false, invisibleDuration).join();
+        assertEquals(3, popResult.messageList().size());
+        for (FlatMessageExt message : popResult.messageList()) {
+            receiptHandles.add(message.receiptHandle().get());
+        }
+
+        // verify rocksdb is not empty
+        assertTrue(verifyStatesExist());
+
+        // 3. normal shutdown
+        messageStore.shutdown();
+
+        // verify rocksdb is empty
+        assertFalse(verifyStatesExist());
+
+        // 4. restart
+        messageStore.start();
+
+        // 5. verify rocksdb is empty
+        assertFalse(verifyStatesExist());
+    }
+
+    @Test
+    public void restart_force() throws Exception {
+        // 1. append 5 message
+        for (int i = 0; i < 5; i++) {
+            FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
+            messageStore.put(message).join();
+        }
+        List<String> receiptHandles = new ArrayList<>();
+        // 2. pop 3 message
+        // regard as forever invisible
+        int invisibleDuration = 999999999;
+        PopResult popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, true, false, invisibleDuration).join();
+        assertEquals(3, popResult.messageList().size());
+        for (FlatMessageExt message : popResult.messageList()) {
+            receiptHandles.add(message.receiptHandle().get());
+        }
+
+        // verify rocksdb is not empty
+        assertTrue(verifyStatesExist());
+
+        Mockito.doNothing().when(kvService).clear(Mockito.anyString());
+
+        // 3. shutdown but not clean data
+        messageStore.shutdown();
+
+        // verify rocksdb is not empty
+        assertTrue(verifyStatesExist());
+
+        Mockito.doCallRealMethod().when(kvService).clear(Mockito.anyString());
+
+        // 4. restart
+        messageStore.start();
+
+        // 5. verify rocksdb is empty
+        assertFalse(verifyStatesExist());
+    }
+
+    private boolean verifyStatesExist() {
+        AtomicBoolean exist = new AtomicBoolean(false);
+        try {
+            kvService.iterate(MessageStoreImpl.KV_NAMESPACE_TIMER_TAG, (key, value) -> {
+                exist.set(true);
+            });
+            if (exist.get()) {
+                return true;
+            }
+            kvService.iterate(KV_NAMESPACE_CHECK_POINT, (key, value) -> {
+                exist.set(true);
+            });
+            if (exist.get()) {
+                return true;
+            }
+            kvService.iterate(KV_NAMESPACE_FIFO_INDEX, (key, value) -> {
+                exist.set(true);
+            });
+            if (exist.get()) {
+                return true;
+            }
+            return false;
+        } catch (Exception e) {
+            Assertions.fail(e);
+            return false;
+        }
     }
 }

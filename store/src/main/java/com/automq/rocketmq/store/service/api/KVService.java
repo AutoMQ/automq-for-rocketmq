@@ -102,6 +102,13 @@ public interface KVService {
     void delete(final String namespace, byte[] key) throws StoreException;
 
     /**
+     * Clear all the kv pairs in the specified namespace.
+     * @param namespace the namespace storing required the k-v pair
+     * @throws StoreException if backend engine fails
+     */
+    void clear(final String namespace) throws StoreException;
+
+    /**
      * Forced dirty pages to the hard disk.
      *
      * @param sync synchronous or not
@@ -117,7 +124,7 @@ public interface KVService {
     void close() throws StoreException;
 
     /**
-     * Delete all data in the backend engine.
+     * Close and delete all data in the backend engine.
      *
      * @throws StoreException if backend engine fails
      */

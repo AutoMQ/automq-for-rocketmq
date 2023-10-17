@@ -331,6 +331,19 @@ public class RocksDBKVService implements KVService {
     }
 
     @Override
+    public void clear(String namespace) throws StoreException {
+        if (stopped) {
+            throw new StoreException(StoreErrorCode.KV_SERVICE_IS_NOT_RUNNING, "KV service is stopped.");
+        }
+        if (columnFamilyNameHandleMap.containsKey(namespace)) {
+            ColumnFamilyHandle handle = columnFamilyNameHandleMap.get(namespace);
+            transformException(() -> rocksDB.dropColumnFamily(handle),
+                "Failed to drop column family.");
+            columnFamilyNameHandleMap.remove(namespace);
+        }
+    }
+
+    @Override
     public void flush(boolean sync) throws StoreException {
         if (stopped) {
             throw new StoreException(StoreErrorCode.KV_SERVICE_IS_NOT_RUNNING, "KV service is stopped.");
