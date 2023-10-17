@@ -87,7 +87,9 @@ class ReviveServiceTest {
         logicQueue = new StreamLogicQueue(new StoreConfig(), TOPIC_ID, QUEUE_ID,
             metadataService, stateMachine, streamStore, operationLogService, inflightService);
         LogicQueueManager manager = Mockito.mock(LogicQueueManager.class);
-        Mockito.when(manager.getOrCreate(TOPIC_ID, QUEUE_ID)).thenReturn(CompletableFuture.completedFuture(logicQueue));
+        Mockito.doAnswer(ink -> {
+            return CompletableFuture.completedFuture(logicQueue);
+        }).when(manager).getOrCreate(TOPIC_ID, QUEUE_ID);
         dlqSender = Mockito.mock(DLQSender.class);
         reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, KV_NAMESPACE_TIMER_TAG, kvService, metadataService, inflightService,
             manager, dlqSender);
