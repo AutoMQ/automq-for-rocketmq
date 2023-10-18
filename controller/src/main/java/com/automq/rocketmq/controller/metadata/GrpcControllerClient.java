@@ -236,7 +236,7 @@ public class GrpcControllerClient implements ControllerClient {
         String topicName) {
 
         DescribeTopicRequest request = DescribeTopicRequest.newBuilder()
-            .setTopicId(topicId)
+            .setTopicId(null == topicId ? -1 : topicId)
             .setTopicName(topicName)
             .build();
 

@@ -26,6 +26,7 @@ import picocli.CommandLine;
     showDefaultValues = true,
     subcommands = {
         CreateTopic.class,
+        DescribeTopic.class,
         CreateGroup.class,
         ProduceMessage.class,
         ConsumeMessage.class
