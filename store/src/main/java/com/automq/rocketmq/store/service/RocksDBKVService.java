@@ -31,6 +31,7 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.rocketmq.common.MixAll;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.ColumnFamilyOptions;
@@ -365,8 +366,10 @@ public class RocksDBKVService implements KVService {
     @Override
     public void destroy() throws StoreException {
         close();
-        transformException(() -> RocksDB.destroyDB(path, new Options()),
-            "Failed to destroy RocksDB.");
+        if (new File(path).exists()) {
+            transformException(() -> RocksDB.destroyDB(path, new Options()),
+                "Failed to destroy RocksDB.");
+        }
     }
 
     @Override
