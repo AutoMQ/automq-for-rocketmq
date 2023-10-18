@@ -63,6 +63,7 @@ import com.automq.rocketmq.controller.tasks.ReclaimS3ObjectTask;
 import com.automq.rocketmq.controller.tasks.RecycleGroupTask;
 import com.automq.rocketmq.controller.tasks.RecycleTopicTask;
 import com.automq.rocketmq.controller.tasks.ScanAssignmentTask;
+import com.automq.rocketmq.controller.tasks.ScanGroupTask;
 import com.automq.rocketmq.controller.tasks.ScanNodeTask;
 import com.automq.rocketmq.controller.tasks.ScanYieldingQueueTask;
 import com.automq.rocketmq.controller.tasks.SchedulerTask;
@@ -114,6 +115,8 @@ public class DefaultMetadataStore implements MetadataStore {
     private final TopicManager topicManager;
     private final S3MetadataManager s3MetadataManager;
 
+    private final GroupCache groupCache;
+
     private DataStore dataStore;
 
     public DefaultMetadataStore(ControllerClient client, SqlSessionFactory sessionFactory, ControllerConfig config) {
@@ -127,6 +130,7 @@ public class DefaultMetadataStore implements MetadataStore {
         this.asyncExecutorService = Executors.newFixedThreadPool(10, new PrefixThreadFactory("Controller-Async"));
         this.topicManager = new TopicManager(this, asyncExecutorService);
         this.s3MetadataManager = new S3MetadataManager(this, asyncExecutorService);
+        this.groupCache = new GroupCache();
     }
 
     @Override
@@ -173,6 +177,8 @@ public class DefaultMetadataStore implements MetadataStore {
         this.scheduledExecutorService.scheduleWithFixedDelay(new ReclaimS3ObjectTask(this), 1,
             config.scanIntervalInSecs(), TimeUnit.SECONDS);
         this.scheduledExecutorService.scheduleWithFixedDelay(new ScanTopicTask(this), 1,
+            config.scanIntervalInSecs(), TimeUnit.SECONDS);
+        this.scheduledExecutorService.scheduleWithFixedDelay(new ScanGroupTask(this), 1,
             config.scanIntervalInSecs(), TimeUnit.SECONDS);
         this.scheduledExecutorService.scheduleWithFixedDelay(new ScanAssignmentTask(this), 1,
             config.scanIntervalInSecs(), TimeUnit.SECONDS);
@@ -545,6 +551,8 @@ public class DefaultMetadataStore implements MetadataStore {
                     group.setGroupType(type);
                     groupMapper.create(group);
                     session.commit();
+                    // Cache group metadata
+                    groupCache.apply(List.of(group));
                     future.complete(group.getId());
                 }
             } else {
@@ -718,7 +726,20 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public CompletableFuture<ConsumerGroup> describeConsumerGroup(Long groupId, String groupName) {
+    public CompletableFuture<ConsumerGroup> describeGroup(Long groupId, String groupName) {
+        Group cachedGroup = null;
+        if (null != groupId) {
+            cachedGroup = groupCache.byId(groupId);
+        }
+
+        if (null == cachedGroup && !Strings.isNullOrEmpty(groupName)) {
+            cachedGroup = groupCache.byName(groupName);
+        }
+
+        if (null != cachedGroup) {
+            return CompletableFuture.completedFuture(fromGroup(cachedGroup));
+        }
+
         return CompletableFuture.supplyAsync(() -> {
             try (SqlSession session = openSession()) {
                 GroupMapper groupMapper = session.getMapper(GroupMapper.class);
@@ -729,16 +750,20 @@ public class DefaultMetadataStore implements MetadataStore {
                     throw new CompletionException(e);
                 } else {
                     Group group = groups.get(0);
-                    return ConsumerGroup.newBuilder()
-                        .setGroupId(group.getId())
-                        .setName(group.getName())
-                        .setGroupType(group.getGroupType())
-                        .setMaxDeliveryAttempt(group.getMaxDeliveryAttempt())
-                        .setDeadLetterTopicId(group.getDeadLetterTopicId())
-                        .build();
+                    return fromGroup(group);
                 }
             }
         }, asyncExecutorService);
+    }
+
+    private ConsumerGroup fromGroup(Group group) {
+        return ConsumerGroup.newBuilder()
+            .setGroupId(group.getId())
+            .setName(group.getName())
+            .setGroupType(group.getGroupType())
+            .setMaxDeliveryAttempt(group.getMaxDeliveryAttempt())
+            .setDeadLetterTopicId(group.getDeadLetterTopicId())
+            .build();
     }
 
     @Override
@@ -1081,6 +1106,11 @@ public class DefaultMetadataStore implements MetadataStore {
     @Override
     public void applyAssignmentChange(List<QueueAssignment> assignments) {
         topicManager.assignmentCache.apply(assignments);
+    }
+
+    @Override
+    public void applyGroupChange(List<Group> groups) {
+        this.groupCache.apply(groups);
     }
 
     @Override

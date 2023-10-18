@@ -86,7 +86,7 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
     @Override
     public int getMaxDeliveryAttempts(long consumerGroupId) {
         try {
-            ConsumerGroup group = metadataStore.describeConsumerGroup(consumerGroupId, null).get();
+            ConsumerGroup group = metadataStore.describeGroup(consumerGroupId, null).get();
             return group.getMaxDeliveryAttempt();
         } catch (ExecutionException | InterruptedException e) {
             LOGGER.error("Exception raised while retrieving group for {}", consumerGroupId, e);
@@ -137,7 +137,7 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
 
     @Override
     public CompletableFuture<Integer> maxDeliveryAttemptsOf(long consumerGroupId) {
-        return metadataStore.describeConsumerGroup(consumerGroupId, null).thenApply((ConsumerGroup::getMaxDeliveryAttempt));
+        return metadataStore.describeGroup(consumerGroupId, null).thenApply((ConsumerGroup::getMaxDeliveryAttempt));
     }
 
     @Override
