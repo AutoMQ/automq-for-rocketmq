@@ -58,7 +58,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -73,13 +72,10 @@ public class S3MetadataManager {
 
     private final MetadataStore metadataStore;
 
-    private final ExecutorService asyncExecutorService;
-
     private final Gson gson;
 
-    public S3MetadataManager(MetadataStore metadataStore, ExecutorService asyncExecutorService) {
+    public S3MetadataManager(MetadataStore metadataStore) {
         this.metadataStore = metadataStore;
-        this.asyncExecutorService = asyncExecutorService;
         this.gson = new GsonBuilder()
             .registerTypeAdapter(SubStream.class, new SubStreamSerializer())
             .registerTypeAdapter(SubStream.class, new SubStreamDeserializer())
@@ -618,7 +614,7 @@ public class S3MetadataManager {
 
                 return new ImmutablePair<>(limitedStreamObjects, limitedWalObjectList);
             }
-        }, asyncExecutorService);
+        }, metadataStore.asyncExecutor());
     }
 
 

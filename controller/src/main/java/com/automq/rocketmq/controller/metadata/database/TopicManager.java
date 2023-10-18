@@ -49,7 +49,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.ExecutorService;
 import java.util.stream.IntStream;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -63,18 +62,14 @@ public class TopicManager {
 
     private final MetadataStore metadataStore;
 
-    private final ExecutorService asyncExecutorService;
-
     private final Gson gson;
 
     final TopicCache topicCache;
 
     final AssignmentCache assignmentCache;
 
-    public TopicManager(MetadataStore metadataStore, ExecutorService asyncExecutorService) {
+    public TopicManager(MetadataStore metadataStore) {
         this.metadataStore = metadataStore;
-        this.asyncExecutorService = asyncExecutorService;
-
         this.gson = new GsonBuilder()
             .registerTypeAdapter(SubStream.class, new SubStreamSerializer())
             .registerTypeAdapter(SubStream.class, new SubStreamDeserializer())
@@ -271,7 +266,7 @@ public class TopicManager {
                     }
                 }
             }
-        }, asyncExecutorService);
+        }, metadataStore.asyncExecutor());
     }
 
     public CompletableFuture<apache.rocketmq.controller.v1.Topic> describeTopic(Long topicId,
@@ -317,7 +312,7 @@ public class TopicManager {
                     throw new CompletionException(e);
                 }
             }
-        }, asyncExecutorService);
+        }, metadataStore.asyncExecutor());
     }
 
     public CompletableFuture<List<apache.rocketmq.controller.v1.Topic>> listTopics() {
