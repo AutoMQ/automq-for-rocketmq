@@ -59,10 +59,8 @@ public class TopicCache {
     private void cacheItem(Topic topic) {
         switch (topic.getStatus()) {
             case TOPIC_STATUS_ACTIVE -> {
-                Long prev = names.put(topic.getName(), topic.getId());
-                assert null == prev;
-                Topic prevTopic = topics.put(topic.getId(), topic);
-                assert null == prevTopic;
+                names.put(topic.getName(), topic.getId());
+                topics.put(topic.getId(), topic);
             }
             case TOPIC_STATUS_DELETED -> {
                 names.remove(topic.getName());

@@ -35,6 +35,11 @@
             <version>4.7.5</version>
         </dependency>
         <dependency>
+            <groupId>de.vandermeer</groupId>
+            <artifactId>asciitable</artifactId>
+            <version>0.3.2</version>
+        </dependency>
+        <dependency>
             <groupId>com.automq.rocketmq</groupId>
             <artifactId>rocketmq-controller</artifactId>
             <version>${project.version}</version>

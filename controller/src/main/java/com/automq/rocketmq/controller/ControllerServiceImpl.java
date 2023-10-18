@@ -86,7 +86,7 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     public void registerNode(NodeRegistrationRequest request,
         StreamObserver<NodeRegistrationReply> responseObserver) {
         metadataStore.registerBrokerNode(request.getBrokerName(), request.getAddress(),
-            request.getInstanceId())
+                request.getInstanceId())
             .whenComplete((res, e) -> {
                 if (null != e) {
                     if (e.getCause() instanceof ControllerException ex) {
@@ -194,7 +194,11 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
 
     @Override
     public void describeTopic(DescribeTopicRequest request, StreamObserver<DescribeTopicReply> responseObserver) {
-        metadataStore.describeTopic(request.getTopicId(), request.getTopicName()).whenCompleteAsync((topic, e) -> {
+        Long topicId = null;
+        if (request.getTopicId() > 0) {
+            topicId = request.getTopicId();
+        }
+        metadataStore.describeTopic(topicId, request.getTopicName()).whenCompleteAsync((topic, e) -> {
             if (null != e) {
                 if (e.getCause() instanceof ControllerException ex) {
                     DescribeTopicReply reply = DescribeTopicReply.newBuilder()
@@ -256,7 +260,7 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
                 queueNumber = request.getCount();
             }
             this.metadataStore.updateTopic(request.getTopicId(), request.getName(), queueNumber,
-                request.getAcceptMessageTypesList())
+                    request.getAcceptMessageTypesList())
                 .whenComplete((res, e) -> {
                     if (null != e) {
                         responseObserver.onError(e);
@@ -373,9 +377,9 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     @Override
     public void commitOffset(CommitOffsetRequest request, StreamObserver<CommitOffsetReply> responseObserver) {
         metadataStore.commitOffset(request.getGroupId(),
-            request.getQueue().getTopicId(),
-            request.getQueue().getQueueId(),
-            request.getOffset())
+                request.getQueue().getTopicId(),
+                request.getQueue().getQueueId(),
+                request.getOffset())
             .whenComplete((res, e) -> {
                 if (null != e) {
                     if (e instanceof ControllerException ex) {
@@ -402,7 +406,7 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     @Override
     public void createGroup(CreateGroupRequest request, StreamObserver<CreateGroupReply> responseObserver) {
         metadataStore.createGroup(request.getName(), request.getMaxRetryAttempt(), request.getGroupType(),
-            request.getDeadLetterTopicId())
+                request.getDeadLetterTopicId())
             .whenComplete((groupId, e) -> {
                 if (null != e) {
                     if (e instanceof ControllerException ex) {

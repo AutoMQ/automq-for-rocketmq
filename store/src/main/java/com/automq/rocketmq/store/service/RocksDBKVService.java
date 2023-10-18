@@ -47,16 +47,46 @@ import org.rocksdb.WriteOptions;
 
 public class RocksDBKVService implements KVService {
     private final String path;
-    private ColumnFamilyOptions columnFamilyOptions;
-    private DBOptions dbOptions;
-    private ConcurrentMap<String, ColumnFamilyHandle> columnFamilyNameHandleMap;
-    private ConcurrentMap<Long, Snapshot> snapshotMap;
-    private RocksDB rocksDB;
+    private final ColumnFamilyOptions columnFamilyOptions;
+    private final DBOptions dbOptions;
+    private final ConcurrentMap<String, ColumnFamilyHandle> columnFamilyNameHandleMap;
+    private final ConcurrentMap<Long, Snapshot> snapshotMap;
+    private final RocksDB rocksDB;
     private volatile boolean stopped;
 
     public RocksDBKVService(String path) throws StoreException {
         this.path = path;
-        stopped = true;
+        this.columnFamilyOptions = new ColumnFamilyOptions().optimizeForSmallDb();
+        this.dbOptions = new DBOptions().setCreateIfMissing(true)
+            .setCreateMissingColumnFamilies(true);
+        columnFamilyNameHandleMap = new ConcurrentHashMap<>();
+        File storeFile = new File(this.path);
+        if (!storeFile.getParentFile().exists()) {
+            if (!storeFile.getParentFile().mkdirs()) {
+                throw new StoreException(StoreErrorCode.FILE_SYSTEM_PERMISSION, "Failed to create directory: " + storeFile.getParentFile().getAbsolutePath());
+            }
+        }
+        List<byte[]> columnFamilyNames = new ArrayList<>();
+        List<ColumnFamilyDescriptor> columnFamilyDescriptors = new ArrayList<>();
+        List<ColumnFamilyHandle> columnFamilyHandles = new ArrayList<>();
+        if (storeFile.exists()) {
+            transformException(() -> columnFamilyNames.addAll(RocksDB.listColumnFamilies(new Options(dbOptions, columnFamilyOptions), this.path)),
+                "Failed to list column families.");
+
+        } else {
+            columnFamilyNames.add(RocksDB.DEFAULT_COLUMN_FAMILY);
+        }
+        for (byte[] columnFamilyName : columnFamilyNames) {
+            columnFamilyDescriptors.add(new ColumnFamilyDescriptor(columnFamilyName, columnFamilyOptions));
+        }
+
+        rocksDB = transformException(() -> RocksDB.open(dbOptions, this.path, columnFamilyDescriptors, columnFamilyHandles),
+            "Failed to open RocksDB.");
+        for (int i = 0; i < columnFamilyNames.size(); i++) {
+            columnFamilyNameHandleMap.put(new String(columnFamilyNames.get(i)),
+                columnFamilyHandles.get(i));
+        }
+        snapshotMap = new ConcurrentHashMap<>();
     }
 
     protected interface RocksDBSupplier<T> {
@@ -307,44 +337,6 @@ public class RocksDBKVService implements KVService {
         }
         transformException(() -> rocksDB.flushWal(sync),
             "Failed to flush RocksDB.");
-    }
-
-    @Override
-    public void open() throws StoreException {
-        if (!stopped) {
-            return;
-        }
-        this.columnFamilyOptions = new ColumnFamilyOptions().optimizeForSmallDb();
-        this.dbOptions = new DBOptions().setCreateIfMissing(true)
-            .setCreateMissingColumnFamilies(true);
-        columnFamilyNameHandleMap = new ConcurrentHashMap<>();
-        File storeFile = new File(this.path);
-        if (!storeFile.getParentFile().exists()) {
-            if (!storeFile.getParentFile().mkdirs()) {
-                throw new StoreException(StoreErrorCode.FILE_SYSTEM_PERMISSION, "Failed to create directory: " + storeFile.getParentFile().getAbsolutePath());
-            }
-        }
-        List<byte[]> columnFamilyNames = new ArrayList<>();
-        List<ColumnFamilyDescriptor> columnFamilyDescriptors = new ArrayList<>();
-        List<ColumnFamilyHandle> columnFamilyHandles = new ArrayList<>();
-        if (storeFile.exists()) {
-            transformException(() -> columnFamilyNames.addAll(RocksDB.listColumnFamilies(new Options(dbOptions, columnFamilyOptions), this.path)),
-                "Failed to list column families.");
-
-        } else {
-            columnFamilyNames.add(RocksDB.DEFAULT_COLUMN_FAMILY);
-        }
-        for (byte[] columnFamilyName : columnFamilyNames) {
-            columnFamilyDescriptors.add(new ColumnFamilyDescriptor(columnFamilyName, columnFamilyOptions));
-        }
-        rocksDB = transformException(() -> RocksDB.open(dbOptions, this.path, columnFamilyDescriptors, columnFamilyHandles),
-            "Failed to open RocksDB.");
-        for (int i = 0; i < columnFamilyNames.size(); i++) {
-            columnFamilyNameHandleMap.put(new String(columnFamilyNames.get(i)),
-                columnFamilyHandles.get(i));
-        }
-        snapshotMap = new ConcurrentHashMap<>();
-        stopped = false;
     }
 
     @Override
