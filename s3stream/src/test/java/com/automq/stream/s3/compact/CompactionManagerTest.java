@@ -70,10 +70,10 @@ public class CompactionManagerTest extends CompactionTestBase {
         when(config.s3ObjectCompactionStreamSplitSize()).thenReturn(100L);
         when(config.s3ObjectCompactionForceSplitPeriod()).thenReturn(120);
         when(config.s3ObjectCompactionMaxObjectNum()).thenReturn(100);
-        when(config.s3ObjectCompactionMaxStreamNumInWAL()).thenReturn(100);
-        when(config.s3ObjectCompactionMaxStreamObjectNum()).thenReturn(100);
+        when(config.s3ObjectMaxStreamNumPerWAL()).thenReturn(100);
+        when(config.s3ObjectMaxStreamObjectNumPerCommit()).thenReturn(100);
         compactionAnalyzer = new CompactionAnalyzer(config.s3ObjectCompactionCacheSize(), config.s3ObjectCompactionStreamSplitSize(),
-                config.s3ObjectCompactionMaxStreamNumInWAL(), config.s3ObjectCompactionMaxStreamObjectNum());
+                config.s3ObjectMaxStreamNumPerWAL(), config.s3ObjectMaxStreamObjectNumPerCommit());
     }
 
     @AfterEach
@@ -110,7 +110,7 @@ public class CompactionManagerTest extends CompactionTestBase {
 
     @Test
     public void testForceSplitWithLimit() {
-        when(config.s3ObjectCompactionMaxStreamObjectNum()).thenReturn(3);
+        when(config.s3ObjectMaxStreamObjectNumPerCommit()).thenReturn(3);
         List<S3ObjectMetadata> s3ObjectMetadata = this.objectManager.getServerObjects().join();
         when(config.s3ObjectCompactionForceSplitPeriod()).thenReturn(0);
         compactionManager = new CompactionManager(config, objectManager, s3Operator);
@@ -223,8 +223,8 @@ public class CompactionManagerTest extends CompactionTestBase {
     @Test
     public void testCompactWithLimit() {
         when(config.s3ObjectCompactionStreamSplitSize()).thenReturn(70L);
-        when(config.s3ObjectCompactionMaxStreamNumInWAL()).thenReturn(MAX_STREAM_NUM_IN_WAL);
-        when(config.s3ObjectCompactionMaxStreamObjectNum()).thenReturn(2);
+        when(config.s3ObjectMaxStreamNumPerWAL()).thenReturn(MAX_STREAM_NUM_IN_WAL);
+        when(config.s3ObjectMaxStreamObjectNumPerCommit()).thenReturn(2);
         List<S3ObjectMetadata> s3ObjectMetadata = this.objectManager.getServerObjects().join();
         compactionManager = new CompactionManager(config, objectManager, s3Operator);
         Set<Long> excludedObjects = new HashSet<>();

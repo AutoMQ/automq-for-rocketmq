@@ -67,8 +67,8 @@ public class CompactionManager {
     private final int maxObjectNumToCompact;
     private final int compactionInterval;
     private final int forceSplitObjectPeriod;
-    private final int maxStreamNumInWAL;
-    private final int maxStreamObjectNum;
+    private final int maxStreamNumPerWAL;
+    private final int maxStreamObjectNumPerCommit;
     private final boolean s3ObjectLogEnable;
     private final TokenBucketThrottle networkInThrottle;
 
@@ -92,15 +92,15 @@ public class CompactionManager {
         this.uploader = new CompactionUploader(objectManager, s3Operator, config);
         long compactionCacheSize = config.s3ObjectCompactionCacheSize();
         long streamSplitSize = config.s3ObjectCompactionStreamSplitSize();
-        maxStreamNumInWAL = config.s3ObjectCompactionMaxStreamNumInWAL();
-        maxStreamObjectNum = config.s3ObjectCompactionMaxStreamObjectNum();
-        this.compactionAnalyzer = new CompactionAnalyzer(compactionCacheSize, streamSplitSize, maxStreamNumInWAL,
-                maxStreamObjectNum, new LogContext(String.format("[CompactionAnalyzer id=%d] ", config.brokerId())));
+        maxStreamNumPerWAL = config.s3ObjectMaxStreamNumPerWAL();
+        maxStreamObjectNumPerCommit = config.s3ObjectMaxStreamObjectNumPerCommit();
+        this.compactionAnalyzer = new CompactionAnalyzer(compactionCacheSize, streamSplitSize, maxStreamNumPerWAL,
+                maxStreamObjectNumPerCommit, new LogContext(String.format("[CompactionAnalyzer id=%d] ", config.brokerId())));
         this.scheduledExecutorService = Executors.newSingleThreadScheduledExecutor(new DefaultThreadFactory("object-compaction-manager"));
-        this.executorService = Executors.newFixedThreadPool(8, new DefaultThreadFactory("force-split-executor"));
+        this.executorService = Executors.newFixedThreadPool(1, new DefaultThreadFactory("force-split-executor"));
         this.logger.info("Compaction manager initialized with config: compactionInterval: {} min, compactionCacheSize: {} bytes, " +
                         "streamSplitSize: {} bytes, forceSplitObjectPeriod: {} min, maxObjectNumToCompact: {}, maxStreamNumInWAL: {}, maxStreamObjectNum: {}",
-                compactionInterval, compactionCacheSize, streamSplitSize, forceSplitObjectPeriod, maxObjectNumToCompact, maxStreamNumInWAL, maxStreamObjectNum);
+                compactionInterval, compactionCacheSize, streamSplitSize, forceSplitObjectPeriod, maxObjectNumToCompact, maxStreamNumPerWAL, maxStreamObjectNumPerCommit);
     }
 
     public void start() {
@@ -264,7 +264,7 @@ public class CompactionManager {
         for (Pair<Long, List<List<StreamDataBlock>>> pair : sortedObjectGroupedStreamDataBlockList) {
             long objectId = pair.getLeft();
             List<List<StreamDataBlock>> groupedStreamDataBlocks = pair.getRight();
-            if (totalStreamObjectNum + groupedStreamDataBlocks.size() > maxStreamObjectNum) {
+            if (totalStreamObjectNum + groupedStreamDataBlocks.size() > maxStreamObjectNumPerCommit) {
                 // exceed max stream object number, stop split
                 break;
             }
@@ -277,7 +277,7 @@ public class CompactionManager {
         // add objects that are excluded from split
         excludedObjects.addAll(streamDataBlocksMap.keySet().stream().filter(e -> !includedObjects.contains(e)).collect(Collectors.toSet()));
         logger.info("Force split {} WAL objects, expect to generate {} stream objects, max stream objects {}, objects excluded: {}",
-                objectMetadataList.size(), groupedDataBlocks.size(), maxStreamObjectNum, excludedObjects);
+                objectMetadataList.size(), groupedDataBlocks.size(), maxStreamObjectNumPerCommit, excludedObjects);
         if (groupedDataBlocks.isEmpty()) {
             return new ArrayList<>();
         }
