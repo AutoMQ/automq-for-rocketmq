@@ -25,6 +25,7 @@ import com.automq.rocketmq.store.api.LogicQueueManager;
 import com.automq.rocketmq.store.api.MessageStore;
 import com.automq.rocketmq.store.api.S3ObjectOperator;
 import com.automq.rocketmq.store.api.StreamStore;
+import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.generated.ReceiptHandle;
 import com.automq.rocketmq.store.model.message.AckResult;
 import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
@@ -95,6 +96,7 @@ public class MessageStoreImpl implements MessageStore {
         if (!started.compareAndSet(false, true)) {
             return;
         }
+        clearStateMachineData();
         streamStore.start();
         reviveService.start();
         snapshotService.start();
@@ -110,7 +112,16 @@ public class MessageStoreImpl implements MessageStore {
         snapshotService.shutdown();
         reviveService.shutdown();
         streamStore.shutdown();
+        clearStateMachineData();
     }
+
+    private void clearStateMachineData() throws StoreException {
+        // clear all statemachine related data in rocksdb
+        kvService.clear(KV_NAMESPACE_CHECK_POINT);
+        kvService.clear(KV_NAMESPACE_TIMER_TAG);
+        kvService.clear(KV_NAMESPACE_FIFO_INDEX);
+    }
+
 
     @Override
     public CompletableFuture<PopResult> pop(long consumerGroupId, long topicId, int queueId, Filter filter,
