@@ -29,7 +29,6 @@ import com.automq.rocketmq.metadata.api.StoreMetadataService;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,61 +41,6 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
 
     public DefaultStoreMetadataService(MetadataStore metadataStore) {
         this.metadataStore = metadataStore;
-    }
-
-    @Override
-    public long getStreamId(long topicId, int queueId) {
-        try {
-            return metadataStore.getStream(topicId, queueId, null, StreamRole.STREAM_ROLE_DATA)
-                .get()
-                .getStreamId();
-        } catch (ExecutionException | InterruptedException e) {
-            LOGGER.error("Failed to acquire data stream-id for topic-id={}, queue-id={}", topicId, queueId);
-            return -1L;
-        }
-    }
-
-    @Override
-    public long getOperationLogStreamId(long topicId, int queueId) {
-        try {
-            return metadataStore.getStream(topicId, queueId, null, StreamRole.STREAM_ROLE_OPS).get()
-                .getStreamId();
-        } catch (ExecutionException | InterruptedException e) {
-            LOGGER.error("Failed to acquire data stream-id for topic-id={}, queue-id={}", topicId, queueId);
-            return -1L;
-        }
-    }
-
-    @Override
-    public long getRetryStreamId(long consumerGroupId, long topicId, int queueId) {
-        try {
-            return metadataStore.getStream(topicId, queueId, consumerGroupId, StreamRole.STREAM_ROLE_RETRY).get()
-                .getStreamId();
-        } catch (ExecutionException | InterruptedException e) {
-            LOGGER.error("Failed to acquire data stream-id for topic-id={}, queue-id={}", topicId, queueId);
-            return -1L;
-        }
-    }
-
-    @Override
-    public long getDeadLetterStreamId(long consumerGroupId, long topicId, int queueId) {
-        throw new RuntimeException("Unsupported operation");
-    }
-
-    @Override
-    public int getMaxDeliveryAttempts(long consumerGroupId) {
-        try {
-            ConsumerGroup group = metadataStore.describeGroup(consumerGroupId, null).get();
-            return group.getMaxDeliveryAttempt();
-        } catch (ExecutionException | InterruptedException e) {
-            LOGGER.error("Exception raised while retrieving group for {}", consumerGroupId, e);
-            return -1;
-        }
-    }
-
-    @Override
-    public int getNodeId() {
-        return metadataStore.config().nodeId();
     }
 
     @Override
@@ -120,22 +64,6 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
     }
 
     @Override
-    public CompletableFuture<List<StreamMetadata>> listStreamsManagedBy(long topicId, int queueId) {
-        CompletableFuture<StreamMetadata> operationStreamOf = operationStreamOf(topicId, queueId);
-        CompletableFuture<StreamMetadata> dataStreamOf = dataStreamOf(topicId, queueId);
-        CompletableFuture<StreamMetadata> retryStreamOf = metadataStore.getStream(topicId, queueId, null, StreamRole.STREAM_ROLE_RETRY);
-
-        return CompletableFuture.allOf(dataStreamOf, operationStreamOf, retryStreamOf)
-            .thenApplyAsync(v -> {
-                StreamMetadata dataStreamMetadata = dataStreamOf.join();
-                StreamMetadata operationStreamMetadata = operationStreamOf.join();
-                StreamMetadata retryStreamMetadata = retryStreamOf.join();
-
-                return List.of(dataStreamMetadata, operationStreamMetadata, retryStreamMetadata);
-            });
-    }
-
-    @Override
     public CompletableFuture<Integer> maxDeliveryAttemptsOf(long consumerGroupId) {
         return metadataStore.describeGroup(consumerGroupId, null).thenApply((ConsumerGroup::getMaxDeliveryAttempt));
     }
@@ -152,13 +80,13 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
     }
 
     @Override
-    public CompletableFuture<StreamMetadata> openStream(long streamId, long streamEpoch, int nodeId) {
-        return metadataStore.openStream(streamId, streamEpoch, nodeId);
+    public CompletableFuture<StreamMetadata> openStream(long streamId, long streamEpoch) {
+        return metadataStore.openStream(streamId, streamEpoch, metadataStore.config().nodeId());
     }
 
     @Override
-    public CompletableFuture<Void> closeStream(long streamId, long streamEpoch, int nodeId) {
-        return metadataStore.closeStream(streamId, streamEpoch, nodeId);
+    public CompletableFuture<Void> closeStream(long streamId, long streamEpoch) {
+        return metadataStore.closeStream(streamId, streamEpoch, metadataStore.config().nodeId());
     }
 
     @Override

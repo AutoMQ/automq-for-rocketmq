@@ -43,6 +43,13 @@ public interface StoreMetadataService {
      */
     CompletableFuture<StreamMetadata> operationStreamOf(long topicId, int queueId);
 
+    /**
+     * Get the snapshot stream metadata of the specified message queue.
+     *
+     * @param topicId topic id
+     * @param queueId the specified message queue id
+     * @return {@link CompletableFuture} of {@link StreamMetadata}
+     */
     CompletableFuture<StreamMetadata> snapshotStreamOf(long topicId, int queueId);
 
     /**
@@ -54,20 +61,6 @@ public interface StoreMetadataService {
      * @return {@link CompletableFuture} of {@link StreamMetadata}
      */
     CompletableFuture<StreamMetadata> retryStreamOf(long consumerGroupId, long topicId, int queueId);
-
-    /**
-     * List all the streams managed by the specified queue.
-     * <p>
-     * Each queue will manage some streams:
-     * 1. data stream that stores the messages.
-     * 2. operation log stream that stores the operation logs.
-     * 3. retry streams that stores the messages that need to be retried.
-     *
-     * @param topicId topic id
-     * @param queueId the specified message queue id
-     * @return {@link CompletableFuture} of {@link StreamMetadata}
-     */
-    CompletableFuture<List<StreamMetadata>> listStreamsManagedBy(long topicId, int queueId);
 
     /**
      * Get the configured max delivery attempt times of the specified consumer group.
@@ -94,20 +87,18 @@ public interface StoreMetadataService {
      *
      * @param streamId stream id.
      * @param streamEpoch stream epoch.
-     * @param nodeId node id.
      * @return {@link StreamMetadata}
      */
-    CompletableFuture<StreamMetadata> openStream(long streamId, long streamEpoch, int nodeId);
+    CompletableFuture<StreamMetadata> openStream(long streamId, long streamEpoch);
 
     /**
      * Mark the specified stream as closed.
      *
      * @param streamId stream id.
      * @param streamEpoch stream epoch.
-     * @param nodeId node id.
      * @return {@link CompletableFuture} of close operation.
      */
-    CompletableFuture<Void> closeStream(long streamId, long streamEpoch, int nodeId);
+    CompletableFuture<Void> closeStream(long streamId, long streamEpoch);
 
     /**
      * List the open streams of current server.
@@ -130,9 +121,7 @@ public interface StoreMetadataService {
     /**
      * Commit an uploaded or compacted S3 WAL object.
      * <p>
-     * This operation will be triggered in upload or compaction process.
-     *
-     * TODO: Describe all expected valid use cases.
+     * This operation will be triggered by upload or compaction process.
      *
      * @param walObject the new WAL object.
      * @param streamObjects the stream objects that split from the compaction process.
@@ -192,21 +181,4 @@ public interface StoreMetadataService {
      */
     CompletableFuture<Pair<List<S3StreamObject>, List<S3WALObject>>> listObjects(long streamId, long startOffset,
         long endOffset, int limit);
-
-    /**
-     * Get the nodeId of the current broker
-     * @return nodeId
-     */
-    int getNodeId();
-
-    @Deprecated
-    long getStreamId(long topicId, int queueId);
-    @Deprecated
-    long getOperationLogStreamId(long topicId, int queueId);
-    @Deprecated
-    long getRetryStreamId(long consumerGroupId, long topicId, int queueId);
-    @Deprecated
-    long getDeadLetterStreamId(long consumerGroupId, long topicId, int queueId);
-    @Deprecated
-    int getMaxDeliveryAttempts(long consumerGroupId);
 }

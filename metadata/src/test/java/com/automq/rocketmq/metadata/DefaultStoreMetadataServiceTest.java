@@ -26,6 +26,7 @@ import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -69,7 +70,7 @@ class DefaultStoreMetadataServiceTest {
             .thenReturn(future);
 
         DefaultStoreMetadataService service = new DefaultStoreMetadataService(metadataStore);
-        Assertions.assertEquals(1L, service.getStreamId(1L, 2));
+        Assertions.assertEquals(1L, service.dataStreamOf(1L, 2).join().getStreamId());
     }
 
     @Test
@@ -80,7 +81,10 @@ class DefaultStoreMetadataServiceTest {
                 ArgumentMatchers.nullable(Long.class), ArgumentMatchers.eq(StreamRole.STREAM_ROLE_DATA)))
             .thenReturn(future);
         DefaultStoreMetadataService service = new DefaultStoreMetadataService(metadataStore);
-        Assertions.assertEquals(-1L, service.getStreamId(1L, 2));
+        CompletableFuture<StreamMetadata> streamCf = service.dataStreamOf(1L, 2);
+        // Assert exception thrown
+        ControllerException exception = (ControllerException) Assertions.assertThrows(ExecutionException.class, streamCf::get).getCause();
+        Assertions.assertEquals(Code.NOT_FOUND_VALUE, exception.getErrorCode());
     }
 
     @Test
@@ -93,7 +97,7 @@ class DefaultStoreMetadataServiceTest {
                 ArgumentMatchers.nullable(Long.class), ArgumentMatchers.eq(StreamRole.STREAM_ROLE_OPS)))
             .thenReturn(future);
         DefaultStoreMetadataService service = new DefaultStoreMetadataService(metadataStore);
-        Assertions.assertEquals(1L, service.getOperationLogStreamId(1L, 2));
+        Assertions.assertEquals(1L, service.operationStreamOf(1L, 2).join().getStreamId());
     }
 
     @Test
@@ -104,7 +108,10 @@ class DefaultStoreMetadataServiceTest {
                 ArgumentMatchers.nullable(Long.class), ArgumentMatchers.eq(StreamRole.STREAM_ROLE_OPS)))
             .thenReturn(future);
         DefaultStoreMetadataService service = new DefaultStoreMetadataService(metadataStore);
-        Assertions.assertEquals(-1L, service.getOperationLogStreamId(1L, 2));
+        CompletableFuture<StreamMetadata> streamCf = service.operationStreamOf(1L, 2);
+        // Assert exception thrown
+        ControllerException exception = (ControllerException) Assertions.assertThrows(ExecutionException.class, streamCf::get).getCause();
+        Assertions.assertEquals(Code.NOT_FOUND_VALUE, exception.getErrorCode());
     }
 
     @Test
@@ -117,7 +124,7 @@ class DefaultStoreMetadataServiceTest {
                 ArgumentMatchers.nullable(Long.class), ArgumentMatchers.eq(StreamRole.STREAM_ROLE_RETRY)))
             .thenReturn(future);
         DefaultStoreMetadataService service = new DefaultStoreMetadataService(metadataStore);
-        Assertions.assertEquals(1L, service.getRetryStreamId(3L, 1L, 2));
+        Assertions.assertEquals(1L, service.retryStreamOf(3L, 1L, 2).join().getStreamId());
     }
 
     @Test
@@ -128,7 +135,11 @@ class DefaultStoreMetadataServiceTest {
                 ArgumentMatchers.nullable(Long.class), ArgumentMatchers.eq(StreamRole.STREAM_ROLE_RETRY)))
             .thenReturn(future);
         DefaultStoreMetadataService service = new DefaultStoreMetadataService(metadataStore);
-        Assertions.assertEquals(-1L, service.getRetryStreamId(0L, 1L, 2));
+
+        CompletableFuture<StreamMetadata> streamCf = service.retryStreamOf(0L, 1L, 2);
+        // Assert exception thrown
+        ControllerException exception = (ControllerException) Assertions.assertThrows(ExecutionException.class, streamCf::get).getCause();
+        Assertions.assertEquals(Code.NOT_FOUND_VALUE, exception.getErrorCode());
     }
 
 }

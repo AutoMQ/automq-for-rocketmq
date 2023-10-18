@@ -28,53 +28,6 @@ import org.apache.commons.lang3.tuple.Pair;
 
 public class MockStoreMetadataService implements StoreMetadataService {
     @Override
-    public long getStreamId(long topicId, int queueId) {
-        ByteBuffer buffer = ByteBuffer.allocate(8);
-        // Mark the stream type as origin topic.
-        buffer.putShort(0, (short) 0);
-        buffer.putShort(2, (short) topicId);
-        buffer.putShort(4, (short) queueId);
-        return buffer.getLong(0);
-    }
-
-    @Override
-    public long getOperationLogStreamId(long topicId, int queueId) {
-        ByteBuffer buffer = ByteBuffer.allocate(8);
-        // Mark the stream type as operation log.
-        buffer.putShort(0, (short) 1);
-        buffer.putShort(2, (short) topicId);
-        buffer.putShort(4, (short) queueId);
-        return buffer.getLong(0);
-    }
-
-    @Override
-    public long getRetryStreamId(long consumerGroupId, long topicId, int queueId) {
-        ByteBuffer buffer = ByteBuffer.allocate(8);
-        // Mark the stream type as retry topic.
-        buffer.putShort(0, (short) 2);
-        buffer.putShort(2, (short) consumerGroupId);
-        buffer.putShort(4, (short) topicId);
-        buffer.putShort(6, (short) queueId);
-        return buffer.getLong(0);
-    }
-
-    @Override
-    public long getDeadLetterStreamId(long consumerGroupId, long topicId, int queueId) {
-        ByteBuffer buffer = ByteBuffer.allocate(8);
-        // Mark the stream type as dead letter topic.
-        buffer.putShort(0, (short) 3);
-        buffer.putShort(2, (short) consumerGroupId);
-        buffer.putShort(4, (short) topicId);
-        buffer.putShort(6, (short) queueId);
-        return buffer.getLong(0);
-    }
-
-    @Override
-    public int getMaxDeliveryAttempts(long consumerGroupId) {
-        return 1;
-    }
-
-    @Override
     public CompletableFuture<StreamMetadata> dataStreamOf(long topicId, int queueId) {
         ByteBuffer buffer = ByteBuffer.allocate(8);
         // Mark the stream type as origin topic.
@@ -120,11 +73,6 @@ public class MockStoreMetadataService implements StoreMetadataService {
     }
 
     @Override
-    public CompletableFuture<List<StreamMetadata>> listStreamsManagedBy(long topicId, int queueId) {
-        return null;
-    }
-
-    @Override
     public CompletableFuture<Integer> maxDeliveryAttemptsOf(long consumerGroupId) {
         return CompletableFuture.completedFuture(10);
     }
@@ -136,12 +84,12 @@ public class MockStoreMetadataService implements StoreMetadataService {
     }
 
     @Override
-    public CompletableFuture<StreamMetadata> openStream(long streamId, long streamEpoch, int nodeId) {
+    public CompletableFuture<StreamMetadata> openStream(long streamId, long streamEpoch) {
         return null;
     }
 
     @Override
-    public CompletableFuture<Void> closeStream(long streamId, long streamEpoch, int nodeId) {
+    public CompletableFuture<Void> closeStream(long streamId, long streamEpoch) {
         return null;
     }
 
@@ -187,10 +135,5 @@ public class MockStoreMetadataService implements StoreMetadataService {
     public CompletableFuture<Pair<List<S3StreamObject>, List<S3WALObject>>> listObjects(long streamId, long startOffset,
         long endOffset, int limit) {
         return null;
-    }
-
-    @Override
-    public int getNodeId() {
-        return 0;
     }
 }
