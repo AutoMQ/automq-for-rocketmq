@@ -17,18 +17,24 @@
 
 package com.automq.rocketmq.proxy.service;
 
-import com.automq.rocketmq.common.model.FlatMessageExt;
-import com.automq.rocketmq.proxy.mock.MockMessageUtil;
+import apache.rocketmq.v2.Code;
+import apache.rocketmq.v2.ReceiveMessageRequest;
 import com.automq.rocketmq.proxy.model.ProxyContextExt;
-import com.automq.rocketmq.store.model.message.TagFilter;
-import com.google.common.base.Supplier;
+import java.lang.reflect.Field;
 import java.util.Collections;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import org.apache.rocketmq.client.consumer.PopResult;
 import org.apache.rocketmq.client.consumer.PopStatus;
-import org.apache.rocketmq.remoting.protocol.header.PopMessageRequestHeader;
+import org.apache.rocketmq.common.filter.ExpressionType;
+import org.apache.rocketmq.proxy.common.ProxyContext;
+import org.apache.rocketmq.proxy.config.Configuration;
+import org.apache.rocketmq.proxy.config.ConfigurationManager;
+import org.apache.rocketmq.proxy.config.ProxyConfig;
+import org.apache.rocketmq.proxy.grpc.v2.consumer.ReceiveMessageResponseStreamWriter;
+import org.apache.rocketmq.remoting.protocol.heartbeat.SubscriptionData;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -41,42 +47,82 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SuspendPopRequestServiceTest {
     private SuspendPopRequestService suspendPopRequestService;
 
+    @BeforeAll
+    public static void setUpAll() throws Exception {
+        Field field = ConfigurationManager.class.getDeclaredField("configuration");
+        field.setAccessible(true);
+        Configuration configuration = new Configuration();
+        configuration.setProxyConfig(new ProxyConfig());
+        field.set(null, configuration);
+    }
+
     @BeforeEach
     public void setUp() {
-        suspendPopRequestService = new SuspendPopRequestService();
+        suspendPopRequestService = SuspendPopRequestService.getInstance();
+    }
+
+    static class MockWriter extends ReceiveMessageResponseStreamWriter {
+        private final CompletableFuture<PopResult> future = new CompletableFuture<>();
+
+        public MockWriter() {
+            super(null, null);
+        }
+
+        public CompletableFuture<PopResult> future() {
+            return future;
+        }
+
+        @Override
+        public void writeAndComplete(ProxyContext ctx, ReceiveMessageRequest request, PopResult popResult) {
+            future.complete(popResult);
+        }
+
+        @Override
+        public void writeAndComplete(ProxyContext ctx, Code code, String message) {
+            future.completeExceptionally(new IllegalStateException(message));
+        }
+
+        @Override
+        public void writeAndComplete(ProxyContext ctx, ReceiveMessageRequest request, Throwable throwable) {
+            future.completeExceptionally(throwable);
+        }
     }
 
     @Test
     void suspendAndNotify() {
-        PopMessageRequestHeader header = new PopMessageRequestHeader();
-        header.setBornTime(System.currentTimeMillis());
-        header.setTopic("topic");
-        Supplier<CompletableFuture<List<FlatMessageExt>>> supplier = () -> CompletableFuture.completedFuture(List.of(MockMessageUtil.buildMessage(0, 0, "tagA")));
+        SubscriptionData subscriptionData = new SubscriptionData();
+        subscriptionData.setTopic("topic");
+        subscriptionData.setExpressionType(ExpressionType.TAG);
+        subscriptionData.setSubString("tagA");
+
+        Supplier<CompletableFuture<PopResult>> supplier = () -> CompletableFuture.completedFuture(new PopResult(PopStatus.FOUND, Collections.emptyList()));
+        MockWriter writer = new MockWriter();
+        CompletableFuture<PopResult> future = writer.future();
 
         // Try to suspend request with zero polling time.
-        CompletableFuture<PopResult> future = suspendPopRequestService.suspendPopRequest(ProxyContextExt.create(), header, 0, 0,
-            new TagFilter("tagA"), supplier);
+        suspendPopRequestService.suspendPopRequest(ProxyContextExt.create(),
+            null, "topic", 0, subscriptionData, 0, supplier, writer);
         assertEquals(0, suspendPopRequestService.suspendRequestCount());
         assertTrue(future.isDone());
         PopResult popResult = future.getNow(null);
         assertNotNull(popResult);
-        assertEquals(PopStatus.NO_NEW_MSG, popResult.getPopStatus());
+        assertEquals(PopStatus.POLLING_NOT_FOUND, popResult.getPopStatus());
 
         // Try to suspend request with non-zero polling time.
-        header.setBornTime(System.currentTimeMillis());
-        header.setPollTime(100_000);
-        future = suspendPopRequestService.suspendPopRequest(ProxyContextExt.create(), header, 0, 0,
-            new TagFilter("tagA"), supplier);
+        writer = new MockWriter();
+        future = writer.future();
+        suspendPopRequestService.suspendPopRequest(ProxyContextExt.create(),
+            null, "topic", 0, subscriptionData, 100_000, supplier, writer);
         assertEquals(1, suspendPopRequestService.suspendRequestCount());
         assertFalse(future.isDone());
 
         // Notify message that do not need arrival.
-        suspendPopRequestService.notifyMessageArrival(0, 0, "tagB");
+        suspendPopRequestService.notifyMessageArrival("topic", 0, "tagB");
         assertEquals(1, suspendPopRequestService.suspendRequestCount());
         assertFalse(future.isDone());
 
         // Notify message arrival.
-        suspendPopRequestService.notifyMessageArrival(0, 0, "tagA");
+        suspendPopRequestService.notifyMessageArrival("topic", 0, "tagA");
 
         // Wait for pop request to be processed.
         CompletableFuture<PopResult> finalFuture = future;
@@ -86,23 +132,26 @@ class SuspendPopRequestServiceTest {
         popResult = future.getNow(null);
         assertNotNull(popResult);
         assertEquals(PopStatus.FOUND, popResult.getPopStatus());
-        assertEquals(1, popResult.getMsgFoundList().size());
     }
 
     @Test
     void cleanExpired() {
-        PopMessageRequestHeader header = new PopMessageRequestHeader();
-        header.setBornTime(System.currentTimeMillis());
-        header.setPollTime(100);
-        header.setTopic("topic");
+        SubscriptionData subscriptionData = new SubscriptionData();
+        subscriptionData.setTopic("topic");
+        subscriptionData.setExpressionType(ExpressionType.TAG);
+        subscriptionData.setSubString("tagA");
 
-        CompletableFuture<PopResult> future = suspendPopRequestService.suspendPopRequest(ProxyContextExt.create(), header, 0, 0,
-            new TagFilter("tagA"), () -> CompletableFuture.completedFuture(Collections.emptyList()));
+        Supplier<CompletableFuture<PopResult>> supplier = () -> CompletableFuture.completedFuture(new PopResult(PopStatus.NO_NEW_MSG, Collections.emptyList()));
+        MockWriter writer = new MockWriter();
+
+        suspendPopRequestService.suspendPopRequest(ProxyContextExt.create(),
+            null, "topic", 0, subscriptionData, 100, supplier, writer);
         assertEquals(1, suspendPopRequestService.suspendRequestCount());
+        CompletableFuture<PopResult> future = writer.future();
         assertFalse(future.isDone());
 
         // Notify message arrival but message supplier do not produce any messages.
-        suspendPopRequestService.notifyMessageArrival(0, 0, "tagA");
+        suspendPopRequestService.notifyMessageArrival("topic", 0, "tagA");
         assertEquals(1, suspendPopRequestService.suspendRequestCount());
         assertFalse(future.isDone());
 

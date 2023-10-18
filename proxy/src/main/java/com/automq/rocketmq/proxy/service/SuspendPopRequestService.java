@@ -17,34 +17,68 @@
 
 package com.automq.rocketmq.proxy.service;
 
-import com.automq.rocketmq.common.model.FlatMessageExt;
+import apache.rocketmq.v2.ReceiveMessageRequest;
 import com.automq.rocketmq.proxy.model.ProxyContextExt;
-import com.automq.rocketmq.proxy.util.FlatMessageUtil;
 import com.automq.rocketmq.store.model.message.Filter;
-import com.automq.rocketmq.store.model.message.TopicQueueId;
+import com.automq.rocketmq.store.model.message.SQLFilter;
+import com.automq.rocketmq.store.model.message.TagFilter;
 import java.util.Collections;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Supplier;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import javax.annotation.Nonnull;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.rocketmq.client.consumer.PopResult;
 import org.apache.rocketmq.client.consumer.PopStatus;
 import org.apache.rocketmq.common.ServiceThread;
+import org.apache.rocketmq.common.filter.ExpressionType;
+import org.apache.rocketmq.common.thread.ThreadPoolMonitor;
 import org.apache.rocketmq.proxy.common.ProxyContext;
-import org.apache.rocketmq.remoting.protocol.header.PopMessageRequestHeader;
+import org.apache.rocketmq.proxy.config.ConfigurationManager;
+import org.apache.rocketmq.proxy.config.ProxyConfig;
+import org.apache.rocketmq.proxy.grpc.v2.consumer.ReceiveMessageResponseStreamWriter;
+import org.apache.rocketmq.remoting.protocol.heartbeat.SubscriptionData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class SuspendPopRequestService extends ServiceThread {
     protected static final Logger LOGGER = LoggerFactory.getLogger(SuspendPopRequestService.class);
+    public volatile static SuspendPopRequestService INSTANCE;
 
-    private final ConcurrentMap<TopicQueueId, ConcurrentSkipListSet<SuspendRequestTask>> suspendPopRequestMap = new ConcurrentHashMap<>();
+    private final ConcurrentMap<Pair<String/*topic*/, Integer/*queueId*/>, ConcurrentSkipListSet<SuspendRequestTask>> suspendPopRequestMap = new ConcurrentHashMap<>();
     private final AtomicInteger suspendRequestCount = new AtomicInteger(0);
+    protected ThreadPoolExecutor suspendRequestThreadPoolExecutor;
+
+    private SuspendPopRequestService() {
+        ProxyConfig config = ConfigurationManager.getProxyConfig();
+        this.suspendRequestThreadPoolExecutor = ThreadPoolMonitor.createAndMonitor(
+            config.getGrpcConsumerThreadPoolNums(),
+            config.getGrpcConsumerThreadPoolNums(),
+            1,
+            TimeUnit.MINUTES,
+            "SuspendRequestThreadPool",
+            config.getGrpcConsumerThreadQueueCapacity()
+        );
+    }
+
+    public static SuspendPopRequestService getInstance() {
+        if (INSTANCE == null) {
+            synchronized (SuspendPopRequestService.class) {
+                if (INSTANCE == null) {
+                    INSTANCE = new SuspendPopRequestService();
+                }
+            }
+        }
+        return INSTANCE;
+    }
 
     @Override
     public String getServiceName() {
@@ -52,26 +86,25 @@ public class SuspendPopRequestService extends ServiceThread {
     }
 
     static class SuspendRequestTask implements Comparable<SuspendRequestTask> {
-        private final PopMessageRequestHeader requestHeader;
+        private final long bornTime;
+        private final long timeLimit;
         private final Filter filter;
-        private final Supplier<CompletableFuture<List<FlatMessageExt>>> messageSupplier;
-        private final CompletableFuture<PopResult> future;
+        private final Function<Long, CompletableFuture<PopResult>> supplier;
+        private final Consumer<PopResult> writer;
         private final AtomicBoolean inflight = new AtomicBoolean(false);
+        private final AtomicBoolean completed = new AtomicBoolean(false);
 
-        public SuspendRequestTask(PopMessageRequestHeader requestHeader, Filter filter,
-            Supplier<CompletableFuture<List<FlatMessageExt>>> messageSupplier) {
-            this.requestHeader = requestHeader;
+        public SuspendRequestTask(long timeLimit, Filter filter,
+            Function<Long, CompletableFuture<PopResult>> supplier, Consumer<PopResult> writer) {
+            this.bornTime = System.currentTimeMillis();
+            this.timeLimit = timeLimit;
             this.filter = filter;
-            this.messageSupplier = messageSupplier;
-            this.future = new CompletableFuture<>();
+            this.supplier = supplier;
+            this.writer = writer;
         }
 
-        public long bornTime() {
-            return requestHeader.getBornTime();
-        }
-
-        public CompletableFuture<PopResult> future() {
-            return future;
+        public long timeRemaining() {
+            return bornTime + timeLimit - System.currentTimeMillis();
         }
 
         public boolean doFilter(String tag) {
@@ -79,19 +112,37 @@ public class SuspendPopRequestService extends ServiceThread {
         }
 
         public boolean isExpired() {
-            return requestHeader.getBornTime() + requestHeader.getPollTime() < System.currentTimeMillis();
+            return System.currentTimeMillis() - bornTime > timeLimit;
+        }
+
+        public boolean completeTimeout() {
+            if (inflight.compareAndSet(false, true)) {
+                completed.set(true);
+                writer.accept(new PopResult(PopStatus.POLLING_NOT_FOUND, Collections.emptyList()));
+                inflight.set(false);
+                return true;
+            }
+            return false;
         }
 
         public CompletableFuture<Boolean> tryFetchMessages() {
-            if (future.isDone()) {
+            if (completed.get()) {
                 return CompletableFuture.completedFuture(true);
             }
 
             if (inflight.compareAndSet(false, true)) {
-                return messageSupplier.get()
-                    .thenApply(messageList -> {
-                        if (!messageList.isEmpty()) {
-                            future.complete(new PopResult(PopStatus.FOUND, FlatMessageUtil.convertTo(messageList, requestHeader.getTopic(), requestHeader.getInvisibleTime())));
+                if (isExpired()) {
+                    writer.accept(new PopResult(PopStatus.POLLING_NOT_FOUND, Collections.emptyList()));
+                    completed.set(true);
+                    inflight.set(false);
+                    return CompletableFuture.completedFuture(true);
+                }
+
+                return supplier.apply(timeRemaining())
+                    .thenApply(popResult -> {
+                        if (popResult.getPopStatus() == PopStatus.FOUND) {
+                            writer.accept(popResult);
+                            completed.set(true);
                             return true;
                         }
                         inflight.set(false);
@@ -103,52 +154,63 @@ public class SuspendPopRequestService extends ServiceThread {
 
         @Override
         public int compareTo(@Nonnull SuspendPopRequestService.SuspendRequestTask o) {
-            return Long.compare(bornTime(), o.bornTime());
+            return Long.compare(timeRemaining(), o.timeRemaining());
         }
     }
 
-    public void notifyMessageArrival(long topicId, int queueId, String tag) {
-        ConcurrentSkipListSet<SuspendRequestTask> taskList = suspendPopRequestMap.get(new TopicQueueId(topicId, queueId));
+    public void notifyMessageArrival(String topic, int queueId, String tag) {
+        ConcurrentSkipListSet<SuspendRequestTask> taskList = suspendPopRequestMap.get(Pair.of(topic, queueId));
         if (taskList == null) {
             return;
         }
 
         for (SuspendRequestTask task : taskList) {
             if (task.doFilter(tag)) {
-                task.tryFetchMessages()
-                    .thenAccept(result -> {
-                        if (result) {
-                            taskList.remove(task);
-                            suspendRequestCount.decrementAndGet();
-                        }
-                    });
+                suspendRequestThreadPoolExecutor.execute(
+                    () -> task.tryFetchMessages()
+                        .thenAccept(result -> {
+                            if (result) {
+                                taskList.remove(task);
+                                suspendRequestCount.decrementAndGet();
+                            }
+                        }));
             }
         }
     }
 
-    public CompletableFuture<PopResult> suspendPopRequest(ProxyContext context, PopMessageRequestHeader requestHeader,
-        long topicId, int queueId, Filter filter, Supplier<CompletableFuture<List<FlatMessageExt>>> messageSupplier) {
+    public void suspendPopRequest(ProxyContext context, ReceiveMessageRequest request, String topic, int queueId,
+        SubscriptionData subscriptionData, long timeRemaining, Function<Long, CompletableFuture<PopResult>> supplier,
+        ReceiveMessageResponseStreamWriter writer) {
         ((ProxyContextExt) context).setSuspended(true);
 
         // Check if the request is already expired.
-        if (requestHeader.getPollTime() <= 0) {
-            return CompletableFuture.completedFuture(new PopResult(PopStatus.NO_NEW_MSG, Collections.emptyList()));
-        }
-
-        if (requestHeader.getBornTime() + requestHeader.getPollTime() <= System.currentTimeMillis()) {
-            return CompletableFuture.completedFuture(new PopResult(PopStatus.NO_NEW_MSG, Collections.emptyList()));
+        if (timeRemaining <= 0) {
+            writer.writeAndComplete(context, request, new PopResult(PopStatus.POLLING_NOT_FOUND, Collections.emptyList()));
+            return;
         }
 
         // TODO: make max size configurable.
         if (suspendRequestCount.get() > 1000) {
-            return CompletableFuture.completedFuture(new PopResult(PopStatus.POLLING_FULL, Collections.emptyList()));
+            writer.writeAndComplete(context, request, new PopResult(PopStatus.POLLING_NOT_FOUND, Collections.emptyList()));
+            return;
         }
 
-        SuspendRequestTask task = new SuspendRequestTask(requestHeader, filter, messageSupplier);
-        ConcurrentSkipListSet<SuspendRequestTask> taskList = suspendPopRequestMap.computeIfAbsent(new TopicQueueId(topicId, queueId), k -> new ConcurrentSkipListSet<>());
+        Filter filter;
+        if (StringUtils.isNotBlank(subscriptionData.getExpressionType())) {
+            filter = switch (subscriptionData.getExpressionType()) {
+                case ExpressionType.TAG ->
+                    subscriptionData.getSubString().contains(TagFilter.SUB_ALL) ? Filter.DEFAULT_FILTER : new TagFilter(subscriptionData.getSubString());
+                case ExpressionType.SQL92 -> new SQLFilter(subscriptionData.getSubString());
+                default -> Filter.DEFAULT_FILTER;
+            };
+        } else {
+            filter = Filter.DEFAULT_FILTER;
+        }
+
+        SuspendRequestTask task = new SuspendRequestTask(timeRemaining, filter, supplier, popResult -> writer.writeAndComplete(context, request, popResult));
+        ConcurrentSkipListSet<SuspendRequestTask> taskList = suspendPopRequestMap.computeIfAbsent(Pair.of(topic, queueId), k -> new ConcurrentSkipListSet<>());
         taskList.add(task);
         suspendRequestCount.incrementAndGet();
-        return task.future();
     }
 
     public int suspendRequestCount() {
@@ -159,8 +221,7 @@ public class SuspendPopRequestService extends ServiceThread {
         suspendPopRequestMap.forEach((topicQueueId, taskList) -> {
             for (SuspendRequestTask task : taskList) {
                 // Complete the request if it is expired.
-                if (task.isExpired()) {
-                    task.future().complete(new PopResult(PopStatus.NO_NEW_MSG, Collections.emptyList()));
+                if (task.isExpired() && task.completeTimeout()) {
                     taskList.remove(task);
                     suspendRequestCount.decrementAndGet();
                 }

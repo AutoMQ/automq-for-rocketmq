@@ -98,7 +98,7 @@ public class MessageServiceImpl implements MessageService {
         this.store = store;
         this.metadataService = metadataService;
         this.lockService = lockService;
-        this.suspendPopRequestService = new SuspendPopRequestService();
+        this.suspendPopRequestService = SuspendPopRequestService.getInstance();
     }
 
     public TopicMessageType getMessageType(SendMessageRequestHeader requestHeader) {
@@ -142,7 +142,7 @@ public class MessageServiceImpl implements MessageService {
 
         return putFuture.thenApply(putResult -> {
             // Wakeup the suspended pop request if there is any message arrival.
-            suspendPopRequestService.notifyMessageArrival(virtualQueue.topicId(), virtualQueue.physicalQueueId(), message.getTags());
+            suspendPopRequestService.notifyMessageArrival(requestHeader.getTopic(), virtualQueue.physicalQueueId(), message.getTags());
 
             ProxyMetricsManager.recordIncomingMessages(requestHeader.getTopic(), getMessageType(requestHeader), 1, message.getBody().length);
 
@@ -263,13 +263,11 @@ public class MessageServiceImpl implements MessageService {
         }).thenCompose(nil -> popSpecifiedQueue(consumerGroupReference.get(), clientId, topicReference.get(), virtualQueue.physicalQueueId(), filter,
             requestHeader.getMaxMsgNums(), requestHeader.isOrder(), requestHeader.getInvisibleTime(), timeoutMillis));
 
-        return popMessageFuture.thenCompose(messageList -> {
+        return popMessageFuture.thenApply(messageList -> {
             if (messageList.isEmpty()) {
-                return suspendPopRequestService.suspendPopRequest(ctx, requestHeader, topicReference.get().getTopicId(), virtualQueue.physicalQueueId(), filter,
-                    () -> popSpecifiedQueue(consumerGroupReference.get(), clientId, topicReference.get(), virtualQueue.physicalQueueId(), filter,
-                        requestHeader.getMaxMsgNums(), requestHeader.isOrder(), requestHeader.getInvisibleTime(), timeoutMillis));
+                return new PopResult(PopStatus.NO_NEW_MSG, Collections.emptyList());
             }
-            return CompletableFuture.completedFuture(new PopResult(PopStatus.FOUND, FlatMessageUtil.convertTo(messageList, requestHeader.getTopic(), requestHeader.getInvisibleTime())));
+            return new PopResult(PopStatus.FOUND, FlatMessageUtil.convertTo(messageList, requestHeader.getTopic(), requestHeader.getInvisibleTime()));
         });
     }
 
