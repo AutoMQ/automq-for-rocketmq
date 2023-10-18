@@ -114,7 +114,8 @@ public class CompactionManager {
                         .exceptionally(ex -> {
                             logger.error("Compaction failed, cost {} ms, ", System.currentTimeMillis() - start, ex);
                             return null;
-                        });
+                        })
+                        .join();
             } catch (Exception ex) {
                 logger.error("Error while compacting objects ", ex);
             }
@@ -234,6 +235,13 @@ public class CompactionManager {
         return cf;
     }
 
+    /**
+     * Split specified WAL objects into stream objects.
+     *
+     * @param objectMetadataList WAL objects to split
+     * @param excludedObjects objects that are excluded from split
+     * @return List of CompletableFuture of StreamObject
+     */
     Collection<CompletableFuture<StreamObject>> splitWALObjects(List<S3ObjectMetadata> objectMetadataList, Set<Long> excludedObjects) {
         if (objectMetadataList.isEmpty()) {
             return new ArrayList<>();
@@ -245,14 +253,17 @@ public class CompactionManager {
         Set<Long> includedObjects = new HashSet<>();
         List<Pair<Long, List<List<StreamDataBlock>>>> sortedObjectGroupedStreamDataBlockList = new ArrayList<>();
         for (Map.Entry<Long, List<StreamDataBlock>> entry : streamDataBlocksMap.entrySet()) {
+            // group continuous stream data blocks, each group will be written to a stream object
             List<List<StreamDataBlock>> groupedStreamDataBlocks = CompactionUtils.groupStreamDataBlocks(entry.getValue());
             sortedObjectGroupedStreamDataBlockList.add(new ImmutablePair<>(entry.getKey(), groupedStreamDataBlocks));
         }
+        // sort WAL object by number of stream objects to be generated, object with less stream objects will be split first
         sortedObjectGroupedStreamDataBlockList.sort(Comparator.comparingInt(e -> e.getRight().size()));
         for (Pair<Long, List<List<StreamDataBlock>>> pair : sortedObjectGroupedStreamDataBlockList) {
             long objectId = pair.getLeft();
             List<List<StreamDataBlock>> groupedStreamDataBlocks = pair.getRight();
             if (totalStreamObjectNum + groupedStreamDataBlocks.size() > maxStreamObjectNum) {
+                // exceed max stream object number, stop split
                 break;
             }
             for (List<StreamDataBlock> streamDataBlocks : groupedStreamDataBlocks) {
@@ -261,13 +272,15 @@ public class CompactionManager {
             includedObjects.add(objectId);
             totalStreamObjectNum += groupedStreamDataBlocks.size();
         }
+        // add objects that are excluded from split
         excludedObjects.addAll(streamDataBlocksMap.keySet().stream().filter(e -> !includedObjects.contains(e)).collect(Collectors.toSet()));
         logger.info("Force split {} WAL objects, expect to generate {} stream objects, max stream objects {}, objects excluded: {}",
                 objectMetadataList.size(), groupedDataBlocks.size(), maxStreamObjectNum, excludedObjects);
         if (groupedDataBlocks.isEmpty()) {
             return new ArrayList<>();
         }
-        objectManager.prepareObject(groupedDataBlocks.size(), TimeUnit.MINUTES.toMillis(30))
+        // prepare N stream objects at one time
+        objectManager.prepareObject(groupedDataBlocks.size(), TimeUnit.MINUTES.toMillis(60))
                 .thenAcceptAsync(objectId -> {
                     for (Pair<List<StreamDataBlock>, CompletableFuture<StreamObject>> pair : groupedDataBlocks) {
                         List<StreamDataBlock> streamDataBlocks = pair.getKey();
@@ -313,11 +326,14 @@ public class CompactionManager {
 
         List<CompactionPlan> compactionPlans = new ArrayList<>();
         if (excludedObjectIds.isEmpty()) {
+            // compact WAL objects only when compaction limitations are not violated after force split
             try {
                 logger.info("{} WAL objects as compact candidates, total compaction size: {}",
                         objectsToCompact.size(), objectsToCompact.stream().mapToLong(S3ObjectMetadata::objectSize).sum());
                 Map<Long, List<StreamDataBlock>> streamDataBlockMap = CompactionUtils.blockWaitObjectIndices(objectsToCompact, s3Operator);
+                long now = System.currentTimeMillis();
                 compactionPlans = this.compactionAnalyzer.analyze(streamDataBlockMap, excludedObjectIds);
+                logger.info("Analyze compaction plans complete, cost {}ms", System.currentTimeMillis() - now);
                 logCompactionPlans(compactionPlans, excludedObjectIds);
                 objectsToCompact = objectsToCompact.stream().filter(e -> !excludedObjectIds.contains(e.objectId())).collect(Collectors.toList());
                 compactWALObjects(request, compactionPlans, objectsToCompact);

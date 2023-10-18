@@ -76,6 +76,14 @@ public class CompactionAnalyzer {
         return Collections.emptyList();
     }
 
+    /**
+     * Group stream data blocks into different compaction type ({@link CompactionType#COMPACT} & {@link CompactionType#SPLIT})
+     * with compaction limitation ({@code maxStreamObjectNum} and {@code maxStreamNumInWAL}).
+     *
+     * @param streamDataBlockMap stream data blocks map, key: object id, value: stream data blocks
+     * @param excludedObjectIds objects that are excluded from compaction because of compaction limitation
+     * @return list of {@link CompactedObjectBuilder}
+     */
     List<CompactedObjectBuilder> groupObjectWithLimits(Map<Long, List<StreamDataBlock>> streamDataBlockMap, Set<Long> excludedObjectIds) {
         List<StreamDataBlock> sortedStreamDataBlocks = sortStreamRangePositions(streamDataBlockMap);
         List<CompactedObjectBuilder> compactedObjectBuilders = new ArrayList<>();
@@ -118,22 +126,38 @@ public class CompactionAnalyzer {
         return compactedObjectBuilders;
     }
 
+    /**
+     * Find objects to exclude from compaction.
+     *
+     * @param compactionType {@link CompactionType#COMPACT} means to exclude objects to reduce stream number in WAL;
+     *                       {@link CompactionType#SPLIT} means to exclude objects to reduce stream object number
+     * @param compactedObjectBuilders all compacted object builders
+     * @param stats compaction stats
+     * @param objectsToRemove objects to remove
+     */
     private void addObjectsToRemove(CompactionType compactionType, List<CompactedObjectBuilder> compactedObjectBuilders,
                                     CompactionStats stats, Set<Long> objectsToRemove) {
         List<CompactedObjectBuilder> sortedCompactedObjectIndexList = new ArrayList<>();
         for (CompactedObjectBuilder compactedObjectBuilder : compactedObjectBuilders) {
+            // find all compacted objects of the same type
             if (compactedObjectBuilder.type() == compactionType) {
                 sortedCompactedObjectIndexList.add(compactedObjectBuilder);
             }
         }
         if (compactionType == CompactionType.SPLIT) {
+            // try to find out one stream object to remove
             sortedCompactedObjectIndexList.sort(new StreamObjectComparator(stats.getS3ObjectToCompactedObjectNumMap()));
+            // remove compacted object with the highest priority
             CompactedObjectBuilder compactedObjectToRemove = sortedCompactedObjectIndexList.get(0);
+            // add all objects in the compacted object
             objectsToRemove.addAll(compactedObjectToRemove.streamDataBlocks().stream()
                     .map(StreamDataBlock::getObjectId)
                     .collect(Collectors.toSet()));
         } else {
+            // try to find out one stream to remove
+            // key: stream id, value: id of all objects that contains the stream
             Map<Long, Set<Long>> streamObjectIdsMap = new HashMap<>();
+            // key: object id, value: id of all streams from the object, used to describe the dispersion of streams in the object
             Map<Long, Set<Long>> objectStreamIdsMap = new HashMap<>();
             for (CompactedObjectBuilder compactedObjectBuilder : sortedCompactedObjectIndexList) {
                 for (StreamDataBlock streamDataBlock : compactedObjectBuilder.streamDataBlocks()) {
@@ -154,10 +178,17 @@ public class CompactionAnalyzer {
                 sortedStreamObjectStatsList.add(new ImmutablePair<>(streamId, objectStreamNum));
             }
             sortedStreamObjectStatsList.sort(Comparator.comparingInt(Pair::getRight));
+            // remove stream with minimum object dispersion
             objectsToRemove.addAll(streamObjectIdsMap.get(sortedStreamObjectStatsList.get(0).getKey()));
         }
     }
 
+    /**
+     * Generate compaction plan with cache size limit.
+     *
+     * @param compactedObjectBuilders compacted object builders
+     * @return list of {@link CompactionPlan} with each plan's memory consumption is less than {@code compactionCacheSize}
+     */
     List<CompactionPlan> generatePlanWithCacheLimit(List<CompactedObjectBuilder> compactedObjectBuilders) {
         List<CompactionPlan> compactionPlans = new ArrayList<>();
         List<CompactedObject> compactedObjects = new ArrayList<>();
@@ -237,6 +268,12 @@ public class CompactionAnalyzer {
         return new CompactionPlan(new ArrayList<>(compactedObjects), streamDataBlockMap);
     }
 
+    /**
+     * Iterate through stream data blocks and group them into different {@link CompactionType}.
+     *
+     * @param streamDataBlocks stream data blocks
+     * @return list of {@link CompactedObjectBuilder}
+     */
     private List<CompactedObjectBuilder> compactObjects(List<StreamDataBlock> streamDataBlocks) {
         List<CompactedObjectBuilder> compactedObjectBuilders = new ArrayList<>();
         CompactedObjectBuilder builder = new CompactedObjectBuilder();
@@ -270,7 +307,14 @@ public class CompactionAnalyzer {
         return compactedObjectBuilders;
     }
 
+    /**
+     * Filter out objects that have at least one stream data block which can be compacted with other objects.
+     *
+     * @param streamDataBlocksMap stream data blocks map, key: object id, value: stream data blocks
+     * @return filtered stream data blocks map
+     */
     Map<Long, List<StreamDataBlock>> filterBlocksToCompact(Map<Long, List<StreamDataBlock>> streamDataBlocksMap) {
+        // group stream data blocks by stream id, key: stream id, value: ids of objects that contains this stream
         Map<Long, Set<Long>> streamToObjectIds = streamDataBlocksMap.values().stream()
                 .flatMap(Collection::stream)
                 .collect(Collectors.groupingBy(StreamDataBlock::getStreamId, Collectors.mapping(StreamDataBlock::getObjectId, Collectors.toSet())));
@@ -306,6 +350,12 @@ public class CompactionAnalyzer {
         return builder;
     }
 
+    /**
+     * Sort stream data blocks by stream id and {@code startOffset).
+     *
+     * @param streamDataBlocksMap stream data blocks map, key: object id, value: stream data blocks
+     * @return sorted stream data blocks
+     */
     List<StreamDataBlock> sortStreamRangePositions(Map<Long, List<StreamDataBlock>> streamDataBlocksMap) {
         //TODO: use merge sort
         Map<Long, List<StreamDataBlock>> sortedStreamObjectMap = new TreeMap<>();
