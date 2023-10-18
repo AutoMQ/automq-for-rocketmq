@@ -1729,7 +1729,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         }
 
         try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            ConsumerGroup got = metadataStore.describeConsumerGroup(groupId, null).get();
+            ConsumerGroup got = metadataStore.describeGroup(groupId, null).get();
             Assertions.assertEquals(5, got.getMaxDeliveryAttempt());
             Assertions.assertEquals(GroupType.GROUP_TYPE_STANDARD, got.getGroupType());
             Assertions.assertEquals(1L, got.getDeadLetterTopicId());

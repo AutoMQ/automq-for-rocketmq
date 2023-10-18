@@ -29,6 +29,7 @@ import apache.rocketmq.controller.v1.MessageType;
 import com.automq.rocketmq.common.api.DataStore;
 import com.automq.rocketmq.common.config.ControllerConfig;
 import com.automq.rocketmq.controller.exception.ControllerException;
+import com.automq.rocketmq.controller.metadata.database.dao.Group;
 import com.automq.rocketmq.controller.metadata.database.dao.Lease;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
@@ -153,7 +154,7 @@ public interface MetadataStore extends Closeable {
      */
     CompletableFuture<Void> onQueueClosed(long topicId, int queueId);
 
-    CompletableFuture<ConsumerGroup> describeConsumerGroup(Long groupId, String groupName);
+    CompletableFuture<ConsumerGroup> describeGroup(Long groupId, String groupName);
 
     CompletableFuture<Void> trimStream(long streamId, long streamEpoch, long newStartOffset) throws ControllerException;
 
@@ -189,6 +190,8 @@ public interface MetadataStore extends Closeable {
     void applyTopicChange(List<com.automq.rocketmq.controller.metadata.database.dao.Topic> topics);
 
     void applyAssignmentChange(List<QueueAssignment> assignments);
+
+    void applyGroupChange(List<Group> groups);
 
     ConcurrentMap<Integer, BrokerNode> allNodes();
 

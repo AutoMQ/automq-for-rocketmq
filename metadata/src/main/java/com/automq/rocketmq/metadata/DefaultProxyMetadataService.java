@@ -69,7 +69,7 @@ public class DefaultProxyMetadataService implements ProxyMetadataService {
 
     @Override
     public CompletableFuture<ConsumerGroup> consumerGroupOf(String groupName) {
-        return metadataStore.describeConsumerGroup(null, groupName);
+        return metadataStore.describeGroup(null, groupName);
     }
 
     @Override
