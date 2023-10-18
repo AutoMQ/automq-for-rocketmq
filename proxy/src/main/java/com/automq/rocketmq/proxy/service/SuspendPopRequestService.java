@@ -51,7 +51,7 @@ import org.slf4j.LoggerFactory;
 
 public class SuspendPopRequestService extends ServiceThread {
     protected static final Logger LOGGER = LoggerFactory.getLogger(SuspendPopRequestService.class);
-    public volatile static SuspendPopRequestService INSTANCE;
+    private volatile static SuspendPopRequestService instance;
 
     private final ConcurrentMap<Pair<String/*topic*/, Integer/*queueId*/>, ConcurrentSkipListSet<SuspendRequestTask>> suspendPopRequestMap = new ConcurrentHashMap<>();
     private final AtomicInteger suspendRequestCount = new AtomicInteger(0);
@@ -70,14 +70,14 @@ public class SuspendPopRequestService extends ServiceThread {
     }
 
     public static SuspendPopRequestService getInstance() {
-        if (INSTANCE == null) {
+        if (instance == null) {
             synchronized (SuspendPopRequestService.class) {
-                if (INSTANCE == null) {
-                    INSTANCE = new SuspendPopRequestService();
+                if (instance == null) {
+                    instance = new SuspendPopRequestService();
                 }
             }
         }
-        return INSTANCE;
+        return instance;
     }
 
     @Override
