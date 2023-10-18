@@ -17,7 +17,7 @@
 
 package com.automq.stream.s3.operator;
 
-import com.automq.stream.s3.ByteBufAlloc;
+import com.automq.stream.s3.DirectByteBufAlloc;
 import com.automq.stream.s3.compact.AsyncTokenBucketThrottle;
 import com.automq.stream.s3.metrics.TimerUtil;
 import com.automq.stream.s3.metrics.operations.S3ObjectStage;
@@ -26,7 +26,6 @@ import com.automq.stream.s3.metrics.stats.OperationMetricsStats;
 import com.automq.stream.s3.metrics.stats.S3ObjectMetricsStats;
 import com.automq.stream.utils.ThreadUtils;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 import org.apache.commons.lang3.StringUtils;
@@ -191,10 +190,9 @@ public class DefaultS3Operator implements S3Operator {
     }
 
     CompletableFuture<ByteBuf> mergedRangeRead(String path, long start, long end) {
-        ByteBufAllocator alloc = ByteBufAlloc.ALLOC;
         end = end - 1;
         CompletableFuture<ByteBuf> cf = new CompletableFuture<>();
-        ByteBuf buf = alloc.directBuffer((int) (end - start));
+        ByteBuf buf = DirectByteBufAlloc.byteBuffer((int) (end - start));
         mergedRangeRead0(path, start, end, buf, cf);
         return cf;
     }
@@ -568,7 +566,7 @@ public class DefaultS3Operator implements S3Operator {
 
         class ObjectPart {
             private final int partNumber = nextPartNumber.getAndIncrement();
-            private final CompositeByteBuf partBuf = ByteBufAlloc.ALLOC.compositeBuffer();
+            private final CompositeByteBuf partBuf = DirectByteBufAlloc.compositeByteBuffer();
             private CompletableFuture<Void> lastRangeReadCf = CompletableFuture.completedFuture(null);
             private final CompletableFuture<CompletedPart> partCf = new CompletableFuture<>();
             private long size;
