@@ -361,7 +361,8 @@ message CreateGroupReply {
 
 message DescribeGroupRequest {
   ControllerRequestContext context = 1;
-  string name = 2;
+  int64 id = 2;
+  string name = 3;
 }
 
 message DescribeGroupReply {
@@ -371,7 +372,7 @@ message DescribeGroupReply {
 
 message DeleteGroupRequest {
   ControllerRequestContext context = 1;
-  string name = 2;
+  int64 id = 2;
 }
 
 message DeleteGroupReply {

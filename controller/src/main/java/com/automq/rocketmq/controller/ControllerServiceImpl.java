@@ -31,8 +31,12 @@ import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.CreateTopicReply;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
+import apache.rocketmq.controller.v1.DeleteGroupReply;
+import apache.rocketmq.controller.v1.DeleteGroupRequest;
 import apache.rocketmq.controller.v1.DeleteTopicReply;
 import apache.rocketmq.controller.v1.DeleteTopicRequest;
+import apache.rocketmq.controller.v1.DescribeGroupReply;
+import apache.rocketmq.controller.v1.DescribeGroupRequest;
 import apache.rocketmq.controller.v1.DescribeTopicReply;
 import apache.rocketmq.controller.v1.DescribeTopicRequest;
 import apache.rocketmq.controller.v1.HeartbeatReply;
@@ -430,6 +434,63 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
                     responseObserver.onCompleted();
                 }
             });
+    }
+
+    @Override
+    public void describeGroup(DescribeGroupRequest request, StreamObserver<DescribeGroupReply> responseObserver) {
+        Long groupId = null;
+        if (request.getId() > 0) {
+            groupId = request.getId();
+        }
+        metadataStore.describeGroup(groupId, request.getName()).whenComplete(((group, e) -> {
+            if (null != e) {
+                if (e.getCause() instanceof ControllerException ex) {
+                    DescribeGroupReply reply = DescribeGroupReply.newBuilder()
+                        .setStatus(Status.newBuilder()
+                            .setCode(Code.forNumber(ex.getErrorCode()))
+                            .setMessage(ex.getMessage()).build())
+                        .build();
+                    responseObserver.onNext(reply);
+                    responseObserver.onCompleted();
+                    return;
+                }
+
+                responseObserver.onError(e);
+                return;
+            }
+
+            DescribeGroupReply reply = DescribeGroupReply.newBuilder()
+                .setGroup(group)
+                .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                .build();
+            responseObserver.onNext(reply);
+            responseObserver.onCompleted();
+        }));
+    }
+
+    @Override
+    public void deleteGroup(DeleteGroupRequest request, StreamObserver<DeleteGroupReply> responseObserver) {
+        metadataStore.deleteGroup(request.getId()).whenComplete((res, e) -> {
+            if (null != e) {
+                if (e.getCause() instanceof ControllerException ex) {
+                    DeleteGroupReply reply = DeleteGroupReply.newBuilder()
+                        .setStatus(Status.newBuilder()
+                            .setCode(Code.forNumber(ex.getErrorCode()))
+                            .setMessage(ex.getMessage())
+                            .build())
+                        .build();
+                    responseObserver.onNext(reply);
+                    responseObserver.onCompleted();
+                    return;
+                }
+                responseObserver.onError(e);
+                return;
+            }
+
+            responseObserver.onNext(DeleteGroupReply.newBuilder()
+                .setStatus(Status.newBuilder().setCode(Code.OK).build()).build());
+            responseObserver.onCompleted();
+        });
     }
 
     @Override

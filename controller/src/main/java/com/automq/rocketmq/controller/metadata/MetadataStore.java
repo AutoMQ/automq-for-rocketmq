@@ -52,7 +52,7 @@ public interface MetadataStore extends Closeable {
     /**
      * Open a JDBC connection with auto-commit disabled.
      * </p>
-     *
+     * <p>
      * Remember to commit session manually if updates are involved.
      *
      * @return SqlSession instance
@@ -91,8 +91,8 @@ public interface MetadataStore extends Closeable {
      * If the node is a leader, it should keep the sending node alive once it receives heartbeat requests
      * from it.
      *
-     * @param nodeId Heartbeat sender node-id
-     * @param epoch Epoch of the node
+     * @param nodeId    Heartbeat sender node-id
+     * @param epoch     Epoch of the node
      * @param goingAway Flag if the node is going away shortly
      */
     void keepAlive(int nodeId, long epoch, boolean goingAway);
@@ -147,6 +147,16 @@ public interface MetadataStore extends Closeable {
 
     CompletableFuture<Long> createGroup(String groupName, int maxRetry, GroupType type, long dlq);
 
+    CompletableFuture<ConsumerGroup> describeGroup(Long groupId, String groupName);
+
+    /**
+     * Delete group with the given group id logically.
+     *
+     * @param groupId Given group ID
+     * @return Deleted consumer group
+     */
+    CompletableFuture<ConsumerGroup> deleteGroup(long groupId);
+
     CompletableFuture<StreamMetadata> getStream(long topicId, int queueId, Long groupId, StreamRole streamRole);
 
     /**
@@ -156,8 +166,6 @@ public interface MetadataStore extends Closeable {
      * @param queueId Queue ID
      */
     CompletableFuture<Void> onQueueClosed(long topicId, int queueId);
-
-    CompletableFuture<ConsumerGroup> describeGroup(Long groupId, String groupName);
 
     CompletableFuture<Void> trimStream(long streamId, long streamEpoch, long newStartOffset) throws ControllerException;
 
@@ -186,7 +194,8 @@ public interface MetadataStore extends Closeable {
 
     String addressOfNode(int nodeId);
 
-    CompletableFuture<Pair<List<S3StreamObject>, List<S3WALObject>>> listObjects(long streamId, long startOffset, long endOffset, int limit);
+    CompletableFuture<Pair<List<S3StreamObject>, List<S3WALObject>>> listObjects(long streamId, long startOffset,
+        long endOffset, int limit);
 
     boolean maintainLeadershipWithSharedLock(SqlSession session);
 

@@ -384,6 +384,11 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
+    public CompletableFuture<ConsumerGroup> deleteGroup(long groupId) {
+        return groupManager.deleteGroup(groupId);
+    }
+
+    @Override
     public ConcurrentMap<Integer, BrokerNode> allNodes() {
         return nodes;
     }

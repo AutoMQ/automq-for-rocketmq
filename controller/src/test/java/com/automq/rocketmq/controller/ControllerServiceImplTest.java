@@ -25,12 +25,14 @@ import apache.rocketmq.controller.v1.CommitStreamObjectReply;
 import apache.rocketmq.controller.v1.CommitStreamObjectRequest;
 import apache.rocketmq.controller.v1.CommitWALObjectReply;
 import apache.rocketmq.controller.v1.CommitWALObjectRequest;
+import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.ControllerServiceGrpc;
 import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.DeleteTopicReply;
 import apache.rocketmq.controller.v1.DeleteTopicRequest;
+import apache.rocketmq.controller.v1.GroupStatus;
 import apache.rocketmq.controller.v1.GroupType;
 import apache.rocketmq.controller.v1.HeartbeatReply;
 import apache.rocketmq.controller.v1.HeartbeatRequest;
@@ -59,6 +61,7 @@ import com.automq.rocketmq.controller.metadata.DatabaseTestBase;
 import com.automq.rocketmq.controller.metadata.GrpcControllerClient;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.DefaultMetadataStore;
+import com.automq.rocketmq.controller.metadata.database.dao.Group;
 import com.automq.rocketmq.controller.metadata.database.dao.GroupProgress;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
@@ -68,6 +71,7 @@ import com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject;
 import com.automq.rocketmq.controller.metadata.database.dao.S3WalObject;
 import com.automq.rocketmq.controller.metadata.database.dao.Stream;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
+import com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.GroupProgressMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper;
@@ -367,7 +371,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testCreateGroup() throws IOException, ControllerException, ExecutionException, InterruptedException {
+    public void testCreateGroup() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
 
         try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), config)) {
@@ -398,6 +402,91 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 // Test duplication
                 client.createGroup(target, request).whenComplete(
                     (res, e) -> Assertions.assertEquals(ExecutionException.class, e.getClass()));
+            }
+        }
+    }
+
+    @Test
+    public void testDescribeGroup() throws IOException, ExecutionException, InterruptedException {
+        ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
+
+        long groupId;
+
+        try (SqlSession session = getSessionFactory().openSession()) {
+            GroupMapper mapper = session.getMapper(GroupMapper.class);
+            Group group = new Group();
+            group.setStatus(GroupStatus.GROUP_STATUS_ACTIVE);
+            group.setName("G1");
+            group.setMaxDeliveryAttempt(1);
+            group.setGroupType(GroupType.GROUP_TYPE_FIFO);
+            group.setDeadLetterTopicId(2L);
+            mapper.create(group);
+            groupId = group.getId();
+            session.commit();
+        }
+
+        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), config)) {
+            metadataStore.start();
+            Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
+                .atMost(10, TimeUnit.SECONDS)
+                .until(metadataStore::isLeader);
+
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
+                 ControllerClient client = new GrpcControllerClient()
+            ) {
+                testServer.start();
+                int port = testServer.getPort();
+
+                String target = String.format("localhost:%d", port);
+
+                ConsumerGroup cg = client.describeGroup(target, "G1").get();
+                Assertions.assertEquals(cg.getGroupId(), groupId);
+                Assertions.assertEquals(cg.getMaxDeliveryAttempt(), 1);
+                Assertions.assertEquals(cg.getGroupType(), GroupType.GROUP_TYPE_FIFO);
+            }
+        }
+    }
+
+    @Test
+    public void testDeleteGroup() throws IOException {
+        ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
+
+        long groupId;
+
+        try (SqlSession session = getSessionFactory().openSession()) {
+            GroupMapper mapper = session.getMapper(GroupMapper.class);
+            Group group = new Group();
+            group.setStatus(GroupStatus.GROUP_STATUS_ACTIVE);
+            group.setName("G1");
+            group.setMaxDeliveryAttempt(1);
+            group.setGroupType(GroupType.GROUP_TYPE_FIFO);
+            group.setDeadLetterTopicId(2L);
+            mapper.create(group);
+            groupId = group.getId();
+            session.commit();
+        }
+
+        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), config)) {
+            metadataStore.start();
+            Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
+                .atMost(10, TimeUnit.SECONDS)
+                .until(metadataStore::isLeader);
+
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
+                 ControllerClient client = new GrpcControllerClient()
+            ) {
+                testServer.start();
+                int port = testServer.getPort();
+                String target = String.format("localhost:%d", port);
+                Assertions.assertDoesNotThrow(() -> client.deleteGroup(target, groupId).get());
+
+                try (SqlSession session = getSessionFactory().openSession()) {
+                    GroupMapper mapper = session.getMapper(GroupMapper.class);
+                    List<Group> groups = mapper.list(groupId, null, null, null);
+                    Assertions.assertEquals(1, groups.size());
+                    Group g = groups.get(0);
+                    Assertions.assertEquals(GroupStatus.GROUP_STATUS_DELETED, g.getStatus());
+                }
             }
         }
     }
@@ -1279,7 +1368,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
     }
 
-
     @Test
     public void test3StreamObjects_2PC_Expired() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
@@ -1290,7 +1378,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
                 .atMost(10, TimeUnit.SECONDS)
                 .until(metadataStore::isLeader);
-
 
             try (SqlSession session = this.getSessionFactory().openSession()) {
                 S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
@@ -1308,7 +1395,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 s3Object1.setState(S3ObjectState.BOS_PREPARED);
                 s3Object1.setExpiredTimestamp(new Date());
                 s3ObjectMapper.prepare(s3Object1);
-
 
                 S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
                 com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
@@ -1374,13 +1460,11 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 objectId = reply.getFirstObjectId();
             }
 
-
             apache.rocketmq.controller.v1.S3StreamObject s3StreamObject = apache.rocketmq.controller.v1.S3StreamObject.newBuilder()
                 .setObjectId(objectId + 2)
                 .setStreamId(streamId)
                 .setObjectSize(111L)
                 .build();
-
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
                  ControllerClient client = new GrpcControllerClient()
@@ -1411,7 +1495,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 if (object.getBaseDataTimestamp() - time > 5 * 60) {
                     Assertions.fail();
                 }
-                Assertions.assertNotNull(object.getCommittedTimestamp());
                 Assertions.assertTrue(object.getCommittedTimestamp() > 0);
                 if (object.getCommittedTimestamp() - time > 5 * 60) {
                     Assertions.fail();
@@ -1446,13 +1529,11 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 objectId = reply.getFirstObjectId();
             }
 
-
             apache.rocketmq.controller.v1.S3StreamObject s3StreamObject = apache.rocketmq.controller.v1.S3StreamObject.newBuilder()
                 .setObjectId(objectId + 2)
                 .setStreamId(streamId)
                 .setObjectSize(111L)
                 .build();
-
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
                  ControllerClient client = new GrpcControllerClient()
@@ -1518,12 +1599,12 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             }
 
             String expectSubStream = """
-            {
-              "1234567890": {
-                "streamId": 1234567890,
-                "startOffset": 0,
-                "endOffset": 10
-              }}""";
+                {
+                  "1234567890": {
+                    "streamId": 1234567890,
+                    "startOffset": 0,
+                    "endOffset": 10
+                  }}""";
 
             try (SqlSession session = this.getSessionFactory().openSession()) {
                 S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
@@ -1547,7 +1628,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
                 session.commit();
             }
-
 
             apache.rocketmq.controller.v1.S3WALObject walObject = apache.rocketmq.controller.v1.S3WALObject.newBuilder()
                 .setObjectId(objectId + 4)
@@ -1658,7 +1738,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 if (object.getBaseDataTimestamp() - time > 5 * 60) {
                     Assertions.fail();
                 }
-                Assertions.assertNotNull(object.getCommittedTimestamp());
                 Assertions.assertTrue(object.getCommittedTimestamp() > 0);
                 if (object.getCommittedTimestamp() - time > 5 * 60) {
                     Assertions.fail();
@@ -1695,12 +1774,12 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             }
 
             String expectSubStream = """
-            {
-              "1234567890": {
-                "streamId": 1234567890,
-                "startOffset": 0,
-                "endOffset": 10
-              }}""";
+                {
+                  "1234567890": {
+                    "streamId": 1234567890,
+                    "startOffset": 0,
+                    "endOffset": 10
+                  }}""";
 
             try (SqlSession session = this.getSessionFactory().openSession()) {
                 S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
@@ -1734,7 +1813,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .setEndOffset(222L)
                 .build();
 
-
             apache.rocketmq.controller.v1.S3StreamObject s3StreamObject1 = apache.rocketmq.controller.v1.S3StreamObject.newBuilder()
                 .setObjectId(objectId + 1)
                 .setStreamId(streamId)
@@ -1755,7 +1833,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .setBrokerId(nodeId)
                 .build();
 
-            long time = System.currentTimeMillis();
             List<Long> compactedObjects = new ArrayList<>();
             compactedObjects.add(objectId + 2);
             compactedObjects.add(objectId + 3);
@@ -1806,12 +1883,12 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             }
 
             String expectSubStream = """
-            {
-              "1234567890": {
-                "streamId": 1234567890,
-                "startOffset": 0,
-                "endOffset": 10
-              }}""";
+                {
+                  "1234567890": {
+                    "streamId": 1234567890,
+                    "startOffset": 0,
+                    "endOffset": 10
+                  }}""";
 
             try (SqlSession session = this.getSessionFactory().openSession()) {
                 S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
@@ -1844,7 +1921,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .setStartOffset(111L)
                 .setEndOffset(222L)
                 .build();
-
 
             apache.rocketmq.controller.v1.S3StreamObject s3StreamObject1 = apache.rocketmq.controller.v1.S3StreamObject.newBuilder()
                 .setObjectId(objectId + 1)
@@ -1949,12 +2025,12 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             }
 
             String expectSubStream = """
-            {
-              "1234567890": {
-                "streamId": 1234567890,
-                "startOffset": 0,
-                "endOffset": 10
-              }}""";
+                {
+                  "1234567890": {
+                    "streamId": 1234567890,
+                    "startOffset": 0,
+                    "endOffset": 10
+                  }}""";
 
             try (SqlSession session = this.getSessionFactory().openSession()) {
                 S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
@@ -1987,7 +2063,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .setStartOffset(111L)
                 .setEndOffset(222L)
                 .build();
-
 
             apache.rocketmq.controller.v1.S3StreamObject s3StreamObject1 = apache.rocketmq.controller.v1.S3StreamObject.newBuilder()
                 .setObjectId(objectId + 1)
