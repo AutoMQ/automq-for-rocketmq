@@ -23,6 +23,7 @@ import apache.rocketmq.controller.v1.CommitStreamObjectReply;
 import apache.rocketmq.controller.v1.CommitStreamObjectRequest;
 import apache.rocketmq.controller.v1.CommitWALObjectReply;
 import apache.rocketmq.controller.v1.CommitWALObjectRequest;
+import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.ListOpenStreamsReply;
@@ -58,11 +59,13 @@ public interface ControllerClient extends Closeable {
 
     CompletableFuture<Void> notifyQueueClose(String target, long topicId, int queueId) throws ControllerException;
 
-    CompletableFuture<CreateGroupReply> createGroup(String target, CreateGroupRequest request)
-        throws ControllerException;
+    CompletableFuture<CreateGroupReply> createGroup(String target, CreateGroupRequest request);
 
-    CompletableFuture<Void> commitOffset(String target, long groupId, long topicId, int queueId,
-        long offset);
+    CompletableFuture<ConsumerGroup> describeGroup(String target, String groupName);
+
+    CompletableFuture<Void> deleteGroup(String target, long groupId);
+
+    CompletableFuture<Void> commitOffset(String target, long groupId, long topicId, int queueId, long offset);
 
     CompletableFuture<OpenStreamReply> openStream(String target, OpenStreamRequest request);
 

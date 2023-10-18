@@ -31,8 +31,12 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import org.apache.ibatis.session.SqlSession;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class GroupManager {
+    private static final Logger LOGGER = LoggerFactory.getLogger(GroupMapper.class);
+
     final GroupCache groupCache;
     private final MetadataStore metadataStore;
 
@@ -122,6 +126,34 @@ public class GroupManager {
                 }
             }
         }, metadataStore.asyncExecutor());
+    }
+
+    public CompletableFuture<ConsumerGroup> deleteGroup(long groupId) {
+
+        return CompletableFuture.supplyAsync(() -> {
+            try (SqlSession session = metadataStore.openSession()) {
+                GroupMapper mapper = session.getMapper(GroupMapper.class);
+                List<Group> groups = mapper.list(groupId, null, null, null);
+                if (groups.isEmpty()) {
+                    String message = String.format("Group[group-id=%d] is not found", groupId);
+                    LOGGER.warn("Try to delete non-existing group[id={}]", groupId);
+                    throw new CompletionException(new ControllerException(Code.NOT_FOUND_VALUE, message));
+                }
+
+                Group group = groups.get(0);
+                if (GroupStatus.GROUP_STATUS_DELETED == group.getStatus()) {
+                    LOGGER.warn("Group[id={}] has already been deleted", groupId);
+                    String message = String.format("Group[group-id=%d] has already been deleted", groupId);
+                    throw new CompletionException(new ControllerException(Code.NOT_FOUND_VALUE, message));
+                }
+
+                group.setStatus(GroupStatus.GROUP_STATUS_DELETED);
+                mapper.update(group);
+                session.commit();
+                return fromGroup(group);
+            }
+        }, metadataStore.asyncExecutor());
+
     }
 
     private ConsumerGroup fromGroup(Group group) {

@@ -25,12 +25,17 @@ import apache.rocketmq.controller.v1.CommitStreamObjectReply;
 import apache.rocketmq.controller.v1.CommitStreamObjectRequest;
 import apache.rocketmq.controller.v1.CommitWALObjectReply;
 import apache.rocketmq.controller.v1.CommitWALObjectRequest;
+import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.CreateTopicReply;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
+import apache.rocketmq.controller.v1.DeleteGroupReply;
+import apache.rocketmq.controller.v1.DeleteGroupRequest;
 import apache.rocketmq.controller.v1.DeleteTopicReply;
 import apache.rocketmq.controller.v1.DeleteTopicRequest;
+import apache.rocketmq.controller.v1.DescribeGroupReply;
+import apache.rocketmq.controller.v1.DescribeGroupRequest;
 import apache.rocketmq.controller.v1.DescribeTopicReply;
 import apache.rocketmq.controller.v1.DescribeTopicRequest;
 import apache.rocketmq.controller.v1.HeartbeatReply;
@@ -61,6 +66,7 @@ import com.google.common.base.Strings;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.MoreExecutors;
+import com.google.protobuf.TextFormat;
 import io.grpc.Channel;
 import io.grpc.Grpc;
 import io.grpc.InsecureChannelCredentials;
@@ -367,17 +373,19 @@ public class GrpcControllerClient implements ControllerClient {
     }
 
     @Override
-    public CompletableFuture<CreateGroupReply> createGroup(String target,
-        CreateGroupRequest request) throws ControllerException {
+    public CompletableFuture<CreateGroupReply> createGroup(String target, CreateGroupRequest request) {
+        try {
+            this.buildStubForTarget(target);
+        } catch (ControllerException e) {
+            return CompletableFuture.failedFuture(e);
+        }
 
         CompletableFuture<CreateGroupReply> future = new CompletableFuture<>();
-        Futures.addCallback(this.buildStubForTarget(target).createGroup(request), new FutureCallback<>() {
+        Futures.addCallback(stubs.get(target).createGroup(request), new FutureCallback<>() {
             @Override
             public void onSuccess(CreateGroupReply result) {
                 switch (result.getStatus().getCode()) {
-                    case OK -> {
-                        future.complete(result);
-                    }
+                    case OK -> future.complete(result);
                     case DUPLICATED -> {
                         LOGGER.info("Group name {} has been taken", request.getName());
                         ControllerException e = new ControllerException(result.getStatus().getCodeValue(),
@@ -389,6 +397,79 @@ public class GrpcControllerClient implements ControllerClient {
                         ControllerException e = new ControllerException(result.getStatus().getCodeValue(),
                             result.getStatus().getMessage());
                         future.completeExceptionally(e);
+                    }
+                }
+            }
+
+            @Override
+            public void onFailure(@Nonnull Throwable t) {
+                future.completeExceptionally(t);
+            }
+        }, MoreExecutors.directExecutor());
+        return future;
+    }
+
+    @Override
+    public CompletableFuture<ConsumerGroup> describeGroup(String target, String groupName) {
+        try {
+            buildStubForTarget(target);
+        } catch (ControllerException e) {
+            return CompletableFuture.failedFuture(e);
+        }
+
+        DescribeGroupRequest request = DescribeGroupRequest.newBuilder()
+            .setName(groupName).build();
+
+        CompletableFuture<ConsumerGroup> future = new CompletableFuture<>();
+
+        Futures.addCallback(stubs.get(target).describeGroup(request), new FutureCallback<>() {
+            @Override
+            public void onSuccess(DescribeGroupReply result) {
+                switch (result.getStatus().getCode()) {
+                    case OK -> future.complete(result.getGroup());
+                    case NOT_FOUND -> {
+                        LOGGER.info("Group[{}] is not found", groupName);
+                        future.completeExceptionally(new ControllerException(result.getStatus().getCodeValue(), result.getStatus().getMessage()));
+                    }
+                    default -> {
+                        LOGGER.error("Unexpected describe group response: {}", TextFormat.shortDebugString(result));
+                        future.completeExceptionally(new ControllerException(result.getStatus().getCodeValue(), result.getStatus().getMessage()));
+                    }
+                }
+            }
+
+            @Override
+            public void onFailure(@Nonnull Throwable t) {
+                future.completeExceptionally(t);
+            }
+        }, MoreExecutors.directExecutor());
+        return future;
+    }
+
+    @Override
+    public CompletableFuture<Void> deleteGroup(String target, long groupId) {
+        try {
+            buildStubForTarget(target);
+        } catch (ControllerException e) {
+            return CompletableFuture.failedFuture(e);
+        }
+
+        DeleteGroupRequest request = DeleteGroupRequest.newBuilder().setId(groupId).build();
+
+        CompletableFuture<Void> future = new CompletableFuture<>();
+
+        Futures.addCallback(stubs.get(target).deleteGroup(request), new FutureCallback<>() {
+            @Override
+            public void onSuccess(DeleteGroupReply result) {
+                switch (result.getStatus().getCode()) {
+                    case OK -> future.complete(null);
+                    case NOT_FOUND -> {
+                        LOGGER.info("Group[group-id{}] is not found", groupId);
+                        future.completeExceptionally(new ControllerException(result.getStatus().getCodeValue(), result.getStatus().getMessage()));
+                    }
+                    default -> {
+                        LOGGER.error("Unexpected delete group response: {}", TextFormat.shortDebugString(result));
+                        future.completeExceptionally(new ControllerException(result.getStatus().getCodeValue(), result.getStatus().getMessage()));
                     }
                 }
             }
