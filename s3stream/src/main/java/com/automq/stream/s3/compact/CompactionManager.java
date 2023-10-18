@@ -250,7 +250,9 @@ public class CompactionManager {
         Map<Long, List<StreamDataBlock>> streamDataBlocksMap = CompactionUtils.blockWaitObjectIndices(objectMetadataList, s3Operator);
         List<Pair<List<StreamDataBlock>, CompletableFuture<StreamObject>>> groupedDataBlocks = new ArrayList<>();
         int totalStreamObjectNum = 0;
+        // set of object ids to be included in split
         Set<Long> includedObjects = new HashSet<>();
+        // list of <object_id, list of stream objects>, each stream object is a list of adjacent stream data blocks
         List<Pair<Long, List<List<StreamDataBlock>>>> sortedObjectGroupedStreamDataBlockList = new ArrayList<>();
         for (Map.Entry<Long, List<StreamDataBlock>> entry : streamDataBlocksMap.entrySet()) {
             // group continuous stream data blocks, each group will be written to a stream object
@@ -285,10 +287,7 @@ public class CompactionManager {
                     for (Pair<List<StreamDataBlock>, CompletableFuture<StreamObject>> pair : groupedDataBlocks) {
                         List<StreamDataBlock> streamDataBlocks = pair.getKey();
                         DataBlockWriter writer = new DataBlockWriter(objectId, s3Operator, kafkaConfig.s3ObjectPartSize());
-                        for (StreamDataBlock block : streamDataBlocks) {
-                            logger.debug("Split {} to {}", block, objectId);
-                            writer.copyWrite(block);
-                        }
+                        writer.copyWrite(streamDataBlocks);
                         final long objectIdFinal = objectId;
                         writer.close().thenAccept(v -> {
                             StreamObject streamObject = new StreamObject();

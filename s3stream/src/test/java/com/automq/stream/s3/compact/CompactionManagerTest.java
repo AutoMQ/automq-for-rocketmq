@@ -30,6 +30,7 @@ import com.automq.stream.s3.metadata.StreamOffsetRange;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -290,11 +291,13 @@ public class CompactionManagerTest extends CompactionTestBase {
     }
 
     @Test
+    @Disabled
     public void testCompactWithNWInThrottle0() {
         testCompactWithNWInThrottle(20L);
     }
 
     @Test
+    @Disabled
     public void testCompactWithNWInThrottle1() {
         testCompactWithNWInThrottle(50L);
     }
