@@ -24,7 +24,7 @@ import java.lang.reflect.Field;
 import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
+import java.util.function.Function;
 import org.apache.rocketmq.client.consumer.PopResult;
 import org.apache.rocketmq.client.consumer.PopStatus;
 import org.apache.rocketmq.common.filter.ExpressionType;
@@ -95,7 +95,7 @@ class SuspendPopRequestServiceTest {
         subscriptionData.setExpressionType(ExpressionType.TAG);
         subscriptionData.setSubString("tagA");
 
-        Supplier<CompletableFuture<PopResult>> supplier = () -> CompletableFuture.completedFuture(new PopResult(PopStatus.FOUND, Collections.emptyList()));
+        Function<Long, CompletableFuture<PopResult>> supplier = ignore -> CompletableFuture.completedFuture(new PopResult(PopStatus.FOUND, Collections.emptyList()));
         MockWriter writer = new MockWriter();
         CompletableFuture<PopResult> future = writer.future();
 
@@ -141,7 +141,7 @@ class SuspendPopRequestServiceTest {
         subscriptionData.setExpressionType(ExpressionType.TAG);
         subscriptionData.setSubString("tagA");
 
-        Supplier<CompletableFuture<PopResult>> supplier = () -> CompletableFuture.completedFuture(new PopResult(PopStatus.NO_NEW_MSG, Collections.emptyList()));
+        Function<Long, CompletableFuture<PopResult>> supplier = ignore -> CompletableFuture.completedFuture(new PopResult(PopStatus.NO_NEW_MSG, Collections.emptyList()));
         MockWriter writer = new MockWriter();
 
         suspendPopRequestService.suspendPopRequest(ProxyContextExt.create(),

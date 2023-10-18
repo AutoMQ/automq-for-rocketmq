@@ -27,6 +27,7 @@ import com.automq.rocketmq.proxy.util.FlatMessageUtil;
 import com.automq.rocketmq.proxy.util.ReceiptHandleUtil;
 import com.automq.rocketmq.store.api.MessageStore;
 import com.automq.rocketmq.store.model.message.TagFilter;
+import java.lang.reflect.Field;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.rocketmq.client.consumer.AckResult;
@@ -39,6 +40,8 @@ import org.apache.rocketmq.common.filter.ExpressionType;
 import org.apache.rocketmq.common.message.Message;
 import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.proxy.common.ProxyContext;
+import org.apache.rocketmq.proxy.config.Configuration;
+import org.apache.rocketmq.proxy.config.ConfigurationManager;
 import org.apache.rocketmq.proxy.service.message.MessageService;
 import org.apache.rocketmq.proxy.service.route.AddressableMessageQueue;
 import org.apache.rocketmq.remoting.protocol.header.AckMessageRequestHeader;
@@ -47,6 +50,7 @@ import org.apache.rocketmq.remoting.protocol.header.PopMessageRequestHeader;
 import org.apache.rocketmq.remoting.protocol.header.QueryConsumerOffsetRequestHeader;
 import org.apache.rocketmq.remoting.protocol.header.SendMessageRequestHeader;
 import org.apache.rocketmq.remoting.protocol.header.UpdateConsumerOffsetRequestHeader;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
@@ -60,6 +64,15 @@ class MessageServiceImplTest {
     private ProxyMetadataService metadataService;
     private MessageStore messageStore;
     private MessageService messageService;
+
+    @BeforeAll
+    public static void setUpAll() throws Exception {
+        Field field = ConfigurationManager.class.getDeclaredField("configuration");
+        field.setAccessible(true);
+        Configuration configuration = new Configuration();
+        configuration.setProxyConfig(new org.apache.rocketmq.proxy.config.ProxyConfig());
+        field.set(null, configuration);
+    }
 
     @BeforeEach
     public void setUp() {
