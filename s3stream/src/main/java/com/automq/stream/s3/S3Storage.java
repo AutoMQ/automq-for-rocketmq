@@ -221,6 +221,7 @@ public class S3Storage implements Storage {
         TimerUtil timerUtil = new TimerUtil();
         if (!tryAcquirePermit()) {
             backoffRecords.offer(new BackoffRecord(streamRecord, cf));
+            OperationMetricsStats.getOrCreateOperationMetrics(S3Operation.APPEND_STORAGE_LOG_CACHE_FULL).operationCount.inc();
             LOGGER.warn("[BACKOFF] log cache size {} is larger than {}", logCache.size(), maxWALCacheSize);
             return;
         }
