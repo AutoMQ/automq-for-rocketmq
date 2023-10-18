@@ -76,7 +76,8 @@ public class BrokerStartup {
         try {
             controller.start();
         } catch (Exception e) {
-            LOGGER.error("Failed to start broker controller", e);
+            LOGGER.error("Failed to start broker", e);
+            System.exit(-1);
         }
     }
 
