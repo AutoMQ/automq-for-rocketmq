@@ -96,7 +96,7 @@ public class MessageStoreImpl implements MessageStore {
         if (!started.compareAndSet(false, true)) {
             return;
         }
-        clearStmData();
+        clearStateMachineData();
         streamStore.start();
         reviveService.start();
         snapshotService.start();
@@ -112,10 +112,10 @@ public class MessageStoreImpl implements MessageStore {
         snapshotService.shutdown();
         reviveService.shutdown();
         streamStore.shutdown();
-        clearStmData();
+        clearStateMachineData();
     }
 
-    private void clearStmData() throws StoreException {
+    private void clearStateMachineData() throws StoreException {
         // clear all statemachine related data in rocksdb
         kvService.clear(KV_NAMESPACE_CHECK_POINT);
         kvService.clear(KV_NAMESPACE_TIMER_TAG);
