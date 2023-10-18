@@ -31,6 +31,10 @@ public class ExtendMessagingProcessor extends DefaultMessagingProcessor {
         return new ExtendMessagingProcessor(serviceManager);
     }
 
+    public ServiceManager getServiceManager() {
+        return serviceManager;
+    }
+
     public ProducerManager producerManager() {
         return serviceManager.getProducerManager();
     }
