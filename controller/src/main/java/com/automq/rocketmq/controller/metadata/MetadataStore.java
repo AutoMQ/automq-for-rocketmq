@@ -37,6 +37,7 @@ import java.io.Closeable;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutorService;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
@@ -45,6 +46,8 @@ import org.apache.ibatis.session.SqlSession;
 public interface MetadataStore extends Closeable {
 
     ControllerConfig config();
+
+    ExecutorService asyncExecutor();
 
     /**
      * Open a JDBC connection with auto-commit disabled.

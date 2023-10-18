@@ -21,7 +21,6 @@ import apache.rocketmq.controller.v1.AssignmentStatus;
 import apache.rocketmq.controller.v1.CloseStreamRequest;
 import apache.rocketmq.controller.v1.Code;
 import apache.rocketmq.controller.v1.ConsumerGroup;
-import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.GroupStatus;
 import apache.rocketmq.controller.v1.GroupType;
 import apache.rocketmq.controller.v1.ListOpenStreamsRequest;
@@ -113,9 +112,10 @@ public class DefaultMetadataStore implements MetadataStore {
     private Lease lease;
 
     private final TopicManager topicManager;
-    private final S3MetadataManager s3MetadataManager;
 
-    private final GroupCache groupCache;
+    private final GroupManager groupManager;
+
+    private final S3MetadataManager s3MetadataManager;
 
     private DataStore dataStore;
 
@@ -128,14 +128,19 @@ public class DefaultMetadataStore implements MetadataStore {
         this.scheduledExecutorService = new ScheduledThreadPoolExecutor(Runtime.getRuntime().availableProcessors(),
             new PrefixThreadFactory("Controller"));
         this.asyncExecutorService = Executors.newFixedThreadPool(10, new PrefixThreadFactory("Controller-Async"));
-        this.topicManager = new TopicManager(this, asyncExecutorService);
-        this.s3MetadataManager = new S3MetadataManager(this, asyncExecutorService);
-        this.groupCache = new GroupCache();
+        this.topicManager = new TopicManager(this);
+        this.s3MetadataManager = new S3MetadataManager(this);
+        this.groupManager = new GroupManager(this);
     }
 
     @Override
     public ControllerConfig config() {
         return config;
+    }
+
+    @Override
+    public ExecutorService asyncExecutor() {
+        return asyncExecutorService;
     }
 
     @Override
@@ -369,6 +374,16 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
+    public CompletableFuture<Long> createGroup(String groupName, int maxRetry, GroupType type, long dlq) {
+        return groupManager.createGroup(groupName, maxRetry, type, dlq);
+    }
+
+    @Override
+    public CompletableFuture<ConsumerGroup> describeGroup(Long groupId, String groupName) {
+        return groupManager.describeGroup(groupId, groupName);
+    }
+
+    @Override
     public ConcurrentMap<Integer, BrokerNode> allNodes() {
         return nodes;
     }
@@ -527,60 +542,6 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public CompletableFuture<Long> createGroup(String groupName, int maxRetry, GroupType type, long deadLetterTopicId) {
-        CompletableFuture<Long> future = new CompletableFuture<>();
-        for (; ; ) {
-            if (isLeader()) {
-                try (SqlSession session = openSession()) {
-                    if (!maintainLeadershipWithSharedLock(session)) {
-                        continue;
-                    }
-                    GroupMapper groupMapper = session.getMapper(GroupMapper.class);
-                    List<Group> groups = groupMapper.list(null, groupName, null, null);
-                    if (!groups.isEmpty()) {
-                        ControllerException e = new ControllerException(Code.DUPLICATED_VALUE, String.format("Group name '%s' is not available", groupName));
-                        future.completeExceptionally(e);
-                        return future;
-                    }
-
-                    Group group = new Group();
-                    group.setName(groupName);
-                    group.setMaxDeliveryAttempt(maxRetry);
-                    group.setDeadLetterTopicId(deadLetterTopicId);
-                    group.setStatus(GroupStatus.GROUP_STATUS_ACTIVE);
-                    group.setGroupType(type);
-                    groupMapper.create(group);
-                    session.commit();
-                    // Cache group metadata
-                    groupCache.apply(List.of(group));
-                    future.complete(group.getId());
-                }
-            } else {
-                CreateGroupRequest request = CreateGroupRequest.newBuilder()
-                    .setName(groupName)
-                    .setMaxRetryAttempt(maxRetry)
-                    .setGroupType(type)
-                    .setDeadLetterTopicId(deadLetterTopicId)
-                    .build();
-
-                try {
-                    this.controllerClient.createGroup(leaderAddress(), request).whenComplete((reply, e) -> {
-                        if (null != e) {
-                            future.completeExceptionally(e);
-                        } else {
-                            future.complete(reply.getGroupId());
-                        }
-                    });
-                } catch (ControllerException e) {
-                    future.completeExceptionally(e);
-                }
-            }
-            break;
-        }
-        return future;
-    }
-
-    @Override
     public CompletableFuture<StreamMetadata> getStream(long topicId, int queueId, Long groupId, StreamRole streamRole) {
         return CompletableFuture.supplyAsync(() -> {
             try (SqlSession session = openSession()) {
@@ -723,47 +684,6 @@ public class DefaultMetadataStore implements MetadataStore {
                 return future;
             }
         }
-    }
-
-    @Override
-    public CompletableFuture<ConsumerGroup> describeGroup(Long groupId, String groupName) {
-        Group cachedGroup = null;
-        if (null != groupId) {
-            cachedGroup = groupCache.byId(groupId);
-        }
-
-        if (null == cachedGroup && !Strings.isNullOrEmpty(groupName)) {
-            cachedGroup = groupCache.byName(groupName);
-        }
-
-        if (null != cachedGroup) {
-            return CompletableFuture.completedFuture(fromGroup(cachedGroup));
-        }
-
-        return CompletableFuture.supplyAsync(() -> {
-            try (SqlSession session = openSession()) {
-                GroupMapper groupMapper = session.getMapper(GroupMapper.class);
-                List<Group> groups = groupMapper.list(groupId, groupName, null, null);
-                if (groups.isEmpty()) {
-                    ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE,
-                        String.format("Group with group-id=%d is not found", groupId));
-                    throw new CompletionException(e);
-                } else {
-                    Group group = groups.get(0);
-                    return fromGroup(group);
-                }
-            }
-        }, asyncExecutorService);
-    }
-
-    private ConsumerGroup fromGroup(Group group) {
-        return ConsumerGroup.newBuilder()
-            .setGroupId(group.getId())
-            .setName(group.getName())
-            .setGroupType(group.getGroupType())
-            .setMaxDeliveryAttempt(group.getMaxDeliveryAttempt())
-            .setDeadLetterTopicId(group.getDeadLetterTopicId())
-            .build();
     }
 
     @Override
@@ -1110,7 +1030,7 @@ public class DefaultMetadataStore implements MetadataStore {
 
     @Override
     public void applyGroupChange(List<Group> groups) {
-        this.groupCache.apply(groups);
+        this.groupManager.groupCache.apply(groups);
     }
 
     @Override
