@@ -110,13 +110,6 @@ public interface KVService {
     void flush(boolean sync) throws StoreException;
 
     /**
-     * Open the backend engine.
-     *
-     * @throws StoreException if backend engine fails
-     */
-    void open() throws StoreException;
-
-    /**
      * Flush all dirty pages and shutdown the backend engine.
      *
      * @throws StoreException if backend engine fails
@@ -124,7 +117,7 @@ public interface KVService {
     void close() throws StoreException;
 
     /**
-     * Close and delete all data in the backend engine.
+     * Delete all data in the backend engine.
      *
      * @throws StoreException if backend engine fails
      */
