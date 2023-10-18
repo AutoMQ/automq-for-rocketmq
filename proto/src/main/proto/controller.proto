@@ -359,6 +359,25 @@ message CreateGroupReply {
   int64 group_id = 2;
 }
 
+message DescribeGroupRequest {
+  ControllerRequestContext context = 1;
+  string name = 2;
+}
+
+message DescribeGroupReply {
+  Status status = 1;
+  ConsumerGroup group = 2;
+}
+
+message DeleteGroupRequest {
+  ControllerRequestContext context = 1;
+  string name = 2;
+}
+
+message DeleteGroupReply {
+  Status status = 1;
+}
+
 service ControllerService {
   rpc registerNode(NodeRegistrationRequest) returns (NodeRegistrationReply) {}
 
@@ -387,6 +406,10 @@ service ControllerService {
   rpc listMessageQueueReassignments(ListMessageQueueReassignmentsRequest) returns (ListMessageQueueReassignmentsReply) {}
 
   rpc createGroup(CreateGroupRequest) returns (CreateGroupReply) {}
+
+  rpc describeGroup(DescribeGroupRequest) returns (DescribeGroupReply) {}
+
+  rpc deleteGroup(DeleteGroupRequest) returns (DeleteGroupReply) {}
 
   rpc commitOffset(CommitOffsetRequest) returns (CommitOffsetReply) {}
 
