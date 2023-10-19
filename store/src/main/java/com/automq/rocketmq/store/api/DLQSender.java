@@ -21,5 +21,11 @@ import com.automq.rocketmq.common.model.FlatMessageExt;
 import java.util.concurrent.CompletableFuture;
 
 public interface DLQSender {
-    CompletableFuture<Void> send(FlatMessageExt flatMessageExt);
+    /**
+     * Send message to DLQ
+     *
+     * @param consumerGroupId consumer group id
+     * @param originalFlatMessage original message
+     */
+    CompletableFuture<Void> send(long consumerGroupId, FlatMessageExt originalFlatMessage);
 }

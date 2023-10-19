@@ -105,10 +105,12 @@ class ReviveServiceTest {
     @Test
     void tryRevive_normal() throws StoreException {
         Mockito.doAnswer(ink -> {
-            FlatMessageExt flatMessageExt = ink.getArgument(0);
+            long consumerGroupId = ink.getArgument(0);
+            assertEquals(CONSUMER_GROUP_ID, consumerGroupId);
+            FlatMessageExt flatMessageExt = ink.getArgument(1);
             assertNotNull(flatMessageExt);
             return CompletableFuture.completedFuture(null);
-        }).when(dlqSender).send(Mockito.any(FlatMessageExt.class));
+        }).when(dlqSender).send(Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
         // mock max delivery attempts
         Mockito.doReturn(CompletableFuture.completedFuture(2))
             .when(metadataService).maxDeliveryAttemptsOf(Mockito.anyLong());
@@ -160,7 +162,8 @@ class ReviveServiceTest {
         });
 
         // check if this message has been sent to DLQ
-        Mockito.verify(dlqSender, Mockito.times(1)).send(Mockito.any(FlatMessageExt.class));
+        Mockito.verify(dlqSender, Mockito.times(1))
+            .send(Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
         PopResult popResult1 = logicQueue.popRetry(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
         assertEquals(0, popResult1.messageList().size());
     }
@@ -168,10 +171,13 @@ class ReviveServiceTest {
     @Test
     void tryRevive_fifo() throws StoreException {
         Mockito.doAnswer(ink -> {
-            FlatMessageExt flatMessageExt = ink.getArgument(0);
-            assertNotNull(flatMessageExt);
-            return CompletableFuture.completedFuture(null);
-        }).when(dlqSender).send(Mockito.any(FlatMessageExt.class));
+                long consumerGroupId = ink.getArgument(0);
+                assertEquals(CONSUMER_GROUP_ID, consumerGroupId);
+                FlatMessageExt flatMessageExt = ink.getArgument(1);
+                assertNotNull(flatMessageExt);
+                return CompletableFuture.completedFuture(null);
+            }).when(dlqSender)
+            .send(Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
         // mock max delivery attempts
         Mockito.doReturn(CompletableFuture.completedFuture(2))
             .when(metadataService).maxDeliveryAttemptsOf(Mockito.anyLong());
@@ -222,7 +228,8 @@ class ReviveServiceTest {
         });
 
         // check if this message has been sent to DLQ
-        Mockito.verify(dlqSender, Mockito.times(1)).send(Mockito.any(FlatMessageExt.class));
+        Mockito.verify(dlqSender, Mockito.times(1))
+            .send(Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
 
         assertEquals(1, logicQueue.getAckOffset(CONSUMER_GROUP_ID));
 
@@ -237,10 +244,12 @@ class ReviveServiceTest {
     @Test
     void tryRevive_queue_not_opened() throws Exception {
         Mockito.doAnswer(ink -> {
-            FlatMessageExt flatMessageExt = ink.getArgument(0);
+            long consumerGroupId = ink.getArgument(0);
+            assertEquals(CONSUMER_GROUP_ID, consumerGroupId);
+            FlatMessageExt flatMessageExt = ink.getArgument(1);
             assertNotNull(flatMessageExt);
             return CompletableFuture.completedFuture(null);
-        }).when(dlqSender).send(Mockito.any(FlatMessageExt.class));
+        }).when(dlqSender).send(Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
         // mock max delivery attempts
         Mockito.doReturn(CompletableFuture.completedFuture(2))
             .when(metadataService).maxDeliveryAttemptsOf(Mockito.anyLong());
@@ -253,7 +262,6 @@ class ReviveServiceTest {
         assertEquals(1, popResult.messageList().size());
         // check ck exist
         ReceiptHandle handle = SerializeUtil.decodeReceiptHandle(popResult.messageList().get(0).receiptHandle().get());
-        byte[] bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.operationId()));
         byte[] ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.operationId()));
         assertNotNull(ckValue);
         // now revive but can't clear ck
@@ -299,10 +307,9 @@ class ReviveServiceTest {
         });
 
         // check if this message has been sent to DLQ
-        Mockito.verify(dlqSender, Mockito.times(0)).send(Mockito.any(FlatMessageExt.class));
+        Mockito.verify(dlqSender, Mockito.times(0)).send(Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
         // check ck still exist
         handle = SerializeUtil.decodeReceiptHandle(retryPopResult.messageList().get(0).receiptHandle().get());
-        bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.operationId()));
         ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.operationId()));
         assertNotNull(ckValue);
 
@@ -318,7 +325,7 @@ class ReviveServiceTest {
         });
 
         // check if this message has been sent to DLQ
-        Mockito.verify(dlqSender, Mockito.times(0)).send(Mockito.any(FlatMessageExt.class));
+        Mockito.verify(dlqSender, Mockito.times(0)).send(Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
         // check ck still exist
         handle = SerializeUtil.decodeReceiptHandle(retryPopResult.messageList().get(0).receiptHandle().get());
         ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.operationId()));
@@ -336,7 +343,7 @@ class ReviveServiceTest {
         });
 
         // check if this message has been sent to DLQ
-        Mockito.verify(dlqSender, Mockito.times(1)).send(Mockito.any(FlatMessageExt.class));
+        Mockito.verify(dlqSender, Mockito.times(1)).send(Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
         // check ck not exist
         handle = SerializeUtil.decodeReceiptHandle(retryPopResult.messageList().get(0).receiptHandle().get());
         ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.operationId()));

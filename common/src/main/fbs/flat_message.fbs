@@ -44,7 +44,10 @@ table SystemProperties {
     trace_context: string;
     // The queue offset in the original queue
     // This field is only used in the retry message
+    // Set the default value to -1 to tell the flatc compiler allocate space for this field to support inplace-update.
     original_queue_offset: long = -1;
-    dlq_original_topic_id: long = -1;
+    // For a dead letter message, this field is the original topic id
+    dlq_original_topic_id: long;
+    // For a dead letter message, this field is the original message id
     dlq_original_message_id: string;
 }

@@ -207,14 +207,14 @@ public class ReviveService implements Runnable, Lifecycle {
                     if (consumeTimes >= maxDeliveryAttempts) {
                         messageExt.setDeliveryAttempts(consumeTimes);
                         // send as DLQ
-                        return dlqSender.send(messageExt)
+                        return dlqSender.send(consumerGroupId, messageExt)
                             .thenApply(nil -> Pair.of(true, logicQueue));
                     }
                     return CompletableFuture.completedFuture(Pair.of(false, logicQueue));
                 }
                 if (messageExt.deliveryAttempts() >= maxDeliveryAttempts) {
                     // send as DLQ
-                    return dlqSender.send(messageExt)
+                    return dlqSender.send(consumerGroupId, messageExt)
                         .thenApply(nil -> Pair.of(true, logicQueue));
                 }
                 messageExt.setOriginalQueueOffset(messageExt.originalOffset());
