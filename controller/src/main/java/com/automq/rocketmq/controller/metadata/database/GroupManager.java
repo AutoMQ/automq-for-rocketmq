@@ -22,11 +22,14 @@ import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.GroupStatus;
 import apache.rocketmq.controller.v1.GroupType;
+import apache.rocketmq.controller.v1.TopicStatus;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.dao.Group;
 import com.automq.rocketmq.controller.metadata.database.dao.GroupCriteria;
+import com.automq.rocketmq.controller.metadata.database.dao.Topic;
 import com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 import com.google.common.base.Strings;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -60,6 +63,18 @@ public class GroupManager {
                         ControllerException e = new ControllerException(Code.DUPLICATED_VALUE, String.format("Group name '%s' is not available", groupName));
                         future.completeExceptionally(e);
                         return future;
+                    }
+
+                    if (deadLetterTopicId > 0) {
+                        TopicMapper topicMapper = session.getMapper(TopicMapper.class);
+                        Topic t = topicMapper.get(deadLetterTopicId, null);
+                        if (null == t || t.getStatus() == TopicStatus.TOPIC_STATUS_DELETED) {
+                            String msg = String.format("Specified dead letter topic[topic-id=%d] does not exist",
+                                deadLetterTopicId);
+                            ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE, msg);
+                            future.completeExceptionally(e);
+                            return future;
+                        }
                     }
 
                     Group group = new Group();

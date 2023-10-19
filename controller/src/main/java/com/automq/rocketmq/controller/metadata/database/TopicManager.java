@@ -20,6 +20,7 @@ package com.automq.rocketmq.controller.metadata.database;
 import apache.rocketmq.controller.v1.AssignmentStatus;
 import apache.rocketmq.controller.v1.Code;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
+import apache.rocketmq.controller.v1.GroupStatus;
 import apache.rocketmq.controller.v1.MessageType;
 import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.StreamState;
@@ -29,10 +30,13 @@ import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.BrokerNode;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
+import com.automq.rocketmq.controller.metadata.database.dao.Group;
+import com.automq.rocketmq.controller.metadata.database.dao.GroupCriteria;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import com.automq.rocketmq.controller.metadata.database.dao.Stream;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
+import com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
@@ -237,6 +241,20 @@ public class TopicManager {
                             ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE, String.format("This is no topic with topic-id %d", topicId));
                             throw new CompletionException(e);
                         }
+
+                        // Ensure this topic is not as DEAD LETTER TOPIC.
+                        GroupMapper groupMapper = session.getMapper(GroupMapper.class);
+                        List<Group> groups = groupMapper.byCriteria(GroupCriteria.newBuilder()
+                            .setStatus(GroupStatus.GROUP_STATUS_ACTIVE)
+                            .setDeadLetterTopicId(topicId)
+                            .build());
+                        if (!groups.isEmpty()) {
+                            String msg = String.format("Topic %s is still referenced by %s as dead letter topic",
+                                topic.getName(), groups.get(0).getName());
+                            ControllerException e = new ControllerException(Code.REFERENCED_AS_DEAD_LETTER_TOPIC_VALUE, msg);
+                            throw new CompletionException(e);
+                        }
+
                         topicMapper.updateStatusById(topicId, TopicStatus.TOPIC_STATUS_DELETED);
 
                         QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
@@ -339,7 +357,8 @@ public class TopicManager {
         return future;
     }
 
-    private List<QueueAssignment> createQueues(IntStream range, long topicId, SqlSession session) throws ControllerException {
+    private List<QueueAssignment> createQueues(IntStream range, long topicId,
+        SqlSession session) throws ControllerException {
         QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
         StreamMapper streamMapper = session.getMapper(StreamMapper.class);
 
