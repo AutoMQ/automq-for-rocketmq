@@ -38,6 +38,7 @@ public class ProxyConfig extends BaseConfig {
     private int grpcThreadPoolNums = 16 + PROCESSOR_NUMBER * 2;
     private int grpcThreadPoolQueueCapacity = 100000;
     private int grpcListenPort = 8081;
+    private int remotingListenPort = 8080;
     private int grpcBossLoopNum = 1;
     private int grpcWorkerLoopNum = PROCESSOR_NUMBER * 2;
     private boolean enableGrpcEpoll = false;
@@ -127,5 +128,13 @@ public class ProxyConfig extends BaseConfig {
 
     public long printThreadPoolStatusInMillis() {
         return printThreadPoolStatusInMillis;
+    }
+
+    public int remotingListenPort() {
+        return remotingListenPort;
+    }
+
+    public void setRemotingListenPort(int remotingListenPort) {
+        this.remotingListenPort = remotingListenPort;
     }
 }
