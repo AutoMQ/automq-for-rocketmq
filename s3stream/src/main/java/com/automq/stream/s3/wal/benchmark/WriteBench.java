@@ -115,6 +115,7 @@ public class WriteBench implements AutoCloseable {
         AtomicLong count = new AtomicLong();
         AtomicLong costNanos = new AtomicLong();
         AtomicLong maxCostNanos = new AtomicLong();
+        long offset = 0;
 
         while (true) {
             while (true) {
@@ -137,10 +138,10 @@ public class WriteBench implements AutoCloseable {
                 long costNanosValue = costNanos.getAndSet(0);
                 long maxCostNanosValue = maxCostNanos.getAndSet(0);
                 if (0 != countValue) {
-                    System.out.printf("Append task %d | Append Rate %d msg/s %.2f KB/s | Avg Latency %.3f ms | Max Latency %.3f ms\n",
+                    System.out.printf("Append task %d | Append Rate %d msg/s %d KB/s | Avg Latency %.3f ms | Max Latency %.3f ms\n",
                             index,
                             countValue / LOG_INTERVAL_SECONDS,
-                            (countValue * config.recordSizeBytes) / LOG_INTERVAL_SECONDS / 1024.0,
+                            (countValue * config.recordSizeBytes) / LOG_INTERVAL_SECONDS / 1024,
                             costNanosValue / 1_000_000.0 / countValue,
                             maxCostNanosValue / 1_000_000.0);
                     lastLogTimeMillis = now;
@@ -148,7 +149,14 @@ public class WriteBench implements AutoCloseable {
             }
 
             long appendStartTimeNanos = System.nanoTime();
-            WriteAheadLog.AppendResult result = log.append(payload);
+            WriteAheadLog.AppendResult result;
+            try {
+                result = log.append(payload);
+            } catch (WriteAheadLog.OverCapacityException e) {
+                log.trim(offset);
+                continue;
+            }
+            offset = result.recordOffset();
             result.future().thenAccept(v -> {
                 long costNanosValue = System.nanoTime() - appendStartTimeNanos;
                 count.incrementAndGet();
