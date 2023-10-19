@@ -64,11 +64,11 @@ public class DatabaseTestBase {
         this.s3ObjectIdSequence = new AtomicLong(1);
         config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.nodeId()).thenReturn(1);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
+        Mockito.when(config.scanIntervalInSecs()).thenReturn(1L);
         Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
         Mockito.when(config.deletedTopicLingersInSecs()).thenCallRealMethod();
         Mockito.when(config.deletedGroupLingersInSecs()).thenCallRealMethod();
+        Mockito.when(config.balanceWorkloadIntervalInSecs()).thenCallRealMethod();
         gson = new GsonBuilder()
             .registerTypeAdapter(SubStream.class, new SubStreamSerializer())
             .registerTypeAdapter(SubStream.class, new SubStreamDeserializer())

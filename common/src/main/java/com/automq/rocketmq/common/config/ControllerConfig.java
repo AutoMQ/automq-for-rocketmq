@@ -35,7 +35,7 @@ public interface ControllerConfig {
 
     void setEpoch(long epoch);
 
-    default int scanIntervalInSecs() {
+    default long scanIntervalInSecs() {
         return 30;
     }
 
@@ -55,7 +55,7 @@ public interface ControllerConfig {
         return 300;
     }
 
-    default int balanceWorkloadIntervalInSecs() {
+    default long balanceWorkloadIntervalInSecs() {
         return 10;
     }
 

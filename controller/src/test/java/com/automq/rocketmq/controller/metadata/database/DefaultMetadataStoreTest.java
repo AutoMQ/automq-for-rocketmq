@@ -33,7 +33,6 @@ import apache.rocketmq.controller.v1.MessageType;
 import com.automq.rocketmq.common.system.StreamConstants;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.ControllerClient;
-import com.automq.rocketmq.common.config.ControllerConfig;
 import com.automq.rocketmq.controller.metadata.DatabaseTestBase;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.Role;
@@ -127,10 +126,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
      */
     @Test
     void testGetLease() throws IOException {
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.nodeId()).thenReturn(1);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertNull(metadataStore.getLease());
         }
@@ -732,10 +727,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         Map<Long, SubStream> subStreams = gson.fromJson(new String(expectSubStream.getBytes(StandardCharsets.UTF_8)),
             new TypeToken<>() {
             });
-        ControllerConfig config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.nodeId()).thenReturn(1);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(1);
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertNull(metadataStore.getLease());
