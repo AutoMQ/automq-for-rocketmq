@@ -41,35 +41,21 @@
     <delete id="delete">
         DELETE
         FROM queue_assignment
-        WHERE 1 = 1
-        <if test="null != topicId">
-            AND topic_id = #{topicId}
-        </if>
+        <where>
+            <if test="null != topicId">topic_id = #{topicId}</if>
+        </where>
     </delete>
 
     <select id="list" resultType="QueueAssignment">
         SELECT topic_id, queue_id, src_node_id, dst_node_id, status, create_time, update_time
         FROM queue_assignment
-        WHERE 1 = 1
-        <if test="topicId != null">
-            AND topic_id = #{topicId}
-        </if>
-
-        <if test="null != srcNodeId">
-            AND src_node_id = #{srcNodeId}
-        </if>
-
-        <if test="null != dstNodeId">
-            AND dst_node_id = #{dstNodeId}
-        </if>
-
-        <if test="null != status">
-            AND status = #{status}
-        </if>
-
-        <if test="updateTime != null">
-            AND update_time >= #{updateTime}
-        </if>
+        <where>
+            <if test="topicId != null">topic_id = #{topicId}</if>
+            <if test="null != srcNodeId">AND src_node_id = #{srcNodeId}</if>
+            <if test="null != dstNodeId">AND dst_node_id = #{dstNodeId}</if>
+            <if test="null != status">AND status = #{status}</if>
+            <if test="updateTime != null">AND update_time >= #{updateTime}</if>
+        </where>
     </select>
 
     <select id="get" resultType="QueueAssignment">

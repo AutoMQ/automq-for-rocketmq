@@ -27,54 +27,44 @@
 
     <update id="update" parameterType="Node">
         UPDATE node
-        SET epoch = #{epoch}, address = #{address}
-        <if test="null != instanceId">, instance_id = #{instanceId}</if>
-        <if test="null != volumeId">, volume_id = #{volumeId}</if>
-        <if test="null != hostName">, host_name = #{hostName}</if>
-        <if test="null != vpcId">, vpc_id = #{vpcId}</if>
+        <set>
+            <if test="epoch > 0">epoch = #{epoch},</if>
+            <if test="null != address">address = #{address},</if>
+            <if test="null != instanceId">instance_id = #{instanceId},</if>
+            <if test="null != volumeId">volume_id = #{volumeId},</if>
+            <if test="null != hostName">host_name = #{hostName},</if>
+            <if test="null != vpcId">vpc_id = #{vpcId},</if>
+        </set>
         <where>
-            <if test="id > 0">
-                id = #{id}
-            </if>
-            <if test="null != name">
-                AND name = #{name}
-            </if>
+            <if test="id > 0">id = #{id}</if>
+            <if test="null != name">AND name = #{name}</if>
         </where>
     </update>
 
     <delete id="delete">
         DELETE
         FROM node
-        WHERE 1 = 1
-        <if test="null != id">
-           AND id = #{id}
-        </if>
+        <where>
+            <if test="null != id">id = #{id}</if>
+        </where>
     </delete>
 
     <select id="list" resultType="Node">
         SELECT id, name, instance_id, volume_id, hostname, vpc_id, address, epoch
         FROM node
-        WHERE 1 = 1
-        <if test="null != updateTime">
-            AND update_time >= #{updateTime}
-        </if>
+        <where>
+            <if test="null != updateTime">update_time >= #{updateTime}</if>
+        </where>
     </select>
 
     <select id="get" resultType="Node" >
         SELECT id, name, instance_id, volume_id, hostname, vpc_id, address, epoch
         FROM node
-        WHERE 1 = 1
-        <if test="null != id">
-            AND id = #{id}
-        </if>
-        <if test="null != instanceId">
-            AND instance_id = #{instanceId}
-        </if>
-        <if test="null != name">
-            AND name = #{name}
-        </if>
-        <if test="null != volumeId">
-            AND volume_id = #{volumeId}
-        </if>
+        <where>
+            <if test="null != id">AND id = #{id}</if>
+            <if test="null != instanceId">AND instance_id = #{instanceId}</if>
+            <if test="null != name">AND name = #{name}</if>
+            <if test="null != volumeId">AND volume_id = #{volumeId}</if>
+        </where>
     </select>
 </mapper>

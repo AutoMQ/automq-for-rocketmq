@@ -30,37 +30,31 @@
     <delete id="delete">
         DELETE
         FROM group_progress
-        WHERE 1 = 1
-        <if test="null != groupId">
-            AND group_id = #{groupId}
-        </if>
-        <if test="null != topicId">
-            AND topic_id = #{topicId}
-        </if>
+        <where>
+            <if test="null != groupId">group_id = #{groupId}</if>
+            <if test="null != topicId">AND topic_id = #{topicId}</if>
+        </where>
     </delete>
 
     <select id="list" resultType="GroupProgress">
         SELECT group_id, topic_id, queue_id, queue_offset
         FROM group_progress
-        WHERE 1 = 1
-        <if test="null != groupId">
-            AND group_id = #{groupId}
-        </if>
-
-        <if test="null != topicId">
-            AND topic_id = #{topicId}
-        </if>
+        <where>
+            <if test="null != groupId">group_id = #{groupId}</if>
+            <if test="null != topicId">AND topic_id = #{topicId}</if>
+        </where>
     </select>
 
     <select id="get" resultType="GroupProgress">
         SELECT group_id, topic_id, queue_id, queue_offset
         FROM group_progress
-        WHERE 1 = 1
-        <if test="null != groupId and null != topicId and null != queueId">
-            AND group_id = #{groupId}
-            AND topic_id = #{topicId}
-            AND queue_id = #{queueId}
-        </if>
+        <where>
+            <if test="null != groupId and null != topicId and null != queueId">
+                group_id = #{groupId}
+                AND topic_id = #{topicId}
+                AND queue_id = #{queueId}
+            </if>
+        </where>
     </select>
 
 </mapper>
