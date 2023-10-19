@@ -40,13 +40,22 @@ public class DefaultProxyMetadataService implements ProxyMetadataService {
 
     @Override
     public CompletableFuture<Topic> topicOf(String topicName) {
+        return topicOf(null, topicName);
+    }
+
+    @Override
+    public CompletableFuture<Topic> topicOf(long topicId) {
+        return topicOf(topicId, null);
+    }
+
+    private CompletableFuture<Topic> topicOf(Long topicId, String topicName) {
         Stopwatch stopwatch = Stopwatch.createStarted();
-        return metadataStore.describeTopic(null, topicName).thenApply((topic -> {
+        return metadataStore.describeTopic(topicId, topicName).thenApply((topic -> {
             long elapsed = stopwatch.elapsed().toMillis();
             if (elapsed > 100) {
-                LOGGER.warn("It took {}ms to query topic {}", elapsed, topicName);
+                LOGGER.warn("It took {}ms to query topic, id: {}, name: {}", elapsed, topicId, topicName);
             } else if (elapsed > 10) {
-                LOGGER.debug("It took {}ms to query topic {}", elapsed, topicName);
+                LOGGER.debug("It took {}ms to query topic, id: {}, name: {}", elapsed, topicId, topicName);
             }
             return topic;
         }));
@@ -69,6 +78,11 @@ public class DefaultProxyMetadataService implements ProxyMetadataService {
     @Override
     public CompletableFuture<ConsumerGroup> consumerGroupOf(String groupName) {
         return metadataStore.describeGroup(null, groupName);
+    }
+
+    @Override
+    public CompletableFuture<ConsumerGroup> consumerGroupOf(long consumerGroupId) {
+        return metadataStore.describeGroup(consumerGroupId, null);
     }
 
     @Override

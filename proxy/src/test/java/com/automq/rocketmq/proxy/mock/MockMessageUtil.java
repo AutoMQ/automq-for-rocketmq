@@ -28,30 +28,35 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class MockMessageUtil {
-    public static FlatMessageExt buildMessage() {
-        return buildMessage(1, 1, "");
-    }
+
+    public static final String DEFAULT_PAYLOAD = "Hello, AutoMQ Message";
+    public static final String DEFAULT_MESSAGE_GROUP = "test-group";
+    public static final String DEFAULT_KEYS = "key-a key-b";
+    public static final String USER_PROPERTIES_0_KEY = "key-0";
+    public static final String USER_PROPERTIES_0_VALUE = "value-0";
+    public static final String DEFAULT_MESSAGE_ID = "0000000001";
+    public static final long DEFAULT_MESSAGE_OFFSET = 13;
 
     public static FlatMessageExt buildMessage(long topicId, int queueId, String tag) {
         FlatMessageT flatMessageT = new FlatMessageT();
         flatMessageT.setTopicId(topicId);
         flatMessageT.setQueueId(queueId);
-        flatMessageT.setPayload("Hello, AutoMQ Message".getBytes(StandardCharsets.UTF_8));
-        flatMessageT.setMessageGroup("test-group");
-        flatMessageT.setKeys("keys");
+        flatMessageT.setPayload(DEFAULT_PAYLOAD.getBytes(StandardCharsets.UTF_8));
+        flatMessageT.setMessageGroup(DEFAULT_MESSAGE_GROUP);
+        flatMessageT.setKeys(DEFAULT_KEYS);
         flatMessageT.setTag(tag);
 
         List<KeyValueT> userProperties = new ArrayList<>();
         KeyValueT keyValueT = new KeyValueT();
-        keyValueT.setKey("key");
-        keyValueT.setValue("value");
+        keyValueT.setKey(USER_PROPERTIES_0_KEY);
+        keyValueT.setValue(USER_PROPERTIES_0_VALUE);
         userProperties.add(keyValueT);
         flatMessageT.setUserProperties(userProperties.toArray(new KeyValueT[0]));
 
         SystemPropertiesT systemPropertiesT = new SystemPropertiesT();
         systemPropertiesT.setBornTimestamp(System.currentTimeMillis());
         systemPropertiesT.setStoreTimestamp(System.currentTimeMillis());
-        systemPropertiesT.setMessageId("0000000001");
+        systemPropertiesT.setMessageId(DEFAULT_MESSAGE_ID);
         systemPropertiesT.setDeliveryAttempts(1);
         systemPropertiesT.setOriginalQueueOffset(0);
         flatMessageT.setSystemProperties(systemPropertiesT);
@@ -62,7 +67,7 @@ public class MockMessageUtil {
         FlatMessage flatMessage = FlatMessage.getRootAsFlatMessage(builder.dataBuffer());
         return FlatMessageExt.Builder.builder()
             .message(flatMessage)
-            .offset(0)
+            .offset(DEFAULT_MESSAGE_OFFSET)
             .build();
     }
 }

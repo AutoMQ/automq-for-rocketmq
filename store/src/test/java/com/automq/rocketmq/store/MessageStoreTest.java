@@ -94,7 +94,7 @@ public class MessageStoreTest {
         logicQueueManager = new DefaultLogicQueueManager(config, streamStore, kvService, metadataService, operationLogService, inflightService);
         dlqSender = Mockito.mock(DLQSender.class);
         Mockito.doReturn(CompletableFuture.completedFuture(null))
-            .when(dlqSender).send(Mockito.any(FlatMessageExt.class));
+            .when(dlqSender).send(Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
         reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, KV_NAMESPACE_TIMER_TAG, kvService, metadataService, inflightService,
             logicQueueManager, dlqSender);
         S3ObjectOperator operator = new S3ObjectOperatorImpl(new MemoryS3Operator());

@@ -24,6 +24,7 @@ import com.automq.rocketmq.common.model.generated.KeyValue;
 import com.automq.rocketmq.common.model.generated.KeyValueT;
 import com.automq.rocketmq.common.model.generated.SystemProperties;
 import com.automq.rocketmq.common.model.generated.SystemPropertiesT;
+import com.automq.rocketmq.common.system.MessageConstants;
 import com.automq.rocketmq.proxy.model.VirtualQueue;
 import com.google.common.base.Strings;
 import com.google.flatbuffers.FlatBufferBuilder;
@@ -164,7 +165,7 @@ public class FlatMessageUtil {
         }
 
         // set DLQ related properties
-        String dlqOriginalTopicId = properties.remove(MessageConst.PROPERTY_DLQ_ORIGIN_TOPIC);
+        String dlqOriginalTopicId = properties.remove(MessageConstants.PROPERTY_DLQ_ORIGIN_TOPIC_ID);
         if (!Strings.isNullOrEmpty(dlqOriginalTopicId)) {
             systemPropertiesT.setDlqOriginalTopicId(Long.parseLong(dlqOriginalTopicId));
         }
@@ -203,9 +204,10 @@ public class FlatMessageUtil {
         if (systemProperties.traceContext() != null) {
             MessageAccessor.putProperty(messageExt, MessageConst.PROPERTY_TRACE_CONTEXT, systemProperties.traceContext());
         }
-        if (systemProperties.dlqOriginalTopicId() != -1) {
-            MessageAccessor.putProperty(messageExt, MessageConst.PROPERTY_DLQ_ORIGIN_TOPIC, String.valueOf(systemProperties.dlqOriginalTopicId()));
+        if (systemProperties.dlqOriginalTopicId() != 0) {
+            MessageAccessor.putProperty(messageExt, MessageConstants.PROPERTY_DLQ_ORIGIN_TOPIC_ID, String.valueOf(systemProperties.dlqOriginalTopicId()));
         }
+        // TODO: set MessageConstants#PROPERTY_DLQ_ORIGIN_TOPIC
         if (systemProperties.dlqOriginalMessageId() != null) {
             MessageAccessor.putProperty(messageExt, MessageConst.PROPERTY_DLQ_ORIGIN_MESSAGE_ID, String.valueOf(systemProperties.dlqOriginalMessageId()));
         }

@@ -53,6 +53,11 @@ public class MockProxyMetadataService implements ProxyMetadataService {
     }
 
     @Override
+    public CompletableFuture<Topic> topicOf(long topicId) {
+        return null;
+    }
+
+    @Override
     public CompletableFuture<List<MessageQueueAssignment>> queueAssignmentsOf(String topicName) {
         return null;
     }
@@ -66,6 +71,11 @@ public class MockProxyMetadataService implements ProxyMetadataService {
     public CompletableFuture<ConsumerGroup> consumerGroupOf(String groupName) {
         long groupId = 8;
         return CompletableFuture.completedFuture(ConsumerGroup.newBuilder().setName(groupName).setGroupId(groupId).build());
+    }
+
+    @Override
+    public CompletableFuture<ConsumerGroup> consumerGroupOf(long consumerGroupId) {
+        return CompletableFuture.completedFuture(ConsumerGroup.newBuilder().setName("test").setGroupId(consumerGroupId).build());
     }
 
     @Override

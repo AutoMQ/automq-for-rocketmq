@@ -65,7 +65,7 @@ public class BrokerController implements Lifecycle {
         proxyMetadataService = new DefaultProxyMetadataService(metadataStore);
         storeMetadataService = new DefaultStoreMetadataService(metadataStore);
 
-        dlqService = new DLQService();
+        dlqService = new DLQService(brokerConfig, proxyMetadataService);
 
         MessageStoreImpl messageStore = MessageStoreBuilder.build(brokerConfig.store(), brokerConfig.s3Stream(), storeMetadataService, dlqService);
         this.messageStore = messageStore;

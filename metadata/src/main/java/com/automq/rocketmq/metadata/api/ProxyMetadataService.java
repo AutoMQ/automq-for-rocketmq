@@ -33,6 +33,14 @@ public interface ProxyMetadataService {
     CompletableFuture<Topic> topicOf(String topicName);
 
     /**
+     * Query the topic metadata of a given topic id.
+     *
+     * @param topicId topic id
+     * @return {@link CompletableFuture} of {@link Topic}
+     */
+    CompletableFuture<Topic> topicOf(long topicId);
+
+    /**
      * List all the queue assignments for a given topic that assigned to the current server.
      *
      * @param topicName topic name
@@ -54,6 +62,14 @@ public interface ProxyMetadataService {
      * @return {@link CompletableFuture} of {@link ConsumerGroup}
      */
     CompletableFuture<ConsumerGroup> consumerGroupOf(String groupName);
+
+    /**
+     * Query the consumer group metadata of a given group id
+     *
+     * @param consumerGroupId consumer group id
+     * @return {@link CompletableFuture} of {@link ConsumerGroup}
+     */
+    CompletableFuture<ConsumerGroup> consumerGroupOf(long consumerGroupId);
 
     /**
      * Query the consumer offset of a given consumer group, topic and queue.

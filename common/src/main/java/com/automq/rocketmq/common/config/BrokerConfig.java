@@ -53,6 +53,12 @@ public class BrokerConfig implements ControllerConfig {
      */
     private String advertiseAddress;
 
+    /**
+     * Access key and secret key for system internal access.
+     */
+    private String innerAccessKey;
+    private String innerSecretKey;
+
     private final MetricsConfig metrics;
     private final ProxyConfig proxy;
     private final StoreConfig store;
@@ -197,5 +203,21 @@ public class BrokerConfig implements ControllerConfig {
 
     public void setAdvertiseAddress(String advertiseAddress) {
         this.advertiseAddress = advertiseAddress;
+    }
+
+    public void setInnerAccessKey(String innerAccessKey) {
+        this.innerAccessKey = innerAccessKey;
+    }
+
+    public void setInnerSecretKey(String innerSecretKey) {
+        this.innerSecretKey = innerSecretKey;
+    }
+
+    public String getInnerAccessKey() {
+        return innerAccessKey;
+    }
+
+    public String getInnerSecretKey() {
+        return innerSecretKey;
     }
 }
