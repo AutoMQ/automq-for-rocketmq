@@ -31,6 +31,7 @@ public class ProxyConfiguration extends ConfigurationManager {
         innerConfig.setGrpcThreadPoolNums(config.grpcThreadPoolNums());
         innerConfig.setGrpcThreadPoolQueueCapacity(config.grpcThreadPoolQueueCapacity());
         innerConfig.setGrpcServerPort(config.getGrpcListenPort());
+        innerConfig.setRemotingListenPort(config.remotingListenPort());
         innerConfig.setGrpcMaxInboundMessageSize(config.grpcMaxInboundMessageSize());
         innerConfig.setGrpcClientIdleTimeMills(config.grpcClientIdleTimeMills());
         innerConfig.setEnableGrpcEpoll(config.enableGrpcEpoll());

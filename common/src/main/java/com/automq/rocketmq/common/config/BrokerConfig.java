@@ -118,12 +118,19 @@ public class BrokerConfig implements ControllerConfig {
             this.advertiseAddress = host + ":" + parsePort(bindAddress);
         }
 
-        if (parsePort(advertiseAddress) != parsePort(bindAddress)) {
+        int mainPort = parsePort(advertiseAddress);
+
+        if (mainPort != parsePort(bindAddress)) {
             throw new RocketMQException(500, "Listen port does not match advertise address port");
         }
 
         proxy.setHostName(parseHost(advertiseAddress));
-        proxy.setGrpcListenPort(parsePort(advertiseAddress));
+
+        // Use the main port as the Remoting port
+        proxy.setRemotingListenPort(mainPort);
+
+        // Use the main port + 1 as the gRPC port
+        proxy.setGrpcListenPort(mainPort + 1);
     }
 
     @Override
