@@ -18,15 +18,23 @@
 package com.automq.rocketmq.cli;
 
 import apache.rocketmq.controller.v1.Topic;
+import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.controller.metadata.GrpcControllerClient;
+import com.google.common.base.Strings;
 import java.util.concurrent.Callable;
 import picocli.CommandLine;
 
-@CommandLine.Command(name = "describeTopic", mixinStandardHelpOptions = true, showDefaultValues = true)
-public class DescribeTopic implements Callable<Void> {
+@CommandLine.Command(name = "updateTopic", mixinStandardHelpOptions = true, showDefaultValues = true)
+public class UpdateTopic implements Callable<Void> {
 
-    @CommandLine.Option(names = {"-t", "--topicName"}, description = "Topic name", required = true)
+    @CommandLine.Option(names = {"-i", "--topicId"}, description = "Topic ID", required = true)
+    long topicId;
+
+    @CommandLine.Option(names = {"-t", "--topicName"}, description = "Topic name")
     String topicName;
+
+    @CommandLine.Option(names = {"-q", "--queueNumber"}, description = "Queue number")
+    int queueNumber = 0;
 
     @CommandLine.ParentCommand
     MQAdmin mqAdmin;
@@ -34,12 +42,24 @@ public class DescribeTopic implements Callable<Void> {
     @Override
     public Void call() throws Exception {
         try (GrpcControllerClient client = new GrpcControllerClient()) {
-            Topic topic = client.describeTopic(mqAdmin.endpoint, null, topicName)
+            Topic topic = client.describeTopic(mqAdmin.endpoint, topicId, null)
                 .join();
             if (null == topic) {
                 System.err.printf("Topic '%s' is not found%n%n", topicName);
                 return null;
             }
+
+            UpdateTopicRequest.Builder builder = UpdateTopicRequest.newBuilder()
+                .setTopicId(topicId);
+            if (queueNumber > topic.getCount()) {
+                builder.setCount(queueNumber);
+            }
+
+            if (!Strings.isNullOrEmpty(topicName)) {
+                builder.setName(topicName);
+            }
+            client.updateTopic(mqAdmin.endpoint, builder.build()).join();
+            topic = client.describeTopic(mqAdmin.endpoint, topicId, null).join();
             ConsoleHelper.printTable(topic);
         }
         return null;

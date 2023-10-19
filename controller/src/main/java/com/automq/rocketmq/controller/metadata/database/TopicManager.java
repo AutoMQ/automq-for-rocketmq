@@ -179,12 +179,18 @@ public class TopicManager {
                         changed = true;
                     }
 
-                    // Update queue nums
+                    // Update queue number
                     if (null != queueNumber && !queueNumber.equals(topic.getQueueNum())) {
                         if (queueNumber > topic.getQueueNum()) {
-                            createQueues(IntStream.range(topic.getQueueNum(), queueNumber), topic.getId(), session);
+                            IntStream range = IntStream.range(topic.getQueueNum(), queueNumber);
+                            List<QueueAssignment> assignments = createQueues(range, topic.getId(), session);
+                            assignmentCache.apply(assignments);
+                            topic.setQueueNum(queueNumber);
+                            changed = true;
+                        } else {
+                            // Ignore queue number field if not enlarged
+                            topic.setQueueNum(null);
                         }
-                        changed = true;
                     }
 
                     if (changed) {
