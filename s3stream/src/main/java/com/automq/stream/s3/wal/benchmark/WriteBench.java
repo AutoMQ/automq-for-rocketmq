@@ -28,9 +28,8 @@ import net.sourceforge.argparse4j.helper.HelpScreenException;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
 import net.sourceforge.argparse4j.inf.Namespace;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -41,21 +40,21 @@ import java.util.concurrent.locks.LockSupport;
  * WriteBench is a tool for benchmarking write performance of {@link BlockWALService}
  */
 public class WriteBench implements AutoCloseable {
-    private static final Logger LOGGER = LoggerFactory.getLogger(WriteBench.class);
-
     private static final int LOG_INTERVAL_SECONDS = 1;
 
     private final WriteAheadLog log;
 
-    public WriteBench(Config config) {
+    public WriteBench(Config config) throws IOException {
         BlockWALService.BlockWALServiceBuilder builder = BlockWALService.builder(config.path, config.capacity);
         if (config.depth != null) {
             builder.ioThreadNums(config.depth);
         }
         this.log = builder.build();
+        this.log.start();
+        this.log.reset();
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
         Namespace ns = null;
         ArgumentParser parser = Config.parser();
         try {
@@ -74,10 +73,10 @@ public class WriteBench implements AutoCloseable {
     }
 
     private void run(Config config) {
-        LOGGER.info("Starting benchmark");
+        System.out.println("Starting benchmark");
 
         ExecutorService executor = Threads.newFixedThreadPool(
-                config.threads, ThreadUtils.createThreadFactory("append-thread-%d", false), LOGGER);
+                config.threads, ThreadUtils.createThreadFactory("append-thread-%d", false), null);
         AppendTaskConfig appendTaskConfig = new AppendTaskConfig(config);
         for (int i = 0; i < config.threads; i++) {
             int index = i;
@@ -85,25 +84,26 @@ public class WriteBench implements AutoCloseable {
                 try {
                     runAppendTask(index, appendTaskConfig);
                 } catch (Exception e) {
-                    LOGGER.error("Append task failed", e);
+                    System.err.printf("Append task %d failed, %s\n", index, e.getMessage());
+                    e.printStackTrace();
                 }
             });
         }
 
         executor.shutdown();
         try {
-            if (!executor.awaitTermination(config.durationSeconds, TimeUnit.SECONDS)) {
+            if (!executor.awaitTermination(config.durationSeconds + 10, TimeUnit.SECONDS)) {
                 executor.shutdownNow();
             }
         } catch (InterruptedException e) {
             executor.shutdownNow();
         }
 
-        LOGGER.info("Benchmark finished");
+        System.out.println("Benchmark finished");
     }
 
     private void runAppendTask(int index, AppendTaskConfig config) throws Exception {
-        LOGGER.info("Append task {} started", index);
+        System.out.printf("Append task %d started\n", index);
 
         byte[] bytes = new byte[config.recordSizeBytes];
         new Random().nextBytes(bytes);
@@ -137,12 +137,12 @@ public class WriteBench implements AutoCloseable {
                 long costNanosValue = costNanos.getAndSet(0);
                 long maxCostNanosValue = maxCostNanos.getAndSet(0);
                 if (0 != countValue) {
-                    LOGGER.info("Append task {} | Append Rate {} msg/s {} KB/s | Avg Latency {} ms | Max Latency {} ms",
+                    System.out.printf("Append task %d | Append Rate %d msg/s %.2f KB/s | Avg Latency %.3f ms | Max Latency %.3f ms\n",
                             index,
                             countValue / LOG_INTERVAL_SECONDS,
-                            (countValue * config.recordSizeBytes) / LOG_INTERVAL_SECONDS / (1 << 10),
-                            TimeUnit.NANOSECONDS.toMillis(costNanosValue / countValue),
-                            TimeUnit.NANOSECONDS.toMillis(maxCostNanosValue));
+                            (countValue * config.recordSizeBytes) / LOG_INTERVAL_SECONDS / 1024.0,
+                            costNanosValue / 1_000_000.0 / countValue,
+                            maxCostNanosValue / 1_000_000.0);
                     lastLogTimeMillis = now;
                 }
             }
@@ -157,7 +157,7 @@ public class WriteBench implements AutoCloseable {
             });
         }
 
-        LOGGER.info("Append task {} finished", index);
+        System.out.printf("Append task %d finished\n", index);
     }
 
     static class Config {
@@ -192,8 +192,8 @@ public class WriteBench implements AutoCloseable {
                     .required(true)
                     .help("Path of the WAL file");
             parser.addArgument("-c", "--capacity")
-                    .required(true)
                     .type(Long.class)
+                    .setDefault((long) 1 << 30)
                     .help("Capacity of the WAL in bytes");
             parser.addArgument("-d", "--depth")
                     .type(Integer.class)
@@ -207,6 +207,7 @@ public class WriteBench implements AutoCloseable {
                     .setDefault(1 << 20)
                     .help("Expected throughput in total in bytes per second");
             parser.addArgument("--record-size")
+                    .dest("recordSize")
                     .type(Integer.class)
                     .setDefault(1 << 10)
                     .help("Size of each record in bytes");
