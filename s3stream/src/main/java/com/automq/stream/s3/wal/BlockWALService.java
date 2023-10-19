@@ -146,9 +146,9 @@ public class BlockWALService implements WriteAheadLog {
         this.flushWALHeaderScheduler.scheduleAtFixedRate(() -> {
             try {
                 BlockWALService.this.flushWALHeader(
-                        this.slidingWindowService.getWindowCoreData().getWindowStartOffset().get(),
-                        this.slidingWindowService.getWindowCoreData().getWindowMaxLength().get(),
-                        this.slidingWindowService.getWindowCoreData().getWindowNextWriteOffset().get(),
+                        this.slidingWindowService.getWindowCoreData().getWindowStartOffset(),
+                        this.slidingWindowService.getWindowCoreData().getWindowMaxLength(),
+                        this.slidingWindowService.getWindowCoreData().getWindowNextWriteOffset(),
                         ShutdownType.UNGRACEFULLY);
             } catch (IOException ignored) {
             }
@@ -372,9 +372,9 @@ public class BlockWALService implements WriteAheadLog {
         boolean gracefulShutdown = slidingWindowService.shutdown(1, TimeUnit.DAYS);
         try {
             flushWALHeader(
-                    slidingWindowService.getWindowCoreData().getWindowStartOffset().get(),
-                    slidingWindowService.getWindowCoreData().getWindowMaxLength().get(),
-                    slidingWindowService.getWindowCoreData().getWindowNextWriteOffset().get(),
+                    slidingWindowService.getWindowCoreData().getWindowStartOffset(),
+                    slidingWindowService.getWindowCoreData().getWindowMaxLength(),
+                    slidingWindowService.getWindowCoreData().getWindowNextWriteOffset(),
                     gracefulShutdown ? ShutdownType.GRACEFULLY : ShutdownType.UNGRACEFULLY
             );
         } catch (IOException e) {
@@ -438,9 +438,9 @@ public class BlockWALService implements WriteAheadLog {
             @Override
             public void flushWALHeader(long windowMaxLength) throws IOException {
                 BlockWALService.this.flushWALHeader(
-                        slidingWindowService.getWindowCoreData().getWindowStartOffset().get(),
+                        slidingWindowService.getWindowCoreData().getWindowStartOffset(),
                         windowMaxLength,
-                        slidingWindowService.getWindowCoreData().getWindowNextWriteOffset().get(),
+                        slidingWindowService.getWindowCoreData().getWindowNextWriteOffset(),
                         ShutdownType.UNGRACEFULLY
                 );
             }
@@ -480,9 +480,9 @@ public class BlockWALService implements WriteAheadLog {
     public CompletableFuture<Void> reset() {
         checkReadyToServe();
 
-        long previousNextWriteOffset = slidingWindowService.getWindowCoreData().getWindowNextWriteOffset().get();
-        slidingWindowService.getWindowCoreData().getWindowStartOffset().set(previousNextWriteOffset + WALUtil.BLOCK_SIZE);
-        slidingWindowService.getWindowCoreData().getWindowNextWriteOffset().set(previousNextWriteOffset + WALUtil.BLOCK_SIZE);
+        long previousNextWriteOffset = slidingWindowService.getWindowCoreData().getWindowNextWriteOffset();
+        slidingWindowService.getWindowCoreData().setWindowStartOffset(previousNextWriteOffset + WALUtil.BLOCK_SIZE);
+        slidingWindowService.getWindowCoreData().setWindowNextWriteOffset(previousNextWriteOffset + WALUtil.BLOCK_SIZE);
         LOGGER.info("reset sliding window and trim WAL to offset: {}", previousNextWriteOffset);
         return trim(previousNextWriteOffset);
     }
@@ -491,16 +491,16 @@ public class BlockWALService implements WriteAheadLog {
     public CompletableFuture<Void> trim(long offset) {
         checkReadyToServe();
 
-        if (offset >= slidingWindowService.getWindowCoreData().getWindowStartOffset().get()) {
+        if (offset >= slidingWindowService.getWindowCoreData().getWindowStartOffset()) {
             throw new IllegalArgumentException("failed to trim: record at offset " + offset + " has not been flushed yet");
         }
 
         walHeaderCoreData.updateTrimOffset(offset);
         return CompletableFuture.runAsync(() -> {
             // TODO: more beautiful
-            this.walHeaderCoreData.setSlidingWindowStartOffset(slidingWindowService.getWindowCoreData().getWindowStartOffset().get());
-            this.walHeaderCoreData.setSlidingWindowNextWriteOffset(slidingWindowService.getWindowCoreData().getWindowNextWriteOffset().get());
-            this.walHeaderCoreData.setSlidingWindowMaxLength(slidingWindowService.getWindowCoreData().getWindowMaxLength().get());
+            this.walHeaderCoreData.setSlidingWindowStartOffset(slidingWindowService.getWindowCoreData().getWindowStartOffset());
+            this.walHeaderCoreData.setSlidingWindowNextWriteOffset(slidingWindowService.getWindowCoreData().getWindowNextWriteOffset());
+            this.walHeaderCoreData.setSlidingWindowMaxLength(slidingWindowService.getWindowCoreData().getWindowMaxLength());
             try {
                 flushWALHeader();
             } catch (IOException e) {
