@@ -55,6 +55,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * <p>
  * 3. Call {@link BlockWALService#reset} to reset the service. This will clear all records, so make sure
  * all recovered records are processed before calling this method.
+ * <p>
  * 4. Call {@link BlockWALService#append} to append records. As records are written in a circular way similar to
  * RingBuffer, if the caller does not call {@link BlockWALService#trim} in time, an {@link OverCapacityException}
  * will be thrown when calling {@link BlockWALService#append}.
