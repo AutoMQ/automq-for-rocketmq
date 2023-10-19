@@ -34,6 +34,9 @@ enum Code {
 
   // Broker nodes are unavailable
   NODE_UNAVAILABLE = 1006;
+
+  // Referenced
+  REFERENCED_AS_DEAD_LETTER_TOPIC = 1007;
 }
 
 message Status {
