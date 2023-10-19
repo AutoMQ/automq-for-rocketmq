@@ -342,12 +342,6 @@ public class MessageServiceImpl implements MessageService {
     }
 
     @Override
-    public CompletableFuture<PullResult> pullMessage(ProxyContext ctx, AddressableMessageQueue messageQueue,
-        PullMessageRequestHeader requestHeader, long timeoutMillis) {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
     public CompletableFuture<Long> queryConsumerOffset(ProxyContext ctx, AddressableMessageQueue messageQueue,
         QueryConsumerOffsetRequestHeader requestHeader, long timeoutMillis) {
         CompletableFuture<ConsumerGroup> consumeGroupFuture = metadataService.consumerGroupOf(requestHeader.getConsumerGroup());
@@ -368,39 +362,50 @@ public class MessageServiceImpl implements MessageService {
     }
 
     @Override
+    public CompletableFuture<PullResult> pullMessage(ProxyContext ctx, AddressableMessageQueue messageQueue,
+        PullMessageRequestHeader requestHeader, long timeoutMillis) {
+        // TODO: Support in the next iteration
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public CompletableFuture<Set<MessageQueue>> lockBatchMQ(ProxyContext ctx, AddressableMessageQueue messageQueue,
         LockBatchRequestBody requestBody, long timeoutMillis) {
+        // TODO: Support in the next iteration
         throw new UnsupportedOperationException();
     }
 
     @Override
     public CompletableFuture<Void> unlockBatchMQ(ProxyContext ctx, AddressableMessageQueue messageQueue,
         UnlockBatchRequestBody requestBody, long timeoutMillis) {
+        // TODO: Support in the next iteration
         throw new UnsupportedOperationException();
     }
 
     @Override
     public CompletableFuture<Long> getMaxOffset(ProxyContext ctx, AddressableMessageQueue messageQueue,
         GetMaxOffsetRequestHeader requestHeader, long timeoutMillis) {
+        // TODO: Support in the next iteration
         throw new UnsupportedOperationException();
     }
 
     @Override
     public CompletableFuture<Long> getMinOffset(ProxyContext ctx, AddressableMessageQueue messageQueue,
         GetMinOffsetRequestHeader requestHeader, long timeoutMillis) {
+        // TODO: Support in the next iteration
         throw new UnsupportedOperationException();
     }
 
     @Override
     public CompletableFuture<RemotingCommand> request(ProxyContext ctx, String brokerName, RemotingCommand request,
         long timeoutMillis) {
-        throw new UnsupportedOperationException();
+        throw new UnsupportedOperationException("Shouldn't call the method directly, we never implement it");
     }
 
     @Override
     public CompletableFuture<Void> requestOneway(ProxyContext ctx, String brokerName, RemotingCommand request,
         long timeoutMillis) {
-        throw new UnsupportedOperationException();
+        throw new UnsupportedOperationException("Shouldn't call the method directly, we never implement it");
     }
 
     private CompletableFuture<Topic> topicOf(String topicName) {
