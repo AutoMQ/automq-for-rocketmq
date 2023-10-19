@@ -375,6 +375,20 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     public void testCreateGroup() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
 
+        // Create dead letter topic first.
+        long topicId;
+        try (SqlSession session = getSessionFactory().openSession()) {
+            TopicMapper topicMapper = session.getMapper(TopicMapper.class);
+            Topic topic = new Topic();
+            topic.setName("T1");
+            topic.setStatus(TopicStatus.TOPIC_STATUS_ACTIVE);
+            topic.setQueueNum(4);
+            topic.setAcceptMessageTypes("abc");
+            topicMapper.create(topic);
+            topicId = topic.getId();
+            session.commit();
+        }
+
         try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
@@ -390,7 +404,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 CreateGroupRequest request = CreateGroupRequest.newBuilder()
                     .setGroupType(GroupType.GROUP_TYPE_STANDARD)
                     .setName("G-abc")
-                    .setDeadLetterTopicId(1)
+                    .setDeadLetterTopicId(topicId)
                     .setMaxRetryAttempt(5)
                     .build();
 
