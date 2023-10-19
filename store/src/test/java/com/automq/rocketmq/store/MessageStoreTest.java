@@ -42,11 +42,13 @@ import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.service.api.OperationLogService;
 import com.automq.stream.s3.operator.MemoryS3Operator;
 import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.rocketmq.common.UtilAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -116,7 +118,7 @@ public class MessageStoreTest {
         }
         List<String> receiptHandles = new ArrayList<>();
         // 2. pop 3 message
-        int invisibleDuration = 800;
+        int invisibleDuration = 50;
         PopResult popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, invisibleDuration).join();
         assertEquals(3, popResult.messageList().size());
         for (FlatMessageExt message : popResult.messageList()) {
@@ -140,12 +142,13 @@ public class MessageStoreTest {
         assertEquals(PopResult.Status.END_OF_QUEUE, popResult.status());
 
         // 6. after 1100ms, pop again
-        long reviveTimestamp = System.currentTimeMillis() + invisibleDuration;
-        await().until(() -> reviveService.reviveTimestamp() >= reviveTimestamp);
-        popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, invisibleDuration).join();
-        assertEquals(PopResult.Status.END_OF_QUEUE, popResult.status());
-        popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, true, invisibleDuration).join();
-        assertEquals(PopResult.Status.FOUND, popResult.status());
+        AtomicReference<PopResult> popRetryResult = new AtomicReference<>();
+        await().atMost(Duration.ofSeconds(3))
+            .until(() -> {
+                popRetryResult.set(messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, true, invisibleDuration).join());
+                return popRetryResult.get().status() == PopResult.Status.FOUND;
+            });
+        popResult = popRetryResult.get();
         assertEquals(3, popResult.messageList().size());
         assertEquals(0, popResult.messageList().get(0).offset());
         assertEquals(0, popResult.messageList().get(0).originalOffset());
@@ -157,13 +160,16 @@ public class MessageStoreTest {
         assertEquals(4, popResult.messageList().get(2).originalOffset());
         assertEquals(2, popResult.messageList().get(2).deliveryAttempts());
 
-        // 7. after 1100ms, pop again
-        long reviveTimestamp1 = System.currentTimeMillis() + invisibleDuration;
-        await().until(() -> reviveService.reviveTimestamp() >= reviveTimestamp1);
-
         popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, invisibleDuration).join();
         assertEquals(PopResult.Status.END_OF_QUEUE, popResult.status());
-        popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, true, invisibleDuration).join();
+
+        // 7. after 1100ms, pop again
+        await().atMost(Duration.ofSeconds(3))
+            .until(() -> {
+                popRetryResult.set(messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, true, invisibleDuration).join());
+                return popRetryResult.get().status() == PopResult.Status.FOUND;
+            });
+        popResult = popRetryResult.get();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(3, popResult.messageList().size());
         assertEquals(3, popResult.messageList().get(0).offset());
@@ -175,6 +181,9 @@ public class MessageStoreTest {
         assertEquals(5, popResult.messageList().get(2).offset());
         assertEquals(4, popResult.messageList().get(2).originalOffset());
         assertEquals(3, popResult.messageList().get(2).deliveryAttempts());
+
+        popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, invisibleDuration).join();
+        assertEquals(PopResult.Status.END_OF_QUEUE, popResult.status());
     }
 
     @Test
