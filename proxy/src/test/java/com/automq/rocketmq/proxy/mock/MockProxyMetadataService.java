@@ -26,7 +26,6 @@ import com.automq.rocketmq.metadata.api.ProxyMetadataService;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 public class MockProxyMetadataService implements ProxyMetadataService {
@@ -65,47 +64,23 @@ public class MockProxyMetadataService implements ProxyMetadataService {
 
     @Override
     public CompletableFuture<ConsumerGroup> consumerGroupOf(String groupName) {
-        long groupId = queryConsumerGroupId(groupName);
+        long groupId = 8;
         return CompletableFuture.completedFuture(ConsumerGroup.newBuilder().setName(groupName).setGroupId(groupId).build());
     }
 
     @Override
     public CompletableFuture<Long> consumerOffsetOf(long consumerGroupId, long topicId, int queueId) {
-        return CompletableFuture.completedFuture(queryConsumerOffset(consumerGroupId, topicId, queueId));
+        long offset = 0;
+        if (offsetMap.containsKey(consumerGroupId + topicId + queueId)) {
+            offset = offsetMap.get(consumerGroupId + topicId + queueId);
+        }
+        return CompletableFuture.completedFuture(offset);
     }
 
     @Override
     public CompletableFuture<Void> updateConsumerOffset(long consumerGroupId, long topicId, int queueId,
         long newOffset) {
-        updateConsumerOffset(consumerGroupId, topicId, queueId, newOffset, false);
+        offsetMap.put(consumerGroupId + topicId + queueId, newOffset);
         return CompletableFuture.completedFuture(null);
-    }
-
-    @Override
-    public long queryTopicId(String name) {
-        return 2;
-    }
-
-    @Override
-    public Set<Integer> queryAssignmentQueueSet(long topicId) {
-        return Set.of(0, 2, 4);
-    }
-
-    @Override
-    public long queryConsumerGroupId(String name) {
-        return 8;
-    }
-
-    @Override
-    public long queryConsumerOffset(long consumerGroupId, long topicId, int queueId) {
-        if (offsetMap.containsKey(consumerGroupId + topicId + queueId)) {
-            return offsetMap.get(consumerGroupId + topicId + queueId);
-        }
-        return 0;
-    }
-
-    @Override
-    public void updateConsumerOffset(long consumerGroupId, long topicId, int queueId, long offset, boolean retry) {
-        offsetMap.put(consumerGroupId + topicId + queueId, offset);
     }
 }

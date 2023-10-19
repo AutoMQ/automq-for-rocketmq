@@ -238,7 +238,7 @@ public class MessageStoreTest {
 
         // 11. after 1100ms, pop again
         long reviveTimestamp = System.currentTimeMillis() + invisibleDuration;
-        await().until(() -> reviveService.reviveTimestamp() >= reviveTimestamp);
+        await().until(() -> reviveService.reviveTimestamp() > reviveTimestamp);
 
         popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, true, false, invisibleDuration).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
@@ -294,7 +294,7 @@ public class MessageStoreTest {
 
         // 6. after 1100ms, pop again
         long reviveTimestamp = System.currentTimeMillis() + invisibleDuration;
-        await().until(() -> reviveService.reviveTimestamp() >= reviveTimestamp);
+        await().until(() -> reviveService.reviveTimestamp() > reviveTimestamp);
 
         popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, invisibleDuration).join();
         assertEquals(PopResult.Status.END_OF_QUEUE, popResult.status());

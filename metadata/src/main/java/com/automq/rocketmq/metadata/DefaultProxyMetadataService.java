@@ -24,7 +24,6 @@ import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.metadata.api.ProxyMetadataService;
 import com.google.common.base.Stopwatch;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,30 +80,5 @@ public class DefaultProxyMetadataService implements ProxyMetadataService {
     public CompletableFuture<Void> updateConsumerOffset(long consumerGroupId, long topicId, int queueId,
         long newOffset) {
         return metadataStore.commitOffset(consumerGroupId, topicId, queueId, newOffset);
-    }
-
-    @Override
-    public long queryTopicId(String name) {
-        return 0;
-    }
-
-    @Override
-    public Set<Integer> queryAssignmentQueueSet(long topicId) {
-        return null;
-    }
-
-    @Override
-    public long queryConsumerGroupId(String name) {
-        return 0;
-    }
-
-    @Override
-    public long queryConsumerOffset(long consumerGroupId, long topicId, int queueId) {
-        return 0;
-    }
-
-    @Override
-    public void updateConsumerOffset(long consumerGroupId, long topicId, int queueId, long offset, boolean retry) {
-
     }
 }
