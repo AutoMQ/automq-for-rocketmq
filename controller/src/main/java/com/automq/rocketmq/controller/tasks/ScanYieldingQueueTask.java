@@ -86,17 +86,28 @@ public class ScanYieldingQueueTask extends ScanTask {
         public void doNext() {
             DataStore dataStore = metadataStore.getDataStore();
             switch (next) {
-                case STORE_CLOSE -> closeQueue(dataStore,
-                    assignment.getTopicId(), assignment.getQueueId());
+                case STORE_CLOSE -> {
+                    LOGGER.info("Invoke DataStore to close queue[topic-id={}, queue-id={}]", assignment.getTopicId(),
+                        assignment.getQueueId());
+                    closeQueue(dataStore,
+                        assignment.getTopicId(), assignment.getQueueId());
+                }
 
-                case NOTIFY_LEADER -> ScanYieldingQueueTask.this.metadataStore
-                    .onQueueClosed(assignment.getTopicId(), assignment.getQueueId())
-                    .whenComplete((res, e) -> {
-                        if (null != e) {
-                            next = NextState.COMPLETED;
-                            doNext();
-                        }
-                    });
+                case NOTIFY_LEADER -> {
+                    LOGGER.info("Notify controller leader that DataStore has already closed queue[topic-id={}, queue-id={}]",
+                        assignment.getTopicId(), assignment.getQueueId());
+                    ScanYieldingQueueTask.this.metadataStore
+                        .onQueueClosed(assignment.getTopicId(), assignment.getQueueId())
+                        .whenComplete((res, e) -> {
+                            if (null != e) {
+                                next = NextState.COMPLETED;
+                                doNext();
+                                LOGGER.info("Controller leader has completed assignment/stream status update for " +
+                                    "topic-id={}, queue-id={}", assignment.getTopicId(), assignment.getQueueId());
+                            }
+                        });
+                }
+
                 case COMPLETED ->
                     ScanYieldingQueueTask.this.doComplete(assignment.getTopicId(), assignment.getQueueId());
             }
