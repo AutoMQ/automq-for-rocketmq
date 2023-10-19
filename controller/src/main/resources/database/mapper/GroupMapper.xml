@@ -47,7 +47,7 @@
         AND #{updateTime} >= update_time
     </delete>
 
-    <select id="list" resultType="Group">
+    <select id="byCriteria" resultType="Group" parameterType="GroupCriteria">
         SELECT id, name, status, dead_letter_topic_id, max_delivery_attempt, group_type, create_time, update_time
         FROM consumer_group
         WHERE 1 = 1
@@ -61,6 +61,10 @@
 
         <if test="null != status">
             AND status = #{status}
+        </if>
+
+        <if test="null != topicId">
+            AND dead_letter_topic_id = #{topicId}
         </if>
 
         <if test="null != updateTime">

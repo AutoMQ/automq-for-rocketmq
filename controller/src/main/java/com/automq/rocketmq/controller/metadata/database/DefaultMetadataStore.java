@@ -42,6 +42,7 @@ import com.automq.rocketmq.common.config.ControllerConfig;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.Role;
 import com.automq.rocketmq.controller.metadata.database.dao.Group;
+import com.automq.rocketmq.controller.metadata.database.dao.GroupCriteria;
 import com.automq.rocketmq.controller.metadata.database.dao.GroupProgress;
 import com.automq.rocketmq.controller.metadata.database.dao.Lease;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
@@ -597,7 +598,10 @@ public class DefaultMetadataStore implements MetadataStore {
 
                         // Verify Group exists.
                         GroupMapper groupMapper = session.getMapper(GroupMapper.class);
-                        List<Group> groups = groupMapper.list(groupId, null, GroupStatus.GROUP_STATUS_ACTIVE, null);
+                        List<Group> groups = groupMapper.byCriteria(GroupCriteria.newBuilder()
+                            .setGroupId(groupId)
+                            .setStatus(GroupStatus.GROUP_STATUS_ACTIVE)
+                            .build());
                         if (groups.size() != 1) {
                             String msg = String.format("Group[group-id=%d] is not found", groupId);
                             throw new CompletionException(new ControllerException(Code.NOT_FOUND_VALUE, msg));

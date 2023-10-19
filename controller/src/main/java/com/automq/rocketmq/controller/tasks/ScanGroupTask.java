@@ -20,6 +20,7 @@ package com.automq.rocketmq.controller.tasks;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.dao.Group;
+import com.automq.rocketmq.controller.metadata.database.dao.GroupCriteria;
 import com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper;
 import java.util.List;
 import org.apache.ibatis.session.SqlSession;
@@ -33,7 +34,7 @@ public class ScanGroupTask extends ScanTask {
     public void process() throws ControllerException {
         try (SqlSession session = metadataStore.openSession()) {
             GroupMapper mapper = session.getMapper(GroupMapper.class);
-            List<Group> groups = mapper.list(null, null, null, lastScanTime);
+            List<Group> groups = mapper.byCriteria(GroupCriteria.newBuilder().setLastUpdateTime(lastScanTime).build());
             metadataStore.applyGroupChange(groups);
 
             // Update last scan time

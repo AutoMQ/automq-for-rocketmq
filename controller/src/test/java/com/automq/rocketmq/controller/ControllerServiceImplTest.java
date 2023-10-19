@@ -62,6 +62,7 @@ import com.automq.rocketmq.controller.metadata.GrpcControllerClient;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.DefaultMetadataStore;
 import com.automq.rocketmq.controller.metadata.database.dao.Group;
+import com.automq.rocketmq.controller.metadata.database.dao.GroupCriteria;
 import com.automq.rocketmq.controller.metadata.database.dao.GroupProgress;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
@@ -482,7 +483,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
                 try (SqlSession session = getSessionFactory().openSession()) {
                     GroupMapper mapper = session.getMapper(GroupMapper.class);
-                    List<Group> groups = mapper.list(groupId, null, null, null);
+                    List<Group> groups = mapper.byCriteria(GroupCriteria.newBuilder().setGroupId(groupId).build());
                     Assertions.assertEquals(1, groups.size());
                     Group g = groups.get(0);
                     Assertions.assertEquals(GroupStatus.GROUP_STATUS_DELETED, g.getStatus());

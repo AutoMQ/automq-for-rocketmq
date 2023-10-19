@@ -19,6 +19,7 @@ package com.automq.rocketmq.controller.metadata;
 
 import apache.rocketmq.controller.v1.GroupStatus;
 import com.automq.rocketmq.controller.metadata.database.dao.Group;
+import com.automq.rocketmq.controller.metadata.database.dao.GroupCriteria;
 import com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper;
 import java.io.IOException;
 import java.util.List;
@@ -42,14 +43,14 @@ public class GroupTest extends DatabaseTestBase {
             group.setDeadLetterTopicId(2L);
             mapper.update(group);
 
-            List<Group> groups = mapper.list(null, null, null, null);
+            List<Group> groups = mapper.byCriteria(GroupCriteria.newBuilder().build());
             Assertions.assertEquals(1, groups.size());
             Group got = groups.get(0);
             Assertions.assertEquals("G1", got.getName());
             Assertions.assertEquals(GroupStatus.GROUP_STATUS_DELETED, got.getStatus());
             Assertions.assertEquals(2, got.getDeadLetterTopicId());
 
-            groups = mapper.list(null, null, GroupStatus.GROUP_STATUS_ACTIVE, null);
+            groups = mapper.byCriteria(GroupCriteria.newBuilder().setStatus(GroupStatus.GROUP_STATUS_ACTIVE).build());
             Assertions.assertTrue(groups.isEmpty());
 
             rowsAffected = mapper.delete(group.getId());
