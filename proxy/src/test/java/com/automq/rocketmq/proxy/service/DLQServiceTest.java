@@ -148,6 +148,12 @@ public class DLQServiceTest {
             .setName(DLQ_TOPIC_NAME)
             .addAcceptMessageTypes(MessageType.TRANSACTION)
             .build();
+        consumerGroup = ConsumerGroup.newBuilder()
+            .setGroupId(CONSUMER_GROUP_ID)
+            .setName(CONSUMER_GROUP_NAME)
+            .setGroupType(GroupType.GROUP_TYPE_STANDARD)
+            .setDeadLetterTopicId(DLQ_TOPIC_ID)
+            .build();
         Mockito.doReturn(CompletableFuture.completedFuture(dlqTopic))
             .when(metadataService).topicOf(DLQ_TOPIC_ID);
         Mockito.doReturn(CompletableFuture.completedFuture(consumerGroup))
