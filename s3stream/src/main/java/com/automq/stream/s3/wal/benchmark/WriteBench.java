@@ -4,6 +4,8 @@ import com.automq.stream.s3.wal.BlockWALService;
 import com.automq.stream.s3.wal.WriteAheadLog;
 import com.automq.stream.utils.ThreadUtils;
 import com.automq.stream.utils.Threads;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.helper.HelpScreenException;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
@@ -12,14 +14,19 @@ import net.sourceforge.argparse4j.inf.Namespace;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.LockSupport;
 
 /**
  * WriteBench is a tool for benchmarking write performance of {@link BlockWALService}
  */
 public class WriteBench implements AutoCloseable {
     private static final Logger LOGGER = LoggerFactory.getLogger(WriteBench.class);
+
+    private static final int LOG_INTERVAL_SECONDS = 1;
 
     private final WriteAheadLog log;
 
@@ -79,7 +86,61 @@ public class WriteBench implements AutoCloseable {
     }
 
     private void runAppendTask(int index, AppendTaskConfig config) throws Exception {
-        // TODO
+        LOGGER.info("Append task {} started", index);
+
+        byte[] bytes = new byte[config.recordSizeBytes];
+        new Random().nextBytes(bytes);
+        ByteBuf payload = Unpooled.wrappedBuffer(bytes).retain();
+        int intervalNanos = (int) TimeUnit.SECONDS.toNanos(1) / Math.max(1, config.throughputBytes / config.recordSizeBytes);
+        long lastAppendTimeNanos = System.nanoTime();
+        long lastLogTimeMillis = System.currentTimeMillis();
+        long taskStartTimeMillis = System.currentTimeMillis();
+        AtomicLong count = new AtomicLong();
+        AtomicLong costNanos = new AtomicLong();
+        AtomicLong maxCostNanos = new AtomicLong();
+
+        while (true) {
+            while (true) {
+                long now = System.nanoTime();
+                long elapsedNanos = now - lastAppendTimeNanos;
+                if (elapsedNanos >= intervalNanos) {
+                    lastAppendTimeNanos = now;
+                    break;
+                }
+                LockSupport.parkNanos(intervalNanos - elapsedNanos);
+            }
+
+            long now = System.currentTimeMillis();
+            if (now - taskStartTimeMillis > TimeUnit.SECONDS.toMillis(config.durationSeconds)) {
+                break;
+            }
+
+            if (now - lastLogTimeMillis > TimeUnit.SECONDS.toMillis(LOG_INTERVAL_SECONDS)) {
+                long countValue = count.getAndSet(0);
+                long costNanosValue = costNanos.getAndSet(0);
+                long maxCostNanosValue = maxCostNanos.getAndSet(0);
+                if (0 != countValue) {
+                    LOGGER.info("Append task {} | Append Rate {} msg/s {} KB/s | Avg Latency {} ms | Max Latency {} ms",
+                            index,
+                            countValue / LOG_INTERVAL_SECONDS,
+                            (countValue * config.recordSizeBytes) / LOG_INTERVAL_SECONDS / (1 << 10),
+                            TimeUnit.NANOSECONDS.toMillis(costNanosValue / countValue),
+                            TimeUnit.NANOSECONDS.toMillis(maxCostNanosValue));
+                    lastLogTimeMillis = now;
+                }
+            }
+
+            long appendStartTimeNanos = System.nanoTime();
+            WriteAheadLog.AppendResult result = log.append(payload);
+            result.future().thenAccept(v -> {
+                long costNanosValue = System.nanoTime() - appendStartTimeNanos;
+                count.incrementAndGet();
+                costNanos.addAndGet(costNanosValue);
+                maxCostNanos.accumulateAndGet(costNanosValue, Math::max);
+            });
+        }
+
+        LOGGER.info("Append task {} finished", index);
     }
 
     static class Config {
