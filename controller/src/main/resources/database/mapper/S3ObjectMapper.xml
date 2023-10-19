@@ -42,11 +42,11 @@
     </update>
 
     <delete id="delete">
-        DELETE FROM s3object
-        WHERE 1 = 1
-        <if test="null != id">
-            id = #{id}
-        </if>
+        DELETE
+        FROM s3object
+        <where>
+            <if test="null != id">id = #{id}</if>
+        </where>
     </delete>
 
     <delete id="batchDelete">
@@ -76,13 +76,10 @@
         SELECT id, object_size, stream_id, prepared_timestamp, committed_timestamp, expired_timestamp,
         marked_for_deletion_timestamp, state
         FROM s3object
-        WHERE 1 = 1
-        <if test="null != state">
-            AND state = #{state}
-        </if>
-        <if test="null != streamId">
-            AND stream_id = #{streamId}
-        </if>
+        <where>
+            <if test="null != state">state = #{state}</if>
+            <if test="null != streamId">AND stream_id = #{streamId}</if>
+        </where>
     </select>
     
 </mapper>

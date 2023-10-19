@@ -28,16 +28,11 @@
     <select id="list" resultType="Subscription">
         SELECT id, group_id, topic_id, expression, create_time, update_time
         FROM subscription
-        WHERE 1 = 1
-        <if test="null != groupId">
-            AND group_id = #{groupId}
-        </if>
-        <if test="null != topicId">
-            AND topic_id = #{topicId}
-        </if>
-        <if test="null != updateTime">
-            AND update_time >= #{updateTime}
-        </if>
+        <where>
+            <if test="null != groupId">group_id = #{groupId}</if>
+            <if test="null != topicId">AND topic_id = #{topicId}</if>
+            <if test="null != updateTime">AND update_time >= #{updateTime}</if>
+        </where>
     </select>
 
 

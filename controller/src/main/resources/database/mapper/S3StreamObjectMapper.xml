@@ -81,16 +81,11 @@
     <delete id="delete">
         DELETE
         FROM s3streamobject
-        WHERE 1 = 1
-        <if test="null != id">
-            AND id = #{id}
-        </if>
-        <if test="null != objectId">
-            AND object_id = #{objectId}
-        </if>
-        <if test="null != streamId">
-            AND stream_id = #{streamId}
-        </if>
+        <where>
+            <if test="null != id">id = #{id}</if>
+            <if test="null != objectId">AND object_id = #{objectId}</if>
+            <if test="null != streamId">AND stream_id = #{streamId}</if>
+        </where>
     </delete>
 
     <delete id="batchDelete">
@@ -112,19 +107,12 @@
     <select id="list" resultType="S3StreamObject">
         SELECT id, object_id, object_size, stream_id, start_offset, end_offset, base_data_timestamp, committed_timestamp
         FROM s3streamobject
-        WHERE 1 = 1
-        <if test="null != objectId">
-            AND object_id = #{objectId}
-        </if>
-        <if test="null != streamId">
-            AND stream_id = #{streamId}
-        </if>
-        <if test="null != startOffset">
-            AND start_offset &lt;= #{endOffset}
-        </if>
-        <if test="null != endOffset">
-            AND end_offset &gt; #{startOffset}
-        </if>
+        <where>
+            <if test="null != objectId">object_id = #{objectId}</if>
+            <if test="null != streamId">AND stream_id = #{streamId}</if>
+            <if test="null != startOffset">AND start_offset &lt;= #{endOffset}</if>
+            <if test="null != endOffset">AND end_offset &gt; #{startOffset}</if>
+        </where>
         ORDER BY start_offset ASC
         <if test="null != limit">
             LIMIT #{limit}
