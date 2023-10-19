@@ -671,6 +671,8 @@ public class DefaultMetadataStore implements MetadataStore {
                     StreamMapper streamMapper = session.getMapper(StreamMapper.class);
                     streamMapper.updateStreamState(null, topicId, queueId, StreamState.CLOSED);
                     session.commit();
+                    LOGGER.info("Update status of queue assignment and stream since all its belonging streams are closed," +
+                        " having topic-id={}, queue-id={}", topicId, queueId);
                     future.complete(null);
                     return future;
                 }
