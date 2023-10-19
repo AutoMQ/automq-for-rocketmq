@@ -24,10 +24,12 @@ import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.ibatis.session.SqlSession;
 
 public class SchedulerTask extends ControllerTask {
@@ -56,26 +58,86 @@ public class SchedulerTask extends ControllerTask {
                 .stream()
                 .filter(assignment -> assignment.getStatus() != AssignmentStatus.ASSIGNMENT_STATUS_DELETED)
                 .toList();
-            Map<Integer, List<QueueAssignment>> workload = new HashMap<>();
-            assignments.forEach(assignment -> {
-                if (!workload.containsKey(assignment.getDstNodeId())) {
-                    workload.put(assignment.getDstNodeId(), new ArrayList<>());
-                }
-                workload.get(assignment.getDstNodeId()).add(assignment);
-            });
 
-            if (doSchedule(session, workload)) {
+            Map<Integer, List<QueueAssignment>> workload = new HashMap<>();
+            // Assignment that is orphan or about to be orphan.
+            Map<Integer, List<QueueAssignment>> orphan = new HashMap<>();
+            metadataStore
+                .allNodes()
+                .values()
+                .forEach(node -> {
+                    if (node.isAlive(metadataStore.config()) && !node.isGoingAway()) {
+                        workload.put(node.getNode().getId(), new ArrayList<>());
+                    } else {
+                        orphan.put(node.getNode().getId(), new ArrayList<>());
+                    }
+                });
+
+            assignments
+                .forEach(assignment -> {
+                    if (workload.containsKey(assignment.getDstNodeId())) {
+                        workload.get(assignment.getDstNodeId()).add(assignment);
+                    }
+
+                    if (orphan.containsKey(assignment.getDstNodeId())) {
+                        orphan.get(assignment.getDstNodeId()).add(assignment);
+                    }
+                });
+
+            if (doSchedule(session, workload, orphan)) {
                 session.commit();
             }
         }
     }
 
-    private boolean doSchedule(SqlSession session, Map<Integer, List<QueueAssignment>> workload) {
-        boolean changed = false;
+    private int pick(Map<Integer, List<QueueAssignment>> workload) {
+        int id = 0;
+        int load = Integer.MAX_VALUE;
+        for (Map.Entry<Integer, List<QueueAssignment>> entry : workload.entrySet()) {
+            if (entry.getValue().size() <= load) {
+                id = entry.getKey();
+                load = entry.getValue().size();
+            }
+        }
+        return id;
+    }
+
+    private boolean doSchedule(SqlSession session,
+        Map<Integer, List<QueueAssignment>> workload,
+        Map<Integer, List<QueueAssignment>> orphan) {
+        AtomicBoolean changed = new AtomicBoolean(false);
 
         QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
         StreamMapper streamMapper = session.getMapper(StreamMapper.class);
 
+        if (!orphan.isEmpty()) {
+            if (workload.isEmpty()) {
+                LOGGER.warn("No serving node is available");
+                return false;
+            }
+
+            orphan.values().stream().flatMap(Collection::stream)
+                .filter(assignment -> assignment.getStatus() == AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNED)
+                .forEach(assignment -> {
+                    // Pick a destination node that serves the fewest queues and streams.
+                    int dst = pick(workload);
+                    assignment.setSrcNodeId(assignment.getDstNodeId());
+                    assignment.setDstNodeId(dst);
+                    assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_YIELDING);
+                    assignmentMapper.update(assignment);
+                    workload.get(dst).add(assignment);
+                    LOGGER.info("Let Node[node-id={}] yield queue[topic-id={}, queue-id={}] to Node[node-id={}]",
+                        assignment.getSrcNodeId(), assignment.getTopicId(), assignment.getQueueId(),
+                        assignment.getDstNodeId());
+                    int cnt = streamMapper.planMove(assignment.getTopicId(), assignment.getQueueId(), assignment.getSrcNodeId(),
+                        assignment.getDstNodeId());
+                    LOGGER.info("Moved Queue[topic-id={}, queue-id={}], containing {} streams, from Node[node-id={}] to Node[node-id={}]",
+                        assignment.getTopicId(), assignment.getQueueId(), cnt, assignment.getSrcNodeId(), assignment.getDstNodeId());
+                    changed.set(true);
+                });
+        }
+
+        // Ensure workload among active nodes are balanced.
         for (; ; ) {
 
             if (workload.isEmpty()) {
@@ -88,6 +150,7 @@ public class SchedulerTask extends ControllerTask {
 
             int dst = -1;
 
+            // Find nodes that has the most and fewest queues assigned or yielded to
             List<QueueAssignment> max = null;
             List<QueueAssignment> min = null;
             for (Map.Entry<Integer, List<QueueAssignment>> entry : workload.entrySet()) {
@@ -102,6 +165,8 @@ public class SchedulerTask extends ControllerTask {
             }
 
             if (max.size() <= min.size() + metadataStore.config().workloadTolerance()) {
+                LOGGER.debug("Workload are already balanced, delta: {}, tolerance: {}", max.size() - min.size(),
+                    metadataStore.config().workloadTolerance());
                 break;
             }
 
@@ -114,6 +179,7 @@ public class SchedulerTask extends ControllerTask {
                     assignment.setSrcNodeId(assignment.getDstNodeId());
                     assert dst != -1;
                     assignment.setDstNodeId(dst);
+                    assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_YIELDING);
                     min.add(assignment);
 
                     assignmentMapper.update(assignment);
@@ -121,18 +187,18 @@ public class SchedulerTask extends ControllerTask {
                         assignment.getDstNodeId());
                     LOGGER.info("Moved Queue[topic-id={}, queue-id={}], containing {} streams, from Node[node-id={}] to Node[node-id={}]",
                         assignment.getTopicId(), assignment.getQueueId(), cnt, assignment.getSrcNodeId(), assignment.getDstNodeId());
-                    changed = true;
+                    changed.set(true);
                     reassign = true;
                     break;
                 }
             }
 
             if (!reassign) {
-                // One of the node is not working properly, let's wait till the cluster runs stable
+                // One of the node is not working properly, let's wait till the cluster stabilizes.
                 break;
             }
         }
 
-        return changed;
+        return changed.get();
     }
 }

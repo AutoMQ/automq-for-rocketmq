@@ -172,7 +172,7 @@ public class DefaultMetadataStore implements MetadataStore {
         this.scheduledExecutorService.scheduleWithFixedDelay(new ScanYieldingQueueTask(this), 1,
             config.scanIntervalInSecs(), TimeUnit.SECONDS);
         this.scheduledExecutorService.scheduleWithFixedDelay(new SchedulerTask(this), 1,
-            config.scanIntervalInSecs(), TimeUnit.SECONDS);
+            config.balanceWorkloadIntervalInSecs(), TimeUnit.SECONDS);
         this.scheduledExecutorService.scheduleAtFixedRate(new HeartbeatTask(this), 3,
             Math.max(config().nodeAliveIntervalInSecs() / 2, 10), TimeUnit.SECONDS);
         this.scheduledExecutorService.scheduleWithFixedDelay(new RecycleTopicTask(this), 1,

@@ -55,11 +55,15 @@ public interface ControllerConfig {
         return 300;
     }
 
+    default int balanceWorkloadIntervalInSecs() {
+        return 10;
+    }
+
     /**
      * @return Tolerance of workload unfairness among nodes in terms of stream number.
      */
     default int workloadTolerance() {
-        return 3;
+        return 1;
     }
 
     String dbUrl();
