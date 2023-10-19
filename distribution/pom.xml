@@ -61,6 +61,6 @@
                 </executions>
             </plugin>
         </plugins>
-        <finalName>rocketmq-on-s3-${project.version}</finalName>
+        <finalName>rocketmq-on-s3</finalName>
     </build>
 </project>
