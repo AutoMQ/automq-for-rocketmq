@@ -38,11 +38,9 @@ import com.automq.stream.s3.operator.S3Operator;
 import com.automq.stream.s3.streams.StreamManager;
 import com.automq.stream.s3.wal.BlockWALService;
 import com.automq.stream.s3.wal.WriteAheadLog;
-import com.automq.stream.utils.FutureUtil;
 import java.util.List;
-import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,8 +56,6 @@ public class S3StreamStore implements StreamStore {
     private final Storage storage;
     private final CompactionManager compactionManager;
     private final S3BlockCache blockCache;
-    // TODO: Should clean the closed streams to avoid memory leak.
-    private final Map<Long, Stream> openStreams = new ConcurrentHashMap<>();
 
     public S3StreamStore(S3StreamConfig streamConfig, StoreMetadataService metadataService, S3Operator operator) {
         this.s3Config = configFrom(streamConfig);
@@ -84,62 +80,71 @@ public class S3StreamStore implements StreamStore {
 
     @Override
     public CompletableFuture<FetchResult> fetch(long streamId, long startOffset, int maxCount) {
-        Stream stream = openStreams.get(streamId);
-        if (stream == null) {
+        Optional<Stream> stream = streamClient.getStream(streamId);
+        if (stream.isEmpty()) {
             throw new IllegalStateException("Stream " + streamId + " is not opened.");
         }
-        return stream.fetch(startOffset, startOffset + maxCount, Integer.MAX_VALUE);
+        return stream.get().fetch(startOffset, startOffset + maxCount, Integer.MAX_VALUE);
     }
 
     @Override
     public CompletableFuture<AppendResult> append(long streamId, RecordBatch recordBatch) {
-        Stream stream = openStreams.get(streamId);
-        if (stream == null) {
+        Optional<Stream> stream = streamClient.getStream(streamId);
+        if (stream.isEmpty()) {
             throw new IllegalStateException("Stream " + streamId + " is not opened.");
         }
-        return stream.append(recordBatch);
+        return stream.get().append(recordBatch);
     }
 
     @Override
     public CompletableFuture<Void> close(List<Long> streamIds) {
-        // TODO: Close Stream
-        return CompletableFuture.completedFuture(null);
+        List<CompletableFuture<Void>> futureList = streamIds.stream()
+            .map(streamId -> {
+                Optional<Stream> stream = streamClient.getStream(streamId);
+                if (stream.isEmpty()) {
+                    return stream.get().close();
+                }
+                return null;
+            })
+            .filter(x -> x != null)
+            .collect(java.util.stream.Collectors.toList());
+        return CompletableFuture.allOf(futureList.toArray(new CompletableFuture[0]));
     }
 
     @Override
     public CompletableFuture<Void> trim(long streamId, long newStartOffset) {
-        Stream stream = openStreams.get(streamId);
-        if (stream == null) {
+        Optional<Stream> stream = streamClient.getStream(streamId);
+        if (stream.isEmpty()) {
             throw new IllegalStateException("Stream " + streamId + " is not opened.");
         }
-        return stream.trim(newStartOffset);
+        return stream.get().trim(newStartOffset);
     }
 
     @Override
     public long startOffset(long streamId) {
-        Stream stream = openStreams.get(streamId);
-        if (stream == null) {
+        Optional<Stream> stream = streamClient.getStream(streamId);
+        if (stream.isEmpty()) {
             throw new IllegalStateException("Stream " + streamId + " is not opened.");
         }
-        return stream.startOffset();
+        return stream.get().startOffset();
     }
 
     @Override
     public long confirmOffset(long streamId) {
-        Stream stream = openStreams.get(streamId);
-        if (stream == null) {
+        Optional<Stream> stream = streamClient.getStream(streamId);
+        if (stream.isEmpty()) {
             throw new IllegalStateException("Stream " + streamId + " is not opened.");
         }
-        return stream.confirmOffset();
+        return stream.get().confirmOffset();
     }
 
     @Override
     public long nextOffset(long streamId) {
-        Stream stream = openStreams.get(streamId);
-        if (stream == null) {
+        Optional<Stream> stream = streamClient.getStream(streamId);
+        if (stream.isEmpty()) {
             throw new IllegalStateException("Stream " + streamId + " is not opened.");
         }
-        return stream.nextOffset();
+        return stream.get().nextOffset();
     }
 
     @Override
@@ -157,21 +162,18 @@ public class S3StreamStore implements StreamStore {
 
     @Override
     public CompletableFuture<Void> open(long streamId, long epoch) {
-        if (openStreams.containsKey(streamId)) {
+        Optional<Stream> optionalStream = streamClient.getStream(streamId);
+        if (optionalStream.isPresent()) {
             return CompletableFuture.completedFuture(null);
         }
 
         // Open the specified stream if not opened yet.
         OpenStreamOptions options = OpenStreamOptions.newBuilder().epoch(epoch).build();
         return streamClient.openStream(streamId, options)
-            .thenAccept(stream -> openStreams.put(streamId, stream))
-            .whenComplete((stream, ex) -> {
-                if (ex != null) {
-                    Throwable cause = FutureUtil.cause(ex);
-                    LOGGER.error("Failed to open stream {}", streamId, cause);
-                } else {
-                    LOGGER.info("Stream {} opened", streamId);
-                }
+            .thenAccept(stream -> LOGGER.info("Stream {} opened", streamId))
+            .exceptionally(throwable -> {
+                LOGGER.error("Failed to open stream {}", streamId, throwable);
+                return null;
             });
     }
 

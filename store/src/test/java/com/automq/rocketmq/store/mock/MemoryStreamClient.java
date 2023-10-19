@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
@@ -54,6 +55,11 @@ public class MemoryStreamClient implements StreamClient {
     public CompletableFuture<Stream> openStream(long streamId, OpenStreamOptions options) {
         Stream stream = streamMap.computeIfAbsent(streamId, MemoryStream::new);
         return CompletableFuture.completedFuture(stream);
+    }
+
+    @Override
+    public Optional<Stream> getStream(long streamId) {
+        return Optional.ofNullable(streamMap.get(streamId));
     }
 
     @Override
