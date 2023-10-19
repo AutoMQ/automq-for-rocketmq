@@ -17,8 +17,8 @@
 
 package com.automq.rocketmq.broker;
 
-import com.automq.rocketmq.broker.protocol.GrpcProtocolServer;
-import com.automq.rocketmq.broker.protocol.RemotingProtocolServer;
+import com.automq.rocketmq.proxy.grpc.GrpcProtocolServer;
+import com.automq.rocketmq.proxy.remoting.RemotingProtocolServer;
 import com.automq.rocketmq.common.api.DataStore;
 import com.automq.rocketmq.common.config.BrokerConfig;
 import com.automq.rocketmq.common.util.Lifecycle;
