@@ -191,11 +191,11 @@ public class WriteBench implements AutoCloseable {
             parser.addArgument("-p", "--path")
                     .required(true)
                     .help("Path of the WAL file");
-            parser.addArgument("—c", "--capacity")
+            parser.addArgument("-c", "--capacity")
                     .required(true)
                     .type(Long.class)
                     .help("Capacity of the WAL in bytes");
-            parser.addArgument("—d", "--depth")
+            parser.addArgument("-d", "--depth")
                     .type(Integer.class)
                     .help("IO depth of the WAL");
             parser.addArgument("--threads")
