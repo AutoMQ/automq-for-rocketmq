@@ -20,7 +20,6 @@ package com.automq.rocketmq.proxy.service;
 import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.metadata.api.ProxyMetadataService;
-import com.automq.rocketmq.proxy.model.ProxyContextExt;
 import com.automq.rocketmq.proxy.model.VirtualQueue;
 import com.google.common.collect.Lists;
 import com.google.common.net.HostAndPort;

@@ -15,17 +15,19 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.broker.protocol;
+package com.automq.rocketmq.proxy.remoting;
 
+import com.automq.rocketmq.proxy.remoting.activity.ExtendSendMessageActivity;
 import io.netty.channel.ChannelHandlerContext;
 import org.apache.rocketmq.proxy.processor.MessagingProcessor;
+import org.apache.rocketmq.proxy.remoting.pipeline.RequestPipeline;
 import org.apache.rocketmq.remoting.RemotingServer;
 import org.apache.rocketmq.remoting.netty.NettyRequestProcessor;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
-import org.apache.rocketmq.remoting.protocol.RemotingSysResponseCode;
 import org.apache.rocketmq.remoting.protocol.RequestCode;
 
 public class RemotingProtocolServer extends org.apache.rocketmq.proxy.remoting.RemotingProtocolServer {
+    private RequestPipeline requestPipeline;
     public RemotingProtocolServer(MessagingProcessor messagingProcessor) {
         super(messagingProcessor);
 
@@ -34,6 +36,21 @@ public class RemotingProtocolServer extends org.apache.rocketmq.proxy.remoting.R
 
         // Disable some features.
         narrowRequestCode();
+
+        // Replace some request code to use our own implementation.
+        replaceRequestCode();
+    }
+
+    /**
+     * S3RocketMQ will override some implementation of the remoting activities, replace them here.
+     */
+    private void replaceRequestCode() {
+        RemotingServer remotingServer = this.defaultRemotingServer;
+        ExtendSendMessageActivity sendMessageActivity = new ExtendSendMessageActivity(requestPipeline, messagingProcessor);
+        remotingServer.registerProcessor(RequestCode.SEND_MESSAGE, sendMessageActivity, this.defaultExecutor);
+        remotingServer.registerProcessor(RequestCode.SEND_MESSAGE_V2, sendMessageActivity, this.sendMessageExecutor);
+        remotingServer.registerProcessor(RequestCode.SEND_BATCH_MESSAGE, sendMessageActivity, this.sendMessageExecutor);
+        remotingServer.registerProcessor(RequestCode.CONSUMER_SEND_MSG_BACK, sendMessageActivity, sendMessageExecutor);
     }
 
     /**
@@ -55,12 +72,19 @@ public class RemotingProtocolServer extends org.apache.rocketmq.proxy.remoting.R
 
     }
 
+    @Override
+    protected RequestPipeline createRequestPipeline() {
+        // Cache the request pipeline, to avoid creating it multiple times.
+        // We may extend pipeline here in the future.
+        requestPipeline = super.createRequestPipeline();
+        return requestPipeline;
+    }
+
     static class DefaultRejectionProcessor implements NettyRequestProcessor {
         @Override
         public RemotingCommand processRequest(ChannelHandlerContext context,
             RemotingCommand command) {
-            String error = " request type " + command.getCode() + " not supported";
-            return RemotingCommand.createResponseCommand(RemotingSysResponseCode.REQUEST_CODE_NOT_SUPPORTED, error);
+            return RemotingUtil.notSupportedResponse(command);
         }
 
         @Override
