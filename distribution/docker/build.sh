@@ -17,5 +17,11 @@
 #
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-DIST_DIR="$(dirname "$SCRIPT_DIR")"
-"$SCRIPT_DIR"/run-server.sh com.automq.rocketmq.broker.BrokerStartup -c "$DIST_DIR/conf/broker.yaml"
+REPO_DIR=$(dirname "$(dirname "$SCRIPT_DIR")")
+cd "$REPO_DIR" || exit 1
+mvn package -Dmaven.test.skip=true
+cp distribution/target/rocketmq-on-s3.tar.gz "$SCRIPT_DIR"
+cd "$SCRIPT_DIR" || exit 1
+docker build -t rocketmq-on-s3:"$(uname -m)"-0.0.1 -f Dockerfile .
+
+
