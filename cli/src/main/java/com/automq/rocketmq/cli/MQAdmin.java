@@ -27,6 +27,7 @@ import picocli.CommandLine;
     subcommands = {
         CreateTopic.class,
         DescribeTopic.class,
+        UpdateTopic.class,
         CreateGroup.class,
         DescribeGroup.class,
         ProduceMessage.class,

@@ -263,6 +263,7 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
             if (request.getCount() > 0) {
                 queueNumber = request.getCount();
             }
+
             this.metadataStore.updateTopic(request.getTopicId(), request.getName(), queueNumber,
                     request.getAcceptMessageTypesList())
                 .whenComplete((res, e) -> {

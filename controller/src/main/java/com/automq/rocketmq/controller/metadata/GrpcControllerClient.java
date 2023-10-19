@@ -238,17 +238,20 @@ public class GrpcControllerClient implements ControllerClient {
     }
 
     @Override
-    public CompletableFuture<Topic> describeTopic(String target, Long topicId,
-        String topicName) {
+    public CompletableFuture<Topic> describeTopic(String target, Long topicId, String topicName) {
 
-        DescribeTopicRequest request = DescribeTopicRequest.newBuilder()
-            .setTopicId(null == topicId ? -1 : topicId)
-            .setTopicName(topicName)
-            .build();
+        DescribeTopicRequest.Builder builder = DescribeTopicRequest.newBuilder();
+        if (null != topicId && topicId > 0) {
+            builder.setTopicId(topicId);
+        }
+
+        if (!Strings.isNullOrEmpty(topicName)) {
+            builder.setTopicName(topicName.trim());
+        }
 
         CompletableFuture<Topic> future = new CompletableFuture<>();
         try {
-            Futures.addCallback(buildStubForTarget(target).describeTopic(request), new FutureCallback<>() {
+            Futures.addCallback(buildStubForTarget(target).describeTopic(builder.build()), new FutureCallback<>() {
                 @Override
                 public void onSuccess(DescribeTopicReply result) {
                     if (result.getStatus().getCode() == Code.OK) {
