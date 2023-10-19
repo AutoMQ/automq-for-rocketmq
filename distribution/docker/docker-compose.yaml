@@ -10,6 +10,9 @@ services:
       mysql-server:
         condition: service_healthy
         restart: true
+  tool:
+    image: "ubuntu:22.04"
+    command: ["sleep","infinity"]
   mysql-server:
     image: "mysql:8.1"
     command: --default-authentication-plugin=mysql_native_password
