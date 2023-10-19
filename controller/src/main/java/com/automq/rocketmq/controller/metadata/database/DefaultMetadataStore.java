@@ -219,8 +219,11 @@ public class DefaultMetadataStore implements MetadataStore {
                         NodeMapper nodeMapper = session.getMapper(NodeMapper.class);
                         Node node = nodeMapper.get(null, name, instanceId, null);
                         if (null != node) {
-                            nodeMapper.increaseEpoch(node.getId());
+                            if (!Strings.isNullOrEmpty(address)) {
+                                node.setAddress(address);
+                            }
                             node.setEpoch(node.getEpoch() + 1);
+                            nodeMapper.update(node);
                         } else {
                             LeaseMapper leaseMapper = session.getMapper(LeaseMapper.class);
                             Lease lease = leaseMapper.currentWithShareLock();

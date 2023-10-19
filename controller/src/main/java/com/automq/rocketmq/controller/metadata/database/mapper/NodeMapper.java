@@ -38,13 +38,7 @@ public interface NodeMapper {
         @Param("volumeId") String volumeId
     );
 
-    /**
-     * Increase term of the node for each registration.
-     *
-     * @param id ID of the broker whose term should be increased
-     * @return Number of rows affected, expected to be 1.
-     */
-    int increaseEpoch(int id);
+    void update(Node node);
 
     List<Node> list(@Param("updateTime") Date updateTime);
 

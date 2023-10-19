@@ -25,10 +25,21 @@
         VALUES (#{name}, #{instanceId}, #{volumeId}, #{hostName}, #{vpcId}, #{address})
     </insert>
 
-    <update id="increaseEpoch" parameterType="int">
+    <update id="update" parameterType="Node">
         UPDATE node
-        SET epoch = epoch + 1
-        WHERE id = #{id}
+        SET epoch = #{epoch}, address = #{address}
+        <if test="null != instanceId">, instance_id = #{instanceId}</if>
+        <if test="null != volumeId">, volume_id = #{volumeId}</if>
+        <if test="null != hostName">, host_name = #{hostName}</if>
+        <if test="null != vpcId">, vpc_id = #{vpcId}</if>
+        <where>
+            <if test="id > 0">
+                id = #{id}
+            </if>
+            <if test="null != name">
+                AND name = #{name}
+            </if>
+        </where>
     </update>
 
     <delete id="delete">
