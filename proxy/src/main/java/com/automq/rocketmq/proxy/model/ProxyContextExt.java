@@ -24,8 +24,14 @@ public class ProxyContextExt extends ProxyContext {
     private final Stopwatch stopwatch = Stopwatch.createStarted();
     private boolean suspended;
 
-    public static ProxyContext create() {
+    public static ProxyContextExt create() {
         return new ProxyContextExt();
+    }
+
+    public static ProxyContextExt create(ProxyContext context) {
+        ProxyContextExt contextExt = new ProxyContextExt();
+        contextExt.getValue().putAll(context.getValue());
+        return contextExt;
     }
 
     public boolean suspended() {
