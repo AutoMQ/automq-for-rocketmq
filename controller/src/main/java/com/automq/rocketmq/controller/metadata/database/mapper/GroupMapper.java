@@ -19,6 +19,7 @@ package com.automq.rocketmq.controller.metadata.database.mapper;
 
 import apache.rocketmq.controller.v1.GroupStatus;
 import com.automq.rocketmq.controller.metadata.database.dao.Group;
+import com.automq.rocketmq.controller.metadata.database.dao.GroupCriteria;
 import java.util.Date;
 import java.util.List;
 import org.apache.ibatis.annotations.Param;
@@ -27,25 +28,8 @@ public interface GroupMapper {
 
     int create(Group group);
 
-    /**
-     * If <code>null != id</code>, the exact row will be returned; otherwise, all existing records will be
-     *
-     * @param id         Optionally group-id
-     * @param status     Optional group status
-     * @param updateTime Optionally update-time
-     * @return
-     */
-    List<Group> list(@Param("id") Long id,
-        @Param("name") String name,
-        @Param("status") GroupStatus status,
-        @Param("updateTime") Date updateTime);
+    List<Group> byCriteria(GroupCriteria criteria);
 
-    /**
-     * Only group name can be modified.
-     *
-     * @param group
-     * @return
-     */
     int update(Group group);
 
     /**
