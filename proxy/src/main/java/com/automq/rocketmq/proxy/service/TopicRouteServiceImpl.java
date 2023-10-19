@@ -20,6 +20,7 @@ package com.automq.rocketmq.proxy.service;
 import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.metadata.api.ProxyMetadataService;
+import com.automq.rocketmq.proxy.model.ProxyContextExt;
 import com.automq.rocketmq.proxy.model.VirtualQueue;
 import com.google.common.collect.Lists;
 import com.google.common.net.HostAndPort;
@@ -34,6 +35,7 @@ import org.apache.rocketmq.common.constant.PermName;
 import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.proxy.common.Address;
 import org.apache.rocketmq.proxy.common.ProxyContext;
+import org.apache.rocketmq.proxy.processor.channel.ChannelProtocolType;
 import org.apache.rocketmq.proxy.service.route.AddressableMessageQueue;
 import org.apache.rocketmq.proxy.service.route.MessageQueueView;
 import org.apache.rocketmq.proxy.service.route.ProxyTopicRouteData;
@@ -77,6 +79,7 @@ public class TopicRouteServiceImpl extends TopicRouteService {
 
         ProxyTopicRouteData proxyTopicRouteData = new ProxyTopicRouteData();
         proxyTopicRouteData.setQueueDatas(topicRouteData.getQueueDatas());
+        boolean isGrpc = isGrpcProtocol(ctx);
 
         for (BrokerData brokerData : topicRouteData.getBrokerDatas()) {
             ProxyTopicRouteData.ProxyBrokerData proxyBrokerData = new ProxyTopicRouteData.ProxyBrokerData();
@@ -85,6 +88,10 @@ public class TopicRouteServiceImpl extends TopicRouteService {
             for (Long brokerId : brokerData.getBrokerAddrs().keySet()) {
                 String brokerAddr = brokerData.getBrokerAddrs().get(brokerId);
                 HostAndPort brokerHostAndPort = HostAndPort.fromString(brokerAddr);
+                if (isGrpc) {
+                    // This is the default behavior of S3RocketMQ broker, that the gRPC port is always 1 more than the remoting port.
+                    brokerHostAndPort = HostAndPort.fromParts(brokerHostAndPort.getHost(), brokerHostAndPort.getPort() + 1);
+                }
                 proxyBrokerData.getBrokerAddrs().put(brokerId, Lists.newArrayList(new Address(Address.AddressScheme.IPv4, brokerHostAndPort)));
             }
             proxyTopicRouteData.getBrokerDatas().add(proxyBrokerData);
@@ -147,5 +154,13 @@ public class TopicRouteServiceImpl extends TopicRouteService {
         topicRouteData.setQueueDatas(queueDataList);
 
         return topicRouteData;
+    }
+
+    private boolean isGrpcProtocol(ProxyContext ctx) {
+        if (ChannelProtocolType.GRPC_V2.getName().equals(ctx.getProtocolType()) ||
+            ChannelProtocolType.GRPC_V1.getName().equals(ctx.getProtocolType())) {
+            return true;
+        }
+        return false;
     }
 }
