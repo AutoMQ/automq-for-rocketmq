@@ -42,9 +42,10 @@ public interface WriteBlockTask {
      */
     List<CompletableFuture<AppendResult.CallbackResult>> futures();
 
-    ByteBuffer recordHeader();
-
-    ByteBuffer recordBody();
+    /**
+     * The whole record, including header and body.
+     */
+    ByteBuffer record();
 
     void flushWALHeader(long windowMaxLength) throws IOException;
 }

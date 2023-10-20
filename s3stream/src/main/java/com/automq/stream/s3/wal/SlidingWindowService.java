@@ -124,22 +124,14 @@ public class SlidingWindowService {
 
 
     private void writeRecord(WriteBlockTask ioTask) throws IOException {
-        final ByteBuffer totalRecord = ByteBuffer.allocate(ioTask.recordHeader().limit() + ioTask.recordBody().limit());
-
-        totalRecord.put(ioTask.recordHeader());
-
-        totalRecord.put(ioTask.recordBody());
-
-        totalRecord.position(0);
-
         // TODO: make this beautiful
         long position = WALUtil.recordOffsetToPosition(ioTask.startOffset(), walChannel.capacity() - WAL_HEADER_TOTAL_CAPACITY, WAL_HEADER_TOTAL_CAPACITY);
 
-        walChannel.write(totalRecord, position);
+        walChannel.write(ioTask.record(), position);
     }
 
     public boolean makeWriteOffsetMatchWindow(final WriteBlockTask writeBlockTask) throws IOException {
-        long newWindowEndOffset = writeBlockTask.startOffset() + writeBlockTask.recordHeader().limit() + writeBlockTask.recordBody().limit();
+        long newWindowEndOffset = writeBlockTask.startOffset() + writeBlockTask.record().limit();
         // align to block size
         newWindowEndOffset = WALUtil.alignLargeByBlockSize(newWindowEndOffset);
         long windowStartOffset = windowCoreData.getWindowStartOffset();

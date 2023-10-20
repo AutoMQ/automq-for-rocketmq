@@ -17,10 +17,10 @@
 
 package com.automq.stream.s3.wal;
 
+import com.automq.stream.s3.Config;
 import com.automq.stream.s3.metrics.TimerUtil;
 import com.automq.stream.s3.metrics.operations.S3Operation;
 import com.automq.stream.s3.metrics.stats.OperationMetricsStats;
-import com.automq.stream.s3.Config;
 import com.automq.stream.s3.wal.util.WALChannel;
 import com.automq.stream.s3.wal.util.WALUtil;
 import com.automq.stream.utils.ThreadUtils;
@@ -403,12 +403,18 @@ public class BlockWALService implements WriteAheadLog {
         TimerUtil timerUtil = new TimerUtil();
         checkReadyToServe();
 
-        ByteBuffer record = buf.nioBuffer();
+        ByteBuffer body = buf.nioBuffer();
 
-        final int recordBodyCRC = 0 == crc ? WALUtil.crc32(record) : crc;
-        final long expectedWriteOffset = slidingWindowService.allocateWriteOffset(record.limit(), walHeaderCoreData.getFlushedTrimOffset(), walHeaderCoreData.getCapacity() - WAL_HEADER_TOTAL_CAPACITY);
+        final int recordBodyCRC = 0 == crc ? WALUtil.crc32(body) : crc;
+        final long expectedWriteOffset = slidingWindowService.allocateWriteOffset(body.limit(), walHeaderCoreData.getFlushedTrimOffset(), walHeaderCoreData.getCapacity() - WAL_HEADER_TOTAL_CAPACITY);
         final CompletableFuture<AppendResult.CallbackResult> appendResultFuture = new CompletableFuture<>();
         final AppendResult appendResult = new AppendResultImpl(expectedWriteOffset, appendResultFuture);
+
+        // build record
+        ByteBuffer record = ByteBuffer.allocate(RECORD_HEADER_SIZE + body.limit());
+        record.put(recordHeader(body, recordBodyCRC, expectedWriteOffset));
+        record.put(body);
+        record.flip();
 
         // submit write task
         slidingWindowService.submitWriteRecordTask(new WriteBlockTask() {
@@ -424,18 +430,7 @@ public class BlockWALService implements WriteAheadLog {
             }
 
             @Override
-            public ByteBuffer recordHeader() {
-                SlidingWindowService.RecordHeaderCoreData recordHeaderCoreData = new SlidingWindowService.RecordHeaderCoreData();
-                recordHeaderCoreData
-                        .setMagicCode(RECORD_HEADER_MAGIC_CODE)
-                        .setRecordBodyLength(record.limit())
-                        .setRecordBodyOffset(expectedWriteOffset + RECORD_HEADER_SIZE)
-                        .setRecordBodyCRC(recordBodyCRC);
-                return recordHeaderCoreData.marshal();
-            }
-
-            @Override
-            public ByteBuffer recordBody() {
+            public ByteBuffer record() {
                 return record;
             }
 
@@ -456,6 +451,15 @@ public class BlockWALService implements WriteAheadLog {
         });
 
         return appendResult;
+    }
+
+    private static ByteBuffer recordHeader(ByteBuffer body, int crc, long start) {
+        return new SlidingWindowService.RecordHeaderCoreData()
+                .setMagicCode(RECORD_HEADER_MAGIC_CODE)
+                .setRecordBodyLength(body.limit())
+                .setRecordBodyOffset(start + RECORD_HEADER_SIZE)
+                .setRecordBodyCRC(crc)
+                .marshal();
     }
 
     @Override
