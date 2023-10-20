@@ -18,6 +18,13 @@
 package com.automq.rocketmq.common.config;
 
 import com.automq.rocketmq.common.exception.RocketMQException;
+import com.google.common.base.CaseFormat;
+import com.google.common.base.Splitter;
+import com.google.common.base.Strings;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.List;
+import java.util.regex.Pattern;
 import org.apache.rocketmq.common.utils.NetworkUtil;
 
 public class BrokerConfig implements ControllerConfig {
@@ -64,9 +71,43 @@ public class BrokerConfig implements ControllerConfig {
         this.db = new DatabaseConfig();
     }
 
-    private  static int parsePort(String address) {
+    private static int parsePort(String address) {
         int pos = address.lastIndexOf(':');
         return Integer.parseInt(address.substring(pos + 1));
+    }
+
+    private static final String ENV_CONFIG_PREFIX = "ROCKETMQ_NODE";
+
+    /**
+     * The following environment is supported
+     * ROCKETMQ_NODE_NAME
+     * ROCKETMQ_NODE_BIND_ADDRESS
+     * ROCKETMQ_NODE_ADVERTISE_ADDRESS
+     */
+    public void initEnvVar() {
+        Method[] methods = BrokerConfig.class.getMethods();
+        for (Method method : methods) {
+            if (method.getName().startsWith("set")) {
+                if (method.getParameterCount() == 1 && method.getParameterTypes()[0] == String.class) {
+                    String envName = envVarName(method.getName());
+                    String value = System.getenv(envName);
+                    if (!Strings.isNullOrEmpty(value)) {
+                        System.out.printf("Accept environment variable %s --> %s%n", envName, value);
+                        try {
+                            method.invoke(this, value.trim());
+                            System.out.printf("%s to %s%n", method.getName(), value);
+                        } catch (IllegalAccessException | InvocationTargetException ignore) {
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private String envVarName(String setterName) {
+        String upperSnakeCase = CaseFormat.LOWER_CAMEL.converterTo(CaseFormat.UPPER_UNDERSCORE).convert(setterName);
+        assert upperSnakeCase != null;
+        return ENV_CONFIG_PREFIX + upperSnakeCase.substring(3);
     }
 
     public void validate() throws RocketMQException {
