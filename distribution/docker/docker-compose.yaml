@@ -21,7 +21,8 @@ services:
     ports:
       - "3306:3306"
     volumes:
-      - "./ddl.sql:/docker-entrypoint-initdb.d/1.sql"
+      - "./schema.sql:/docker-entrypoint-initdb.d/1.sql"
+      - "./ddl.sql:/docker-entrypoint-initdb.d/2.sql"
     # https://docs.docker.com/compose/startup-order/
     # https://docs.docker.com/compose/compose-file/05-services/#healthcheck
     healthcheck:
