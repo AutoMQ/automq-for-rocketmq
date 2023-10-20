@@ -19,12 +19,9 @@ package com.automq.rocketmq.common.config;
 
 import com.automq.rocketmq.common.exception.RocketMQException;
 import com.google.common.base.CaseFormat;
-import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.List;
-import java.util.regex.Pattern;
 import org.apache.rocketmq.common.utils.NetworkUtil;
 
 public class BrokerConfig implements ControllerConfig {
