@@ -405,6 +405,7 @@ public class BlockWALService implements WriteAheadLog {
 
         ByteBuffer body = buf.nioBuffer();
         final long recordSize = RECORD_HEADER_SIZE + body.limit();
+        final int recordBodyCRC = 0 == crc ? WALUtil.crc32(body) : crc;
         final CompletableFuture<AppendResult.CallbackResult> appendResultFuture = new CompletableFuture<>();
         long expectedWriteOffset;
 
@@ -413,11 +414,11 @@ public class BlockWALService implements WriteAheadLog {
         try {
             Block block = slidingWindowService.getCurrentBlockLocked();
             try {
-                expectedWriteOffset = block.addRecord(recordSize, (offset) -> record(body, crc, offset), appendResultFuture);
+                expectedWriteOffset = block.addRecord(recordSize, (offset) -> record(body, recordBodyCRC, offset), appendResultFuture);
             } catch (Block.BlockFullException e) {
                 // this block is full, create a new one
                 block = slidingWindowService.sealAndNewBlockLocked(block, recordSize, walHeaderCoreData.getFlushedTrimOffset(), walHeaderCoreData.getCapacity() - WAL_HEADER_TOTAL_CAPACITY);
-                expectedWriteOffset = block.addRecord(recordSize, (offset) -> record(body, crc, offset), appendResultFuture);
+                expectedWriteOffset = block.addRecord(recordSize, (offset) -> record(body, recordBodyCRC, offset), appendResultFuture);
             }
         } finally {
             lock.unlock();
