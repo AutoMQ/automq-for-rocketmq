@@ -424,13 +424,19 @@ public class BlockWALService implements WriteAheadLog {
             }
 
             @Override
+            public long addRecord(ByteBuffer record, CompletableFuture<AppendResult.CallbackResult> future) {
+                // TODO flag1
+                return 0;
+            }
+
+            @Override
             public List<CompletableFuture<AppendResult.CallbackResult>> futures() {
                 // TODO: flag1
                 return List.of(appendResultFuture);
             }
 
             @Override
-            public ByteBuffer record() {
+            public ByteBuffer data() {
                 return record;
             }
 

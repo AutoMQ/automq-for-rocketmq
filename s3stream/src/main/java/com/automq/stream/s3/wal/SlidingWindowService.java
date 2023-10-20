@@ -96,8 +96,7 @@ public class SlidingWindowService {
         long expectedWriteOffset;
         do {
             lastWriteOffset = windowCoreData.getWindowNextWriteOffset();
-
-            expectedWriteOffset = WALUtil.alignLargeByBlockSize(lastWriteOffset);
+            expectedWriteOffset = lastWriteOffset;
 
             // If the end of the physical device is insufficient for this write, jump to the start of the physical device
             if ((recordSectionCapacity - expectedWriteOffset % recordSectionCapacity) < totalWriteSize) {
@@ -127,11 +126,11 @@ public class SlidingWindowService {
         // TODO: make this beautiful
         long position = WALUtil.recordOffsetToPosition(ioTask.startOffset(), walChannel.capacity() - WAL_HEADER_TOTAL_CAPACITY, WAL_HEADER_TOTAL_CAPACITY);
 
-        walChannel.write(ioTask.record(), position);
+        walChannel.write(ioTask.data(), position);
     }
 
     public boolean makeWriteOffsetMatchWindow(final WriteBlockTask writeBlockTask) throws IOException {
-        long newWindowEndOffset = writeBlockTask.startOffset() + writeBlockTask.record().limit();
+        long newWindowEndOffset = writeBlockTask.startOffset() + writeBlockTask.data().limit();
         // align to block size
         newWindowEndOffset = WALUtil.alignLargeByBlockSize(newWindowEndOffset);
         long windowStartOffset = windowCoreData.getWindowStartOffset();

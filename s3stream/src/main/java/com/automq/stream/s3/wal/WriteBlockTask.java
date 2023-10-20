@@ -38,14 +38,30 @@ public interface WriteBlockTask {
     long startOffset();
 
     /**
+     * Append a record to this block.
+     *
+     * @param record The record including the header.
+     * @param future The future of this record, which will be completed when the record is written to the WAL.
+     * @return The start offset of this record.
+     * @throws BlockFullException If the size of this block exceeds the limit.
+     */
+    long addRecord(ByteBuffer record, CompletableFuture<AppendResult.CallbackResult> future);
+
+    /**
      * Futures of all records in this task.
      */
     List<CompletableFuture<AppendResult.CallbackResult>> futures();
 
     /**
-     * The whole record, including header and body.
+     * The content of this block, which contains multiple records.
      */
-    ByteBuffer record();
+    ByteBuffer data();
 
     void flushWALHeader(long windowMaxLength) throws IOException;
+
+    class BlockFullException extends RuntimeException {
+        public BlockFullException(String message) {
+            super(message);
+        }
+    }
 }
