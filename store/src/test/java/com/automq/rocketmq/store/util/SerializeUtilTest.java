@@ -25,7 +25,7 @@ import com.automq.rocketmq.store.model.operation.OperationSnapshot;
 import com.automq.rocketmq.store.model.operation.PopOperation.PopOperationType;
 import java.nio.ByteBuffer;
 import java.util.List;
-import java.util.TreeMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 import org.junit.jupiter.api.Test;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -142,8 +142,8 @@ public class SerializeUtilTest {
     }
 
     @Test
-    void encodeOperationSnapshot() throws Exception {
-        TreeMap<Long, Integer> consumeTimes = new TreeMap<>();
+    void encodeOperationSnapshot() {
+        ConcurrentSkipListMap<Long, Integer> consumeTimes = new ConcurrentSkipListMap<>();
         consumeTimes.put(1L, 2);
         consumeTimes.put(3L, 4);
         consumeTimes.put(5L, 6);

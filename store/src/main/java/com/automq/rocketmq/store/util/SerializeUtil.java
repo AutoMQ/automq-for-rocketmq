@@ -31,7 +31,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
-import java.util.TreeMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 
 public class SerializeUtil {
 
@@ -197,7 +197,7 @@ public class SerializeUtil {
             byte[] ackBitMap = new byte[consumerGroupMetadata.ackBitMapLength()];
             consumerGroupMetadata.ackBitMapAsByteBuffer().get(ackBitMap);
             byte[] retryAckBitMap = new byte[consumerGroupMetadata.retryAckBitMapLength()];
-            TreeMap<Long, Integer> consumeTimes = new TreeMap<>();
+            ConcurrentSkipListMap<Long, Integer> consumeTimes = new ConcurrentSkipListMap<>();
             for (int j = 0; j < consumerGroupMetadata.consumeTimesLength(); j++) {
                 com.automq.rocketmq.store.model.generated.ConsumeTimes consumeTime = consumerGroupMetadata.consumeTimes(j);
                 consumeTimes.put(consumeTime.offset(), consumeTime.consumeTimes());
