@@ -137,7 +137,7 @@ public class MessageServiceImpl implements MessageService {
                 return CompletableFuture.failedFuture(new MQBrokerException(ResponseCode.TOPIC_NOT_EXIST, "Topic not exist"));
             }
 
-            return store.put(FlatMessageUtil.convertTo(topic.getTopicId(), virtualQueue.physicalQueueId(), config.localHostName(), message));
+            return store.put(FlatMessageUtil.convertTo(topic.getTopicId(), virtualQueue.physicalQueueId(), config.hostName(), message));
         });
 
         return putFuture.thenApply(putResult -> {
