@@ -15,16 +15,15 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.store.exception;
+package com.automq.rocketmq.common.config;
 
-public enum StoreErrorCode {
-    FILE_SYSTEM_PERMISSION,
-    KV_SERVICE_IS_NOT_RUNNING,
-    ILLEGAL_ARGUMENT,
-    KV_ENGINE_ERROR,
-    QUEUE_NOT_OPENED,
-    QUEUE_FENCED,
-    QUEUE_NOT_FOUND,
-    QUEUE_OPENING,
-    INNER_ERROR,
+import org.junit.jupiter.api.Test;
+
+class BrokerConfigTest {
+
+    @Test
+    public void testInitEnvVar() {
+        BrokerConfig brokerConfig = new BrokerConfig();
+        brokerConfig.initEnvVar();
+    }
 }

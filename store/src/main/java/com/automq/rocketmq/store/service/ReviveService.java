@@ -30,6 +30,7 @@ import com.automq.rocketmq.store.model.generated.ReceiptHandle;
 import com.automq.rocketmq.store.model.message.AckResult;
 import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PullResult;
+import com.automq.rocketmq.store.model.message.TopicQueueId;
 import com.automq.rocketmq.store.model.operation.PopOperation;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.util.SerializeUtil;
@@ -49,6 +50,9 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static com.automq.rocketmq.store.exception.StoreErrorCode.QUEUE_NOT_OPENED;
+import static com.automq.rocketmq.store.exception.StoreErrorCode.QUEUE_OPENING;
 
 public class ReviveService implements Runnable, Lifecycle {
     private static final Logger LOGGER = LoggerFactory.getLogger(ReviveService.class);
@@ -139,83 +143,118 @@ public class ReviveService implements Runnable, Lifecycle {
             int queueId = receiptHandle.queueId();
             long operationId = receiptHandle.operationId();
             byte[] ckKey = SerializeUtil.buildCheckPointKey(topicId, queueId, operationId);
-            if (inflightRevive.containsKey(operationId)) {
+            CompletableFuture<Void> cf = CompletableFuture.completedFuture(null);
+            CompletableFuture<Void> preCf = inflightRevive.putIfAbsent(operationId, cf);
+            if (preCf != null) {
                 LOGGER.trace("{}: Inflight revive operation: {}", identity, operationId);
                 return;
             }
-            try {
-                byte[] ckValue = kvService.get(checkPointNamespace, ckKey);
-                if (ckValue == null) {
-                    throw new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "Not found check point");
-                }
-                CheckPoint checkPoint = SerializeUtil.decodeCheckPoint(ByteBuffer.wrap(ckValue));
-                PopOperation.PopOperationType operationType = PopOperation.PopOperationType.valueOf(checkPoint.popOperationType());
-                CompletableFuture<Pair<LogicQueue, PullResult>> pullMsgCf = logicQueueManager.getOrCreate(topicId, queueId)
-                    .thenComposeAsync(queue -> {
-                        CompletableFuture<PullResult> pullCf;
-                        if (operationType == PopOperation.PopOperationType.POP_RETRY) {
-                            pullCf = queue.pullRetry(consumerGroupId, Filter.DEFAULT_FILTER, checkPoint.messageOffset(), 1);
-                        } else {
-                            pullCf = queue.pullNormal(consumerGroupId, Filter.DEFAULT_FILTER, checkPoint.messageOffset(), 1);
-                        }
-                        return pullCf.thenApply(result -> Pair.of(queue, result));
-                    }, backgroundExecutor);
-                CompletableFuture<Triple<LogicQueue, FlatMessageExt, Integer>> cf = pullMsgCf.thenCombineAsync(metadataService.maxDeliveryAttemptsOf(consumerGroupId), (pair, maxDeliveryAttempts) -> {
-                    LogicQueue logicQueue = pair.getLeft();
-                    PullResult pullResult = pair.getRight();
-                    if (pullResult.messageList().size() != 1) {
-                        throw new CompletionException(new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "Revive message not found"));
-                    }
-                    // Build the retry message and append it to retry stream or dead letter stream.
-                    FlatMessageExt messageExt = pullResult.messageList().get(0);
-                    return Triple.of(logicQueue, messageExt, maxDeliveryAttempts);
-                }, backgroundExecutor);
-                CompletableFuture<Pair<Boolean, LogicQueue>> resendCf = cf.thenCompose(triple -> {
-                    LogicQueue logicQueue = triple.getLeft();
-                    FlatMessageExt messageExt = triple.getMiddle();
-                    int maxDeliveryAttempts = triple.getRight();
 
-                    if (operationType == PopOperation.PopOperationType.POP_ORDER) {
-                        int consumeTimes = logicQueue.getConsumeTimes(consumerGroupId, messageExt.offset());
-                        if (consumeTimes >= maxDeliveryAttempts) {
-                            messageExt.setDeliveryAttempts(consumeTimes);
-                            // send as DLQ
-                            return dlqSender.send(messageExt)
-                                .thenApply(nil -> Pair.of(true, logicQueue));
-                        }
-                        return CompletableFuture.completedFuture(Pair.of(false, logicQueue));
+            CompletableFuture<Triple<LogicQueue, PullResult, PopOperation.PopOperationType>> pullMsgCf = cf.thenCompose(nil -> logicQueueManager.getOrCreate(topicId, queueId))
+                .thenComposeAsync(queue -> {
+                    LogicQueue.State queueState = queue.getState();
+                    if (queueState == LogicQueue.State.OPENING) {
+                        // queue is opening, ignore its revive operation
+                        LOGGER.info("{}: Queue: {} is opening, ignore revive operation: {}", identity, TopicQueueId.of(topicId, queueId), operationId);
+                        throw new CompletionException(new StoreException(QUEUE_OPENING, "Queue is opening"));
                     }
-                    if (messageExt.deliveryAttempts() >= maxDeliveryAttempts) {
+                    if (queueState != LogicQueue.State.OPENED) {
+                        throw new CompletionException(new StoreException(QUEUE_NOT_OPENED, "Queue is not opened"));
+                    }
+                    byte[] ckValue;
+                    try {
+                        ckValue = kvService.get(checkPointNamespace, ckKey);
+                    } catch (StoreException e) {
+                        LOGGER.error("{}: Failed to get check point with topicId: {}, queueId: {}, operationId: {}", identity, topicId, queueId, operationId, e);
+                        throw new CompletionException(e);
+                    }
+                    if (ckValue == null) {
+                        LOGGER.error("{}: Not found check point with topicId: {}, queueId: {}, operationId: {}", identity, topicId, queueId, operationId);
+                        throw new CompletionException(new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "Not found check point"));
+                    }
+                    CheckPoint checkPoint = SerializeUtil.decodeCheckPoint(ByteBuffer.wrap(ckValue));
+                    PopOperation.PopOperationType operationType = PopOperation.PopOperationType.valueOf(checkPoint.popOperationType());
+
+                    CompletableFuture<PullResult> pullCf;
+                    if (operationType == PopOperation.PopOperationType.POP_RETRY) {
+                        pullCf = queue.pullRetry(consumerGroupId, Filter.DEFAULT_FILTER, checkPoint.messageOffset(), 1);
+                    } else {
+                        pullCf = queue.pullNormal(consumerGroupId, Filter.DEFAULT_FILTER, checkPoint.messageOffset(), 1);
+                    }
+                    return pullCf.thenApply(result -> Triple.of(queue, result, operationType));
+                }, backgroundExecutor);
+
+            CompletableFuture<Triple<LogicQueue, FlatMessageExt, Pair<PopOperation.PopOperationType, Integer>>> checkCf = pullMsgCf.thenCombineAsync(metadataService.maxDeliveryAttemptsOf(consumerGroupId), (pair, maxDeliveryAttempts) -> {
+                LogicQueue logicQueue = pair.getLeft();
+                PullResult pullResult = pair.getMiddle();
+                PopOperation.PopOperationType operationType = pair.getRight();
+                if (pullResult.messageList().size() != 1) {
+                    throw new CompletionException(new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "Revive message not found"));
+                }
+                // Build the retry message and append it to retry stream or dead letter stream.
+                FlatMessageExt messageExt = pullResult.messageList().get(0);
+                return Triple.of(logicQueue, messageExt, Pair.of(operationType, maxDeliveryAttempts));
+            }, backgroundExecutor);
+
+            CompletableFuture<Pair<Boolean, LogicQueue>> resendCf = checkCf.thenCompose(triple -> {
+                LogicQueue logicQueue = triple.getLeft();
+                FlatMessageExt messageExt = triple.getMiddle();
+                int maxDeliveryAttempts = triple.getRight().getRight();
+                PopOperation.PopOperationType operationType = triple.getRight().getLeft();
+
+                if (operationType == PopOperation.PopOperationType.POP_ORDER) {
+                    int consumeTimes = logicQueue.getConsumeTimes(consumerGroupId, messageExt.offset());
+                    if (consumeTimes >= maxDeliveryAttempts) {
+                        messageExt.setDeliveryAttempts(consumeTimes);
                         // send as DLQ
                         return dlqSender.send(messageExt)
                             .thenApply(nil -> Pair.of(true, logicQueue));
                     }
-                    messageExt.setOriginalQueueOffset(messageExt.originalOffset());
-                    messageExt.setDeliveryAttempts(messageExt.deliveryAttempts() + 1);
-                    return logicQueue.putRetry(consumerGroupId, messageExt.message())
-                        .thenApply(nil -> Pair.of(false, logicQueue));
-                });
-                CompletableFuture<AckResult> ackCf = resendCf.thenComposeAsync(pair -> {
-                    boolean sendDLQ = pair.getLeft();
-                    LogicQueue queue = pair.getRight();
-                    if (sendDLQ) {
-                        // regard sending to DLQ as ack
-                        return queue.ack(SerializeUtil.encodeReceiptHandle(receiptHandle));
+                    return CompletableFuture.completedFuture(Pair.of(false, logicQueue));
+                }
+                if (messageExt.deliveryAttempts() >= maxDeliveryAttempts) {
+                    // send as DLQ
+                    return dlqSender.send(messageExt)
+                        .thenApply(nil -> Pair.of(true, logicQueue));
+                }
+                messageExt.setOriginalQueueOffset(messageExt.originalOffset());
+                messageExt.setDeliveryAttempts(messageExt.deliveryAttempts() + 1);
+                return logicQueue.putRetry(consumerGroupId, messageExt.message())
+                    .thenApply(nil -> Pair.of(false, logicQueue));
+            });
+            CompletableFuture<AckResult> ackCf = resendCf.thenComposeAsync(pair -> {
+                boolean sendDLQ = pair.getLeft();
+                LogicQueue queue = pair.getRight();
+                if (sendDLQ) {
+                    // regard sending to DLQ as ack
+                    return queue.ack(SerializeUtil.encodeReceiptHandle(receiptHandle));
+                }
+                // ack timeout
+                return queue.ackTimeout(SerializeUtil.encodeReceiptHandle(receiptHandle));
+            }, backgroundExecutor);
+            ackCf.thenAcceptAsync(nil -> {
+                inflightRevive.remove(operationId);
+            }, backgroundExecutor).exceptionally(e -> {
+                inflightRevive.remove(operationId);
+                Throwable cause = FutureUtil.cause(e);
+                if (cause instanceof StoreException) {
+                    StoreException storeException = (StoreException) cause;
+                    switch (storeException.code()) {
+                        case QUEUE_OPENING:
+                            // ignore
+                            break;
+                        case QUEUE_NOT_OPENED:
+                            LOGGER.error("{}: Failed to revive ck with operationId: {}, queue not opened", identity, operationId, storeException);
+                            break;
+                        default:
+                            LOGGER.error("{}: Failed to revive ck with operationId: {}", identity, operationId, storeException);
+                            break;
                     }
-                    // ack timeout
-                    return queue.ackTimeout(SerializeUtil.encodeReceiptHandle(receiptHandle));
-                }, backgroundExecutor);
-                inflightRevive.putIfAbsent(operationId, ackCf.thenApply(nil -> null));
-                ackCf.thenAcceptAsync(nil -> inflightRevive.remove(operationId), backgroundExecutor)
-                    .exceptionally(e -> {
-                        inflightRevive.remove(operationId);
-                        Throwable cause = FutureUtil.cause(e);
-                        LOGGER.error("{}: Failed to revive ck with operationId: {}", identity, operationId, cause);
-                        return null;
-                    });
-            } catch (StoreException e) {
-                LOGGER.error("{}: Failed to revive message", identity, e);
-            }
+                    return null;
+                }
+                LOGGER.error("{}: Failed to revive ck with operationId: {}", identity, operationId, cause);
+                return null;
+            });
         });
         this.reviveTimestamp = endTimestamp;
     }
