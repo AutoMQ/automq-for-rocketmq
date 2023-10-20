@@ -274,7 +274,7 @@ public class SlidingWindowService {
         return writingBlocks.first();
     }
 
-    private void writeBlock(Block block) throws IOException {
+    private void writeBlockData(Block block) throws IOException {
         // TODO: make this beautiful
         long position = WALUtil.recordOffsetToPosition(block.startOffset(), walChannel.capacity() - WAL_HEADER_TOTAL_CAPACITY, WAL_HEADER_TOTAL_CAPACITY);
 
@@ -470,9 +470,18 @@ public class SlidingWindowService {
 
         @Override
         public void run() {
+            Block block = this.block;
+            do {
+                writeBlock(block);
+                block = pollBlock();
+            } while (block != null);
+            semaphore.release();
+        }
+
+        private void writeBlock(Block block) {
             try {
                 if (makeWriteOffsetMatchWindow(block)) {
-                    writeBlock(block);
+                    writeBlockData(block);
 
                     // Update the start offset of the sliding window after finishing writing the record.
                     windowCoreData.setWindowStartOffset(calculateStartOffset(block));
