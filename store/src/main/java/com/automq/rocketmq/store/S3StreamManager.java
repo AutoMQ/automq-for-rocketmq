@@ -40,6 +40,12 @@ public class S3StreamManager implements StreamManager {
     }
 
     @Override
+    public CompletableFuture<List<StreamMetadata>> getStreams(List<Long> streamIds) {
+        //TODO: implement this
+        return CompletableFuture.failedFuture(new UnsupportedOperationException("Get streams is not supported."));
+    }
+
+    @Override
     public CompletableFuture<Long> createStream() {
         // Don't support create stream, stream is created on demand.
         return CompletableFuture.failedFuture(new UnsupportedOperationException("Create stream is not supported."));
