@@ -137,22 +137,23 @@ public class CompactionManager {
     }
 
     private CompletableFuture<CompactResult> compact() {
-        CompletableFuture<List<StreamMetadata>> streamMetadataFuture = this.streamManager.getOpeningStreams();
-        CompletableFuture<List<S3ObjectMetadata>> objectMetadataFuture = this.objectManager.getServerObjects();
-        return CompletableFuture.allOf(streamMetadataFuture, objectMetadataFuture).thenApplyAsync(v -> {
-            List<StreamMetadata> streamMetadataList = streamMetadataFuture.join();
-            List<S3ObjectMetadata> objectMetadataList = objectMetadataFuture.join();
-            if (objectMetadataList.isEmpty()) {
-                logger.info("No WAL objects to compact");
-                return CompactResult.SKIPPED;
-            }
-            // sort by S3 object data time in descending order
-            objectMetadataList.sort((o1, o2) -> Long.compare(o2.dataTimeInMs(), o1.dataTimeInMs()));
-            if (maxObjectNumToCompact < objectMetadataList.size()) {
-                // compact latest S3 objects first when number of objects to compact exceeds maxObjectNumToCompact
-                objectMetadataList = objectMetadataList.subList(0, maxObjectNumToCompact);
-            }
-            return this.compact(streamMetadataList, objectMetadataList);
+        return this.objectManager.getServerObjects().thenComposeAsync(objectMetadataList -> {
+            List<Long> streamIds = objectMetadataList.stream().flatMap(e -> e.getOffsetRanges().stream())
+                    .map(StreamOffsetRange::getStreamId).distinct().toList();
+            return this.streamManager.getStreams(streamIds).thenApplyAsync(streamMetadataList -> {
+                List<S3ObjectMetadata> s3ObjectMetadataList = objectMetadataList;
+                if (s3ObjectMetadataList.isEmpty()) {
+                    logger.info("No WAL objects to compact");
+                    return CompactResult.SKIPPED;
+                }
+                // sort by S3 object data time in descending order
+                s3ObjectMetadataList.sort((o1, o2) -> Long.compare(o2.dataTimeInMs(), o1.dataTimeInMs()));
+                if (maxObjectNumToCompact < s3ObjectMetadataList.size()) {
+                    // compact latest S3 objects first when number of objects to compact exceeds maxObjectNumToCompact
+                    s3ObjectMetadataList = s3ObjectMetadataList.subList(0, maxObjectNumToCompact);
+                }
+                return this.compact(streamMetadataList, s3ObjectMetadataList);
+            }, compactThreadPool);
         }, compactThreadPool);
     }
 
@@ -212,12 +213,10 @@ public class CompactionManager {
     public CompletableFuture<Void> forceSplitAll() {
         CompletableFuture<Void> cf = new CompletableFuture<>();
         //TODO: deal with metadata delay
-        this.scheduledExecutorService.execute(() -> {
-            CompletableFuture<List<StreamMetadata>> streamMetadataCf = this.streamManager.getOpeningStreams();
-            CompletableFuture<List<S3ObjectMetadata>> objectMetadataCf = this.objectManager.getServerObjects();
-            streamMetadataCf.thenCombine(objectMetadataCf, ImmutablePair::new).thenAcceptAsync(p -> {
-                List<StreamMetadata> streamMetadataList = p.left;
-                List<S3ObjectMetadata> objectMetadataList = p.right;
+        this.scheduledExecutorService.execute(() -> this.objectManager.getServerObjects().thenAcceptAsync(objectMetadataList -> {
+            List<Long> streamIds = objectMetadataList.stream().flatMap(e -> e.getOffsetRanges().stream())
+                    .map(StreamOffsetRange::getStreamId).distinct().toList();
+            this.streamManager.getStreams(streamIds).thenAcceptAsync(streamMetadataList -> {
                 if (objectMetadataList.isEmpty()) {
                     logger.info("No WAL objects to force split");
                     return;
@@ -237,12 +236,12 @@ public class CompactionManager {
                         cf.complete(null);
                     }
                 });
-            }, forceSplitThreadPool).exceptionally(ex -> {
-                logger.error("Error while force split all WAL objects ", ex);
-                cf.completeExceptionally(ex);
-                return null;
-            });
-        });
+            }, forceSplitThreadPool);
+        }, forceSplitThreadPool).exceptionally(ex -> {
+            logger.error("Error while force split all WAL objects ", ex);
+            cf.completeExceptionally(ex);
+            return null;
+        }));
 
         return cf;
     }

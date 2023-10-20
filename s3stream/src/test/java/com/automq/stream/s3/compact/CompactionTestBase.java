@@ -66,7 +66,7 @@ public class CompactionTestBase {
 
     public void setUp() throws Exception {
         streamManager = Mockito.mock(MemoryMetadataManager.class);
-        when(streamManager.getOpeningStreams()).thenReturn(CompletableFuture.completedFuture(
+        when(streamManager.getStreams(Mockito.anyList())).thenReturn(CompletableFuture.completedFuture(
                 List.of(new StreamMetadata(STREAM_0, 0, 0, 20, StreamState.OPENED),
                         new StreamMetadata(STREAM_1, 0, 25, 500, StreamState.OPENED),
                         new StreamMetadata(STREAM_2, 0, 30, 270, StreamState.OPENED))));
