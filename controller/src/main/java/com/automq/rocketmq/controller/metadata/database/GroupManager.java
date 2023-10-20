@@ -22,10 +22,14 @@ import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.GroupStatus;
 import apache.rocketmq.controller.v1.GroupType;
+import apache.rocketmq.controller.v1.TopicStatus;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.dao.Group;
+import com.automq.rocketmq.controller.metadata.database.dao.GroupCriteria;
+import com.automq.rocketmq.controller.metadata.database.dao.Topic;
 import com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper;
+import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 import com.google.common.base.Strings;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -54,11 +58,23 @@ public class GroupManager {
                         continue;
                     }
                     GroupMapper groupMapper = session.getMapper(GroupMapper.class);
-                    List<Group> groups = groupMapper.list(null, groupName, null, null);
+                    List<Group> groups = groupMapper.byCriteria(GroupCriteria.newBuilder().setGroupName(groupName).build());
                     if (!groups.isEmpty()) {
                         ControllerException e = new ControllerException(Code.DUPLICATED_VALUE, String.format("Group name '%s' is not available", groupName));
                         future.completeExceptionally(e);
                         return future;
+                    }
+
+                    if (deadLetterTopicId > 0) {
+                        TopicMapper topicMapper = session.getMapper(TopicMapper.class);
+                        Topic t = topicMapper.get(deadLetterTopicId, null);
+                        if (null == t || t.getStatus() == TopicStatus.TOPIC_STATUS_DELETED) {
+                            String msg = String.format("Specified dead letter topic[topic-id=%d] does not exist",
+                                deadLetterTopicId);
+                            ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE, msg);
+                            future.completeExceptionally(e);
+                            return future;
+                        }
                     }
 
                     Group group = new Group();
@@ -115,7 +131,10 @@ public class GroupManager {
         return CompletableFuture.supplyAsync(() -> {
             try (SqlSession session = metadataStore.openSession()) {
                 GroupMapper groupMapper = session.getMapper(GroupMapper.class);
-                List<Group> groups = groupMapper.list(groupId, groupName, null, null);
+                List<Group> groups = groupMapper.byCriteria(GroupCriteria.newBuilder()
+                    .setGroupId(groupId)
+                    .setGroupName(groupName)
+                    .build());
                 if (groups.isEmpty()) {
                     ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE,
                         String.format("Group with group-id=%d is not found", groupId));
@@ -133,7 +152,7 @@ public class GroupManager {
         return CompletableFuture.supplyAsync(() -> {
             try (SqlSession session = metadataStore.openSession()) {
                 GroupMapper mapper = session.getMapper(GroupMapper.class);
-                List<Group> groups = mapper.list(groupId, null, null, null);
+                List<Group> groups = mapper.byCriteria(GroupCriteria.newBuilder().setGroupId(groupId).build());
                 if (groups.isEmpty()) {
                     String message = String.format("Group[group-id=%d] is not found", groupId);
                     LOGGER.warn("Try to delete non-existing group[id={}]", groupId);

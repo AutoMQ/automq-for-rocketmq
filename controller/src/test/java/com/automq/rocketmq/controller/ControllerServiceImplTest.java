@@ -62,6 +62,7 @@ import com.automq.rocketmq.controller.metadata.GrpcControllerClient;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.DefaultMetadataStore;
 import com.automq.rocketmq.controller.metadata.database.dao.Group;
+import com.automq.rocketmq.controller.metadata.database.dao.GroupCriteria;
 import com.automq.rocketmq.controller.metadata.database.dao.GroupProgress;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
@@ -374,6 +375,20 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     public void testCreateGroup() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
 
+        // Create dead letter topic first.
+        long topicId;
+        try (SqlSession session = getSessionFactory().openSession()) {
+            TopicMapper topicMapper = session.getMapper(TopicMapper.class);
+            Topic topic = new Topic();
+            topic.setName("T1");
+            topic.setStatus(TopicStatus.TOPIC_STATUS_ACTIVE);
+            topic.setQueueNum(4);
+            topic.setAcceptMessageTypes("abc");
+            topicMapper.create(topic);
+            topicId = topic.getId();
+            session.commit();
+        }
+
         try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
@@ -389,7 +404,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 CreateGroupRequest request = CreateGroupRequest.newBuilder()
                     .setGroupType(GroupType.GROUP_TYPE_STANDARD)
                     .setName("G-abc")
-                    .setDeadLetterTopicId(1)
+                    .setDeadLetterTopicId(topicId)
                     .setMaxRetryAttempt(5)
                     .build();
 
@@ -482,7 +497,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
                 try (SqlSession session = getSessionFactory().openSession()) {
                     GroupMapper mapper = session.getMapper(GroupMapper.class);
-                    List<Group> groups = mapper.list(groupId, null, null, null);
+                    List<Group> groups = mapper.byCriteria(GroupCriteria.newBuilder().setGroupId(groupId).build());
                     Assertions.assertEquals(1, groups.size());
                     Group g = groups.get(0);
                     Assertions.assertEquals(GroupStatus.GROUP_STATUS_DELETED, g.getStatus());

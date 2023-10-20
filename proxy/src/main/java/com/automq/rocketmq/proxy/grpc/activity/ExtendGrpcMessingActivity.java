@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.proxy.grpc.activity;
 
+import com.automq.rocketmq.proxy.service.SuspendPopRequestService;
 import org.apache.rocketmq.proxy.grpc.v2.DefaultGrpcMessingActivity;
 import org.apache.rocketmq.proxy.processor.MessagingProcessor;
 
@@ -32,5 +33,6 @@ public class ExtendGrpcMessingActivity extends DefaultGrpcMessingActivity {
         this.routeActivity = new ExtendRouteActivity(messagingProcessor, grpcClientSettingsManager, grpcChannelManager);
         this.sendMessageActivity = new ExtendSendMessageActivity(messagingProcessor, grpcClientSettingsManager, grpcChannelManager);
         this.receiveMessageActivity = new ExtendReceiveMessageActivity(messagingProcessor, receiptHandleProcessor, grpcClientSettingsManager, grpcChannelManager);
+        appendStartAndShutdown(SuspendPopRequestService.getInstance());
     }
 }

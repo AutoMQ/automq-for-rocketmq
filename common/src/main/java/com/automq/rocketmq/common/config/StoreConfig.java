@@ -18,6 +18,8 @@
 package com.automq.rocketmq.common.config;
 
 public class StoreConfig {
+    private static final int PROCESSOR_NUMBER = Runtime.getRuntime().availableProcessors();
+
     // Fetch limitation of a single request.
     // Filtered out messages will also be counted.
 
@@ -37,6 +39,9 @@ public class StoreConfig {
 
     // DEFAULT is 1000 * 1000, unit in records
     private int operationSnapshotInterval = 1000 * 1000;
+
+    private int workingThreadPoolNums = PROCESSOR_NUMBER;
+    private int workingThreadQueueCapacity = 10000;
 
     public int maxFetchCount() {
         return maxFetchCount;
@@ -64,5 +69,21 @@ public class StoreConfig {
 
     public void setOperationSnapshotInterval(int operationSnapshotInterval) {
         this.operationSnapshotInterval = operationSnapshotInterval;
+    }
+
+    public int workingThreadPoolNums() {
+        return workingThreadPoolNums;
+    }
+
+    public void setWorkingThreadPoolNums(int workingThreadPoolNums) {
+        this.workingThreadPoolNums = workingThreadPoolNums;
+    }
+
+    public int workingThreadQueueCapacity() {
+        return workingThreadQueueCapacity;
+    }
+
+    public void setWorkingThreadQueueCapacity(int workingThreadQueueCapacity) {
+        this.workingThreadQueueCapacity = workingThreadQueueCapacity;
     }
 }

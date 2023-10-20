@@ -17,7 +17,8 @@
 
 package com.automq.rocketmq.broker;
 
-import com.automq.rocketmq.broker.protocol.GrpcProtocolServer;
+import com.automq.rocketmq.proxy.grpc.GrpcProtocolServer;
+import com.automq.rocketmq.proxy.remoting.RemotingProtocolServer;
 import com.automq.rocketmq.common.api.DataStore;
 import com.automq.rocketmq.common.config.BrokerConfig;
 import com.automq.rocketmq.common.util.Lifecycle;
@@ -46,6 +47,7 @@ public class BrokerController implements Lifecycle {
     private final BrokerConfig brokerConfig;
     private final ServiceManager serviceManager;
     private final GrpcProtocolServer grpcServer;
+    private final RemotingProtocolServer remotingServer;
     private final MetadataStore metadataStore;
     private final MessageStore messageStore;
     private final StoreMetadataService storeMetadataService;
@@ -65,7 +67,7 @@ public class BrokerController implements Lifecycle {
         proxyMetadataService = new DefaultProxyMetadataService(metadataStore);
         storeMetadataService = new DefaultStoreMetadataService(metadataStore);
 
-        dlqService = new DLQService();
+        dlqService = new DLQService(brokerConfig, proxyMetadataService);
 
         MessageStoreImpl messageStore = MessageStoreBuilder.build(brokerConfig.store(), brokerConfig.s3Stream(), storeMetadataService, dlqService);
         this.messageStore = messageStore;
@@ -80,6 +82,7 @@ public class BrokerController implements Lifecycle {
         // TODO: Split controller to a separate port
         ControllerServiceImpl controllerService = MetadataStoreBuilder.build(metadataStore);
         grpcServer = new GrpcProtocolServer(brokerConfig.proxy(), messagingProcessor, controllerService);
+        remotingServer = new RemotingProtocolServer(messagingProcessor);
 
         metricsExporter = new MetricsExporter(brokerConfig, messageStore, (ExtendMessagingProcessor) messagingProcessor);
     }
@@ -92,6 +95,7 @@ public class BrokerController implements Lifecycle {
         messageStore.start();
         messagingProcessor.start();
         grpcServer.start();
+        remotingServer.start();
         metadataStore.registerCurrentNode(brokerConfig.name(), brokerConfig.advertiseAddress(), brokerConfig.instanceId());
         metricsExporter.start();
 
@@ -101,6 +105,7 @@ public class BrokerController implements Lifecycle {
     @Override
     public void shutdown() throws Exception {
         grpcServer.shutdown();
+        remotingServer.shutdown();
         messagingProcessor.shutdown();
         messageStore.shutdown();
         metadataStore.close();

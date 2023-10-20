@@ -27,9 +27,18 @@
             <SizeBasedTriggeringPolicy size="100MB" />
             <DefaultRolloverStrategy max="10"/>
         </RollingFile>
+
+        <RollingFile name="controllerAppender" fileName="${LOG_DIR}/controller.log" filePattern="${LOG_DIR}/controller.%i.log">
+            <PatternLayout pattern = "%d{yyyy-MM-dd HH:mm:ss} %-5p %m%n"/>
+            <SizeBasedTriggeringPolicy size="100MB" />
+            <DefaultRolloverStrategy max="10"/>
+        </RollingFile>
     </Appenders>
 
     <Loggers>
+        <Logger name="com.automq.rocketmq.controller" level="info" additivity="false">
+            <AppenderRef ref="controllerAppender" />
+        </Logger>
         <Root level="info">
             <AppenderRef ref="rollingFile"/>
         </Root>

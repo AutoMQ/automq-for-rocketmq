@@ -1,6 +1,8 @@
 name: DefaultBroker
 instanceId: "ec2-test"
 bindAddress: "0.0.0.0:8081"
+innerAccessKey: ""
+innerSecretKey: ""
 s3Stream:
   s3WALPath: "/tmp/s3rocketmq/wal"
   s3Endpoint: "http://minio.hellocorp.test"
@@ -10,7 +12,7 @@ s3Stream:
   s3AccessKey: "mcFoJPLvxNmRq497dhK0"
   s3SecretKey: "UU7PE0VOo3fRtqYEBeIIQzOSGFT3GctuiLoZg2hY"
 db:
-  url: "jdbc:mysql://localhost:3306/metadata"
+  url: "jdbc:mysql://mysql-server:3306/metadata"
   userName: "root"
   password: "password"
 metrics:

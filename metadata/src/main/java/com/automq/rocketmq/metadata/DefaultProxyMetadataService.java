@@ -24,7 +24,6 @@ import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.metadata.api.ProxyMetadataService;
 import com.google.common.base.Stopwatch;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,13 +40,22 @@ public class DefaultProxyMetadataService implements ProxyMetadataService {
 
     @Override
     public CompletableFuture<Topic> topicOf(String topicName) {
+        return topicOf(null, topicName);
+    }
+
+    @Override
+    public CompletableFuture<Topic> topicOf(long topicId) {
+        return topicOf(topicId, null);
+    }
+
+    private CompletableFuture<Topic> topicOf(Long topicId, String topicName) {
         Stopwatch stopwatch = Stopwatch.createStarted();
-        return metadataStore.describeTopic(null, topicName).thenApply((topic -> {
+        return metadataStore.describeTopic(topicId, topicName).thenApply((topic -> {
             long elapsed = stopwatch.elapsed().toMillis();
             if (elapsed > 100) {
-                LOGGER.warn("It took {}ms to query topic {}", elapsed, topicName);
+                LOGGER.warn("It took {}ms to query topic, id: {}, name: {}", elapsed, topicId, topicName);
             } else if (elapsed > 10) {
-                LOGGER.debug("It took {}ms to query topic {}", elapsed, topicName);
+                LOGGER.debug("It took {}ms to query topic, id: {}, name: {}", elapsed, topicId, topicName);
             }
             return topic;
         }));
@@ -73,6 +81,11 @@ public class DefaultProxyMetadataService implements ProxyMetadataService {
     }
 
     @Override
+    public CompletableFuture<ConsumerGroup> consumerGroupOf(long consumerGroupId) {
+        return metadataStore.describeGroup(consumerGroupId, null);
+    }
+
+    @Override
     public CompletableFuture<Long> consumerOffsetOf(long consumerGroupId, long topicId, int queueId) {
         return metadataStore.getConsumerOffset(consumerGroupId, topicId, queueId);
     }
@@ -81,30 +94,5 @@ public class DefaultProxyMetadataService implements ProxyMetadataService {
     public CompletableFuture<Void> updateConsumerOffset(long consumerGroupId, long topicId, int queueId,
         long newOffset) {
         return metadataStore.commitOffset(consumerGroupId, topicId, queueId, newOffset);
-    }
-
-    @Override
-    public long queryTopicId(String name) {
-        return 0;
-    }
-
-    @Override
-    public Set<Integer> queryAssignmentQueueSet(long topicId) {
-        return null;
-    }
-
-    @Override
-    public long queryConsumerGroupId(String name) {
-        return 0;
-    }
-
-    @Override
-    public long queryConsumerOffset(long consumerGroupId, long topicId, int queueId) {
-        return 0;
-    }
-
-    @Override
-    public void updateConsumerOffset(long consumerGroupId, long topicId, int queueId, long offset, boolean retry) {
-
     }
 }

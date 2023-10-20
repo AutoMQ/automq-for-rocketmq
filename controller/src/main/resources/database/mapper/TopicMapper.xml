@@ -41,15 +41,10 @@
     <update id="update">
         UPDATE topic
         <set>
-            <if test="null != status">
-                status = #{status},
-            </if>
-            <if test="null != queueNum">
-                queue_num = #{queueNum},
-            </if>
-            <if test="null != acceptMessageTypes">
-                accept_message_types = #{acceptMessageTypes},
-            </if>
+            <if test="null != status">status = #{status},</if>
+            <if test="null != name">name = #{name},</if>
+            <if test="null != queueNum">queue_num = #{queueNum},</if>
+            <if test="null != acceptMessageTypes">accept_message_types = #{acceptMessageTypes},</if>
         </set>
         WHERE id = #{id}
     </update>
@@ -57,10 +52,9 @@
     <delete id="delete">
         DELETE
         FROM topic
-        WHERE 1 = 1
-        <if test="null != id">
-            AND id = #{id}
-        </if>
+        <where>
+            <if test="null != id">id = #{id}</if>
+        </where>
     </delete>
 
     <delete id="recycle">
@@ -72,25 +66,18 @@
     <select id="get" resultType="Topic">
         SELECT id, name, queue_num, status, create_time, update_time, accept_message_types
         FROM topic
-        WHERE 1 = 1
-        <if test="null != id">
-            AND id = #{id}
-        </if>
-        <if test="null != name and '' != name">
-           AND name = #{name}
-        </if>
+        <where>
+            <if test="null != id">AND id = #{id}</if>
+            <if test="null != name and '' != name">AND name = #{name}</if>
+        </where>
     </select>
 
     <select id="list" resultType="Topic">
         SELECT id, name, queue_num, status, create_time, update_time, accept_message_types
         FROM topic
-        WHERE 1 = 1
-        <if test="status != null">
-            AND status = #{status}
-        </if>
-
-        <if test="updateTime != null">
-            AND update_time >= #{updateTime}
-        </if>
+        <where>
+            <if test="status != null">AND status = #{status}</if>
+            <if test="updateTime != null">AND update_time >= #{updateTime}</if>
+        </where>
     </select>
 </mapper>

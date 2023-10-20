@@ -17,5 +17,5 @@
 #
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-DIST_DIR="$(dirname "SCRIPT_DIR")"
+DIST_DIR="$(dirname "$SCRIPT_DIR")"
 "$SCRIPT_DIR"/run-server.sh com.automq.rocketmq.broker.BrokerStartup -c "$DIST_DIR/conf/broker.yaml"

@@ -94,7 +94,7 @@ public class MessageStoreTest {
         logicQueueManager = new DefaultLogicQueueManager(config, streamStore, kvService, metadataService, operationLogService, inflightService);
         dlqSender = Mockito.mock(DLQSender.class);
         Mockito.doReturn(CompletableFuture.completedFuture(null))
-            .when(dlqSender).send(Mockito.any(FlatMessageExt.class));
+            .when(dlqSender).send(Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
         reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, KV_NAMESPACE_TIMER_TAG, kvService, metadataService, inflightService,
             logicQueueManager, dlqSender);
         S3ObjectOperator operator = new S3ObjectOperatorImpl(new MemoryS3Operator());
@@ -110,7 +110,7 @@ public class MessageStoreTest {
     }
 
     @Test
-    public void pop_normal() throws Exception {
+    public void pop_normal() {
         // 1. append 5 message
         for (int i = 0; i < 5; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
@@ -187,7 +187,7 @@ public class MessageStoreTest {
     }
 
     @Test
-    public void pop_order() throws Exception {
+    public void pop_order() {
         // 1. append 5 message
         for (int i = 0; i < 5; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
@@ -238,7 +238,7 @@ public class MessageStoreTest {
 
         // 11. after 1100ms, pop again
         long reviveTimestamp = System.currentTimeMillis() + invisibleDuration;
-        await().until(() -> reviveService.reviveTimestamp() >= reviveTimestamp);
+        await().until(() -> reviveService.reviveTimestamp() > reviveTimestamp);
 
         popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, true, false, invisibleDuration).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
@@ -250,7 +250,7 @@ public class MessageStoreTest {
     }
 
     @Test
-    public void pop_snapshot() throws Exception {
+    public void pop_snapshot() {
         // set snapshot interval to 7
         config.setOperationSnapshotInterval(7);
         // 1. append 5 message
@@ -294,7 +294,7 @@ public class MessageStoreTest {
 
         // 6. after 1100ms, pop again
         long reviveTimestamp = System.currentTimeMillis() + invisibleDuration;
-        await().until(() -> reviveService.reviveTimestamp() >= reviveTimestamp);
+        await().until(() -> reviveService.reviveTimestamp() > reviveTimestamp);
 
         popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, invisibleDuration).join();
         assertEquals(PopResult.Status.END_OF_QUEUE, popResult.status());

@@ -20,8 +20,6 @@
     "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper">
-
-
     <insert id="create" parameterType="Group" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
         INSERT INTO consumer_group (name, status, dead_letter_topic_id, max_delivery_attempt, group_type)
         VALUES (#{name}, #{status}, #{deadLetterTopicId}, #{maxDeliveryAttempt}, #{groupType})
@@ -35,10 +33,9 @@
 
     <delete id="delete">
         DELETE FROM consumer_group
-        WHERE 1 = 1
-        <if test="null != id">
-            AND id = #{id}
-        </if>
+        <where>
+            <if test="null != id">id = #{id}</if>
+        </where>
     </delete>
 
     <delete id="recycle">
@@ -47,25 +44,16 @@
         AND #{updateTime} >= update_time
     </delete>
 
-    <select id="list" resultType="Group">
+    <select id="byCriteria" resultType="Group" parameterType="GroupCriteria">
         SELECT id, name, status, dead_letter_topic_id, max_delivery_attempt, group_type, create_time, update_time
         FROM consumer_group
-        WHERE 1 = 1
-        <if test="null != id">
-            AND id = #{id}
-        </if>
-
-        <if test="null != name">
-            AND name = #{name}
-        </if>
-
-        <if test="null != status">
-            AND status = #{status}
-        </if>
-
-        <if test="null != updateTime">
-            AND update_time >= #{updateTime}
-        </if>
+        <where>
+            <if test="null != id">id = #{id}</if>
+            <if test="null != name">AND name = #{name}</if>
+            <if test="null != status">AND status = #{status}</if>
+            <if test="null != topicId">AND dead_letter_topic_id = #{topicId}</if>
+            <if test="null != updateTime">AND update_time >= #{updateTime}</if>
+        </where>
     </select>
 
 </mapper>

@@ -21,7 +21,6 @@ import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.Topic;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 public interface ProxyMetadataService {
@@ -32,6 +31,14 @@ public interface ProxyMetadataService {
      * @return {@link CompletableFuture} of {@link Topic}
      */
     CompletableFuture<Topic> topicOf(String topicName);
+
+    /**
+     * Query the topic metadata of a given topic id.
+     *
+     * @param topicId topic id
+     * @return {@link CompletableFuture} of {@link Topic}
+     */
+    CompletableFuture<Topic> topicOf(long topicId);
 
     /**
      * List all the queue assignments for a given topic that assigned to the current server.
@@ -57,6 +64,14 @@ public interface ProxyMetadataService {
     CompletableFuture<ConsumerGroup> consumerGroupOf(String groupName);
 
     /**
+     * Query the consumer group metadata of a given group id
+     *
+     * @param consumerGroupId consumer group id
+     * @return {@link CompletableFuture} of {@link ConsumerGroup}
+     */
+    CompletableFuture<ConsumerGroup> consumerGroupOf(long consumerGroupId);
+
+    /**
      * Query the consumer offset of a given consumer group, topic and queue.
      *
      * @param consumerGroupId consumer group id
@@ -76,21 +91,4 @@ public interface ProxyMetadataService {
      * @return {@link CompletableFuture} of {@link Void}
      */
     CompletableFuture<Void> updateConsumerOffset(long consumerGroupId, long topicId, int queueId, long newOffset);
-
-    @Deprecated
-    long queryTopicId(String name);
-
-    @Deprecated
-    Set<Integer> queryAssignmentQueueSet(long topicId);
-
-    @Deprecated
-    long queryConsumerGroupId(String name);
-
-    @Deprecated
-    long queryConsumerOffset(long consumerGroupId, long topicId, int queueId);
-
-    @Deprecated
-    // Each time pop will advance the consumer offset by batch size.
-    // Metadata service will cache the consumer offset in memory, and periodically commit to Controller.
-    void updateConsumerOffset(long consumerGroupId, long topicId, int queueId, long offset, boolean retry);
 }

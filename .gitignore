@@ -1,5 +1,6 @@
 ### IntelliJ IDEA ###
 .idea
+**/**.iml
 
 ### VS Code ###
 .vscode/
@@ -38,3 +39,6 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 *.xml.versionsBackup
+
+# Docker
+distribution/docker/ddl.sql

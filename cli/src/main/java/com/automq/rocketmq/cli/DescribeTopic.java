@@ -17,14 +17,8 @@
 
 package com.automq.rocketmq.cli;
 
-import apache.rocketmq.controller.v1.MessageQueueAssignment;
-import apache.rocketmq.controller.v1.OngoingMessageQueueReassignment;
 import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.controller.metadata.GrpcControllerClient;
-import de.vandermeer.asciitable.AT_Row;
-import de.vandermeer.asciitable.AsciiTable;
-import de.vandermeer.skb.interfaces.transformers.textformat.TextAlignment;
-import java.util.List;
 import java.util.concurrent.Callable;
 import picocli.CommandLine;
 
@@ -46,44 +40,7 @@ public class DescribeTopic implements Callable<Void> {
                 System.err.printf("Topic '%s' is not found%n%n", topicName);
                 return null;
             }
-            AsciiTable topicTable = new AsciiTable();
-            topicTable.addRule();
-            topicTable.addRow("TOPIC ID", "TOPIC NAME");
-            topicTable.addRule();
-            topicTable.addRow(topic.getTopicId(), topic.getName());
-            topicTable.addRule();
-            String render = topicTable.render();
-            System.out.println(render);
-
-            AsciiTable assignmentTable = new AsciiTable();
-            assignmentTable.addRule();
-            AT_Row row = assignmentTable.addRow(null, "ASSIGNMENT");
-            row.getCells().get(1).getContext().setTextAlignment(TextAlignment.CENTER);
-            assignmentTable.addRule();
-            assignmentTable.addRow("NODE ID", "QUEUE ID");
-            assignmentTable.addRule();
-            for (MessageQueueAssignment assignment : topic.getAssignmentsList()) {
-                assignmentTable.addRow(assignment.getNodeId(), assignment.getQueue().getQueueId());
-                assignmentTable.addRule();
-            }
-            render = assignmentTable.render();
-            System.out.println(render);
-
-            List<OngoingMessageQueueReassignment> ongoing = topic.getReassignmentsList();
-            if (!ongoing.isEmpty()) {
-                AsciiTable reassignmentTable = new AsciiTable();
-                assignmentTable.addRule();
-                row = assignmentTable.addRow(null, "ON-GOING REASSIGNMENT");
-                row.getCells().get(1).getContext().setTextAlignment(TextAlignment.CENTER);
-                reassignmentTable.addRule();
-                reassignmentTable.addRow("SRC NODE ID", "DST NODE ID", "QUEUE ID");
-                reassignmentTable.addRule();
-                for (OngoingMessageQueueReassignment reassignment : ongoing) {
-                    reassignmentTable.addRow(reassignment.getSrcNodeId(), reassignment.getDstNodeId(), reassignment.getQueue().getQueueId());
-                    reassignmentTable.addRule();
-                }
-            }
-
+            ConsoleHelper.printTable(topic);
         }
         return null;
     }

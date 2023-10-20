@@ -60,13 +60,22 @@ public class BrokerStartup {
                 try {
                     String configStr = Files.readString(Path.of(configFile), StandardCharsets.UTF_8);
                     brokerConfig = loadBrokerConfig(configStr);
-                    brokerConfig.validate();
                 } catch (IOException e) {
                     LOGGER.error("Failed to read config file {}", configFile, e);
-                    System.exit(-1);
+                    return;
                 }
             }
         }
+
+        if (null == brokerConfig) {
+            LOGGER.error("Default broker config file is not found");
+            return;
+        }
+
+        // Fill overrides from environment variables
+        brokerConfig.initEnvVar();
+
+        brokerConfig.validate();
 
         start(buildBrokerController(brokerConfig));
         LOGGER.info("Broker started, costs {} ms", System.currentTimeMillis() - start);

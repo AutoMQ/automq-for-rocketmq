@@ -18,6 +18,7 @@
 package com.automq.rocketmq.store;
 
 import com.automq.rocketmq.common.config.S3StreamConfig;
+import com.automq.rocketmq.common.config.StoreConfig;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.stream.api.AppendResult;
@@ -41,6 +42,9 @@ import com.automq.stream.s3.wal.WriteAheadLog;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import org.apache.rocketmq.common.thread.ThreadPoolMonitor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,8 +60,10 @@ public class S3StreamStore implements StreamStore {
     private final Storage storage;
     private final CompactionManager compactionManager;
     private final S3BlockCache blockCache;
+    private final ThreadPoolExecutor storeWorkingThreadPool;
 
-    public S3StreamStore(S3StreamConfig streamConfig, StoreMetadataService metadataService, S3Operator operator) {
+    public S3StreamStore(StoreConfig storeConfig, S3StreamConfig streamConfig, StoreMetadataService metadataService,
+        S3Operator operator) {
         this.s3Config = configFrom(streamConfig);
 
         // Build meta service and related manager
@@ -76,6 +82,14 @@ public class S3StreamStore implements StreamStore {
         this.compactionManager = new CompactionManager(s3Config, objectManager, streamManager, operator);
 
         this.streamClient = new S3StreamClient(streamManager, storage, objectManager, operator, s3Config);
+        this.storeWorkingThreadPool = ThreadPoolMonitor.createAndMonitor(
+            storeConfig.workingThreadPoolNums(),
+            storeConfig.workingThreadQueueCapacity(),
+            1,
+            TimeUnit.MINUTES,
+            "StoreWorkingThreadPool",
+            storeConfig.workingThreadQueueCapacity()
+        );
     }
 
     @Override
@@ -84,7 +98,8 @@ public class S3StreamStore implements StreamStore {
         if (stream.isEmpty()) {
             throw new IllegalStateException("Stream " + streamId + " is not opened.");
         }
-        return stream.get().fetch(startOffset, startOffset + maxCount, Integer.MAX_VALUE);
+        return stream.get().fetch(startOffset, startOffset + maxCount, Integer.MAX_VALUE)
+            .thenApplyAsync(result -> result, storeWorkingThreadPool);
     }
 
     @Override
@@ -93,7 +108,8 @@ public class S3StreamStore implements StreamStore {
         if (stream.isEmpty()) {
             throw new IllegalStateException("Stream " + streamId + " is not opened.");
         }
-        return stream.get().append(recordBatch);
+        return stream.get().append(recordBatch)
+            .thenApplyAsync(result -> result, storeWorkingThreadPool);
     }
 
     @Override
@@ -108,7 +124,8 @@ public class S3StreamStore implements StreamStore {
             })
             .filter(x -> x != null)
             .collect(java.util.stream.Collectors.toList());
-        return CompletableFuture.allOf(futureList.toArray(new CompletableFuture[0]));
+        return CompletableFuture.allOf(futureList.toArray(new CompletableFuture[0]))
+            .thenApplyAsync(result -> result, storeWorkingThreadPool);
     }
 
     @Override
@@ -117,7 +134,8 @@ public class S3StreamStore implements StreamStore {
         if (stream.isEmpty()) {
             throw new IllegalStateException("Stream " + streamId + " is not opened.");
         }
-        return stream.get().trim(newStartOffset);
+        return stream.get().trim(newStartOffset)
+            .thenApplyAsync(result -> result, storeWorkingThreadPool);
     }
 
     @Override

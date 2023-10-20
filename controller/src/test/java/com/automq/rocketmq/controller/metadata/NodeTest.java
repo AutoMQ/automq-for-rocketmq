@@ -86,7 +86,7 @@ public class NodeTest extends DatabaseTestBase {
 
     @Test
     @Order(3)
-    public void testEpoch() throws IOException {
+    public void testUpdate() throws IOException {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             NodeMapper nodeMapper = session.getMapper(NodeMapper.class);
             Node node = new Node();
@@ -99,12 +99,12 @@ public class NodeTest extends DatabaseTestBase {
             Node node1 = nodeMapper.get(null, null, node.getInstanceId(), null);
             Assertions.assertEquals(0, node1.getEpoch());
             Assertions.assertEquals(node.getId(), node1.getId());
-            affectedRows = nodeMapper.increaseEpoch(node.getId());
-            Assertions.assertEquals(1, affectedRows);
-
+            node.setEpoch(node.getEpoch() + 1);
+            node.setAddress("localhost:2345");
+            nodeMapper.update(node);
             node1 = nodeMapper.get(null, null, node1.getInstanceId(), null);
             Assertions.assertEquals(1, node1.getEpoch());
-            nodeMapper.delete(affectedRows);
+            Assertions.assertEquals("localhost:2345", node1.getAddress());
         }
     }
 

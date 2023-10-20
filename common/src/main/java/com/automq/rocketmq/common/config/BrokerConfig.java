@@ -18,6 +18,10 @@
 package com.automq.rocketmq.common.config;
 
 import com.automq.rocketmq.common.exception.RocketMQException;
+import com.google.common.base.CaseFormat;
+import com.google.common.base.Strings;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import org.apache.rocketmq.common.utils.NetworkUtil;
 
 public class BrokerConfig implements ControllerConfig {
@@ -49,6 +53,12 @@ public class BrokerConfig implements ControllerConfig {
      */
     private String advertiseAddress;
 
+    /**
+     * Access key and secret key for system internal access.
+     */
+    private String innerAccessKey;
+    private String innerSecretKey;
+
     private final MetricsConfig metrics;
     private final ProxyConfig proxy;
     private final StoreConfig store;
@@ -64,9 +74,48 @@ public class BrokerConfig implements ControllerConfig {
         this.db = new DatabaseConfig();
     }
 
-    private  static int parsePort(String address) {
+    private static String parseHost(String address) {
+        int pos = address.lastIndexOf(':');
+        return address.substring(0, pos);
+    }
+
+    private static int parsePort(String address) {
         int pos = address.lastIndexOf(':');
         return Integer.parseInt(address.substring(pos + 1));
+    }
+
+    private static final String ENV_CONFIG_PREFIX = "ROCKETMQ_NODE";
+
+    /**
+     * The following environment is supported
+     * ROCKETMQ_NODE_NAME
+     * ROCKETMQ_NODE_BIND_ADDRESS
+     * ROCKETMQ_NODE_ADVERTISE_ADDRESS
+     */
+    public void initEnvVar() {
+        Method[] methods = BrokerConfig.class.getMethods();
+        for (Method method : methods) {
+            if (method.getName().startsWith("set")) {
+                if (method.getParameterCount() == 1 && method.getParameterTypes()[0] == String.class) {
+                    String envName = envVarName(method.getName());
+                    String value = System.getenv(envName);
+                    if (!Strings.isNullOrEmpty(value)) {
+                        System.out.printf("Accept environment variable %s --> %s%n", envName, value);
+                        try {
+                            method.invoke(this, value.trim());
+                            System.out.printf("%s to %s%n", method.getName(), value);
+                        } catch (IllegalAccessException | InvocationTargetException ignore) {
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private String envVarName(String setterName) {
+        String upperSnakeCase = CaseFormat.LOWER_CAMEL.converterTo(CaseFormat.UPPER_UNDERSCORE).convert(setterName);
+        assert upperSnakeCase != null;
+        return ENV_CONFIG_PREFIX + upperSnakeCase.substring(3);
     }
 
     public void validate() throws RocketMQException {
@@ -75,11 +124,19 @@ public class BrokerConfig implements ControllerConfig {
             this.advertiseAddress = host + ":" + parsePort(bindAddress);
         }
 
-        if (parsePort(advertiseAddress) != parsePort(bindAddress)) {
+        int mainPort = parsePort(advertiseAddress);
+
+        if (mainPort != parsePort(bindAddress)) {
             throw new RocketMQException(500, "Listen port does not match advertise address port");
         }
 
-        proxy.setGrpcListenPort(parsePort(advertiseAddress));
+        proxy.setHostName(parseHost(advertiseAddress));
+
+        // Use the main port as the Remoting port
+        proxy.setRemotingListenPort(mainPort);
+
+        // Use the main port + 1 as the gRPC port
+        proxy.setGrpcListenPort(mainPort + 1);
     }
 
     @Override
@@ -159,5 +216,21 @@ public class BrokerConfig implements ControllerConfig {
 
     public void setAdvertiseAddress(String advertiseAddress) {
         this.advertiseAddress = advertiseAddress;
+    }
+
+    public void setInnerAccessKey(String innerAccessKey) {
+        this.innerAccessKey = innerAccessKey;
+    }
+
+    public void setInnerSecretKey(String innerSecretKey) {
+        this.innerSecretKey = innerSecretKey;
+    }
+
+    public String getInnerAccessKey() {
+        return innerAccessKey;
+    }
+
+    public String getInnerSecretKey() {
+        return innerSecretKey;
     }
 }

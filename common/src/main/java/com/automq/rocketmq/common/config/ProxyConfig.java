@@ -17,10 +17,7 @@
 
 package com.automq.rocketmq.common.config;
 
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.time.Duration;
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,15 +26,7 @@ public class ProxyConfig extends BaseConfig {
 
     private String name;
 
-    private static String localHostName;
-
-    static {
-        try {
-            localHostName = InetAddress.getLocalHost().getHostName();
-        } catch (UnknownHostException e) {
-            LOGGER.error("Failed to obtain the host name", e);
-        }
-    }
+    private String hostName;
 
     // The proportion of messages that are popped from the retry queue first,
     // default is 20, available value from 0 to 100.
@@ -49,6 +38,7 @@ public class ProxyConfig extends BaseConfig {
     private int grpcThreadPoolNums = 16 + PROCESSOR_NUMBER * 2;
     private int grpcThreadPoolQueueCapacity = 100000;
     private int grpcListenPort = 8081;
+    private int remotingListenPort = 8080;
     private int grpcBossLoopNum = 1;
     private int grpcWorkerLoopNum = PROCESSOR_NUMBER * 2;
     private boolean enableGrpcEpoll = false;
@@ -68,11 +58,12 @@ public class ProxyConfig extends BaseConfig {
         return name;
     }
 
-    public String localHostName() {
-        if (StringUtils.isBlank(localHostName)) {
-            return name();
-        }
-        return localHostName;
+    public String hostName() {
+        return hostName;
+    }
+
+    public void setHostName(String hostName) {
+        this.hostName = hostName;
     }
 
     public int retryPriorityPercentage() {
@@ -137,5 +128,13 @@ public class ProxyConfig extends BaseConfig {
 
     public long printThreadPoolStatusInMillis() {
         return printThreadPoolStatusInMillis;
+    }
+
+    public int remotingListenPort() {
+        return remotingListenPort;
+    }
+
+    public void setRemotingListenPort(int remotingListenPort) {
+        this.remotingListenPort = remotingListenPort;
     }
 }

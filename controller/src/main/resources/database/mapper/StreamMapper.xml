@@ -61,18 +61,10 @@
     <update id="update">
         UPDATE stream
         <set>
-            <if test="null != epoch">
-                epoch = #{epoch},
-            </if>
-            <if test="null != startOffset">
-                start_offset = #{startOffset},
-            </if>
-            <if test="null != rangeId">
-                range_id = #{rangeId},
-            </if>
-            <if test="null != state">
-                state = #{state},
-            </if>
+            <if test="null != epoch">epoch = #{epoch},</if>
+            <if test="null != startOffset">start_offset = #{startOffset},</if>
+            <if test="null != rangeId">range_id = #{rangeId},</if>
+            <if test="null != state">state = #{state},</if>
         </set>
         WHERE id = #{id}
     </update>
@@ -80,16 +72,11 @@
     <update id="updateStreamState">
         UPDATE stream
         SET state = #{state}
-        WHERE 1 = 1
-        <if test="null != id">
-            AND id = #{id}
-        </if>
-        <if test="null != topicId">
-            AND topic_id = #{topicId}
-        </if>
-        <if test="null != queueId">
-            AND queue_id = #{queueId}
-        </if>
+        <where>
+            <if test="null != id">id = #{id}</if>
+            <if test="null != topicId">AND topic_id = #{topicId}</if>
+            <if test="null != queueId">AND queue_id = #{queueId}</if>
+        </where>
     </update>
 
     <update id="planMove">
@@ -104,39 +91,30 @@
 
     <delete id="delete">
         DELETE FROM stream
-        WHERE 1 = 1
-        <if test="null != id">
-            AND id = #{id}
-        </if>
+        <where>
+            <if test="null != id">id = #{id}</if>
+        </where>
     </delete>
 
     <select id="list" resultType="Stream">
         SELECT id, topic_id, queue_id, stream_role, group_id, src_node_id, dst_node_id, epoch, range_id, start_offset,
                state
         FROM stream
-        WHERE 1 = 1
-        <if test="null != topicId">
-            AND topic_id = #{topicId}
-        </if>
-        <if test="null != queueId">
-            AND queue_id = #{queueId}
-        </if>
-        <if test="null != groupId">
-            AND group_id = #{groupId}
-        </if>
+        <where>
+            <if test="null != topicId">topic_id = #{topicId}</if>
+            <if test="null != queueId">AND queue_id = #{queueId}</if>
+            <if test="null != groupId">AND group_id = #{groupId}</if>
+        </where>
     </select>
 
     <select id="listByNode" resultType="Stream">
         SELECT id, topic_id, queue_id, stream_role, group_id, src_node_id, dst_node_id, epoch, range_id, start_offset,
         state
         FROM stream
-        WHERE 1 = 1
-        <if test="null != nodeId">
-            AND dst_node_id = #{nodeId}
-        </if>
-        <if test="null != state">
-            AND state = #{state}
-        </if>
+        <where>
+            <if test="null != nodeId">dst_node_id = #{nodeId}</if>
+            <if test="null != state">AND state = #{state}</if>
+        </where>
     </select>
 
     <select id="queueEpoch" resultType="long">

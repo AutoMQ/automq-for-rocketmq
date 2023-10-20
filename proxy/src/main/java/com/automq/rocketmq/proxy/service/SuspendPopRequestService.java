@@ -41,6 +41,7 @@ import org.apache.rocketmq.client.consumer.PopStatus;
 import org.apache.rocketmq.common.ServiceThread;
 import org.apache.rocketmq.common.filter.ExpressionType;
 import org.apache.rocketmq.common.thread.ThreadPoolMonitor;
+import org.apache.rocketmq.common.utils.StartAndShutdown;
 import org.apache.rocketmq.proxy.common.ProxyContext;
 import org.apache.rocketmq.proxy.config.ConfigurationManager;
 import org.apache.rocketmq.proxy.config.ProxyConfig;
@@ -49,17 +50,17 @@ import org.apache.rocketmq.remoting.protocol.heartbeat.SubscriptionData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class SuspendPopRequestService extends ServiceThread {
+public class SuspendPopRequestService extends ServiceThread implements StartAndShutdown {
     protected static final Logger LOGGER = LoggerFactory.getLogger(SuspendPopRequestService.class);
     private volatile static SuspendPopRequestService instance;
 
     private final ConcurrentMap<Pair<String/*topic*/, Integer/*queueId*/>, ConcurrentSkipListSet<SuspendRequestTask>> suspendPopRequestMap = new ConcurrentHashMap<>();
     private final AtomicInteger suspendRequestCount = new AtomicInteger(0);
-    protected ThreadPoolExecutor suspendRequestThreadPoolExecutor;
+    protected ThreadPoolExecutor suspendRequestThreadPool;
 
     private SuspendPopRequestService() {
         ProxyConfig config = ConfigurationManager.getProxyConfig();
-        this.suspendRequestThreadPoolExecutor = ThreadPoolMonitor.createAndMonitor(
+        this.suspendRequestThreadPool = ThreadPoolMonitor.createAndMonitor(
             config.getGrpcConsumerThreadPoolNums(),
             config.getGrpcConsumerThreadPoolNums(),
             1,
@@ -166,7 +167,7 @@ public class SuspendPopRequestService extends ServiceThread {
 
         for (SuspendRequestTask task : taskList) {
             if (task.doFilter(tag)) {
-                suspendRequestThreadPoolExecutor.execute(
+                suspendRequestThreadPool.execute(
                     () -> task.tryFetchMessages()
                         .thenAccept(result -> {
                             if (result) {
