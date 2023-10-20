@@ -498,7 +498,7 @@ public class SlidingWindowService {
                         }
                     });
                 }
-            } catch (IOException e) {
+            } catch (Exception e) {
                 FutureUtil.completeExceptionally(block.futures(), e);
                 LOGGER.error(String.format("failed to write record, offset: %s", block.startOffset()), e);
             }

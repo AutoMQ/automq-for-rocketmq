@@ -100,6 +100,6 @@ public class BlockImpl implements Block {
 
     @Override
     public ByteBuffer data() {
-        return data;
+        return data.duplicate().flip();
     }
 }
