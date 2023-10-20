@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.proxy.remoting.activity;
 
+import com.automq.rocketmq.proxy.metrics.ProxyMetricsManager;
 import com.automq.rocketmq.proxy.model.ProxyContextExt;
 import com.automq.rocketmq.proxy.remoting.RemotingUtil;
 import com.google.common.base.Strings;
@@ -36,6 +37,7 @@ import org.apache.rocketmq.proxy.remoting.activity.SendMessageActivity;
 import org.apache.rocketmq.proxy.remoting.pipeline.RequestPipeline;
 import org.apache.rocketmq.proxy.service.route.AddressableMessageQueue;
 import org.apache.rocketmq.proxy.service.route.MessageQueueView;
+import org.apache.rocketmq.remoting.common.RemotingHelper;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 import org.apache.rocketmq.remoting.protocol.RequestCode;
 import org.apache.rocketmq.remoting.protocol.ResponseCode;
@@ -115,6 +117,14 @@ public class ExtendSendMessageActivity extends SendMessageActivity {
     @Override
     protected ProxyContext createContext(ChannelHandlerContext ctx, RemotingCommand request) {
         return ProxyContextExt.create(super.createContext(ctx, request));
+    }
+
+    @Override
+    protected void writeResponse(ChannelHandlerContext ctx, ProxyContext context, RemotingCommand request,
+        RemotingCommand response, Throwable t) {
+        ProxyMetricsManager.recordRpcLatency(context.getProtocolType(), context.getAction(),
+            RemotingHelper.getResponseCodeDesc(response.getCode()), ((ProxyContextExt) context).getElapsedTimeNanos());
+        super.writeResponse(ctx, context, request, response, t);
     }
 
     private String dstBrokerName(RemotingCommand request) {
