@@ -22,4 +22,13 @@ if [ ! -f "ddl.sql" ]
 then
   cp "$REPO_DIR/controller/src/main/resources/ddl.sql" .
 fi
+
+OS_NAME=$(uname)
+if [ "$OS_NAME" == "Linux" ]
+then
+  IP=$(ip -o route get to 8.8.8.8 | sed -n 's/.*src \([0-9.]\+\).*/\1/p')
+elif [ "$OS_NAME" == "Darwin" ]; then
+  IP=$(ipconfig getifaddr en0)
+fi
+sed -i "s/192.168.123.147/$IP/g" "$SCRIPT_DIR/docker-compose.yaml"
 docker compose up
