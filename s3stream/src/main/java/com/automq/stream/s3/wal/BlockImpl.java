@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
-public class WriteBlockTaskImpl implements WriteBlockTask {
+public class BlockImpl implements Block {
 
     /**
      * The soft limit of block size. (128 KiB)
@@ -49,7 +49,7 @@ public class WriteBlockTaskImpl implements WriteBlockTask {
     private ByteBuffer data = ByteBuffer.allocate(0);
     private final List<CompletableFuture<WriteAheadLog.AppendResult.CallbackResult>> futures = new LinkedList<>();
 
-    public WriteBlockTaskImpl(long startOffset, long maxSize) {
+    public BlockImpl(long startOffset, long maxSize) {
         this.startOffset = startOffset;
         this.maxSize = maxSize;
     }

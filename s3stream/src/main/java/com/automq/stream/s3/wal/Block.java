@@ -28,9 +28,9 @@ import java.util.function.Function;
 import static com.automq.stream.s3.wal.WriteAheadLog.AppendResult;
 
 /**
- * A WriteBlockTask contains multiple records, and will be written to the WAL in one batch.
+ * A Block contains multiple records, and will be written to the WAL in one batch.
  */
-public interface WriteBlockTask {
+public interface Block {
     /**
      * The start offset of this block.
      * Align to {@link WALUtil#BLOCK_SIZE}
@@ -49,7 +49,7 @@ public interface WriteBlockTask {
     long addRecord(long recordSize, Function<Long, ByteBuffer> recordSupplier, CompletableFuture<AppendResult.CallbackResult> future);
 
     /**
-     * Futures of all records in this task.
+     * Futures of all records in this block.
      */
     List<CompletableFuture<AppendResult.CallbackResult>> futures();
 

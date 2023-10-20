@@ -408,13 +408,13 @@ public class BlockWALService implements WriteAheadLog {
         final CompletableFuture<AppendResult.CallbackResult> appendResultFuture = new CompletableFuture<>();
         long expectedWriteOffset;
 
-        Lock lock = slidingWindowService.getTaskLock();
+        Lock lock = slidingWindowService.getBlockLock();
         lock.lock();
         try {
-            WriteBlockTask block = slidingWindowService.getCurrentBlockLocked();
+            Block block = slidingWindowService.getCurrentBlockLocked();
             try {
                 expectedWriteOffset = block.addRecord(recordSize, (offset) -> record(body, crc, offset), appendResultFuture);
-            } catch (WriteBlockTask.BlockFullException e) {
+            } catch (Block.BlockFullException e) {
                 // this block is full, create a new one
                 block = slidingWindowService.sealAndNewBlockLocked(block, recordSize, walHeaderCoreData.getFlushedTrimOffset(), walHeaderCoreData.getCapacity() - WAL_HEADER_TOTAL_CAPACITY);
                 expectedWriteOffset = block.addRecord(recordSize, (offset) -> record(body, crc, offset), appendResultFuture);
