@@ -102,6 +102,12 @@ public class LeaseTask extends ControllerTask {
         // Note this would make the mybatis cache friendly.
         Node node = mapper.get(null, metadataStore.config().name(), null, null);
         if (null != node) {
+            // Update advertise address if changed.
+            if (!metadataStore.config().advertiseAddress().equals(node.getAddress())) {
+                node.setAddress(metadataStore.config().advertiseAddress());
+                mapper.update(node);
+                session.commit();
+            }
             metadataStore.config().setNodeId(node.getId());
             return;
         }
