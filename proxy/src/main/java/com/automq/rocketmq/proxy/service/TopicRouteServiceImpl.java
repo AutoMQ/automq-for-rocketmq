@@ -19,6 +19,7 @@ package com.automq.rocketmq.proxy.service;
 
 import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.Topic;
+import com.automq.rocketmq.common.config.BrokerConfig;
 import com.automq.rocketmq.metadata.api.ProxyMetadataService;
 import com.automq.rocketmq.proxy.model.VirtualQueue;
 import com.google.common.collect.Lists;
@@ -46,33 +47,38 @@ import org.apache.rocketmq.remoting.protocol.route.TopicRouteData;
 public class TopicRouteServiceImpl extends TopicRouteService {
     public static final String VIRTUAL_CLUSTER_NAME = "DefaultCluster";
     private final ProxyMetadataService metadataService;
+    private final BrokerConfig brokerConfig;
 
-    public TopicRouteServiceImpl(ProxyMetadataService metadataService) {
+    public TopicRouteServiceImpl(BrokerConfig config, ProxyMetadataService metadataService) {
         // We don't need MQClientAPIFactory anymore, so just pass a null.
         super(null);
         this.metadataService = metadataService;
+        this.brokerConfig = config;
+
+        // The parent class has created a scheduledExecutorService, but we don't need it, just destroy it.
+        this.scheduledExecutorService.shutdown();
     }
 
     @Override
     protected void init() {
-        this.appendShutdown(this.scheduledExecutorService::shutdown);
+        // Do nothing.
+        // Just disable the behavior of the parent class.
     }
 
     @Override
-    public MessageQueueView getAllMessageQueueView(ProxyContext ctx, String topicName) throws Exception {
-        Topic topic = metadataService.topicOf(topicName).join();
-        return new MessageQueueView(topicName, routeDataFrom(topic.getAssignmentsList()));
+    public MessageQueueView getAllMessageQueueView(ProxyContext ctx, String topicName) {
+        return new MessageQueueView(topicName, routeDataFrom(assignmentsOf(topicName, QueueFilter.ALL)));
     }
 
     @Override
-    public MessageQueueView getCurrentMessageQueueView(ProxyContext ctx, String topicName) throws Exception {
-        List<MessageQueueAssignment> assignments = metadataService.queueAssignmentsOf(topicName).join();
-        return new MessageQueueView(topicName, routeDataFrom(assignments));
+    public MessageQueueView getCurrentMessageQueueView(ProxyContext ctx, String topicName) {
+        // Only return the MessageQueueAssignment that is assigned to the current broker.
+        return new MessageQueueView(topicName, routeDataFrom(assignmentsOf(topicName, nodeId -> nodeId == brokerConfig.nodeId())));
     }
 
     @Override
     public ProxyTopicRouteData getTopicRouteForProxy(ProxyContext ctx, List<Address> requestHostAndPortList,
-        String topicName) throws Exception {
+        String topicName) {
         MessageQueueView messageQueueView = getAllMessageQueueView(ctx, topicName);
         TopicRouteData topicRouteData = messageQueueView.getTopicRouteData();
 
@@ -155,11 +161,39 @@ public class TopicRouteServiceImpl extends TopicRouteService {
         return topicRouteData;
     }
 
+    private List<MessageQueueAssignment> assignmentsOf(String topicName, QueueFilter filter) {
+        Topic topic = metadataService.topicOf(topicName).join();
+        List<MessageQueueAssignment> assignmentList = new ArrayList<>();
+        topic.getAssignmentsList().forEach(assignment -> {
+            if (filter.filter(assignment.getNodeId())) {
+                assignmentList.add(assignment);
+            }
+        });
+        // Convert OngoingMessageQueueReassignment to MessageQueueAssignment
+        topic.getReassignmentsList().forEach(reassignment -> {
+            if (filter.filter(reassignment.getDstNodeId())) {
+                assignmentList.add(MessageQueueAssignment.newBuilder()
+                    .setNodeId(reassignment.getDstNodeId())
+                    .setQueue(reassignment.getQueue())
+                    .build());
+            }
+        });
+
+        return assignmentList;
+    }
+
     private boolean isGrpcProtocol(ProxyContext ctx) {
         if (ChannelProtocolType.GRPC_V2.getName().equals(ctx.getProtocolType()) ||
             ChannelProtocolType.GRPC_V1.getName().equals(ctx.getProtocolType())) {
             return true;
         }
         return false;
+    }
+
+    // Define a filter for the MessageQueueAssignment class.
+    interface QueueFilter {
+        QueueFilter ALL = nodeId -> true;
+
+        boolean filter(int nodeId);
     }
 }

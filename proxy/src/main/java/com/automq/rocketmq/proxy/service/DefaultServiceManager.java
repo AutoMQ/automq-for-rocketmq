@@ -17,7 +17,7 @@
 
 package com.automq.rocketmq.proxy.service;
 
-import com.automq.rocketmq.common.config.ProxyConfig;
+import com.automq.rocketmq.common.config.BrokerConfig;
 import com.automq.rocketmq.metadata.api.ProxyMetadataService;
 import com.automq.rocketmq.store.api.MessageStore;
 import org.apache.rocketmq.broker.client.ConsumerGroupEvent;
@@ -44,16 +44,16 @@ public class DefaultServiceManager implements ServiceManager {
     private final AdminService adminService;
     private final DLQService dlqService;
 
-    public DefaultServiceManager(ProxyConfig config, ProxyMetadataService metadataService, DLQService dlqService,
+    public DefaultServiceManager(BrokerConfig config, ProxyMetadataService metadataService, DLQService dlqService,
         MessageStore messageStore) {
         this.metadataService = metadataService;
         this.dlqService = dlqService;
-        LockService lockService = new LockService(config);
-        this.messageService = new MessageServiceImpl(config, messageStore, metadataService, lockService);
+        LockService lockService = new LockService(config.proxy());
+        this.messageService = new MessageServiceImpl(config.proxy(), messageStore, metadataService, lockService);
         this.resourceMetadataService = new ResourceMetadataService(metadataService);
-        this.topicRouteService = new TopicRouteServiceImpl(metadataService);
+        this.topicRouteService = new TopicRouteServiceImpl(config, metadataService);
         this.producerManager = new ProducerManager();
-        this.consumerManager = new ConsumerManager(new ConsumerIdsChangeListenerImpl(), config.channelExpiredTimeout());
+        this.consumerManager = new ConsumerManager(new ConsumerIdsChangeListenerImpl(), config.proxy().channelExpiredTimeout());
         this.proxyRelayService = new ProxyRelayServiceImpl();
         this.transactionService = new TransactionServiceImpl();
         this.adminService = new AdminServiceImpl();
