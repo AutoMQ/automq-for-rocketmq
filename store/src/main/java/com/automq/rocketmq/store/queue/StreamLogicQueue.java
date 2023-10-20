@@ -217,10 +217,10 @@ public class StreamLogicQueue extends LogicQueue {
         // Check offset
         long confirmOffset = streamStore.confirmOffset(streamId);
         if (startOffset == confirmOffset) {
-            return CompletableFuture.completedFuture(new PopResult(PopResult.Status.END_OF_QUEUE, 0, Collections.emptyList()));
+            return CompletableFuture.completedFuture(new PopResult(PopResult.Status.END_OF_QUEUE, 0, Collections.emptyList(), 0));
         }
         if (startOffset > confirmOffset) {
-            return CompletableFuture.completedFuture(new PopResult(PopResult.Status.ILLEGAL_OFFSET, 0, Collections.emptyList()));
+            return CompletableFuture.completedFuture(new PopResult(PopResult.Status.ILLEGAL_OFFSET, 0, Collections.emptyList(), 0));
         }
 
         int fetchBatchSize;
@@ -280,8 +280,8 @@ public class StreamLogicQueue extends LogicQueue {
                 status = PopResult.Status.FOUND;
             }
             inflightService.increaseInflightCount(consumerGroupId, topicId, queueId, messageExtList.size());
-            return new PopResult(status, operationTimestamp, messageExtList);
-        }).exceptionally(throwable -> new PopResult(PopResult.Status.ERROR, operationTimestamp, Collections.emptyList()));
+            return new PopResult(status, operationTimestamp, messageExtList, confirmOffset - filterFetchResult.endOffset);
+        }).exceptionally(throwable -> new PopResult(PopResult.Status.ERROR, operationTimestamp, Collections.emptyList(), confirmOffset - startOffset));
     }
 
     @Override
@@ -295,13 +295,12 @@ public class StreamLogicQueue extends LogicQueue {
             long offset = stateMachine.ackOffset(consumerGroup);
             boolean isLocked = stateMachine.isLocked(consumerGroup, offset);
             if (isLocked) {
-                return CompletableFuture.completedFuture(new PopResult(PopResult.Status.LOCKED, 0, Collections.emptyList()));
+                return CompletableFuture.completedFuture(new PopResult(PopResult.Status.LOCKED, 0, Collections.emptyList(), 0));
             } else {
                 return pop(consumerGroup, dataStreamId, offset, PopOperation.PopOperationType.POP_ORDER, filter, batchSize, invisibleDuration);
             }
         } catch (StoreException e) {
-
-            return CompletableFuture.completedFuture(new PopResult(PopResult.Status.ERROR, 0, Collections.emptyList()));
+            return CompletableFuture.completedFuture(new PopResult(PopResult.Status.ERROR, 0, Collections.emptyList(), 0));
         }
     }
 

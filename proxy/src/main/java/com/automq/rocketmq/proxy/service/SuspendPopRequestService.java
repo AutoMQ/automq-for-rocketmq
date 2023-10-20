@@ -41,6 +41,7 @@ import org.apache.rocketmq.client.consumer.PopStatus;
 import org.apache.rocketmq.common.ServiceThread;
 import org.apache.rocketmq.common.filter.ExpressionType;
 import org.apache.rocketmq.common.thread.ThreadPoolMonitor;
+import org.apache.rocketmq.common.utils.StartAndShutdown;
 import org.apache.rocketmq.proxy.common.ProxyContext;
 import org.apache.rocketmq.proxy.config.ConfigurationManager;
 import org.apache.rocketmq.proxy.config.ProxyConfig;
@@ -49,7 +50,7 @@ import org.apache.rocketmq.remoting.protocol.heartbeat.SubscriptionData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class SuspendPopRequestService extends ServiceThread {
+public class SuspendPopRequestService extends ServiceThread implements StartAndShutdown {
     protected static final Logger LOGGER = LoggerFactory.getLogger(SuspendPopRequestService.class);
     private volatile static SuspendPopRequestService instance;
 
