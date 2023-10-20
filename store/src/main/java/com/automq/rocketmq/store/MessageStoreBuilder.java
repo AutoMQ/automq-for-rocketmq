@@ -44,7 +44,7 @@ public class MessageStoreBuilder {
         StoreMetadataService metadataService, DLQSender dlqSender) throws StoreException {
         S3Operator operator = new DefaultS3Operator(s3StreamConfig.s3Endpoint(), s3StreamConfig.s3Region(), s3StreamConfig.s3Bucket(),
             s3StreamConfig.s3ForcePathStyle(), s3StreamConfig.s3AccessKey(), s3StreamConfig.s3SecretKey());
-        StreamStore streamStore = new S3StreamStore(s3StreamConfig, metadataService, operator);
+        StreamStore streamStore = new S3StreamStore(storeConfig, s3StreamConfig, metadataService, operator);
         KVService kvService = new RocksDBKVService(storeConfig.kvPath());
         InflightService inflightService = new InflightService();
         SnapshotService snapshotService = new SnapshotService(streamStore, kvService);

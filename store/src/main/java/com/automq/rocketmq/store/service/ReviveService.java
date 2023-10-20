@@ -206,14 +206,13 @@ public class ReviveService implements Runnable, Lifecycle {
                     return queue.ackTimeout(SerializeUtil.encodeReceiptHandle(receiptHandle));
                 }, backgroundExecutor);
                 inflightRevive.putIfAbsent(operationId, ackCf.thenApply(nil -> null));
-                ackCf.thenAcceptAsync(nil -> {
-                    inflightRevive.remove(operationId);
-                }, backgroundExecutor).exceptionally(e -> {
-                    inflightRevive.remove(operationId);
-                    Throwable cause = FutureUtil.cause(e);
-                    LOGGER.error("{}: Failed to revive ck with operationId: {}", identity, operationId, cause);
-                    return null;
-                });
+                ackCf.thenAcceptAsync(nil -> inflightRevive.remove(operationId), backgroundExecutor)
+                    .exceptionally(e -> {
+                        inflightRevive.remove(operationId);
+                        Throwable cause = FutureUtil.cause(e);
+                        LOGGER.error("{}: Failed to revive ck with operationId: {}", identity, operationId, cause);
+                        return null;
+                    });
             } catch (StoreException e) {
                 LOGGER.error("{}: Failed to revive message", identity, e);
             }
