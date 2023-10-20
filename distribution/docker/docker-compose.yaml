@@ -28,7 +28,7 @@ services:
         condition: service_healthy
   mysql-server:
     image: "mysql:8.1"
-    command: --default-authentication-plugin=mysql_native_password
+    command: --default-authentication-plugin=caching_sha2_password
     environment:
       - MYSQL_ROOT_PASSWORD=password
       - MYSQL_DATABASE=metadata
@@ -39,6 +39,6 @@ services:
     # https://docs.docker.com/compose/startup-order/
     # https://docs.docker.com/compose/compose-file/05-services/#healthcheck
     healthcheck:
-      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      test: "mysql --user=root --password=password metadata -e 'select * from metadata.lease'"
       timeout: 20s
       retries: 10
