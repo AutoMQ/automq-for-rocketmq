@@ -21,7 +21,6 @@ import com.automq.rocketmq.common.config.StoreConfig;
 import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
-import com.automq.rocketmq.store.MessageStoreImpl;
 import com.automq.rocketmq.store.api.DLQSender;
 import com.automq.rocketmq.store.api.LogicQueue;
 import com.automq.rocketmq.store.api.LogicQueueManager;
@@ -171,13 +170,12 @@ class ReviveServiceTest {
     @Test
     void tryRevive_fifo() throws StoreException {
         Mockito.doAnswer(ink -> {
-                long consumerGroupId = ink.getArgument(0);
-                assertEquals(CONSUMER_GROUP_ID, consumerGroupId);
-                FlatMessageExt flatMessageExt = ink.getArgument(1);
-                assertNotNull(flatMessageExt);
-                return CompletableFuture.completedFuture(null);
-            }).when(dlqSender)
-            .send(Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
+            long consumerGroupId = ink.getArgument(0);
+            assertEquals(CONSUMER_GROUP_ID, consumerGroupId);
+            FlatMessageExt flatMessageExt = ink.getArgument(1);
+            assertNotNull(flatMessageExt);
+            return CompletableFuture.completedFuture(null);
+        }).when(dlqSender).send(Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
         // mock max delivery attempts
         Mockito.doReturn(CompletableFuture.completedFuture(2))
             .when(metadataService).maxDeliveryAttemptsOf(Mockito.anyLong());
