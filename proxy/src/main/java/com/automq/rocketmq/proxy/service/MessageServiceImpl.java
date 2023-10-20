@@ -167,7 +167,13 @@ public class MessageServiceImpl implements MessageService {
         throw new UnsupportedOperationException();
     }
 
-    private CompletableFuture<List<FlatMessageExt>> popSpecifiedQueueUnsafe(ConsumerGroup consumerGroup, Topic topic,
+    record InnerPopResult(
+        long restMessageCount,
+        List<FlatMessageExt> messageList
+    ) {
+    }
+
+    private CompletableFuture<InnerPopResult> popSpecifiedQueueUnsafe(ConsumerGroup consumerGroup, Topic topic,
         int queueId, Filter filter, int batchSize, boolean fifo, long invisibleDuration) {
         List<FlatMessageExt> messageList = new ArrayList<>();
         long consumerGroupId = consumerGroup.getGroupId();
@@ -176,7 +182,7 @@ public class MessageServiceImpl implements MessageService {
         // Decide whether to pop the retry-messages first
         boolean retryPriority = !fifo && CommonUtil.applyPercentage(config.retryPriorityPercentage());
 
-        CompletableFuture<List<FlatMessageExt>> popFuture = store.pop(consumerGroupId, topicId, queueId, filter, batchSize, fifo, retryPriority, invisibleDuration)
+        CompletableFuture<InnerPopResult> popFuture = store.pop(consumerGroupId, topicId, queueId, filter, batchSize, fifo, retryPriority, invisibleDuration)
             .thenApply(firstResult -> {
                 List<FlatMessageExt> resultList = firstResult.messageList();
                 messageList.addAll(resultList);
@@ -184,7 +190,7 @@ public class MessageServiceImpl implements MessageService {
                     .map(message -> message.message().payloadAsByteBuffer().remaining())
                     .reduce(0, Integer::sum);
                 ProxyMetricsManager.recordOutgoingMessages(topic.getName(), consumerGroup.getName(), resultList.size(), totalSize, retryPriority);
-                return resultList;
+                return new InnerPopResult(firstResult.restMessageCount(), messageList);
             });
 
         // There is no retry message when pop orderly. So that return origin messages directly.
@@ -192,9 +198,10 @@ public class MessageServiceImpl implements MessageService {
             return popFuture;
         }
 
-        return popFuture.thenCompose(firstPopMessageList -> {
-            if (firstPopMessageList.size() < batchSize) {
-                return store.pop(consumerGroupId, topicId, queueId, filter, batchSize - firstPopMessageList.size(), false, !retryPriority, invisibleDuration)
+        return popFuture.thenCompose(firstPopResult -> {
+            int firstPopMessageCount = firstPopResult.messageList.size();
+            if (firstPopMessageCount < batchSize) {
+                return store.pop(consumerGroupId, topicId, queueId, filter, batchSize - firstPopMessageCount, false, !retryPriority, invisibleDuration)
                     .thenApply(secondResult -> {
                         List<FlatMessageExt> secondPopMessageList = secondResult.messageList();
                         messageList.addAll(secondPopMessageList);
@@ -203,14 +210,14 @@ public class MessageServiceImpl implements MessageService {
                             .reduce(0, Integer::sum);
                         ProxyMetricsManager.recordOutgoingMessages(topic.getName(), consumerGroup.getName(), secondPopMessageList.size(), totalSize, !retryPriority);
 
-                        return messageList;
+                        return new InnerPopResult(firstPopResult.restMessageCount + secondResult.restMessageCount(), messageList);
                     });
             }
-            return CompletableFuture.completedFuture(messageList);
+            return CompletableFuture.completedFuture(firstPopResult);
         });
     }
 
-    private CompletableFuture<List<FlatMessageExt>> popSpecifiedQueue(ConsumerGroup consumerGroup, String clientId,
+    private CompletableFuture<InnerPopResult> popSpecifiedQueue(ConsumerGroup consumerGroup, String clientId,
         Topic topic, int queueId, Filter filter, int batchSize, boolean fifo, long invisibleDuration,
         long timeoutMillis) {
         long topicId = topic.getTopicId();
@@ -223,7 +230,7 @@ public class MessageServiceImpl implements MessageService {
                     lockService.release(topicId, queueId);
                 });
         }
-        return CompletableFuture.completedFuture(Collections.emptyList());
+        return CompletableFuture.completedFuture(new InnerPopResult(0, Collections.emptyList()));
     }
 
     @Override
@@ -250,7 +257,7 @@ public class MessageServiceImpl implements MessageService {
 
         AtomicReference<Topic> topicReference = new AtomicReference<>();
         AtomicReference<ConsumerGroup> consumerGroupReference = new AtomicReference<>();
-        CompletableFuture<List<FlatMessageExt>> popMessageFuture = topicFuture.thenCombine(groupFuture, (topic, group) -> {
+        CompletableFuture<InnerPopResult> popMessageFuture = topicFuture.thenCombine(groupFuture, (topic, group) -> {
             if (topic.getTopicId() != virtualQueue.topicId()) {
                 LOGGER.error("Topic id in request header {} does not match topic id in message queue {}, maybe the topic is recreated.",
                     topic.getTopicId(), virtualQueue.topicId());
@@ -263,11 +270,16 @@ public class MessageServiceImpl implements MessageService {
         }).thenCompose(nil -> popSpecifiedQueue(consumerGroupReference.get(), clientId, topicReference.get(), virtualQueue.physicalQueueId(), filter,
             requestHeader.getMaxMsgNums(), requestHeader.isOrder(), requestHeader.getInvisibleTime(), timeoutMillis));
 
-        return popMessageFuture.thenApply(messageList -> {
-            if (messageList.isEmpty()) {
-                return new PopResult(PopStatus.NO_NEW_MSG, Collections.emptyList());
+        return popMessageFuture.thenApply(result -> {
+            if (result.messageList.isEmpty()) {
+                if (result.restMessageCount > 0) {
+                    // This means there are messages in the queue but not match the filter. So we should prevent long polling.
+                    return new PopResult(PopStatus.POLLING_NOT_FOUND, Collections.emptyList());
+                } else {
+                    return new PopResult(PopStatus.NO_NEW_MSG, Collections.emptyList());
+                }
             }
-            return new PopResult(PopStatus.FOUND, FlatMessageUtil.convertTo(messageList, requestHeader.getTopic(), requestHeader.getInvisibleTime()));
+            return new PopResult(PopStatus.FOUND, FlatMessageUtil.convertTo(result.messageList, requestHeader.getTopic(), requestHeader.getInvisibleTime()));
         });
     }
 
