@@ -57,7 +57,18 @@ public interface WriteBlockTask {
      */
     ByteBuffer data();
 
-    void flushWALHeader(long windowMaxLength) throws IOException;
+    /**
+     * The flusher used to flush WAL header.
+     */
+    WriteBlockTaskImpl.Flusher flusher();
+
+    default void flushWALHeader(long windowMaxLength) throws IOException {
+        flusher().flushWALHeader(windowMaxLength);
+    }
+
+    interface Flusher {
+        void flushWALHeader(long windowMaxLength) throws IOException;
+    }
 
     class BlockFullException extends RuntimeException {
         public BlockFullException(String message) {

@@ -19,7 +19,6 @@ package com.automq.stream.s3.wal;
 
 import com.automq.stream.s3.wal.util.WALUtil;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.LinkedList;
 import java.util.List;
@@ -47,7 +46,7 @@ public class WriteBlockTaskImpl implements WriteBlockTask {
      * Align to {@link WALUtil#BLOCK_SIZE}
      */
     private long nextOffset = 0;
-    private ByteBuffer data = ByteBuffer.allocate(WALUtil.BLOCK_SIZE);
+    private ByteBuffer data = ByteBuffer.allocate(0);
     private final List<CompletableFuture<WriteAheadLog.AppendResult.CallbackResult>> futures = new LinkedList<>();
 
     public WriteBlockTaskImpl(long startOffset, long maxSize, Flusher flusher) {
@@ -104,11 +103,7 @@ public class WriteBlockTaskImpl implements WriteBlockTask {
     }
 
     @Override
-    public void flushWALHeader(long windowMaxLength) throws IOException {
-        flusher.flushWALHeader(windowMaxLength);
-    }
-
-    interface Flusher {
-        void flushWALHeader(long windowMaxLength) throws IOException;
+    public Flusher flusher() {
+        return flusher;
     }
 }

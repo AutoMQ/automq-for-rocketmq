@@ -441,8 +441,8 @@ public class BlockWALService implements WriteAheadLog {
             }
 
             @Override
-            public void flushWALHeader(long windowMaxLength) throws IOException {
-                BlockWALService.this.flushWALHeader(
+            public Flusher flusher() {
+                return windowMaxLength -> BlockWALService.this.flushWALHeader(
                         slidingWindowService.getWindowCoreData().getWindowStartOffset(),
                         windowMaxLength,
                         slidingWindowService.getWindowCoreData().getWindowNextWriteOffset(),

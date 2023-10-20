@@ -27,6 +27,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.LinkedList;
+import java.util.Queue;
 import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -55,6 +57,18 @@ public class SlidingWindowService {
     private final WALChannel walChannel;
     private final WindowCoreData windowCoreData = new WindowCoreData();
     private ExecutorService executorService;
+
+    private final Lock taskLock = new ReentrantLock();
+
+    /**
+     * Pending write task queue.
+     */
+    private final Queue<WriteBlockTask> writeTasks = new LinkedList<>();
+
+    /**
+     * The current block, records are added to this block.
+     */
+    private WriteBlockTask currentWriteTask;
 
     public SlidingWindowService(WALChannel walChannel, int ioThreadNums, long upperLimit, long scaleUnit) {
         this.walChannel = walChannel;
@@ -88,6 +102,7 @@ public class SlidingWindowService {
         }
     }
 
+    @Deprecated
     public long allocateWriteOffset(final int recordBodyLength, final long trimOffset, final long recordSectionCapacity) throws OverCapacityException {
         int totalWriteSize = RECORD_HEADER_SIZE + recordBodyLength;
 
@@ -121,6 +136,44 @@ public class SlidingWindowService {
         executorService.submit(new WriteRecordTaskProcessor(ioTask));
     }
 
+    public Lock getTaskLock() {
+        return taskLock;
+    }
+
+    /**
+     * Create a new block. It
+     * - puts the previous block to the write queue
+     * - creates a new block, sets it as the current block and returns it
+     * Note: this method is NOT thread safe, and it should be called with {@link #taskLock} locked.
+     */
+    public WriteBlockTask newBlockLocked(WriteBlockTask previousBlock, long minSize, long trimOffset, long recordSectionCapacity) throws OverCapacityException {
+        long startOffset = previousBlock.startOffset() + WALUtil.alignLargeByBlockSize(previousBlock.data().limit());
+
+        // If the end of the physical device is insufficient for this block, jump to the start of the physical device
+        if ((recordSectionCapacity - startOffset % recordSectionCapacity) < minSize) {
+            startOffset = startOffset + recordSectionCapacity - startOffset % recordSectionCapacity;
+        }
+
+        // Not enough space for this block
+        if (startOffset + minSize - trimOffset > recordSectionCapacity) {
+            LOGGER.error("failed to allocate write offset as the ring buffer is full: startOffset: {}, minSize: {}, trimOffset: {}, recordSectionCapacity: {}",
+                    startOffset, minSize, trimOffset, recordSectionCapacity);
+            throw new OverCapacityException(String.format("failed to allocate write offset: ring buffer is full: startOffset: %d, minSize: %d, trimOffset: %d, recordSectionCapacity: %d",
+                    startOffset, minSize, trimOffset, recordSectionCapacity));
+        }
+
+        // The size of the block should not be larger than the end of the physical device
+        long maxSize = Math.min(recordSectionCapacity - startOffset + trimOffset, upperLimit);
+
+        WriteBlockTask newBlock = new WriteBlockTaskImpl(startOffset, maxSize, previousBlock.flusher());
+        writeTasks.add(previousBlock);
+        currentWriteTask = newBlock;
+        return newBlock;
+    }
+
+    public WriteBlockTask getCurrentWriteTask() {
+        return currentWriteTask;
+    }
 
     private void writeRecord(WriteBlockTask ioTask) throws IOException {
         // TODO: make this beautiful
@@ -129,7 +182,7 @@ public class SlidingWindowService {
         walChannel.write(ioTask.data(), position);
     }
 
-    public boolean makeWriteOffsetMatchWindow(final WriteBlockTask writeBlockTask) throws IOException {
+    private boolean makeWriteOffsetMatchWindow(final WriteBlockTask writeBlockTask) throws IOException {
         long newWindowEndOffset = writeBlockTask.startOffset() + writeBlockTask.data().limit();
         // align to block size
         newWindowEndOffset = WALUtil.alignLargeByBlockSize(newWindowEndOffset);
