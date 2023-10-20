@@ -44,12 +44,14 @@ public class GrpcProtocolServer implements Lifecycle {
     private static final Logger LOGGER = LoggerFactory.getLogger(GrpcProtocolServer.class);
     private final GrpcServer grpcServer;
     private final ThreadPoolExecutor grpcExecutor;
+    private final GrpcMessagingApplication grpcMessagingApplication;
 
     public GrpcProtocolServer(ProxyConfig config, MessagingProcessor messagingProcessor,
         ControllerServiceImpl controllerService) {
         grpcExecutor = createGrpcExecutor(config.grpcThreadPoolNums(), config.grpcThreadPoolQueueCapacity());
+        grpcMessagingApplication = createServiceProcessor(messagingProcessor);
         grpcServer = GrpcServerBuilder.newBuilder(grpcExecutor, ConfigurationManager.getProxyConfig().getGrpcServerPort())
-            .addService(createServiceProcessor(messagingProcessor))
+            .addService(grpcMessagingApplication)
             .addService(ChannelzService.newInstance(100))
             .addService(ProtoReflectionService.newInstance())
             .addService(controllerService)
@@ -59,11 +61,13 @@ public class GrpcProtocolServer implements Lifecycle {
 
     @Override
     public void start() throws Exception {
+        this.grpcMessagingApplication.start();
         this.grpcServer.start();
     }
 
     @Override
     public void shutdown() throws Exception {
+        this.grpcMessagingApplication.shutdown();
         this.grpcServer.shutdown();
         this.grpcExecutor.shutdown();
     }
