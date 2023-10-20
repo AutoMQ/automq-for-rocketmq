@@ -184,17 +184,23 @@ public class SuspendPopRequestService extends ServiceThread implements StartAndS
         ReceiveMessageResponseStreamWriter writer) {
         ((ProxyContextExt) context).setSuspended(true);
 
-        // Check if the request is already expired.
-        if (timeRemaining <= 0) {
-            writer.writeAndComplete(context, request, new PopResult(PopStatus.POLLING_NOT_FOUND, Collections.emptyList()));
-            return;
-        }
-
         // TODO: make max size configurable.
         if (suspendRequestCount.get() > 1000) {
             writer.writeAndComplete(context, request, new PopResult(PopStatus.POLLING_NOT_FOUND, Collections.emptyList()));
             return;
         }
+
+        // Limit the suspend time to avoid timeout.
+        ProxyConfig config = ConfigurationManager.getProxyConfig();
+        timeRemaining = timeRemaining - config.getGrpcClientConsumerMinLongPollingTimeoutMillis();
+
+        // Check if the request is already expired.
+        if (timeRemaining <= config.getGrpcClientConsumerMinLongPollingTimeoutMillis()) {
+            writer.writeAndComplete(context, request, new PopResult(PopStatus.POLLING_NOT_FOUND, Collections.emptyList()));
+            return;
+        }
+
+        timeRemaining = Math.min(timeRemaining, config.getGrpcClientConsumerMaxLongPollingTimeoutMillis());
 
         Filter filter;
         if (StringUtils.isNotBlank(subscriptionData.getExpressionType())) {

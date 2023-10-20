@@ -24,6 +24,7 @@ import apache.rocketmq.v2.ReceiveMessageResponse;
 import apache.rocketmq.v2.Settings;
 import apache.rocketmq.v2.Subscription;
 import com.automq.rocketmq.proxy.grpc.v2.consumer.ExtendReceiveMessageResponseStreamWriter;
+import com.automq.rocketmq.proxy.model.VirtualQueue;
 import com.automq.rocketmq.proxy.processor.ExtendMessagingProcessor;
 import com.automq.rocketmq.proxy.service.SuspendPopRequestService;
 import com.google.protobuf.util.Durations;
@@ -164,7 +165,7 @@ public class ExtendReceiveMessageActivity extends ReceiveMessageActivity {
                 );
                 AddressableMessageQueue messageQueue = selector.select(ctx, serviceManager.getTopicRouteService().getCurrentMessageQueueView(ctx, topic));
                 actualSelector = new FakeQueueSelector(messageQueue);
-                queueId = messageQueue.getQueueId();
+                queueId = new VirtualQueue(messageQueue).physicalQueueId();
             }
 
             this.messagingProcessor.popMessage(
