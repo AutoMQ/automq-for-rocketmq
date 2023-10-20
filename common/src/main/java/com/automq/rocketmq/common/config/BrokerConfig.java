@@ -68,6 +68,11 @@ public class BrokerConfig implements ControllerConfig {
         this.db = new DatabaseConfig();
     }
 
+    private static String parseHost(String address) {
+        int pos = address.lastIndexOf(':');
+        return address.substring(0, pos);
+    }
+
     private static int parsePort(String address) {
         int pos = address.lastIndexOf(':');
         return Integer.parseInt(address.substring(pos + 1));
@@ -117,6 +122,7 @@ public class BrokerConfig implements ControllerConfig {
             throw new RocketMQException(500, "Listen port does not match advertise address port");
         }
 
+        proxy.setHostName(parseHost(advertiseAddress));
         proxy.setGrpcListenPort(parsePort(advertiseAddress));
     }
 
