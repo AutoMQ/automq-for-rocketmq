@@ -193,6 +193,7 @@ public class DefaultMetadataStore implements MetadataStore {
 
     @Override
     public CompletableFuture<Node> registerBrokerNode(String name, String address, String instanceId) {
+        LOGGER.info("Register broker node with name={}, address={}, instance-id={}", name, address, instanceId);
         CompletableFuture<Node> future = new CompletableFuture<>();
         if (Strings.isNullOrEmpty(name)) {
             future.completeExceptionally(
