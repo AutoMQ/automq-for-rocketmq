@@ -3,8 +3,24 @@ services:
   broker-1:
     image: "rocketmq-on-s3:arm64-0.0.1"
     # https://docs.docker.com/compose/compose-file/05-services/#entrypoint
+    environment:
+      - ROCKETMQ_NODE_NAME=broker-1
+      - ROCKETMQ_NODE_BIND_ADDRESS=0.0.0.0:8081
     ports:
       - "8081:8081"
+    # https://docs.docker.com/compose/compose-file/05-services/#depends_on
+    depends_on:
+      mysql-server:
+        condition: service_healthy
+        restart: true
+  broker-2:
+    image: "rocketmq-on-s3:arm64-0.0.1"
+    # https://docs.docker.com/compose/compose-file/05-services/#entrypoint
+    environment:
+      - ROCKETMQ_NODE_NAME=broker-2
+      - ROCKETMQ_NODE_BIND_ADDRESS=0.0.0.0:8181
+    ports:
+      - "8181:8181"
     # https://docs.docker.com/compose/compose-file/05-services/#depends_on
     depends_on:
       mysql-server:
