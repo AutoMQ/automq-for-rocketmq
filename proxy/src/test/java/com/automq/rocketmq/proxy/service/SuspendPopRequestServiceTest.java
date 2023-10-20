@@ -52,7 +52,9 @@ class SuspendPopRequestServiceTest {
         Field field = ConfigurationManager.class.getDeclaredField("configuration");
         field.setAccessible(true);
         Configuration configuration = new Configuration();
-        configuration.setProxyConfig(new ProxyConfig());
+        ProxyConfig config = new ProxyConfig();
+        config.setGrpcClientConsumerMinLongPollingTimeoutMillis(0);
+        configuration.setProxyConfig(config);
         field.set(null, configuration);
     }
 
