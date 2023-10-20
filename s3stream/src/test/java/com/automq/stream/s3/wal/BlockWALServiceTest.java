@@ -109,7 +109,7 @@ class BlockWALServiceTest {
         AtomicLong maxFlushedOffset = new AtomicLong(-1);
         AtomicLong maxRecordOffset = new AtomicLong(-1);
         try {
-            AtomicLong appendedOffset = new AtomicLong(-1);
+            AtomicLong flushedOffset = new AtomicLong(-1);
             for (int i = 0; i < recordCount; i++) {
                 ByteBuf data = TestUtils.random(recordSize);
                 AppendResult appendResult;
@@ -119,12 +119,12 @@ class BlockWALServiceTest {
                         appendResult = wal.append(data);
                     } catch (OverCapacityException e) {
                         Thread.yield();
-                        long appendedOffsetValue = appendedOffset.get();
-                        if (appendedOffsetValue < 0) {
+                        long flushedOffsetValue = flushedOffset.get();
+                        if (flushedOffsetValue < 0) {
                             Thread.sleep(100);
                             continue;
                         }
-                        wal.trim(appendedOffsetValue).join();
+                        wal.trim(flushedOffsetValue).join();
                         continue;
                     }
                     break;
@@ -138,14 +138,7 @@ class BlockWALServiceTest {
                     maxRecordOffset.accumulateAndGet(recordOffset, Math::max);
                     assertEquals(0, callbackResult.flushedOffset() % WALUtil.alignLargeByBlockSize(recordSize));
 
-                    // Update the appended offset.
-                    long old;
-                    do {
-                        old = appendedOffset.get();
-                        if (old >= recordOffset) {
-                            break;
-                        }
-                    } while (!appendedOffset.compareAndSet(old, recordOffset));
+                    flushedOffset.accumulateAndGet(recordOffset, Math::max);
                 }).whenComplete((callbackResult, throwable) -> {
                     if (null != throwable) {
                         throwable.printStackTrace();
