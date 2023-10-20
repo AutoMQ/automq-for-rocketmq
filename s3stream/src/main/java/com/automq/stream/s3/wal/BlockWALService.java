@@ -411,7 +411,7 @@ public class BlockWALService implements WriteAheadLog {
         Lock lock = slidingWindowService.getTaskLock();
         lock.lock();
         try {
-            WriteBlockTask block = slidingWindowService.getCurrentWriteTask();
+            WriteBlockTask block = slidingWindowService.getCurrentWriteTaskLocked();
             try {
                 expectedWriteOffset = block.addRecord(recordSize, (offset) -> record(body, crc, offset), appendResultFuture);
             } catch (WriteBlockTask.BlockFullException e) {

@@ -88,9 +88,6 @@ public class SlidingWindowService {
     public void resetWindow(long offset) {
         windowCoreData.setWindowStartOffset(offset);
         windowCoreData.setWindowNextWriteOffset(offset);
-        // Trick: we cannot determine the maximum length of the block here, so we set it to 0 first.
-        // When we try to write the first record, this block will be found full, and then a new block will be created.
-        currentWriteTask = new WriteBlockTaskImpl(offset, 0);
     }
 
     public WindowCoreData getWindowCoreData() {
@@ -192,7 +189,17 @@ public class SlidingWindowService {
         return newBlock;
     }
 
-    public WriteBlockTask getCurrentWriteTask() {
+    /**
+     * Get the current block.
+     * Note: this method is NOT thread safe, and it should be called with {@link #taskLock} locked.
+     */
+    public WriteBlockTask getCurrentWriteTaskLocked() {
+        // currentWriteTask is null only when no record has been written
+        if (null == currentWriteTask) {
+            // Trick: we cannot determine the maximum length of the block here, so we set it to 0 first.
+            // When we try to write the first record, this block will be found full, and then a new block will be created.
+            currentWriteTask = new WriteBlockTaskImpl(windowCoreData.getWindowNextWriteOffset(), 0);
+        }
         return currentWriteTask;
     }
 
