@@ -85,6 +85,14 @@ public class SlidingWindowService {
         windowCoreData.setWindowMaxLength(maxLength);
     }
 
+    public void resetWindow(long offset) {
+        windowCoreData.setWindowStartOffset(offset);
+        windowCoreData.setWindowNextWriteOffset(offset);
+        // Trick: we cannot determine the maximum length of the block here, so we set it to 0 first.
+        // When we try to write the first record, this block will be found full, and then a new block will be created.
+        currentWriteTask = new WriteBlockTaskImpl(offset, 0);
+    }
+
     public WindowCoreData getWindowCoreData() {
         return windowCoreData;
     }
@@ -134,8 +142,16 @@ public class SlidingWindowService {
         return expectedWriteOffset;
     }
 
+    @Deprecated
     public void submitWriteRecordTask(WriteBlockTask ioTask) {
         executorService.submit(new WriteRecordTaskProcessor(ioTask));
+    }
+
+    /**
+     * TODO
+     */
+    public void tryWriteBlock() {
+        // TODO
     }
 
     public Lock getTaskLock() {
@@ -143,12 +159,12 @@ public class SlidingWindowService {
     }
 
     /**
-     * Create a new block. It
+     * Seal and create a new block. It
      * - puts the previous block to the write queue
      * - creates a new block, sets it as the current block and returns it
      * Note: this method is NOT thread safe, and it should be called with {@link #taskLock} locked.
      */
-    public WriteBlockTask newBlockLocked(WriteBlockTask previousBlock, long minSize, long trimOffset, long recordSectionCapacity) throws OverCapacityException {
+    public WriteBlockTask sealAndNewBlockLocked(WriteBlockTask previousBlock, long minSize, long trimOffset, long recordSectionCapacity) throws OverCapacityException {
         long startOffset = previousBlock.startOffset() + WALUtil.alignLargeByBlockSize(previousBlock.data().limit());
 
         // If the end of the physical device is insufficient for this block, jump to the start of the physical device
@@ -168,7 +184,10 @@ public class SlidingWindowService {
         long maxSize = Math.min(recordSectionCapacity - startOffset + trimOffset, upperLimit);
 
         WriteBlockTask newBlock = new WriteBlockTaskImpl(startOffset, maxSize);
-        writeTasks.add(previousBlock);
+        if (!previousBlock.futures().isEmpty()) {
+            // There are some records to be written in the previous block
+            writeTasks.add(previousBlock);
+        }
         currentWriteTask = newBlock;
         return newBlock;
     }

@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 
 public class WriteBlockTaskImpl implements WriteBlockTask {
 
@@ -59,9 +60,9 @@ public class WriteBlockTaskImpl implements WriteBlockTask {
     }
 
     @Override
-    public long addRecord(ByteBuffer record, CompletableFuture<WriteAheadLog.AppendResult.CallbackResult> future) throws BlockFullException {
+    public long addRecord(long recordSize, Function<Long, ByteBuffer> recordSupplier, CompletableFuture<WriteAheadLog.AppendResult.CallbackResult> future) throws BlockFullException {
         // TODO no need to align to block size
-        long requiredSize = WALUtil.alignLargeByBlockSize(record.remaining());
+        long requiredSize = WALUtil.alignLargeByBlockSize(recordSize);
         long requiredCapacity = nextOffset + requiredSize;
 
         if (requiredCapacity > maxSize) {
@@ -72,6 +73,7 @@ public class WriteBlockTaskImpl implements WriteBlockTask {
             throw new BlockFullException("The block is almost full. Required capacity: " + requiredCapacity + ", max size: " + maxSize);
         }
 
+        // scale up the buffer
         // TODO use composite buffer
         if (requiredCapacity > data.capacity()) {
             int newCapacity = Math.max(data.capacity() * 2, (int) requiredCapacity);
@@ -81,13 +83,14 @@ public class WriteBlockTaskImpl implements WriteBlockTask {
             data = newData;
         }
 
-        long offset = nextOffset;
+        long offsetInBlock = nextOffset;
+        long recordOffset = startOffset + offsetInBlock;
         nextOffset += requiredSize;
-        data.position((int) offset);
-        data.put(record);
-
+        data.position((int) offsetInBlock);
+        data.put(recordSupplier.apply(recordOffset));
         futures.add(future);
-        return offset;
+
+        return recordOffset;
     }
 
     @Override

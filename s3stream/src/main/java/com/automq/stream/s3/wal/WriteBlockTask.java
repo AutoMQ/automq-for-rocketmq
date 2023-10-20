@@ -23,6 +23,7 @@ import com.automq.stream.s3.wal.util.WALUtil;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 
 import static com.automq.stream.s3.wal.WriteAheadLog.AppendResult;
 
@@ -39,12 +40,13 @@ public interface WriteBlockTask {
     /**
      * Append a record to this block.
      *
-     * @param record The record including the header.
+     * @param recordSize The size of this record.
+     * @param recordSupplier The supplier of this record which receives the start offset of this record as the parameter.
      * @param future The future of this record, which will be completed when the record is written to the WAL.
      * @return The start offset of this record.
      * @throws BlockFullException If the size of this block exceeds the limit.
      */
-    long addRecord(ByteBuffer record, CompletableFuture<AppendResult.CallbackResult> future);
+    long addRecord(long recordSize, Function<Long, ByteBuffer> recordSupplier, CompletableFuture<AppendResult.CallbackResult> future);
 
     /**
      * Futures of all records in this task.

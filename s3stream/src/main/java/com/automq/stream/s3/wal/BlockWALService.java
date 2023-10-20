@@ -33,7 +33,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
-import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -41,6 +40,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.Lock;
 
 /**
  * /**
@@ -404,48 +404,31 @@ public class BlockWALService implements WriteAheadLog {
         checkReadyToServe();
 
         ByteBuffer body = buf.nioBuffer();
-
-        final int recordBodyCRC = 0 == crc ? WALUtil.crc32(body) : crc;
-        final long expectedWriteOffset = slidingWindowService.allocateWriteOffset(body.limit(), walHeaderCoreData.getFlushedTrimOffset(), walHeaderCoreData.getCapacity() - WAL_HEADER_TOTAL_CAPACITY);
+        final long recordSize = RECORD_HEADER_SIZE + body.limit();
         final CompletableFuture<AppendResult.CallbackResult> appendResultFuture = new CompletableFuture<>();
+        long expectedWriteOffset;
+
+        Lock lock = slidingWindowService.getTaskLock();
+        lock.lock();
+        try {
+            WriteBlockTask block = slidingWindowService.getCurrentWriteTask();
+            try {
+                expectedWriteOffset = block.addRecord(recordSize, (offset) -> record(body, crc, offset), appendResultFuture);
+            } catch (WriteBlockTask.BlockFullException e) {
+                // this block is full, create a new one
+                block = slidingWindowService.sealAndNewBlockLocked(block, recordSize, walHeaderCoreData.getFlushedTrimOffset(), walHeaderCoreData.getCapacity() - WAL_HEADER_TOTAL_CAPACITY);
+                expectedWriteOffset = block.addRecord(recordSize, (offset) -> record(body, crc, offset), appendResultFuture);
+            }
+        } finally {
+            lock.unlock();
+        }
+        slidingWindowService.tryWriteBlock();
+
         final AppendResult appendResult = new AppendResultImpl(expectedWriteOffset, appendResultFuture);
-
-        // build record
-        ByteBuffer record = ByteBuffer.allocate(RECORD_HEADER_SIZE + body.limit());
-        record.put(recordHeader(body, recordBodyCRC, expectedWriteOffset));
-        record.put(body);
-        record.flip();
-
-        // submit write task
-        slidingWindowService.submitWriteRecordTask(new WriteBlockTask() {
-            @Override
-            public long startOffset() {
-                return expectedWriteOffset;
-            }
-
-            @Override
-            public long addRecord(ByteBuffer record, CompletableFuture<AppendResult.CallbackResult> future) {
-                // TODO flag1
-                return 0;
-            }
-
-            @Override
-            public List<CompletableFuture<AppendResult.CallbackResult>> futures() {
-                // TODO: flag1
-                return List.of(appendResultFuture);
-            }
-
-            @Override
-            public ByteBuffer data() {
-                return record;
-            }
-        });
-
         appendResult.future().whenComplete((nil, ex) -> {
             OperationMetricsStats.getOrCreateOperationMetrics(S3Operation.APPEND_STORAGE_WAL).operationCount.inc();
             OperationMetricsStats.getOrCreateOperationMetrics(S3Operation.APPEND_STORAGE_WAL).operationTime.update(timerUtil.elapsed());
         });
-
         return appendResult;
     }
 
@@ -456,6 +439,14 @@ public class BlockWALService implements WriteAheadLog {
                 .setRecordBodyOffset(start + RECORD_HEADER_SIZE)
                 .setRecordBodyCRC(crc)
                 .marshal();
+    }
+
+    private static ByteBuffer record(ByteBuffer body, int crc, long start) {
+        ByteBuffer record = ByteBuffer.allocate(RECORD_HEADER_SIZE + body.limit());
+        record.put(recordHeader(body, crc, start));
+        record.put(body);
+        record.flip();
+        return record;
     }
 
     @Override
@@ -485,8 +476,7 @@ public class BlockWALService implements WriteAheadLog {
         checkReadyToServe();
 
         long previousNextWriteOffset = slidingWindowService.getWindowCoreData().getWindowNextWriteOffset();
-        slidingWindowService.getWindowCoreData().setWindowStartOffset(previousNextWriteOffset + WALUtil.BLOCK_SIZE);
-        slidingWindowService.getWindowCoreData().setWindowNextWriteOffset(previousNextWriteOffset + WALUtil.BLOCK_SIZE);
+        slidingWindowService.resetWindow(previousNextWriteOffset + WALUtil.BLOCK_SIZE);
         LOGGER.info("reset sliding window and trim WAL to offset: {}", previousNextWriteOffset);
         return trim(previousNextWriteOffset);
     }
