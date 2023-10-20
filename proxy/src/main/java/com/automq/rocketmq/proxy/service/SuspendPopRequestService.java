@@ -55,11 +55,11 @@ public class SuspendPopRequestService extends ServiceThread {
 
     private final ConcurrentMap<Pair<String/*topic*/, Integer/*queueId*/>, ConcurrentSkipListSet<SuspendRequestTask>> suspendPopRequestMap = new ConcurrentHashMap<>();
     private final AtomicInteger suspendRequestCount = new AtomicInteger(0);
-    protected ThreadPoolExecutor suspendRequestThreadPoolExecutor;
+    protected ThreadPoolExecutor suspendRequestThreadPool;
 
     private SuspendPopRequestService() {
         ProxyConfig config = ConfigurationManager.getProxyConfig();
-        this.suspendRequestThreadPoolExecutor = ThreadPoolMonitor.createAndMonitor(
+        this.suspendRequestThreadPool = ThreadPoolMonitor.createAndMonitor(
             config.getGrpcConsumerThreadPoolNums(),
             config.getGrpcConsumerThreadPoolNums(),
             1,
@@ -166,7 +166,7 @@ public class SuspendPopRequestService extends ServiceThread {
 
         for (SuspendRequestTask task : taskList) {
             if (task.doFilter(tag)) {
-                suspendRequestThreadPoolExecutor.execute(
+                suspendRequestThreadPool.execute(
                     () -> task.tryFetchMessages()
                         .thenAccept(result -> {
                             if (result) {

@@ -110,7 +110,7 @@ public class MessageStoreTest {
     }
 
     @Test
-    public void pop_normal() throws Exception {
+    public void pop_normal() {
         // 1. append 5 message
         for (int i = 0; i < 5; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
@@ -187,7 +187,7 @@ public class MessageStoreTest {
     }
 
     @Test
-    public void pop_order() throws Exception {
+    public void pop_order() {
         // 1. append 5 message
         for (int i = 0; i < 5; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
@@ -250,7 +250,7 @@ public class MessageStoreTest {
     }
 
     @Test
-    public void pop_snapshot() throws Exception {
+    public void pop_snapshot() {
         // set snapshot interval to 7
         config.setOperationSnapshotInterval(7);
         // 1. append 5 message
