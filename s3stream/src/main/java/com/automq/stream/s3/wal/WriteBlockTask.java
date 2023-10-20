@@ -20,7 +20,6 @@ package com.automq.stream.s3.wal;
 
 import com.automq.stream.s3.wal.util.WALUtil;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -56,19 +55,6 @@ public interface WriteBlockTask {
      * The content of this block, which contains multiple records.
      */
     ByteBuffer data();
-
-    /**
-     * The flusher used to flush WAL header.
-     */
-    WriteBlockTaskImpl.Flusher flusher();
-
-    default void flushWALHeader(long windowMaxLength) throws IOException {
-        flusher().flushWALHeader(windowMaxLength);
-    }
-
-    interface Flusher {
-        void flushWALHeader(long windowMaxLength) throws IOException;
-    }
 
     class BlockFullException extends RuntimeException {
         public BlockFullException(String message) {

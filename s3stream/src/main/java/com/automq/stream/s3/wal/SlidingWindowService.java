@@ -55,6 +55,7 @@ public class SlidingWindowService {
     private final long upperLimit;
     private final long scaleUnit;
     private final WALChannel walChannel;
+    private final WALHeaderFlusher walHeaderFlusher;
     private final WindowCoreData windowCoreData = new WindowCoreData();
     private ExecutorService executorService;
 
@@ -70,11 +71,12 @@ public class SlidingWindowService {
      */
     private WriteBlockTask currentWriteTask;
 
-    public SlidingWindowService(WALChannel walChannel, int ioThreadNums, long upperLimit, long scaleUnit) {
+    public SlidingWindowService(WALChannel walChannel, int ioThreadNums, long upperLimit, long scaleUnit, WALHeaderFlusher flusher) {
         this.walChannel = walChannel;
         this.ioThreadNums = ioThreadNums;
         this.upperLimit = upperLimit;
         this.scaleUnit = scaleUnit;
+        this.walHeaderFlusher = flusher;
     }
 
     public void resetWindowWhenRecoverOver(long startOffset, long nextWriteOffset, long maxLength) {
@@ -165,7 +167,7 @@ public class SlidingWindowService {
         // The size of the block should not be larger than the end of the physical device
         long maxSize = Math.min(recordSectionCapacity - startOffset + trimOffset, upperLimit);
 
-        WriteBlockTask newBlock = new WriteBlockTaskImpl(startOffset, maxSize, previousBlock.flusher());
+        WriteBlockTask newBlock = new WriteBlockTaskImpl(startOffset, maxSize);
         writeTasks.add(previousBlock);
         currentWriteTask = newBlock;
         return newBlock;
@@ -204,7 +206,7 @@ public class SlidingWindowService {
                     return false;
                 }
             }
-            windowCoreData.scaleOutWindow(writeBlockTask, newWindowMaxLength);
+            windowCoreData.scaleOutWindow(walHeaderFlusher, newWindowMaxLength);
         }
         return true;
     }
@@ -364,7 +366,7 @@ public class SlidingWindowService {
             }
         }
 
-        public void scaleOutWindow(WriteBlockTask writeBlockTask, long newWindowMaxLength) throws IOException {
+        public void scaleOutWindow(WALHeaderFlusher flusher, long newWindowMaxLength) throws IOException {
             boolean scaleWindowHappened = false;
             treeMapIOTaskRequestLock.lock();
             try {
@@ -373,7 +375,7 @@ public class SlidingWindowService {
                     return;
                 }
 
-                writeBlockTask.flushWALHeader(newWindowMaxLength);
+                flusher.flush(newWindowMaxLength);
                 setWindowMaxLength(newWindowMaxLength);
                 scaleWindowHappened = true;
             } finally {
@@ -424,5 +426,9 @@ public class SlidingWindowService {
                 LOGGER.error(String.format("failed to write record, offset: %s", writeBlockTask.startOffset()), e);
             }
         }
+    }
+
+    interface WALHeaderFlusher {
+        void flush(long windowMaxLength) throws IOException;
     }
 }

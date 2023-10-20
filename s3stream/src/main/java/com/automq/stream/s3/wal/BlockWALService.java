@@ -439,16 +439,6 @@ public class BlockWALService implements WriteAheadLog {
             public ByteBuffer data() {
                 return record;
             }
-
-            @Override
-            public Flusher flusher() {
-                return windowMaxLength -> BlockWALService.this.flushWALHeader(
-                        slidingWindowService.getWindowCoreData().getWindowStartOffset(),
-                        windowMaxLength,
-                        slidingWindowService.getWindowCoreData().getWindowNextWriteOffset(),
-                        ShutdownType.UNGRACEFULLY
-                );
-            }
         });
 
         appendResult.future().whenComplete((nil, ex) -> {
@@ -527,6 +517,15 @@ public class BlockWALService implements WriteAheadLog {
         if (!readyToServe.get()) {
             throw new IllegalStateException("WriteAheadLog is not ready to serve");
         }
+    }
+
+    private SlidingWindowService.WALHeaderFlusher flusher() {
+        return windowMaxLength -> flushWALHeader(
+                slidingWindowService.getWindowCoreData().getWindowStartOffset(),
+                windowMaxLength,
+                slidingWindowService.getWindowCoreData().getWindowNextWriteOffset(),
+                ShutdownType.GRACEFULLY
+        );
     }
 
     static class WALHeaderCoreData {
@@ -756,7 +755,8 @@ public class BlockWALService implements WriteAheadLog {
                     blockWALService.walChannel,
                     ioThreadNums,
                     slidingWindowUpperLimit,
-                    slidingWindowScaleUnit
+                    slidingWindowScaleUnit,
+                    blockWALService.flusher()
             );
 
             LOGGER.info("build BlockWALService: {}", this);

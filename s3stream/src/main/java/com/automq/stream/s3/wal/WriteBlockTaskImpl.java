@@ -39,7 +39,6 @@ public class WriteBlockTaskImpl implements WriteBlockTask {
      * exceeds this limit.
      */
     private final long maxSize;
-    private final Flusher flusher;
 
     /**
      * The next offset to write in this block.
@@ -49,10 +48,9 @@ public class WriteBlockTaskImpl implements WriteBlockTask {
     private ByteBuffer data = ByteBuffer.allocate(0);
     private final List<CompletableFuture<WriteAheadLog.AppendResult.CallbackResult>> futures = new LinkedList<>();
 
-    public WriteBlockTaskImpl(long startOffset, long maxSize, Flusher flusher) {
+    public WriteBlockTaskImpl(long startOffset, long maxSize) {
         this.startOffset = startOffset;
         this.maxSize = maxSize;
-        this.flusher = flusher;
     }
 
     @Override
@@ -100,10 +98,5 @@ public class WriteBlockTaskImpl implements WriteBlockTask {
     @Override
     public ByteBuffer data() {
         return data;
-    }
-
-    @Override
-    public Flusher flusher() {
-        return flusher;
     }
 }
