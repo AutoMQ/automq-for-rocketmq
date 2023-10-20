@@ -18,7 +18,7 @@
 package com.automq.rocketmq.store.model.metadata;
 
 import java.util.Objects;
-import java.util.TreeMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 
 public class ConsumerGroupMetadata {
     private final long consumerGroupId;
@@ -26,14 +26,15 @@ public class ConsumerGroupMetadata {
     private long ackOffset;
     private long retryConsumeOffset;
     private long retryAckOffset;
-    private final TreeMap<Long/*offset*/, Integer/*times*/> consumeTimes;
+    private final ConcurrentSkipListMap<Long/*offset*/, Integer/*times*/> consumeTimes;
 
     public ConsumerGroupMetadata(long consumerGroupId) {
         this.consumerGroupId = consumerGroupId;
-        this.consumeTimes = new TreeMap<>();
+        this.consumeTimes = new ConcurrentSkipListMap<>();
     }
 
-    public ConsumerGroupMetadata(long consumerGroupId, long consumeOffset, long ackOffset, long retryConsumeOffset, long retryAckOffset, TreeMap<Long, Integer> consumeTimes) {
+    public ConsumerGroupMetadata(long consumerGroupId, long consumeOffset, long ackOffset, long retryConsumeOffset,
+        long retryAckOffset, ConcurrentSkipListMap<Long, Integer> consumeTimes) {
         this.consumerGroupId = consumerGroupId;
         this.consumeOffset = consumeOffset;
         this.ackOffset = ackOffset;
@@ -80,7 +81,7 @@ public class ConsumerGroupMetadata {
         this.retryAckOffset = retryAckOffset;
     }
 
-    public TreeMap<Long, Integer> getConsumeTimes() {
+    public ConcurrentSkipListMap<Long, Integer> getConsumeTimes() {
         return consumeTimes;
     }
 
