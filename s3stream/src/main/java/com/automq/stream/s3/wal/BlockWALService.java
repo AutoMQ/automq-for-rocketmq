@@ -514,7 +514,7 @@ public class BlockWALService implements WriteAheadLog {
                 slidingWindowService.getWindowCoreData().getWindowStartOffset(),
                 windowMaxLength,
                 slidingWindowService.getWindowCoreData().getWindowNextWriteOffset(),
-                ShutdownType.GRACEFULLY
+                ShutdownType.UNGRACEFULLY
         );
     }
 

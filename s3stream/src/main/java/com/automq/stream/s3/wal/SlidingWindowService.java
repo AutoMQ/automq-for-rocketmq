@@ -100,13 +100,21 @@ public class SlidingWindowService {
     }
 
     public boolean shutdown(long timeout, TimeUnit unit) {
+        boolean gracefulShutdown;
+
         this.executorService.shutdown();
         try {
-            return this.executorService.awaitTermination(timeout, unit);
+            gracefulShutdown = this.executorService.awaitTermination(timeout, unit);
         } catch (InterruptedException e) {
             this.executorService.shutdownNow();
-            return false;
+            gracefulShutdown = false;
         }
+
+        if (gracefulShutdown) {
+            this.getWindowCoreData().setWindowNextWriteOffset(this.getWindowCoreData().getWindowStartOffset());
+        }
+
+        return gracefulShutdown;
     }
 
     @Deprecated
@@ -378,6 +386,7 @@ public class SlidingWindowService {
         }
 
         public void calculateStartOffset(long wroteOffset) {
+            // TODO: use the first block in writeTasks or the current block to set the start offset.
             this.treeMapIOTaskRequestLock.lock();
             try {
                 treeMapWriteRecordTask.remove(wroteOffset);
