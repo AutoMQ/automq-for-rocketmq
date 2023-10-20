@@ -20,6 +20,7 @@ package com.automq.stream.s3.wal;
 import com.automq.stream.s3.wal.util.ThreadFactoryImpl;
 import com.automq.stream.s3.wal.util.WALChannel;
 import com.automq.stream.s3.wal.util.WALUtil;
+import com.automq.stream.utils.FutureUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -126,12 +127,12 @@ public class SlidingWindowService {
         return expectedWriteOffset;
     }
 
-    public void submitWriteRecordTask(WriteRecordTask ioTask) {
+    public void submitWriteRecordTask(WriteBlockTask ioTask) {
         executorService.submit(new WriteRecordTaskProcessor(ioTask));
     }
 
 
-    private void writeRecord(WriteRecordTask ioTask) throws IOException {
+    private void writeRecord(WriteBlockTask ioTask) throws IOException {
         final ByteBuffer totalRecord = ByteBuffer.allocate(ioTask.recordHeader().limit() + ioTask.recordBody().limit());
 
         totalRecord.put(ioTask.recordHeader());
@@ -146,8 +147,8 @@ public class SlidingWindowService {
         walChannel.write(totalRecord, position);
     }
 
-    public boolean makeWriteOffsetMatchWindow(final WriteRecordTask writeRecordTask) throws IOException {
-        long newWindowEndOffset = writeRecordTask.startOffset() + writeRecordTask.recordHeader().limit() + writeRecordTask.recordBody().limit();
+    public boolean makeWriteOffsetMatchWindow(final WriteBlockTask writeBlockTask) throws IOException {
+        long newWindowEndOffset = writeBlockTask.startOffset() + writeBlockTask.recordHeader().limit() + writeBlockTask.recordBody().limit();
         // align to block size
         newWindowEndOffset = WALUtil.alignLargeByBlockSize(newWindowEndOffset);
         long windowStartOffset = windowCoreData.getWindowStartOffset();
@@ -163,13 +164,12 @@ public class SlidingWindowService {
                     // the new window length is bigger than upper limit, reject this write request
                     LOGGER.error("new windows size {} exceeds upper limit {}, reject this write request, window start offset: {}, new window end offset: {}",
                             newWindowMaxLength, upperLimit, windowStartOffset, newWindowEndOffset);
-                    writeRecordTask.future().completeExceptionally(
-                            new OverCapacityException(String.format("new windows size exceeds upper limit %d", upperLimit))
-                    );
+                    FutureUtil.completeExceptionally(writeBlockTask.futures(),
+                            new OverCapacityException(String.format("new windows size exceeds upper limit %d", upperLimit)));
                     return false;
                 }
             }
-            windowCoreData.scaleOutWindow(writeRecordTask, newWindowMaxLength);
+            windowCoreData.scaleOutWindow(writeBlockTask, newWindowMaxLength);
         }
         return true;
     }
@@ -265,7 +265,7 @@ public class SlidingWindowService {
 
     public static class WindowCoreData {
         private final Lock treeMapIOTaskRequestLock = new ReentrantLock();
-        private final TreeMap<Long, WriteRecordTask> treeMapWriteRecordTask = new TreeMap<>();
+        private final TreeMap<Long, WriteBlockTask> treeMapWriteRecordTask = new TreeMap<>();
         private final AtomicLong windowMaxLength = new AtomicLong(0);
         /**
          * Next write offset of sliding window, always aligned to the {@link WALUtil#BLOCK_SIZE}.
@@ -305,10 +305,10 @@ public class SlidingWindowService {
             this.windowStartOffset.set(windowStartOffset);
         }
 
-        public void putWriteRecordTask(WriteRecordTask writeRecordTask) {
+        public void putWriteRecordTask(WriteBlockTask writeBlockTask) {
             this.treeMapIOTaskRequestLock.lock();
             try {
-                this.treeMapWriteRecordTask.put(writeRecordTask.startOffset(), writeRecordTask);
+                this.treeMapWriteRecordTask.put(writeBlockTask.startOffset(), writeBlockTask);
             } finally {
                 this.treeMapIOTaskRequestLock.unlock();
             }
@@ -329,7 +329,7 @@ public class SlidingWindowService {
             }
         }
 
-        public void scaleOutWindow(WriteRecordTask writeRecordTask, long newWindowMaxLength) throws IOException {
+        public void scaleOutWindow(WriteBlockTask writeBlockTask, long newWindowMaxLength) throws IOException {
             boolean scaleWindowHappened = false;
             treeMapIOTaskRequestLock.lock();
             try {
@@ -338,7 +338,7 @@ public class SlidingWindowService {
                     return;
                 }
 
-                writeRecordTask.flushWALHeader(newWindowMaxLength);
+                writeBlockTask.flushWALHeader(newWindowMaxLength);
                 setWindowMaxLength(newWindowMaxLength);
                 scaleWindowHappened = true;
             } finally {
@@ -353,25 +353,25 @@ public class SlidingWindowService {
     }
 
     class WriteRecordTaskProcessor implements Runnable {
-        private final WriteRecordTask writeRecordTask;
+        private final WriteBlockTask writeBlockTask;
 
-        public WriteRecordTaskProcessor(WriteRecordTask writeRecordTask) {
-            this.writeRecordTask = writeRecordTask;
+        public WriteRecordTaskProcessor(WriteBlockTask writeBlockTask) {
+            this.writeBlockTask = writeBlockTask;
         }
 
         @Override
         public void run() {
             try {
-                if (makeWriteOffsetMatchWindow(writeRecordTask)) {
+                if (makeWriteOffsetMatchWindow(writeBlockTask)) {
 
-                    windowCoreData.putWriteRecordTask(writeRecordTask);
+                    windowCoreData.putWriteRecordTask(writeBlockTask);
 
-                    writeRecord(writeRecordTask);
+                    writeRecord(writeBlockTask);
 
                     // Update the start offset of the sliding window after finishing writing the record.
-                    windowCoreData.calculateStartOffset(writeRecordTask.startOffset());
+                    windowCoreData.calculateStartOffset(writeBlockTask.startOffset());
 
-                    writeRecordTask.future().complete(new AppendResult.CallbackResult() {
+                    FutureUtil.complete(writeBlockTask.futures(), new AppendResult.CallbackResult() {
                         @Override
                         public long flushedOffset() {
                             return windowCoreData.getWindowStartOffset();
@@ -385,8 +385,8 @@ public class SlidingWindowService {
                 }
 
             } catch (IOException e) {
-                writeRecordTask.future().completeExceptionally(e);
-                LOGGER.error(String.format("failed to write record, offset: %s", writeRecordTask.startOffset()), e);
+                FutureUtil.completeExceptionally(writeBlockTask.futures(), e);
+                LOGGER.error(String.format("failed to write record, offset: %s", writeBlockTask.startOffset()), e);
             }
         }
     }

@@ -32,6 +32,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -409,15 +410,16 @@ public class BlockWALService implements WriteAheadLog {
         final AppendResult appendResult = new AppendResultImpl(expectedWriteOffset, appendResultFuture);
 
         // submit write task
-        slidingWindowService.submitWriteRecordTask(new WriteRecordTask() {
+        slidingWindowService.submitWriteRecordTask(new WriteBlockTask() {
             @Override
             public long startOffset() {
                 return expectedWriteOffset;
             }
 
             @Override
-            public CompletableFuture<AppendResult.CallbackResult> future() {
-                return appendResultFuture;
+            public List<CompletableFuture<AppendResult.CallbackResult>> futures() {
+                // TODO: flag1
+                return List.of(appendResultFuture);
             }
 
             @Override

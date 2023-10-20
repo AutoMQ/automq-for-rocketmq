@@ -18,17 +18,29 @@
 package com.automq.stream.s3.wal;
 
 
+import com.automq.stream.s3.wal.util.WALUtil;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import static com.automq.stream.s3.wal.WriteAheadLog.AppendResult;
 
-public interface WriteRecordTask {
-    // Align to {@link WALUtil#BLOCK_SIZE}
+/**
+ * A WriteBlockTask contains multiple records, and will be written to the WAL in one batch.
+ */
+public interface WriteBlockTask {
+    /**
+     * The start offset of this block.
+     * Align to {@link WALUtil#BLOCK_SIZE}
+     */
     long startOffset();
 
-    CompletableFuture<AppendResult.CallbackResult> future();
+    /**
+     * Futures of all records in this task.
+     */
+    List<CompletableFuture<AppendResult.CallbackResult>> futures();
 
     ByteBuffer recordHeader();
 

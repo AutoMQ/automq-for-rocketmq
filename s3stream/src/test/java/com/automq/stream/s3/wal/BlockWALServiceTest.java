@@ -78,6 +78,11 @@ class BlockWALServiceTest {
                     assertNull(throwable);
                     assertTrue(callbackResult.flushedOffset() > expectedOffset, "flushedOffset: " + callbackResult.flushedOffset() + ", expectedOffset: " + expectedOffset);
                     assertEquals(0, callbackResult.flushedOffset() % WALUtil.alignLargeByBlockSize(recordSize));
+                }).whenComplete((callbackResult, throwable) -> {
+                    if (null != throwable) {
+                        throwable.printStackTrace();
+                        System.exit(1);
+                    }
                 });
             }
         } finally {
@@ -133,6 +138,11 @@ class BlockWALServiceTest {
                             break;
                         }
                     } while (!appendedOffset.compareAndSet(old, recordOffset));
+                }).whenComplete((callbackResult, throwable) -> {
+                    if (null != throwable) {
+                        throwable.printStackTrace();
+                        System.exit(1);
+                    }
                 });
             }
         } finally {
@@ -164,6 +174,11 @@ class BlockWALServiceTest {
                             assertEquals(0, appendResult.recordOffset() % WALUtil.BLOCK_SIZE);
                             assertTrue(callbackResult.flushedOffset() > appendResult.recordOffset(), "flushedOffset: " + callbackResult.flushedOffset() + ", recordOffset: " + appendResult.recordOffset());
                             assertEquals(0, callbackResult.flushedOffset() % WALUtil.alignLargeByBlockSize(recordSize));
+                        }).whenComplete((callbackResult, throwable) -> {
+                            if (null != throwable) {
+                                throwable.printStackTrace();
+                                System.exit(1);
+                            }
                         });
                     }
                 }));
