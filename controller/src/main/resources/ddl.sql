@@ -14,10 +14,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-CREATE DATABASE IF NOT EXISTS metadata;
-USE metadata;
-
 CREATE TABLE IF NOT EXISTS lease
 (
     node_id         INT      NOT NULL,
