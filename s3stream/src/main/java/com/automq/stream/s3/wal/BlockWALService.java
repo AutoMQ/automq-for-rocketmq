@@ -21,9 +21,10 @@ import com.automq.stream.s3.metrics.TimerUtil;
 import com.automq.stream.s3.metrics.operations.S3Operation;
 import com.automq.stream.s3.metrics.stats.OperationMetricsStats;
 import com.automq.stream.s3.Config;
-import com.automq.stream.s3.wal.util.ThreadFactoryImpl;
 import com.automq.stream.s3.wal.util.WALChannel;
 import com.automq.stream.s3.wal.util.WALUtil;
+import com.automq.stream.utils.ThreadUtils;
+import com.automq.stream.utils.Threads;
 import io.netty.buffer.ByteBuf;
 import org.apache.commons.lang3.time.StopWatch;
 import org.slf4j.Logger;
@@ -36,7 +37,6 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -144,7 +144,8 @@ public class BlockWALService implements WriteAheadLog {
     private WALHeaderCoreData walHeaderCoreData;
 
     private void startFlushWALHeaderScheduler() {
-        this.flushWALHeaderScheduler = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryImpl("flush-wal-header-thread-"));
+        this.flushWALHeaderScheduler = Threads.newSingleThreadScheduledExecutor(
+                ThreadUtils.createThreadFactory("flush-wal-header-thread-%d", true), LOGGER);
         this.flushWALHeaderScheduler.scheduleAtFixedRate(() -> {
             try {
                 BlockWALService.this.flushWALHeader(
@@ -686,7 +687,6 @@ public class BlockWALService implements WriteAheadLog {
         private long slidingWindowInitialSize = 1 << 20;
         private long slidingWindowUpperLimit = 512 << 20;
         private long slidingWindowScaleUnit = 4 << 20;
-        private int writeQueueCapacity = 10000;
 
         BlockWALServiceBuilder(String blockDevicePath, long capacity) {
             this.blockDevicePath = blockDevicePath;
@@ -699,8 +699,7 @@ public class BlockWALService implements WriteAheadLog {
                     .ioThreadNums(config.s3WALThread())
                     .slidingWindowInitialSize(config.s3WALWindowInitial())
                     .slidingWindowScaleUnit(config.s3WALWindowIncrement())
-                    .slidingWindowUpperLimit(config.s3WALWindowMax())
-                    .writeQueueCapacity(config.s3WALQueue());
+                    .slidingWindowUpperLimit(config.s3WALWindowMax());
         }
 
         public BlockWALServiceBuilder flushHeaderIntervalSeconds(int flushHeaderIntervalSeconds) {
@@ -728,11 +727,6 @@ public class BlockWALService implements WriteAheadLog {
             return this;
         }
 
-        public BlockWALServiceBuilder writeQueueCapacity(int writeQueueCapacity) {
-            this.writeQueueCapacity = writeQueueCapacity;
-            return this;
-        }
-
         public BlockWALService build() {
             BlockWALService blockWALService = new BlockWALService();
 
@@ -752,8 +746,7 @@ public class BlockWALService implements WriteAheadLog {
                     blockWALService.walChannel,
                     ioThreadNums,
                     slidingWindowUpperLimit,
-                    slidingWindowScaleUnit,
-                    writeQueueCapacity
+                    slidingWindowScaleUnit
             );
 
             LOGGER.info("build BlockWALService: {}", this);
@@ -771,7 +764,6 @@ public class BlockWALService implements WriteAheadLog {
                     + ", slidingWindowInitialSize=" + slidingWindowInitialSize
                     + ", slidingWindowUpperLimit=" + slidingWindowUpperLimit
                     + ", slidingWindowScaleUnit=" + slidingWindowScaleUnit
-                    + ", writeQueueCapacity=" + writeQueueCapacity
                     + '}';
         }
     }

@@ -17,20 +17,18 @@
 
 package com.automq.stream.s3.wal;
 
-import com.automq.stream.s3.wal.util.ThreadFactoryImpl;
 import com.automq.stream.s3.wal.util.WALChannel;
 import com.automq.stream.s3.wal.util.WALUtil;
 import com.automq.stream.utils.FutureUtil;
+import com.automq.stream.utils.ThreadUtils;
+import com.automq.stream.utils.Threads;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.TreeMap;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
@@ -54,23 +52,15 @@ public class SlidingWindowService {
     private final int ioThreadNums;
     private final long upperLimit;
     private final long scaleUnit;
-    private final int writeRecordTaskWorkQueueCapacity;
     private final WALChannel walChannel;
     private final WindowCoreData windowCoreData = new WindowCoreData();
     private ExecutorService executorService;
 
-    public SlidingWindowService(WALChannel walChannel, int ioThreadNums, long upperLimit, long scaleUnit, int queueCapacity) {
+    public SlidingWindowService(WALChannel walChannel, int ioThreadNums, long upperLimit, long scaleUnit) {
         this.walChannel = walChannel;
         this.ioThreadNums = ioThreadNums;
         this.upperLimit = upperLimit;
         this.scaleUnit = scaleUnit;
-        this.writeRecordTaskWorkQueueCapacity = queueCapacity;
-    }
-
-    private ExecutorService newCachedThreadPool(int nThreads) {
-        BlockingQueue<Runnable> workQueue = new LinkedBlockingQueue<>(writeRecordTaskWorkQueueCapacity);
-        ThreadFactoryImpl threadFactory = new ThreadFactoryImpl("block-wal-io-thread-");
-        return new ThreadPoolExecutor(1, nThreads, 1L, TimeUnit.MINUTES, workQueue, threadFactory);
     }
 
     public void resetWindowWhenRecoverOver(long startOffset, long nextWriteOffset, long maxLength) {
@@ -84,7 +74,8 @@ public class SlidingWindowService {
     }
 
     public void start() throws IOException {
-        this.executorService = newCachedThreadPool(ioThreadNums);
+        this.executorService = Threads.newFixedThreadPool(ioThreadNums,
+                ThreadUtils.createThreadFactory("block-wal-io-thread-%d", false), LOGGER);
     }
 
     public boolean shutdown(long timeout, TimeUnit unit) {
