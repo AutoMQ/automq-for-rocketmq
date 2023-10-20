@@ -22,6 +22,6 @@ cd "$REPO_DIR" || exit 1
 mvn package -Dmaven.test.skip=true
 cp distribution/target/rocketmq-on-s3.tar.gz "$SCRIPT_DIR"
 cd "$SCRIPT_DIR" || exit 1
-docker build -t rocketmq-on-s3:"$(uname -m)"-0.0.1 -f Dockerfile .
+docker build -t rocketmq-on-s3:0.0.1 -f Dockerfile .
 
 
