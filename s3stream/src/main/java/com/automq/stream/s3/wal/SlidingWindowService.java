@@ -31,6 +31,7 @@ import java.util.LinkedList;
 import java.util.Queue;
 import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
@@ -58,7 +59,11 @@ public class SlidingWindowService {
     private final WALHeaderFlusher walHeaderFlusher;
     private final WindowCoreData windowCoreData = new WindowCoreData();
     private ExecutorService executorService;
+    private Semaphore semaphore;
 
+    /**
+     * The lock of {@link #writeTasks}, {@link #currentBlock}.
+     */
     private final Lock taskLock = new ReentrantLock();
 
     /**
@@ -69,7 +74,7 @@ public class SlidingWindowService {
     /**
      * The current block, records are added to this block.
      */
-    private WriteBlockTask currentWriteTask;
+    private WriteBlockTask currentBlock;
 
     public SlidingWindowService(WALChannel walChannel, int ioThreadNums, long upperLimit, long scaleUnit, WALHeaderFlusher flusher) {
         this.walChannel = walChannel;
@@ -97,6 +102,7 @@ public class SlidingWindowService {
     public void start() throws IOException {
         this.executorService = Threads.newFixedThreadPool(ioThreadNums,
                 ThreadUtils.createThreadFactory("block-wal-io-thread-%d", false), LOGGER);
+        this.semaphore = new Semaphore(ioThreadNums);
     }
 
     public boolean shutdown(long timeout, TimeUnit unit) {
@@ -147,16 +153,18 @@ public class SlidingWindowService {
         return expectedWriteOffset;
     }
 
-    @Deprecated
-    public void submitWriteRecordTask(WriteBlockTask ioTask) {
-        executorService.submit(new WriteRecordTaskProcessor(ioTask));
-    }
-
     /**
-     * TODO
+     * Try to write a block. If the semaphore is not available, it will return immediately.
      */
     public void tryWriteBlock() {
-        // TODO
+        if (semaphore.tryAcquire()) {
+            WriteBlockTask block = pollWriteTask();
+            if (block != null) {
+                executorService.submit(new WriteBlockTaskProcessor(block));
+            } else {
+                semaphore.release();
+            }
+        }
     }
 
     public Lock getTaskLock() {
@@ -170,7 +178,7 @@ public class SlidingWindowService {
      * Note: this method is NOT thread safe, and it should be called with {@link #taskLock} locked.
      */
     public WriteBlockTask sealAndNewBlockLocked(WriteBlockTask previousBlock, long minSize, long trimOffset, long recordSectionCapacity) throws OverCapacityException {
-        long startOffset = previousBlock.startOffset() + WALUtil.alignLargeByBlockSize(previousBlock.data().limit());
+        long startOffset = nextBlockStartOffset(previousBlock);
 
         // If the end of the physical device is insufficient for this block, jump to the start of the physical device
         if ((recordSectionCapacity - startOffset % recordSectionCapacity) < minSize) {
@@ -189,11 +197,11 @@ public class SlidingWindowService {
         long maxSize = Math.min(recordSectionCapacity - startOffset + trimOffset, upperLimit);
 
         WriteBlockTask newBlock = new WriteBlockTaskImpl(startOffset, maxSize);
-        if (!previousBlock.futures().isEmpty()) {
+        if (!previousBlock.isEmpty()) {
             // There are some records to be written in the previous block
             writeTasks.add(previousBlock);
         }
-        currentWriteTask = newBlock;
+        setCurrentBlockLocked(newBlock);
         return newBlock;
     }
 
@@ -201,17 +209,81 @@ public class SlidingWindowService {
      * Get the current block.
      * Note: this method is NOT thread safe, and it should be called with {@link #taskLock} locked.
      */
-    public WriteBlockTask getCurrentWriteTaskLocked() {
-        // currentWriteTask is null only when no record has been written
-        if (null == currentWriteTask) {
-            // Trick: we cannot determine the maximum length of the block here, so we set it to 0 first.
-            // When we try to write the first record, this block will be found full, and then a new block will be created.
-            currentWriteTask = new WriteBlockTaskImpl(windowCoreData.getWindowNextWriteOffset(), 0);
+    public WriteBlockTask getCurrentBlockLocked() {
+        // The current block is null only when no record has been written
+        if (null == currentBlock) {
+            currentBlock = nextBlock(windowCoreData.getWindowNextWriteOffset());
         }
-        return currentWriteTask;
+        return currentBlock;
     }
 
-    private void writeRecord(WriteBlockTask ioTask) throws IOException {
+    /**
+     * Set the current block.
+     * Note: this method is NOT thread safe, and it should be called with {@link #taskLock} locked.
+     */
+    private void setCurrentBlockLocked(WriteBlockTask writeTask) {
+        this.currentBlock = writeTask;
+    }
+
+    /**
+     * Get the start offset of the next block.
+     */
+    private long nextBlockStartOffset(WriteBlockTask block) {
+        return block.startOffset() + WALUtil.alignLargeByBlockSize(block.data().limit());
+    }
+
+    /**
+     * Create a new block with the given start offset.
+     * This method is only used when we don't know the maximum length of the new block.
+     */
+    private WriteBlockTask nextBlock(long startOffset) {
+        // Trick: we cannot determine the maximum length of the block here, so we set it to 0 first.
+        // When we try to write a record, this block will be found full, and then a new block will be created.
+        return new WriteBlockTaskImpl(startOffset, 0);
+    }
+
+    /**
+     * Get the first block to be written. If there is no non-empty block, return null.
+     */
+    private WriteBlockTask pollWriteTask() {
+        taskLock.lock();
+        try {
+            return pollWriteTaskLocked();
+        } finally {
+            taskLock.unlock();
+        }
+    }
+
+    /**
+     * Get the first block to be written. If there is no non-empty block, return null.
+     * Note: this method is NOT thread safe, and it should be called with {@link #taskLock} locked.
+     */
+    private WriteBlockTask pollWriteTaskLocked() {
+        WriteBlockTask writeTask = writeTasks.poll();
+        if (null != writeTask) {
+            return writeTask;
+        }
+
+        WriteBlockTask currentBlock = getCurrentBlockLocked();
+        if (currentBlock.isEmpty()) {
+            // No record to be written
+            return null;
+        }
+
+        setCurrentBlockLocked(nextBlock(nextBlockStartOffset(currentBlock)));
+        return currentBlock;
+    }
+
+    private long calculateStartOffsetLocked() {
+        WriteBlockTask writeTask = writeTasks.peek();
+        if (null != writeTask) {
+            return writeTask.startOffset();
+        }
+
+        return getCurrentBlockLocked().startOffset();
+    }
+
+    private void writeBlock(WriteBlockTask ioTask) throws IOException {
         // TODO: make this beautiful
         long position = WALUtil.recordOffsetToPosition(ioTask.startOffset(), walChannel.capacity() - WAL_HEADER_TOTAL_CAPACITY, WAL_HEADER_TOTAL_CAPACITY);
 
@@ -386,7 +458,7 @@ public class SlidingWindowService {
         }
 
         public void calculateStartOffset(long wroteOffset) {
-            // TODO: use the first block in writeTasks or the current block to set the start offset.
+            // TODO: flag1 use the first block in writeTasks or the current block to set the start offset.
             this.treeMapIOTaskRequestLock.lock();
             try {
                 treeMapWriteRecordTask.remove(wroteOffset);
@@ -424,10 +496,10 @@ public class SlidingWindowService {
         }
     }
 
-    class WriteRecordTaskProcessor implements Runnable {
+    class WriteBlockTaskProcessor implements Runnable {
         private final WriteBlockTask writeBlockTask;
 
-        public WriteRecordTaskProcessor(WriteBlockTask writeBlockTask) {
+        public WriteBlockTaskProcessor(WriteBlockTask writeBlockTask) {
             this.writeBlockTask = writeBlockTask;
         }
 
@@ -436,10 +508,12 @@ public class SlidingWindowService {
             try {
                 if (makeWriteOffsetMatchWindow(writeBlockTask)) {
 
+                    // TODO flag1
                     windowCoreData.putWriteRecordTask(writeBlockTask);
 
-                    writeRecord(writeBlockTask);
+                    writeBlock(writeBlockTask);
 
+                    // TODO flag1
                     // Update the start offset of the sliding window after finishing writing the record.
                     windowCoreData.calculateStartOffset(writeBlockTask.startOffset());
 

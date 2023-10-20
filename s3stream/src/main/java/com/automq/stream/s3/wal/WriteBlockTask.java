@@ -53,6 +53,10 @@ public interface WriteBlockTask {
      */
     List<CompletableFuture<AppendResult.CallbackResult>> futures();
 
+    default boolean isEmpty() {
+        return futures().isEmpty();
+    }
+
     /**
      * The content of this block, which contains multiple records.
      */
