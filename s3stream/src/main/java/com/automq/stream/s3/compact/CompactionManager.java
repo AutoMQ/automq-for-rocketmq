@@ -213,11 +213,11 @@ public class CompactionManager {
         CompletableFuture<Void> cf = new CompletableFuture<>();
         //TODO: deal with metadata delay
         this.scheduledExecutorService.execute(() -> {
-            CompletableFuture<List<StreamMetadata>> streamMetadataFuture = this.streamManager.getOpeningStreams();
-            CompletableFuture<List<S3ObjectMetadata>> objectMetadataFuture = this.objectManager.getServerObjects();
-            CompletableFuture.allOf(streamMetadataFuture, objectMetadataFuture).thenAcceptAsync(v -> {
-                List<StreamMetadata> streamMetadataList = streamMetadataFuture.join();
-                List<S3ObjectMetadata> objectMetadataList = objectMetadataFuture.join();
+            CompletableFuture<List<StreamMetadata>> streamMetadataCf = this.streamManager.getOpeningStreams();
+            CompletableFuture<List<S3ObjectMetadata>> objectMetadataCf = this.objectManager.getServerObjects();
+            streamMetadataCf.thenCombine(objectMetadataCf, ImmutablePair::new).thenAcceptAsync(p -> {
+                List<StreamMetadata> streamMetadataList = p.left;
+                List<S3ObjectMetadata> objectMetadataList = p.right;
                 if (objectMetadataList.isEmpty()) {
                     logger.info("No WAL objects to force split");
                     return;
@@ -237,7 +237,11 @@ public class CompactionManager {
                         cf.complete(null);
                     }
                 });
-            }, forceSplitThreadPool);
+            }, forceSplitThreadPool).exceptionally(ex -> {
+                logger.error("Error while force split all WAL objects ", ex);
+                cf.completeExceptionally(ex);
+                return null;
+            });
         });
 
         return cf;
@@ -430,6 +434,7 @@ public class CompactionManager {
             for (StreamOffsetRange streamOffsetRange : metadata.getOffsetRanges()) {
                 if (!streamMetadataMap.containsKey(streamOffsetRange.getStreamId()) ||
                         streamOffsetRange.getStartOffset() < streamMetadataMap.get(streamOffsetRange.getStreamId()).getStartOffset()) {
+                    // skip stream offset range that has been trimmed
                     continue;
                 }
                 if (!sortedStreamOffsetRanges.containsKey(streamOffsetRange.getStreamId())) {
