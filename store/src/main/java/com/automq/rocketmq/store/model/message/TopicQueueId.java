@@ -48,4 +48,11 @@ public class TopicQueueId {
         return Objects.hash(topicId, queueId);
     }
 
+    @Override
+    public String toString() {
+        return "TopicQueueId{" +
+            "topicId=" + topicId +
+            ", queueId=" + queueId +
+            '}';
+    }
 }
