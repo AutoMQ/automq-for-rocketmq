@@ -17,13 +17,12 @@
 
 package com.automq.rocketmq.proxy.remoting.activity;
 
-import com.automq.rocketmq.proxy.metrics.ProxyMetricsManager;
-import com.automq.rocketmq.proxy.model.ProxyContextExt;
 import com.automq.rocketmq.proxy.remoting.RemotingUtil;
 import com.google.common.base.Strings;
 import io.netty.channel.ChannelHandlerContext;
 import java.util.Collections;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.rocketmq.client.producer.SendResult;
 import org.apache.rocketmq.common.message.Message;
 import org.apache.rocketmq.common.message.MessageAccessor;
@@ -37,7 +36,6 @@ import org.apache.rocketmq.proxy.remoting.activity.SendMessageActivity;
 import org.apache.rocketmq.proxy.remoting.pipeline.RequestPipeline;
 import org.apache.rocketmq.proxy.service.route.AddressableMessageQueue;
 import org.apache.rocketmq.proxy.service.route.MessageQueueView;
-import org.apache.rocketmq.remoting.common.RemotingHelper;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 import org.apache.rocketmq.remoting.protocol.RequestCode;
 import org.apache.rocketmq.remoting.protocol.ResponseCode;
@@ -46,24 +44,42 @@ import org.apache.rocketmq.remoting.protocol.header.SendMessageResponseHeader;
 
 import static com.automq.rocketmq.proxy.remoting.RemotingUtil.REQUEST_NOT_FINISHED;
 
-public class ExtendSendMessageActivity extends SendMessageActivity {
+public class ExtendSendMessageActivity extends SendMessageActivity implements CommonRemotingBehavior {
     public ExtendSendMessageActivity(RequestPipeline requestPipeline,
         MessagingProcessor messagingProcessor) {
         super(requestPipeline, messagingProcessor);
     }
 
     @Override
-    protected RemotingCommand request(ChannelHandlerContext ctx, RemotingCommand request, ProxyContext context,
-        long timeoutMillis) throws Exception {
-        String dstBrokerName = dstBrokerName(request);
-        if (Strings.isNullOrEmpty(dstBrokerName)) {
-            return RemotingCommand.buildErrorResponse(ResponseCode.VERSION_NOT_SUPPORTED,
-                "Request doesn't have field bname");
+    protected RemotingCommand processRequest0(ChannelHandlerContext ctx, RemotingCommand request,
+        ProxyContext context) throws Exception {
+        RemotingCommand response = checkVersion(request);
+        if (response != null) {
+            return response;
         }
 
-        if (request.getCode() == RequestCode.CONSUMER_SEND_MSG_BACK) {
-            return RemotingUtil.notSupportedResponse(request);
+        switch (request.getCode()) {
+            // The ExtendSendMessageActivity only support the bellow request codes.
+            case RequestCode.SEND_MESSAGE, RequestCode.SEND_MESSAGE_V2, RequestCode.SEND_BATCH_MESSAGE, RequestCode.CONSUMER_SEND_MSG_BACK -> {
+                return super.processRequest0(ctx, request, context);
+            }
         }
+
+        return RemotingUtil.codeNotSupportedResponse(request);
+    }
+
+    @Override
+    protected RemotingCommand sendMessage(ChannelHandlerContext ctx, RemotingCommand request,
+        ProxyContext context) throws Exception {
+        // The parent class already checked the message type, added the transaction subscription.
+        RemotingCommand superResponse = super.sendMessage(ctx, request, context);
+        if (superResponse != null) {
+            return superResponse;
+        }
+
+        String dstBrokerName = dstBrokerName(request);
+        // Assert dstBrokerName != null since we have already checked the version.
+        assert dstBrokerName != null;
 
         SendMessageRequestHeader requestHeader = SendMessageRequestHeader.parseRequestHeader(request);
         if (requestHeader == null) {
@@ -73,8 +89,11 @@ public class ExtendSendMessageActivity extends SendMessageActivity {
 
         if (requestHeader.isBatch()) {
             // TODO: Support batch message in the future.
-            return RemotingUtil.notSupportedResponse(request);
+            return RemotingUtil.codeNotSupportedResponse(request);
         }
+
+        // TODO: Support RETRY and DLQ message in the future.
+        // Note that the client will send retry and dlq messages through the SEND_MESSAGE RPC.
 
         final RemotingCommand response = preCheck(ctx, request, requestHeader);
 
@@ -89,50 +108,54 @@ public class ExtendSendMessageActivity extends SendMessageActivity {
         MessageAccessor.setProperties(message, oriProps);
 
         // TODO: Do we need handle more properties here?
-
         messagingProcessor.sendMessage(context,
             new SendMessageQueueSelector(dstBrokerName, requestHeader),
-            // The topic name here is already wrapped with namespace, it's safe to use it as ProducerGroup.
-            // TODO: Consider using the producer group from the request header?
-            requestHeader.getTopic(),
+            // For v4 remoting protocol, we honor the producer group in the request header.
+            requestHeader.getProducerGroup(),
             requestHeader.getSysFlag(),
             Collections.singletonList(message),
-            timeoutMillis).whenComplete((sendResults, throwable) -> {
-                if (throwable != null) {
-                    writeErrResponse(ctx, context, request, throwable);
-                    return;
-                }
+            context.getRemainingMs()).whenComplete((sendResults, throwable) -> {
+            if (throwable != null) {
+                writeErrResponse(ctx, context, request, throwable);
+                return;
+            }
 
-                // Assert sendResults.size() == 1 since we doesn't support batch message yet.
-                // TODO: Support batch message in the future.
-                SendResult sendResult = sendResults.get(0);
-                fillSendMessageResponse(response, sendResult);
-                writeResponse(ctx, context, request, response);
-            });
+            // Assert sendResults.size() == 1 since we doesn't support batch message yet.
+            // TODO: Support batch message in the future.
+            SendResult sendResult = sendResults.get(0);
+            fillSendMessageResponse(response, sendResult);
+            writeResponse(ctx, context, request, response);
+        });
 
         // Return null to uplevel, the response will be sent back in the future.
         return null;
     }
 
     @Override
+    protected RemotingCommand consumerSendMessage(ChannelHandlerContext ctx, RemotingCommand request,
+        ProxyContext context) throws Exception {
+        // TODO: Support RETRY message that through the CONSUMER_SEND_MSG_BACK RPC.
+        return super.consumerSendMessage(ctx, request, context);
+    }
+
+    @Override
+    protected RemotingCommand request(ChannelHandlerContext ctx, RemotingCommand request, ProxyContext context,
+        long timeoutMillis) throws Exception {
+        // The parent class use this method to proxy the request to the broker.
+        // We disable this behavior here.
+        return null;
+    }
+
+    @Override
     protected ProxyContext createContext(ChannelHandlerContext ctx, RemotingCommand request) {
-        return ProxyContextExt.create(super.createContext(ctx, request));
+        return createExtendContext(super.createContext(ctx, request));
     }
 
     @Override
     protected void writeResponse(ChannelHandlerContext ctx, ProxyContext context, RemotingCommand request,
         RemotingCommand response, Throwable t) {
-        ProxyMetricsManager.recordRpcLatency(context.getProtocolType(), context.getAction(),
-            RemotingHelper.getResponseCodeDesc(response.getCode()), ((ProxyContextExt) context).getElapsedTimeNanos());
+        recordRpcLatency(context, response);
         super.writeResponse(ctx, context, request, response, t);
-    }
-
-    private String dstBrokerName(RemotingCommand request) {
-        if (request.getCode() == RequestCode.SEND_MESSAGE_V2) {
-            return request.getExtFields().get(BROKER_NAME_FIELD_FOR_SEND_MESSAGE_V2);
-        } else {
-            return request.getExtFields().get(BROKER_NAME_FIELD);
-        }
     }
 
     private RemotingCommand preCheck(ChannelHandlerContext ctx, RemotingCommand request,
