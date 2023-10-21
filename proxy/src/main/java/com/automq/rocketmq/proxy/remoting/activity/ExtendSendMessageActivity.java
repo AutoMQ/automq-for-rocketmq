@@ -18,11 +18,9 @@
 package com.automq.rocketmq.proxy.remoting.activity;
 
 import com.automq.rocketmq.proxy.remoting.RemotingUtil;
-import com.google.common.base.Strings;
 import io.netty.channel.ChannelHandlerContext;
 import java.util.Collections;
 import java.util.Map;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.rocketmq.client.producer.SendResult;
 import org.apache.rocketmq.common.message.Message;
 import org.apache.rocketmq.common.message.MessageAccessor;
@@ -115,17 +113,17 @@ public class ExtendSendMessageActivity extends SendMessageActivity implements Co
             requestHeader.getSysFlag(),
             Collections.singletonList(message),
             context.getRemainingMs()).whenComplete((sendResults, throwable) -> {
-            if (throwable != null) {
-                writeErrResponse(ctx, context, request, throwable);
-                return;
-            }
+                if (throwable != null) {
+                    writeErrResponse(ctx, context, request, throwable);
+                    return;
+                }
 
-            // Assert sendResults.size() == 1 since we doesn't support batch message yet.
-            // TODO: Support batch message in the future.
-            SendResult sendResult = sendResults.get(0);
-            fillSendMessageResponse(response, sendResult);
-            writeResponse(ctx, context, request, response);
-        });
+                // Assert sendResults.size() == 1 since we doesn't support batch message yet.
+                // TODO: Support batch message in the future.
+                SendResult sendResult = sendResults.get(0);
+                fillSendMessageResponse(response, sendResult);
+                writeResponse(ctx, context, request, response);
+            });
 
         // Return null to uplevel, the response will be sent back in the future.
         return null;
@@ -160,9 +158,10 @@ public class ExtendSendMessageActivity extends SendMessageActivity implements Co
 
     private RemotingCommand preCheck(ChannelHandlerContext ctx, RemotingCommand request,
         SendMessageRequestHeader requestHeader) {
-        final RemotingCommand response = RemotingCommand.createResponseCommand(SendMessageResponseHeader.class);
-        response.setOpaque(request.getOpaque());
-        response.setCode(REQUEST_NOT_FINISHED);
+        final RemotingCommand response = RemotingUtil.buildResponseCommand(
+            request,
+            REQUEST_NOT_FINISHED,
+            SendMessageResponseHeader.class);
 
         // Consider moving the validation logic to the upstream.
         TopicValidator.ValidateTopicResult result = TopicValidator.validateTopic(requestHeader.getTopic());

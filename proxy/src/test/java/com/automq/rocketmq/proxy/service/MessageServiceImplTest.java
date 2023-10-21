@@ -233,7 +233,9 @@ class MessageServiceImplTest {
         updateConsumerOffsetRequestHeader.setTopic("topic");
         updateConsumerOffsetRequestHeader.setQueueId(0);
         updateConsumerOffsetRequestHeader.setCommitOffset(100L);
-        messageService.updateConsumerOffset(ProxyContextExt.create(), null, updateConsumerOffsetRequestHeader, 0).join();
+        VirtualQueue virtualQueue = new VirtualQueue(1, 0);
+        AddressableMessageQueue messageQueue = new AddressableMessageQueue(new MessageQueue("topic", virtualQueue.brokerName(), 0), null);
+        messageService.updateConsumerOffset(ProxyContextExt.create(), messageQueue, updateConsumerOffsetRequestHeader, 0).join();
 
         QueryConsumerOffsetRequestHeader queryConsumerOffsetRequestHeader = new QueryConsumerOffsetRequestHeader();
         queryConsumerOffsetRequestHeader.setConsumerGroup("group");

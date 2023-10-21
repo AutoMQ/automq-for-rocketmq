@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.proxy.remoting;
 
+import org.apache.rocketmq.remoting.CommandCustomHeader;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 import org.apache.rocketmq.remoting.protocol.RemotingSysResponseCode;
 import org.apache.rocketmq.remoting.protocol.ResponseCode;
@@ -39,5 +40,32 @@ public class RemotingUtil {
     public static RemotingCommand versionNotSupportedResponse(RemotingCommand request) {
         String error = " request version " + request.getVersion() + " not supported";
         return RemotingCommand.createResponseCommand(ResponseCode.VERSION_NOT_SUPPORTED, error);
+    }
+
+    /**
+     * Build a response command with the given response code, the opaque of the request, and the given custom header.
+     * @param request The request command.
+     * @param responseCode The response code.
+     * @param classHeader The class of the custom header.
+     * @return The response command.
+     */
+    public static RemotingCommand buildResponseCommand(RemotingCommand request, int responseCode,
+        Class<? extends CommandCustomHeader> classHeader) {
+        RemotingCommand response = RemotingCommand.createResponseCommand(responseCode, null, classHeader);
+        response.setOpaque(request.getOpaque());
+        return response;
+    }
+
+    /**
+     * Build a response command with the given response code, and the opaque of the request.
+     *
+     * @param request The request command.
+     * @param responseCode The response code.
+     * @return The response command.
+     */
+    public static RemotingCommand buildResponseCommand(RemotingCommand request, int responseCode) {
+        RemotingCommand response = RemotingCommand.createResponseCommand(responseCode, null, null);
+        response.setOpaque(request.getOpaque());
+        return response;
     }
 }
