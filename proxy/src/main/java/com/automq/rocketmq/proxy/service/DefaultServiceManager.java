@@ -112,6 +112,7 @@ public class DefaultServiceManager implements ServiceManager {
     protected static class ConsumerIdsChangeListenerImpl implements ConsumerIdsChangeListener {
         @Override
         public void handle(ConsumerGroupEvent event, String group, Object... args) {
+            // TODO: implement this to support consumer group change notification
         }
         @Override
         public void shutdown() {

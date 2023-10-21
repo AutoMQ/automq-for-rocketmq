@@ -18,6 +18,7 @@
 package com.automq.rocketmq.proxy.remoting;
 
 import com.automq.rocketmq.proxy.remoting.activity.ExtendConsumerManagerActivity;
+import com.automq.rocketmq.proxy.remoting.activity.ExtendPullMessageActivity;
 import com.automq.rocketmq.proxy.remoting.activity.ExtendSendMessageActivity;
 import io.netty.channel.ChannelHandlerContext;
 import org.apache.rocketmq.proxy.processor.MessagingProcessor;
@@ -67,6 +68,9 @@ public class RemotingProtocolServer extends org.apache.rocketmq.proxy.remoting.R
         remotingServer.registerProcessor(RequestCode.LOCK_BATCH_MQ, consumerManagerActivity, this.defaultExecutor);
         remotingServer.registerProcessor(RequestCode.UNLOCK_BATCH_MQ, consumerManagerActivity, this.defaultExecutor);
 
+        ExtendPullMessageActivity pullMessageActivity = new ExtendPullMessageActivity(requestPipeline, messagingProcessor);
+        remotingServer.registerProcessor(RequestCode.PULL_MESSAGE, pullMessageActivity, this.pullMessageExecutor);
+        remotingServer.registerProcessor(RequestCode.LITE_PULL_MESSAGE, pullMessageActivity, this.pullMessageExecutor);
     }
 
     /**

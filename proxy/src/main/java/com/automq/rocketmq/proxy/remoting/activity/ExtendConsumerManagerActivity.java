@@ -179,7 +179,9 @@ public class ExtendConsumerManagerActivity extends ConsumerManagerActivity imple
             GetMaxOffsetResponseHeader.class);
 
         String brokerName = dstBrokerName(request);
+        assert brokerName != null;
         MessageQueue messageQueue = new MessageQueue(requestHeader.getTopic(), brokerName, requestHeader.getQueueId());
+
         messagingProcessor.getMaxOffset(context, messageQueue, context.getRemainingMs()).whenComplete((offset, ex) -> {
             if (ex != null) {
                 writeErrResponse(ctx, context, request, ex);
@@ -204,7 +206,9 @@ public class ExtendConsumerManagerActivity extends ConsumerManagerActivity imple
             GetMinOffsetResponseHeader.class);
 
         String brokerName = dstBrokerName(request);
+        assert brokerName != null;
         MessageQueue messageQueue = new MessageQueue(requestHeader.getTopic(), brokerName, requestHeader.getQueueId());
+
         messagingProcessor.getMinOffset(context, messageQueue, context.getRemainingMs()).whenComplete((offset, ex) -> {
             if (ex != null) {
                 writeErrResponse(ctx, context, request, ex);
@@ -229,6 +233,7 @@ public class ExtendConsumerManagerActivity extends ConsumerManagerActivity imple
             QueryConsumerOffsetResponseHeader.class);
 
         String brokerName = dstBrokerName(request);
+        assert brokerName != null;
         MessageQueue messageQueue = new MessageQueue(requestHeader.getTopic(), brokerName, requestHeader.getQueueId());
 
         messagingProcessor.queryConsumerOffset(context, messageQueue, requestHeader.getConsumerGroup(),
@@ -260,6 +265,7 @@ public class ExtendConsumerManagerActivity extends ConsumerManagerActivity imple
         final RemotingCommand response = RemotingUtil.buildResponseCommand(request, ResponseCode.SUCCESS);
 
         String brokerName = dstBrokerName(request);
+        assert brokerName != null;
         MessageQueue messageQueue = new MessageQueue(requestHeader.getTopic(), brokerName, requestHeader.getQueueId());
 
         CompletableFuture<Void> updateOffsetCf = messagingProcessor.updateConsumerOffset(
