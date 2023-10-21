@@ -24,10 +24,11 @@ import org.junit.jupiter.api.Test;
 
 import static com.automq.rocketmq.proxy.remoting.activity.CommonRemotingBehavior.BROKER_NAME_FIELD;
 import static com.automq.rocketmq.proxy.remoting.activity.CommonRemotingBehavior.BROKER_NAME_FIELD_FOR_SEND_MESSAGE_V2;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 class CommonRemotingBehaviorTest {
-    private CommonRemotingBehavior commonRemotingBehavior = new CommonRemotingBehavior() {
+    private final CommonRemotingBehavior commonRemotingBehavior = new CommonRemotingBehavior() {
     };
 
     @Test
