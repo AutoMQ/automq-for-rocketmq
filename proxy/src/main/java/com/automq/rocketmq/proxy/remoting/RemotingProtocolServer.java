@@ -84,7 +84,7 @@ public class RemotingProtocolServer extends org.apache.rocketmq.proxy.remoting.R
         @Override
         public RemotingCommand processRequest(ChannelHandlerContext context,
             RemotingCommand command) {
-            return RemotingUtil.notSupportedResponse(command);
+            return RemotingUtil.codeNotSupportedResponse(command);
         }
 
         @Override

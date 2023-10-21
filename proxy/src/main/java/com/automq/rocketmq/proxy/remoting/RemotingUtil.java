@@ -19,15 +19,25 @@ package com.automq.rocketmq.proxy.remoting;
 
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 import org.apache.rocketmq.remoting.protocol.RemotingSysResponseCode;
+import org.apache.rocketmq.remoting.protocol.ResponseCode;
 
 public class RemotingUtil {
     // The response code that indicates that the request is not finished yet.
     public static final int REQUEST_NOT_FINISHED = -1;
+
     /**
-     * Generates a not supported response command.
+     * Generates a code not supported response command.
      */
-    public static RemotingCommand notSupportedResponse(RemotingCommand request) {
+    public static RemotingCommand codeNotSupportedResponse(RemotingCommand request) {
         String error = " request type " + request.getCode() + " not supported";
         return RemotingCommand.createResponseCommand(RemotingSysResponseCode.REQUEST_CODE_NOT_SUPPORTED, error);
+    }
+
+    /**
+     * Generates a version not supported response command.
+     */
+    public static RemotingCommand versionNotSupportedResponse(RemotingCommand request) {
+        String error = " request version " + request.getVersion() + " not supported";
+        return RemotingCommand.createResponseCommand(ResponseCode.VERSION_NOT_SUPPORTED, error);
     }
 }

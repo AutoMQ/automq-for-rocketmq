@@ -21,8 +21,8 @@ import com.automq.rocketmq.proxy.service.SuspendPopRequestService;
 import org.apache.rocketmq.proxy.grpc.v2.DefaultGrpcMessingActivity;
 import org.apache.rocketmq.proxy.processor.MessagingProcessor;
 
-public class ExtendGrpcMessingActivity extends DefaultGrpcMessingActivity {
-    public ExtendGrpcMessingActivity(MessagingProcessor messagingProcessor) {
+public class ExtendGrpcMessagingActivity extends DefaultGrpcMessingActivity {
+    public ExtendGrpcMessagingActivity(MessagingProcessor messagingProcessor) {
         super(messagingProcessor);
     }
 
