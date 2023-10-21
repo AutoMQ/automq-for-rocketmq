@@ -50,6 +50,7 @@ import static com.automq.rocketmq.store.metrics.StoreMetricsConstant.GAUGE_CONSU
 import static com.automq.rocketmq.store.metrics.StoreMetricsConstant.GAUGE_CONSUMER_READY_MESSAGES;
 import static com.automq.rocketmq.store.metrics.StoreMetricsConstant.LABEL_CONSUMER_GROUP;
 import static com.automq.rocketmq.store.metrics.StoreMetricsConstant.LABEL_IS_RETRY;
+import static com.automq.rocketmq.store.metrics.StoreMetricsConstant.LABEL_QUEUE_ID;
 import static com.automq.rocketmq.store.metrics.StoreMetricsConstant.LABEL_TOPIC;
 
 public class StoreMetricsManager extends ServiceThread implements MetricsManager {
@@ -111,7 +112,7 @@ public class StoreMetricsManager extends ServiceThread implements MetricsManager
 
                     logicQueue.retryStreamIdMap().forEach((consumerGroupId, retryStreamIdFuture) -> {
                         long confirmOffset = streamStore.confirmOffset(logicQueue.dataStreamId());
-                        long consumeOffset = logicQueue.getRetryConsumeOffset(consumerGroupId);
+                        long consumeOffset = logicQueue.getConsumeOffset(consumerGroupId);
                         int inflightCount = logicQueue.getInflightStats(consumerGroupId);
                         // TODO: build lag record for retry stream
                         LagRecord record = new LagRecord(logicQueue.topicId(), logicQueue.queueId(), consumerGroupId, false,
@@ -130,6 +131,7 @@ public class StoreMetricsManager extends ServiceThread implements MetricsManager
         AttributesBuilder attributesBuilder = newAttributesBuilder();
         attributesBuilder.put(LABEL_CONSUMER_GROUP, record.consumerGroupId());
         attributesBuilder.put(LABEL_TOPIC, record.topicId());
+        attributesBuilder.put(LABEL_QUEUE_ID, record.queueId());
         attributesBuilder.put(LABEL_IS_RETRY, record.retry());
         return attributesBuilder.build();
     }
