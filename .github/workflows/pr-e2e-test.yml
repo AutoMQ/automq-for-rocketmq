@@ -29,24 +29,10 @@ jobs:
         java-version: ["17"]
     steps:
       - name: 'Download artifact'
-        uses: actions/github-script@v3.1.0
+        uses: actions/download-artifact@v2
         with:
-          script: |
-            var artifacts = await github.actions.listWorkflowRunArtifacts({
-               owner: context.repo.owner,
-               repo: context.repo.repo,
-            });
-            var matchArtifactRmq = artifacts.data.artifacts.filter((artifact) => {
-              return artifact.name == "rocketmq"
-            })[0];
-            var download = await github.actions.downloadArtifact({
-               owner: context.repo.owner,
-               repo: context.repo.repo,
-               artifact_id: matchArtifactRmq.id,
-               archive_format: 'zip',
-            });
-            var fs = require('fs');
-            fs.writeFileSync('${{github.workspace}}/rocketmq.zip', Buffer.from(download.data));
+          name: rocketmq
+          path: ${{github.workspace}}/rocketmq.zip
       - run: |
           unzip rocketmq.zip
           mkdir rocketmq
