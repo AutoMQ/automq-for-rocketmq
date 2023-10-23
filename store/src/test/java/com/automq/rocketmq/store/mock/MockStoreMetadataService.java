@@ -136,4 +136,9 @@ public class MockStoreMetadataService implements StoreMetadataService {
         long endOffset, int limit) {
         return null;
     }
+
+    @Override
+    public int ownerNode(long topicId, int queueId) {
+        return 0;
+    }
 }
