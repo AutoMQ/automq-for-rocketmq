@@ -164,6 +164,11 @@ public class WriteBench implements AutoCloseable {
                 costNanos.addAndGet(costNanosValue);
                 maxCostNanos.accumulateAndGet(costNanosValue, Math::max);
                 flushedOffset.update(v.flushedOffset());
+            }).whenComplete((v, e) -> {
+                if (e != null) {
+                    System.err.printf("Append task %d failed, %s\n", index, e.getMessage());
+                    e.printStackTrace();
+                }
             });
         }
 

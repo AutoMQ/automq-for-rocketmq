@@ -91,6 +91,7 @@ public class WALFileChannel implements WALChannel {
 
     @Override
     public void write(ByteBuf src, long position) throws IOException {
+        assert src.readableBytes() + position <= fileCapacityFact;
         ByteBuffer[] nioBuffers = src.nioBuffers();
         for (ByteBuffer nioBuffer : nioBuffers) {
             int bytesWritten = write(nioBuffer, position);

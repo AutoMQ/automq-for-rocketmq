@@ -165,8 +165,13 @@ public class SlidingWindowService {
                     startOffset, minSize, trimOffset, recordSectionCapacity));
         }
 
+        long maxSize = upperLimit;
+        // The size of the block should not be larger than writable size of the ring buffer
+        // Let capacity=100, start=198, trim=99, then maxSize=100-198+99=1
+        maxSize = Math.min(recordSectionCapacity - startOffset + trimOffset, maxSize);
+        // Let capacity=100, start=198, trim=198, then maxSize=100-198%100=2
         // The size of the block should not be larger than the end of the physical device
-        long maxSize = Math.min(recordSectionCapacity - startOffset + trimOffset, upperLimit);
+        maxSize = Math.min(recordSectionCapacity - startOffset % recordSectionCapacity, maxSize);
 
         Block newBlock = new BlockImpl(startOffset, maxSize);
         if (!previousBlock.isEmpty()) {
