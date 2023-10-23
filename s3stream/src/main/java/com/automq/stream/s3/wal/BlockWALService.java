@@ -538,6 +538,7 @@ public class BlockWALService implements WriteAheadLog {
 
         public static WALHeaderCoreData unmarshal(ByteBuf buf) throws UnmarshalException {
             WALHeaderCoreData walHeaderCoreData = new WALHeaderCoreData();
+            buf.markReaderIndex();
             walHeaderCoreData.magicCode0 = buf.readInt();
             walHeaderCoreData.capacity1 = buf.readLong();
             walHeaderCoreData.trimOffset2.set(buf.readLong());
@@ -547,6 +548,7 @@ public class BlockWALService implements WriteAheadLog {
             walHeaderCoreData.slidingWindowMaxLength6.set(buf.readLong());
             walHeaderCoreData.shutdownType7 = ShutdownType.fromCode(buf.readInt());
             walHeaderCoreData.crc8 = buf.readInt();
+            buf.resetReaderIndex();
 
             if (walHeaderCoreData.magicCode0 != WAL_HEADER_MAGIC_CODE) {
                 throw new UnmarshalException(String.format("WALHeader MagicCode not match, Recovered: [%d] expect: [%d]", walHeaderCoreData.magicCode0, WAL_HEADER_MAGIC_CODE));

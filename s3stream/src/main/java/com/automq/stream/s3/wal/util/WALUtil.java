@@ -41,6 +41,9 @@ public class WALUtil {
      */
     public static int crc32(ByteBuf buf, int length) {
         CRC32 crc32 = new CRC32();
+        if (buf.writerIndex() < buf.readerIndex() + length) {
+            int a = 1 + 1;
+        }
         buf.markReaderIndex();
         for (int i = 0; i < length; i++) {
             crc32.update(buf.readByte());

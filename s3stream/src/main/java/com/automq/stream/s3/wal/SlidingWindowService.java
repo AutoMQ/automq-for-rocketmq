@@ -318,11 +318,13 @@ public class SlidingWindowService {
 
         public static RecordHeaderCoreData unmarshal(ByteBuf byteBuf) {
             RecordHeaderCoreData recordHeaderCoreData = new RecordHeaderCoreData();
+            byteBuf.markReaderIndex();
             recordHeaderCoreData.magicCode0 = byteBuf.readInt();
             recordHeaderCoreData.recordBodyLength1 = byteBuf.readInt();
             recordHeaderCoreData.recordBodyOffset2 = byteBuf.readLong();
             recordHeaderCoreData.recordBodyCRC3 = byteBuf.readInt();
             recordHeaderCoreData.recordHeaderCRC4 = byteBuf.readInt();
+            byteBuf.resetReaderIndex();
             return recordHeaderCoreData;
         }
 
