@@ -151,7 +151,7 @@ public class SnapshotService implements Lifecycle, Runnable {
         readOptions.setSnapshotVersion(version);
 
         // get queue related checkpoints from kv service
-        byte[] tqPrefix = SerializeUtil.buildCheckPointPrefix(topicId, queueId);
+        byte[] tqPrefix = SerializeUtil.buildCheckPointQueuePrefix(topicId, queueId);
         List<CheckPoint> checkPointList = new ArrayList<>();
         try {
             kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, tqPrefix, null, null, (key, value) -> {

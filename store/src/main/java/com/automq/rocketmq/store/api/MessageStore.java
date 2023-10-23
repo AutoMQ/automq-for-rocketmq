@@ -25,6 +25,7 @@ import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PopResult;
 import com.automq.rocketmq.store.model.message.PullResult;
 import com.automq.rocketmq.store.model.message.PutResult;
+import com.automq.rocketmq.store.model.message.ResetConsumeOffsetResult;
 import java.util.concurrent.CompletableFuture;
 
 public interface MessageStore extends Lifecycle {
@@ -120,4 +121,15 @@ public interface MessageStore extends Lifecycle {
      * @return consume offset
      */
     CompletableFuture<Long> getConsumeOffset(long consumerGroupId, long topicId, int queueId);
+
+    /**
+     * Reset consume offset of specified consumer group.
+     *
+     * @param consumerGroupId consumer group id
+     * @param topicId         topic id
+     * @param queueId         queue id
+     * @param offset          new consume offset
+     * @return reset result, see {@link ResetConsumeOffsetResult}
+     */
+    CompletableFuture<ResetConsumeOffsetResult> resetConsumeOffset(long consumerGroupId, long topicId, int queueId, long offset);
 }

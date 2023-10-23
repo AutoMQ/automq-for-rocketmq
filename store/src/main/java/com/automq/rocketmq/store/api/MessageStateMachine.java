@@ -22,6 +22,7 @@ import com.automq.rocketmq.store.model.operation.AckOperation;
 import com.automq.rocketmq.store.model.operation.ChangeInvisibleDurationOperation;
 import com.automq.rocketmq.store.model.operation.OperationSnapshot;
 import com.automq.rocketmq.store.model.operation.PopOperation;
+import com.automq.rocketmq.store.model.operation.ResetConsumeOffsetOperation;
 
 public interface MessageStateMachine {
     long topicId();
@@ -33,6 +34,8 @@ public interface MessageStateMachine {
     void replayAckOperation(long operationOffset, AckOperation operation) throws StoreException;
 
     void replayChangeInvisibleDurationOperation(long operationOffset, ChangeInvisibleDurationOperation operation);
+
+    void replayResetConsumeOffsetOperation(long operationOffset, ResetConsumeOffsetOperation operation);
 
     OperationSnapshot takeSnapshot() throws StoreException;
 

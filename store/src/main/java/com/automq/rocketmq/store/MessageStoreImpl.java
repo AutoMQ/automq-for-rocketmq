@@ -33,6 +33,7 @@ import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PopResult;
 import com.automq.rocketmq.store.model.message.PullResult;
 import com.automq.rocketmq.store.model.message.PutResult;
+import com.automq.rocketmq.store.model.message.ResetConsumeOffsetResult;
 import com.automq.rocketmq.store.service.InflightService;
 import com.automq.rocketmq.store.service.ReviveService;
 import com.automq.rocketmq.store.service.SnapshotService;
@@ -200,5 +201,12 @@ public class MessageStoreImpl implements MessageStore {
     public CompletableFuture<Long> getConsumeOffset(long consumerGroupId, long topicId, int queueId) {
         return logicQueueManager.getOrCreate(topicId, queueId)
             .thenApply(topicQueue -> topicQueue.getConsumeOffset(consumerGroupId));
+    }
+
+    @Override
+    public CompletableFuture<ResetConsumeOffsetResult> resetConsumeOffset(long consumerGroupId, long topicId,
+        int queueId, long offset) {
+        return logicQueueManager.getOrCreate(topicId, queueId)
+            .thenCompose(topicQueue -> topicQueue.resetConsumeOffset(consumerGroupId, offset));
     }
 }

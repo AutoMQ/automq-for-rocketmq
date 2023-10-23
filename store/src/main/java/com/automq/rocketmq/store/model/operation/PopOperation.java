@@ -25,7 +25,6 @@ public class PopOperation extends Operation {
     private final long offset;
     private final int count;
     private final long invisibleDuration;
-    private final long operationTimestamp;
     private final boolean endMark;
     private final PopOperationType popOperationType;
 

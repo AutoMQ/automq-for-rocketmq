@@ -53,12 +53,13 @@ public class SerializeUtilTest {
     public static final long INVISIBLE_DURATION = 9L;
     public static final long OPERATION_TIMESTAMP = 10L;
     public static final long RETRY_OFFSET = 11L;
+    public static final int CONSUMER_GROUP_VERSION = 13;
     public static final String RECEIPT_HANDLE = "EAAAAAwAGAAIAAAABAAQAAwAAAABAAAABAAAAAAAAAADAAAAAAAAAA==";
 
     @Test
     void buildCheckPointKey() {
-        byte[] key = SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, OPERATION_ID);
-        assertEquals(20, key.length);
+        byte[] key = SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, CONSUMER_GROUP_ID, OPERATION_ID);
+        assertEquals(28, key.length);
     }
 
     @Test
@@ -163,7 +164,7 @@ public class SerializeUtilTest {
 
         OperationSnapshot.ConsumerGroupMetadataSnapshot consumerGroupMetadataSnapshot = new OperationSnapshot.ConsumerGroupMetadataSnapshot(
             CONSUMER_GROUP_ID, 1, 2, 3, 4, ackBitmapBuffer.array(), retryAckBitmapBuffer.array(),
-            consumeTimes
+            consumeTimes, CONSUMER_GROUP_VERSION
         );
         byte[] checkPointValue = SerializeUtil.buildCheckPointValue(TOPIC_ID, QUEUE_ID, OFFSET, COUNT, CONSUMER_GROUP_ID, OPERATION_ID, POP_OPERATION_TYPE, DELIVERY_TIMESTAMP, NEXT_VISIBLE_TIMESTAMP);
         CheckPoint checkPoint = CheckPoint.getRootAsCheckPoint(ByteBuffer.wrap(checkPointValue));

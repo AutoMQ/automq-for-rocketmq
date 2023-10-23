@@ -142,7 +142,7 @@ public class ReviveService implements Runnable, Lifecycle {
             long topicId = receiptHandle.topicId();
             int queueId = receiptHandle.queueId();
             long operationId = receiptHandle.operationId();
-            byte[] ckKey = SerializeUtil.buildCheckPointKey(topicId, queueId, operationId);
+            byte[] ckKey = SerializeUtil.buildCheckPointKey(topicId, queueId, consumerGroupId, operationId);
             CompletableFuture<Void> cf = CompletableFuture.completedFuture(null);
             CompletableFuture<Void> preCf = inflightRevive.putIfAbsent(operationId, cf);
             if (preCf != null) {

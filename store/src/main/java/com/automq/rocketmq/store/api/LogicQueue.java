@@ -24,6 +24,7 @@ import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PopResult;
 import com.automq.rocketmq.store.model.message.PullResult;
 import com.automq.rocketmq.store.model.message.PutResult;
+import com.automq.rocketmq.store.model.message.ResetConsumeOffsetResult;
 import java.util.concurrent.CompletableFuture;
 
 public abstract class LogicQueue {
@@ -66,6 +67,8 @@ public abstract class LogicQueue {
 
     public abstract CompletableFuture<ChangeInvisibleDurationResult> changeInvisibleDuration(String receiptHandle,
         long invisibleDuration);
+
+    public abstract CompletableFuture<ResetConsumeOffsetResult> resetConsumeOffset(long consumerGroupId, long offset);
 
     public abstract CompletableFuture<QueueOffsetRange> getOffsetRange();
 
