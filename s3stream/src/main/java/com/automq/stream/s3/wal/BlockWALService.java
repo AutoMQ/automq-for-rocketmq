@@ -178,7 +178,9 @@ public class BlockWALService implements WriteAheadLog {
         try {
             walHeaderCoreData.setLastWriteTimestamp(System.nanoTime());
             long trimOffset = walHeaderCoreData.getTrimOffset();
-            this.walChannel.write(walHeaderCoreData.marshal(), position);
+            ByteBuf buf = walHeaderCoreData.marshal();
+            this.walChannel.write(buf, position);
+            buf.release();
             walHeaderCoreData.setFlushedTrimOffset(trimOffset);
             LOGGER.debug("WAL header flushed, position: {}, header: {}", position, walHeaderCoreData);
         } catch (IOException e) {
@@ -189,13 +191,29 @@ public class BlockWALService implements WriteAheadLog {
 
     private ByteBuf readRecord(WALHeaderCoreData paramWALHeader, long recoverStartOffset) throws ReadRecordException {
         final ByteBuf recordHeader = DirectByteBufAlloc.byteBuffer(RECORD_HEADER_SIZE);
-        Runnable releaseHeader = recordHeader::release;
+        SlidingWindowService.RecordHeaderCoreData readRecordHeader;
+        try {
+            readRecordHeader = parseRecordHeader(paramWALHeader, recoverStartOffset, recordHeader);
+        } finally {
+            recordHeader.release();
+        }
 
+        int recordBodyLength = readRecordHeader.getRecordBodyLength();
+        ByteBuf recordBody = DirectByteBufAlloc.byteBuffer(recordBodyLength);
+        try {
+            parseRecordBody(paramWALHeader, recoverStartOffset, readRecordHeader, recordBody);
+        } finally {
+            recordBody.release();
+        }
+
+        return recordBody;
+    }
+
+    private SlidingWindowService.RecordHeaderCoreData parseRecordHeader(WALHeaderCoreData paramWALHeader, long recoverStartOffset, ByteBuf recordHeader) throws ReadRecordException {
         final long position = WALUtil.recordOffsetToPosition(recoverStartOffset, paramWALHeader.recordSectionCapacity(), WAL_HEADER_TOTAL_CAPACITY);
         try {
             int read = walChannel.read(recordHeader, position);
             if (read != RECORD_HEADER_SIZE) {
-                releaseHeader.run();
                 throw new ReadRecordException(
                         WALUtil.alignNextBlock(recoverStartOffset),
                         String.format("failed to read record header: expected %d bytes, actual %d bytes, recoverStartOffset: %d", RECORD_HEADER_SIZE, read, recoverStartOffset)
@@ -203,7 +221,6 @@ public class BlockWALService implements WriteAheadLog {
             }
         } catch (IOException e) {
             LOGGER.error("failed to read record header, position: {}, recoverStartOffset: {}", position, recoverStartOffset, e);
-            releaseHeader.run();
             throw new ReadRecordException(
                     WALUtil.alignNextBlock(recoverStartOffset),
                     String.format("failed to read record header, recoverStartOffset: %d", recoverStartOffset)
@@ -212,20 +229,15 @@ public class BlockWALService implements WriteAheadLog {
 
         SlidingWindowService.RecordHeaderCoreData readRecordHeader = SlidingWindowService.RecordHeaderCoreData.unmarshal(recordHeader);
         if (readRecordHeader.getMagicCode() != RECORD_HEADER_MAGIC_CODE) {
-            releaseHeader.run();
             throw new ReadRecordException(
                     WALUtil.alignNextBlock(recoverStartOffset),
                     String.format("magic code mismatch: expected %d, actual %d, recoverStartOffset: %d", RECORD_HEADER_MAGIC_CODE, readRecordHeader.getMagicCode(), recoverStartOffset)
             );
         }
 
-        int recordBodyLength = readRecordHeader.getRecordBodyLength();
-        long recordBodyOffset = readRecordHeader.getRecordBodyOffset();
-        int recordBodyCRC = readRecordHeader.getRecordBodyCRC();
-        int recordHeaderCRC = readRecordHeader.getRecordHeaderCRC();
 
+        int recordHeaderCRC = readRecordHeader.getRecordHeaderCRC();
         int calculatedRecordHeaderCRC = WALUtil.crc32(recordHeader, RECORD_HEADER_WITHOUT_CRC_SIZE);
-        releaseHeader.run();
         if (recordHeaderCRC != calculatedRecordHeaderCRC) {
             throw new ReadRecordException(
                     WALUtil.alignNextBlock(recoverStartOffset),
@@ -233,6 +245,7 @@ public class BlockWALService implements WriteAheadLog {
             );
         }
 
+        int recordBodyLength = readRecordHeader.getRecordBodyLength();
         if (recordBodyLength <= 0) {
             throw new ReadRecordException(
                     WALUtil.alignNextBlock(recoverStartOffset),
@@ -240,19 +253,22 @@ public class BlockWALService implements WriteAheadLog {
             );
         }
 
+        long recordBodyOffset = readRecordHeader.getRecordBodyOffset();
         if (recordBodyOffset != recoverStartOffset + RECORD_HEADER_SIZE) {
             throw new ReadRecordException(
                     WALUtil.alignNextBlock(recoverStartOffset),
                     String.format("invalid record body offset: expected %d, actual %d, recoverStartOffset: %d", recoverStartOffset + RECORD_HEADER_SIZE, recordBodyOffset, recoverStartOffset)
             );
         }
+        return readRecordHeader;
+    }
 
-        ByteBuf recordBody = DirectByteBufAlloc.byteBuffer(recordBodyLength);
-        Runnable releaseBody = recordBody::release;
+    private void parseRecordBody(WALHeaderCoreData paramWALHeader, long recoverStartOffset, SlidingWindowService.RecordHeaderCoreData readRecordHeader, ByteBuf recordBody) throws ReadRecordException {
+        long recordBodyOffset = readRecordHeader.getRecordBodyOffset();
+        int recordBodyLength = readRecordHeader.getRecordBodyLength();
         try {
             int read = walChannel.read(recordBody, WALUtil.recordOffsetToPosition(recordBodyOffset, paramWALHeader.recordSectionCapacity(), WAL_HEADER_TOTAL_CAPACITY));
             if (read != recordBodyLength) {
-                releaseBody.run();
                 throw new ReadRecordException(
                         WALUtil.alignNextBlock(recoverStartOffset + RECORD_HEADER_SIZE + recordBodyLength),
                         String.format("failed to read record body: expected %d bytes, actual %d bytes, recoverStartOffset: %d", recordBodyLength, read, recoverStartOffset)
@@ -260,23 +276,20 @@ public class BlockWALService implements WriteAheadLog {
             }
         } catch (IOException e) {
             LOGGER.error("failed to read record body, position: {}, recoverStartOffset: {}", recordBodyOffset, recoverStartOffset, e);
-            releaseBody.run();
             throw new ReadRecordException(
                     WALUtil.alignNextBlock(recoverStartOffset + RECORD_HEADER_SIZE + recordBodyLength),
                     String.format("failed to read record body, recoverStartOffset: %d", recoverStartOffset)
             );
         }
 
+        int recordBodyCRC = readRecordHeader.getRecordBodyCRC();
         int calculatedRecordBodyCRC = WALUtil.crc32(recordBody);
         if (recordBodyCRC != calculatedRecordBodyCRC) {
-            releaseBody.run();
             throw new ReadRecordException(
                     WALUtil.alignNextBlock(recoverStartOffset + RECORD_HEADER_SIZE + recordBodyLength),
                     String.format("record body crc mismatch: expected %d, actual %d, recoverStartOffset: %d", calculatedRecordBodyCRC, recordBodyCRC, recoverStartOffset)
             );
         }
-
-        return recordBody;
     }
 
     private WALHeaderCoreData recoverEntireWALAndCorrectWALHeader(WALHeaderCoreData paramWALHeader) {
@@ -321,8 +334,8 @@ public class BlockWALService implements WriteAheadLog {
         WALHeaderCoreData walHeaderCoreDataAvailable = null;
 
         for (int i = 0; i < WAL_HEADER_COUNT; i++) {
+            ByteBuf buf = DirectByteBufAlloc.byteBuffer(WAL_HEADER_SIZE);
             try {
-                ByteBuf buf = DirectByteBufAlloc.byteBuffer(WAL_HEADER_SIZE);
                 int read = walChannel.read(buf, i * WAL_HEADER_CAPACITY);
                 if (read != WAL_HEADER_SIZE) {
                     continue;
@@ -333,6 +346,8 @@ public class BlockWALService implements WriteAheadLog {
                 }
             } catch (IOException | UnmarshalException ignored) {
                 // failed to parse WALHeader, ignore
+            } finally {
+                buf.release();
             }
         }
 

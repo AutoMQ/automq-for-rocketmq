@@ -176,6 +176,9 @@ public class SlidingWindowService {
         if (!previousBlock.isEmpty()) {
             // There are some records to be written in the previous block
             pendingBlocks.add(previousBlock);
+        } else {
+            // The previous block is empty, so it can be released directly
+            previousBlock.release();
         }
         setCurrentBlockLocked(newBlock);
         return newBlock;
@@ -504,6 +507,8 @@ public class SlidingWindowService {
             } catch (Exception e) {
                 FutureUtil.completeExceptionally(block.futures(), e);
                 LOGGER.error(String.format("failed to write record, offset: %s", block.startOffset()), e);
+            } finally {
+                block.release();
             }
         }
     }

@@ -50,6 +50,10 @@ public class BlockImpl implements Block {
     private final CompositeByteBuf data = DirectByteBufAlloc.compositeByteBuffer();
     private final List<CompletableFuture<WriteAheadLog.AppendResult.CallbackResult>> futures = new LinkedList<>();
 
+    /**
+     * Create a block.
+     * {@link #release()} must be called when this block is no longer used.
+     */
     public BlockImpl(long startOffset, long maxSize) {
         this.startOffset = startOffset;
         this.maxSize = maxSize;

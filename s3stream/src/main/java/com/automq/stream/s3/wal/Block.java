@@ -60,4 +60,8 @@ public interface Block {
      * The content of this block, which contains multiple records.
      */
     ByteBuf data();
+
+    default void release() {
+        data().release();
+    }
 }
