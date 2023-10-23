@@ -183,4 +183,11 @@ public interface StoreMetadataService {
         long endOffset, int limit);
 
     int ownerNode(long topicId, int queueId);
+
+    /**
+     * Get the stream metadata for the specified list of stream ids.
+     * @param streamIds list of specified stream ids
+     * @return list of {@link StreamMetadata}
+     */
+    CompletableFuture<List<StreamMetadata>> getStreams(List<Long> streamIds);
 }

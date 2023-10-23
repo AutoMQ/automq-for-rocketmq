@@ -216,4 +216,5 @@ public interface MetadataStore extends Closeable {
      */
     int ownerNode(long topicId, int queueId);
 
+    CompletableFuture<List<StreamMetadata>> getStreams(List<Long> streamIds);
 }

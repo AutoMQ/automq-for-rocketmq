@@ -955,22 +955,7 @@ public class DefaultMetadataStore implements MetadataStore {
                         continue;
                     }
                     StreamMapper streamMapper = session.getMapper(StreamMapper.class);
-                    RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
-                    List<StreamMetadata> streams = streamMapper.listByNode(nodeId, StreamState.OPEN)
-                        .stream()
-                        .map(stream -> {
-                            int rangeId = stream.getRangeId();
-                            Range range = rangeMapper.get(rangeId, stream.getId(), null);
-                            return StreamMetadata.newBuilder()
-                                .setStreamId(stream.getId())
-                                .setStartOffset(stream.getStartOffset())
-                                .setEndOffset(null == range ? 0 : range.getEndOffset())
-                                .setEpoch(stream.getEpoch())
-                                .setState(stream.getState())
-                                .setRangeId(stream.getRangeId())
-                                .build();
-                        })
-                        .toList();
+                    List<StreamMetadata> streams = buildStreamMetadata(streamMapper.listByNode(nodeId, StreamState.OPEN), session);
                     future.complete(streams);
                     break;
                 }
@@ -988,6 +973,35 @@ public class DefaultMetadataStore implements MetadataStore {
             }
         }
         return future;
+    }
+
+    private List<StreamMetadata> buildStreamMetadata(List<Stream> streams, SqlSession session) {
+        RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
+        return streams.stream()
+            .map(stream -> {
+                int rangeId = stream.getRangeId();
+                Range range = rangeMapper.get(rangeId, stream.getId(), null);
+                return StreamMetadata.newBuilder()
+                    .setStreamId(stream.getId())
+                    .setStartOffset(stream.getStartOffset())
+                    .setEndOffset(null == range ? 0 : range.getEndOffset())
+                    .setEpoch(stream.getEpoch())
+                    .setState(stream.getState())
+                    .setRangeId(stream.getRangeId())
+                    .build();
+            })
+            .toList();
+    }
+
+    @Override
+    public CompletableFuture<List<StreamMetadata>> getStreams(List<Long> streamIds) {
+        return CompletableFuture.supplyAsync(() -> {
+            try (SqlSession session = openSession()) {
+                StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+                List<Stream> streams = streamMapper.listByStreamIds(streamIds);
+                return buildStreamMetadata(streams, session);
+            }
+        }, asyncExecutorService);
     }
 
     @Override

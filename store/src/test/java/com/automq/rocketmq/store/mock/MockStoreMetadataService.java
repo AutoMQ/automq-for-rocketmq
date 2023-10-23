@@ -141,4 +141,9 @@ public class MockStoreMetadataService implements StoreMetadataService {
     public int ownerNode(long topicId, int queueId) {
         return 0;
     }
+
+    @Override
+    public CompletableFuture<List<StreamMetadata>> getStreams(List<Long> streamIds) {
+        return null;
+    }
 }
