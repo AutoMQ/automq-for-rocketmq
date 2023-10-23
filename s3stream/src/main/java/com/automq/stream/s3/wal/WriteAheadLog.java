@@ -33,6 +33,7 @@ public interface WriteAheadLog {
     /**
      * Append data to log, note append may be out of order.
      * ex. when sequence append R1 R2 , R2 maybe complete before R1.
+     * {@link ByteBuf#release()} will be called whatever append success or not.
      *
      * @return The data position will be written.
      */

@@ -227,6 +227,8 @@ public class S3Storage implements Storage {
         }
         WriteAheadLog.AppendResult appendResult;
         try {
+            streamRecord.encoded();
+            streamRecord.retain();
             appendResult = log.append(streamRecord.encoded());
         } catch (WriteAheadLog.OverCapacityException e) {
             // the WAL write data align with block, 'WAL is full but LogCacheBlock is not full' may happen.

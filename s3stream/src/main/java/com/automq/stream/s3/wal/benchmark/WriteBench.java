@@ -151,7 +151,7 @@ public class WriteBench implements AutoCloseable {
             long appendStartTimeNanos = System.nanoTime();
             WriteAheadLog.AppendResult result;
             try {
-                result = log.append(payload);
+                result = log.append(payload.retainedDuplicate());
             } catch (WriteAheadLog.OverCapacityException e) {
                 log.trim(offset);
                 continue;

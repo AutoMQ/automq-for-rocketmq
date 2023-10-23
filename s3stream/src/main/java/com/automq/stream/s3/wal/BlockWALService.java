@@ -421,6 +421,7 @@ public class BlockWALService implements WriteAheadLog {
         try {
             return append0(buf, crc);
         } catch (OverCapacityException ex) {
+            buf.release();
             OperationMetricsStats.getOrCreateOperationMetrics(S3Operation.APPEND_STORAGE_WAL_FULL).operationCount.inc();
             throw ex;
         }
