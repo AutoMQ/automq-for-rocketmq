@@ -22,13 +22,16 @@ import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.MessageType;
 import apache.rocketmq.controller.v1.OngoingMessageQueueReassignment;
 import apache.rocketmq.controller.v1.Topic;
+import com.automq.rocketmq.controller.metadata.database.cache.Inflight;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentMap;
 
-public class GrpcHelper {
+public class Helper {
     public static Topic buildTopic(Gson gson,
         com.automq.rocketmq.controller.metadata.database.dao.Topic topic,
         Collection<QueueAssignment> assignments) {
@@ -71,5 +74,43 @@ public class GrpcHelper {
             }
         }
         return topicBuilder.build();
+    }
+
+    public enum AddFutureResult {
+        /**
+         * Current request is the leader of the Inflight request chain, should fire a query or RPC call immediately.
+         */
+        LEADER,
+
+        /**
+         * There has been an outstanding request in progress. Added to the wait till response of the prior
+         * request to arrive.
+         */
+        FOLLOWER,
+
+        /**
+         * The Inflight has already completed and cache should have been updated. Please retry to serve with cache.
+         */
+        COMPLETED,
+    }
+
+    public static <K, T> AddFutureResult addFuture(K key, CompletableFuture<T> future,
+        ConcurrentMap<K, Inflight<T>> map) {
+        Inflight<T> prev = map.get(key);
+        if (null == prev) {
+            Inflight<T> inflight = new Inflight<>();
+            prev = map.putIfAbsent(key, inflight);
+            if (null == prev) {
+                boolean successful = inflight.addFuture(future);
+                assert successful;
+                return AddFutureResult.LEADER;
+            }
+        }
+
+        if (!prev.addFuture(future)) {
+            return AddFutureResult.COMPLETED;
+        }
+
+        return AddFutureResult.FOLLOWER;
     }
 }

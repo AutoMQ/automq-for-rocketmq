@@ -346,61 +346,53 @@ public class TopicManager {
             Map<Integer, QueueAssignment> assignmentMap = assignmentCache.byTopicId(topicMetadataCache.getId());
             if (null != assignmentMap && !assignmentMap.isEmpty()) {
                 apache.rocketmq.controller.v1.Topic topic =
-                    GrpcHelper.buildTopic(gson, topicMetadataCache, assignmentMap.values());
+                    Helper.buildTopic(gson, topicMetadataCache, assignmentMap.values());
                 return CompletableFuture.completedFuture(topic);
             }
         }
 
         CompletableFuture<apache.rocketmq.controller.v1.Topic> future = new CompletableFuture<>();
-        boolean first = false;
+        boolean queryNow = false;
         if (null != topicId) {
-            if (null == topicIdRequests.get(topicId)) {
-                Inflight<apache.rocketmq.controller.v1.Topic> inflight = new Inflight<>();
-                Inflight<apache.rocketmq.controller.v1.Topic> prev = topicIdRequests.putIfAbsent(topicId, inflight);
-                if (null == prev) {
-                    inflight.addFuture(future);
-                    first = true;
-                } else {
-                    if (!prev.addFuture(future)) {
-                        return this.describeTopic(topicId, topicName);
-                    }
+            switch (Helper.addFuture(topicId, future, topicIdRequests)) {
+                case COMPLETED -> {
+                    return describeTopic(topicId, topicName);
                 }
-            } else {
-                Inflight<apache.rocketmq.controller.v1.Topic> prev = topicIdRequests.get(topicId);
-                if (null == prev) {
-                    return this.describeTopic(topicId, topicName);
-                } else {
-                    if (!prev.addFuture(future)) {
-                        return this.describeTopic(topicId, topicName);
-                    }
-                }
+                case LEADER -> queryNow = true;
             }
         }
 
-        if (!first) {
-            return future;
+        if (!Strings.isNullOrEmpty(topicName)) {
+            switch (Helper.addFuture(topicName, future, topicNameRequests)) {
+                case COMPLETED -> {
+                    return describeTopic(topicId, topicName);
+                }
+                case LEADER -> queryNow = true;
+            }
         }
 
-        metadataStore.asyncExecutor().submit(() -> {
-            try (SqlSession session = metadataStore.openSession()) {
-                TopicMapper topicMapper = session.getMapper(TopicMapper.class);
-                Topic topic = topicMapper.get(topicId, topicName);
-                if (null == topic) {
-                    ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE,
-                        String.format("Topic not found for topic-id=%d, topic-name=%s", topicId, topicName));
-                    completeTopicDescriptionExceptionally(topicId, topicName, e);
-                    return;
-                }
+        if (queryNow) {
+            metadataStore.asyncExecutor().submit(() -> {
+                try (SqlSession session = metadataStore.openSession()) {
+                    TopicMapper topicMapper = session.getMapper(TopicMapper.class);
+                    Topic topic = topicMapper.get(topicId, topicName);
+                    if (null == topic) {
+                        ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE,
+                            String.format("Topic not found for topic-id=%d, topic-name=%s", topicId, topicName));
+                        completeTopicDescriptionExceptionally(topicId, topicName, e);
+                        return;
+                    }
 
-                QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
-                List<QueueAssignment> assignments = assignmentMapper.list(topic.getId(), null, null, null, null);
-                // Update cache
-                topicCache.apply(List.of(topic));
-                assignmentCache.apply(assignments);
-                apache.rocketmq.controller.v1.Topic result = GrpcHelper.buildTopic(gson, topic, assignments);
-                completeTopicDescription(result);
-            }
-        });
+                    QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
+                    List<QueueAssignment> assignments = assignmentMapper.list(topic.getId(), null, null, null, null);
+                    // Update cache
+                    topicCache.apply(List.of(topic));
+                    assignmentCache.apply(assignments);
+                    apache.rocketmq.controller.v1.Topic result = Helper.buildTopic(gson, topic, assignments);
+                    completeTopicDescription(result);
+                }
+            });
+        }
 
         return future;
     }

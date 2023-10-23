@@ -26,6 +26,7 @@ import apache.rocketmq.controller.v1.TopicStatus;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.cache.GroupCache;
+import com.automq.rocketmq.controller.metadata.database.cache.Inflight;
 import com.automq.rocketmq.controller.metadata.database.dao.Group;
 import com.automq.rocketmq.controller.metadata.database.dao.GroupCriteria;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
@@ -35,6 +36,9 @@ import com.google.common.base.Strings;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import javax.annotation.Nonnull;
 import org.apache.ibatis.session.SqlSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,11 +47,17 @@ public class GroupManager {
     private static final Logger LOGGER = LoggerFactory.getLogger(GroupMapper.class);
 
     final GroupCache groupCache;
+
+    final ConcurrentMap<Long, Inflight<ConsumerGroup>> idRequests;
+    final ConcurrentMap<String, Inflight<ConsumerGroup>> nameRequests;
+
     private final MetadataStore metadataStore;
 
     public GroupManager(MetadataStore metadataStore) {
         this.metadataStore = metadataStore;
         this.groupCache = new GroupCache();
+        this.idRequests = new ConcurrentHashMap<>();
+        this.nameRequests = new ConcurrentHashMap<>();
     }
 
     public CompletableFuture<Long> createGroup(String groupName, int maxRetry, GroupType type, long deadLetterTopicId) {
@@ -115,6 +125,34 @@ public class GroupManager {
         return future;
     }
 
+    private void completeDescription(@Nonnull ConsumerGroup group) {
+        Inflight<ConsumerGroup> idInflight = idRequests.remove(group.getGroupId());
+        if (null != idInflight) {
+            idInflight.complete(group);
+        }
+
+        Inflight<ConsumerGroup> nameInflight = nameRequests.remove(group.getName());
+        if (null != nameInflight) {
+            nameInflight.complete(group);
+        }
+    }
+
+    private void completeDescriptionExceptionally(Long groupId, String groupName, Throwable e) {
+        if (null != groupId) {
+            Inflight<ConsumerGroup> idInflight = idRequests.remove(groupId);
+            if (null != idInflight) {
+                idInflight.completeExceptionally(e);
+            }
+        }
+
+        if (!Strings.isNullOrEmpty(groupName)) {
+            Inflight<ConsumerGroup> nameInflight = nameRequests.remove(groupName);
+            if (null != nameInflight) {
+                nameInflight.completeExceptionally(e);
+            }
+        }
+    }
+
     public CompletableFuture<ConsumerGroup> describeGroup(Long groupId, String groupName) {
         Group cachedGroup = null;
         if (null != groupId) {
@@ -129,23 +167,54 @@ public class GroupManager {
             return CompletableFuture.completedFuture(fromGroup(cachedGroup));
         }
 
-        return CompletableFuture.supplyAsync(() -> {
-            try (SqlSession session = metadataStore.openSession()) {
-                GroupMapper groupMapper = session.getMapper(GroupMapper.class);
-                List<Group> groups = groupMapper.byCriteria(GroupCriteria.newBuilder()
-                    .setGroupId(groupId)
-                    .setGroupName(groupName)
-                    .build());
-                if (groups.isEmpty()) {
-                    ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE,
-                        String.format("Group with group-id=%d is not found", groupId));
-                    throw new CompletionException(e);
-                } else {
-                    Group group = groups.get(0);
-                    return fromGroup(group);
+        boolean queryNow = false;
+        CompletableFuture<ConsumerGroup> future = new CompletableFuture<>();
+
+        if (null != groupId) {
+            switch (Helper.addFuture(groupId, future, idRequests)) {
+                case COMPLETED -> {
+                    return describeGroup(groupId, groupName);
                 }
+                case LEADER -> queryNow = true;
             }
-        }, metadataStore.asyncExecutor());
+        }
+
+        if (!Strings.isNullOrEmpty(groupName)) {
+            switch (Helper.addFuture(groupName, future, nameRequests)) {
+                case COMPLETED -> {
+                    return describeGroup(groupId, groupName);
+                }
+                case LEADER -> queryNow = true;
+            }
+        }
+
+        if (queryNow) {
+            metadataStore.asyncExecutor().submit(() -> {
+                try (SqlSession session = metadataStore.openSession()) {
+                    GroupMapper groupMapper = session.getMapper(GroupMapper.class);
+                    List<Group> groups = groupMapper.byCriteria(GroupCriteria.newBuilder()
+                        .setGroupId(groupId)
+                        .setGroupName(groupName)
+                        .build());
+                    if (groups.isEmpty()) {
+                        ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE,
+                            String.format("Group with group-id=%d is not found", groupId));
+                        completeDescriptionExceptionally(groupId, groupName, e);
+                    } else {
+                        Group group = groups.get(0);
+
+                        // Update cache
+                        groupCache.apply(List.of(group));
+
+                        // Complete futures
+                        ConsumerGroup consumerGroup = fromGroup(group);
+                        completeDescription(consumerGroup);
+                    }
+                }
+            });
+        }
+
+        return future;
     }
 
     public CompletableFuture<ConsumerGroup> deleteGroup(long groupId) {
