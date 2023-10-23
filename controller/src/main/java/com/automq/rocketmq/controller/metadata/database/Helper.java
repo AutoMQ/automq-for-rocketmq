@@ -38,8 +38,9 @@ public class Helper {
         apache.rocketmq.controller.v1.Topic.Builder topicBuilder = apache.rocketmq.controller.v1.Topic
             .newBuilder()
             .setTopicId(topic.getId())
-            .setCount(topic.getQueueNum())
             .setName(topic.getName())
+            .setCount(topic.getQueueNum())
+            .setRetentionHours(topic.getRetentionHours())
             .addAllAcceptMessageTypes(gson.fromJson(topic.getAcceptMessageTypes(), new TypeToken<List<MessageType>>() {
             }.getType()));
 

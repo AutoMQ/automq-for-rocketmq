@@ -105,8 +105,10 @@ message CreateTopicRequest {
   // Number of message queues to create for this topic
   int32 count = 3;
 
+  int32 retention_hours = 4;
+
   // The message type that the topic accepts
-  repeated MessageType accept_message_types = 4;
+  repeated MessageType accept_message_types = 5;
 }
 
 message CreateTopicReply {

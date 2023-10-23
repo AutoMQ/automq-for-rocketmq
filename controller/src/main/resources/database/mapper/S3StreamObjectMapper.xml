@@ -22,7 +22,8 @@
 
     <insert id="create" parameterType="S3StreamObject" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
         INSERT INTO
-        s3streamobject (object_id, object_size, stream_id, start_offset, end_offset, base_data_timestamp, committed_timestamp, created_timestamp)
+        s3streamobject (object_id, object_size, stream_id, start_offset, end_offset, base_data_timestamp,
+        committed_timestamp, created_timestamp)
         VALUES (
         #{objectId},
         #{objectSize},
@@ -117,6 +118,16 @@
         <if test="null != limit">
             LIMIT #{limit}
         </if>
+    </select>
+
+    <select id="recyclable" resultType="long">
+        SELECT object_id
+        FROM s3streamobject
+        WHERE
+        <foreach collection="streamIds" item="streamId" open="stream_id IN (" close=")" separator=",">
+            #{streamId}
+        </foreach>
+        AND committed_timestamp <![CDATA[ < ]]>  #{threshold}
     </select>
 
 </mapper>

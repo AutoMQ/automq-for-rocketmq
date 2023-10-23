@@ -59,6 +59,10 @@ public interface ControllerConfig {
         return 10;
     }
 
+    default long recycleS3IntervalInSecs() {
+        return 3600L;
+    }
+
     /**
      * @return Tolerance of workload unfairness among nodes in terms of stream number.
      */

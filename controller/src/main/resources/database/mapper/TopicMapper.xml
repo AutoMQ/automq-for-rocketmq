@@ -22,10 +22,11 @@
 <mapper namespace="com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper">
 
     <insert id="create" parameterType="Topic" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
-        INSERT INTO topic(name, queue_num, status, accept_message_types)
+        INSERT INTO topic(name, queue_num, retention_hours, status, accept_message_types)
         VALUES (
             #{name},
             #{queueNum},
+            #{retentionHours},
             #{status},
             #{acceptMessageTypes}
         )
@@ -44,6 +45,7 @@
             <if test="null != status">status = #{status},</if>
             <if test="null != name">name = #{name},</if>
             <if test="null != queueNum">queue_num = #{queueNum},</if>
+            <if test="null != retentionHours">retention_hours = #{retentionHours},</if>
             <if test="null != acceptMessageTypes">accept_message_types = #{acceptMessageTypes},</if>
         </set>
         WHERE id = #{id}
@@ -64,7 +66,7 @@
     </delete>
 
     <select id="get" resultType="Topic">
-        SELECT id, name, queue_num, status, create_time, update_time, accept_message_types
+        SELECT id, name, queue_num, retention_hours, status, create_time, update_time, accept_message_types
         FROM topic
         <where>
             <if test="null != id">AND id = #{id}</if>
@@ -73,7 +75,7 @@
     </select>
 
     <select id="list" resultType="Topic">
-        SELECT id, name, queue_num, status, create_time, update_time, accept_message_types
+        SELECT id, name, queue_num, retention_hours, status, create_time, update_time, accept_message_types
         FROM topic
         <where>
             <if test="status != null">AND status = #{status}</if>
