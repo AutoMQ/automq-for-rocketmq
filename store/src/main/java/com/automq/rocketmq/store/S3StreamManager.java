@@ -41,8 +41,7 @@ public class S3StreamManager implements StreamManager {
 
     @Override
     public CompletableFuture<List<StreamMetadata>> getStreams(List<Long> streamIds) {
-        //TODO: implement this
-        return CompletableFuture.failedFuture(new UnsupportedOperationException("Get streams is not supported."));
+        return metaService.getStreams(streamIds).thenApply(streams -> streams.stream().map(this::convertFrom).collect(Collectors.toList()));
     }
 
     @Override

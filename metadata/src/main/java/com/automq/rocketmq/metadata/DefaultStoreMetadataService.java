@@ -145,4 +145,9 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
     public int ownerNode(long topicId, int queueId) {
         return metadataStore.ownerNode(topicId, queueId);
     }
+
+    @Override
+    public CompletableFuture<List<StreamMetadata>> getStreams(List<Long> streamIds) {
+        return metadataStore.getStreams(streamIds);
+    }
 }
