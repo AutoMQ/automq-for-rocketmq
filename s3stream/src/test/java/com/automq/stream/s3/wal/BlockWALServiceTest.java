@@ -72,7 +72,7 @@ class BlockWALServiceTest {
             for (int i = 0; i < recordCount; i++) {
                 ByteBuf data = TestUtils.random(recordSize);
 
-                final AppendResult appendResult = wal.append(data);
+                final AppendResult appendResult = wal.append(data.retainedDuplicate());
 
                 final long expectedOffset = i * WALUtil.alignLargeByBlockSize(recordSize);
                 assertEquals(expectedOffset, appendResult.recordOffset());
@@ -117,7 +117,7 @@ class BlockWALServiceTest {
 
                 while (true) {
                     try {
-                        appendResult = wal.append(data);
+                        appendResult = wal.append(data.retainedDuplicate());
                     } catch (OverCapacityException e) {
                         Thread.yield();
                         long flushedOffsetValue = flushedOffset.get();
@@ -173,7 +173,7 @@ class BlockWALServiceTest {
                     for (int i = 0; i < recordCount; i++) {
                         ByteBuf data = TestUtils.random(recordSize);
 
-                        final AppendResult appendResult = wal.append(data);
+                        final AppendResult appendResult = wal.append(data.retainedDuplicate());
 
                         appendResult.future().whenComplete((callbackResult, throwable) -> {
                             assertNull(throwable);
