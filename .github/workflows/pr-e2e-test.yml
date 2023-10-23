@@ -37,7 +37,7 @@ jobs:
                repo: context.repo.repo,
             });
             var matchArtifactRmq = artifacts.data.artifacts.filter((artifact) => {
-              return artifact.name == "rocketmq-on-s3"
+              return artifact.name == "rocketmq"
             })[0];
             var download = await github.actions.downloadArtifact({
                owner: context.repo.owner,
@@ -46,9 +46,9 @@ jobs:
                archive_format: 'zip',
             });
             var fs = require('fs');
-            fs.writeFileSync('${{github.workspace}}/rocketmq-on-s3.zip', Buffer.from(download.data));
+            fs.writeFileSync('${{github.workspace}}/rocketmq.zip', Buffer.from(download.data));
       - run: |
-          unzip rocketmq-on-s3.zip
+          unzip rocketmq.zip
           mkdir rocketmq
           cp -r rocketmq-* rocketmq/
           ls
