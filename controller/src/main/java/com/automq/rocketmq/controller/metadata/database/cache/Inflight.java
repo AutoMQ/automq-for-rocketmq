@@ -40,7 +40,7 @@ public class Inflight<T> {
         return false;
     }
 
-    public synchronized void complete(T value) {
+    public void complete(T value) {
         if (completed.compareAndSet(false, true)) {
             futures.forEach(future -> {
                 if (!future.isDone()) {
@@ -48,10 +48,9 @@ public class Inflight<T> {
                 }
             });
         }
-
     }
 
-    public synchronized void completeExceptionally(Throwable e) {
+    public void completeExceptionally(Throwable e) {
         if (completed.compareAndSet(false, true)) {
             futures.forEach(future -> {
                 if (!future.isDone()) {
