@@ -32,13 +32,12 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: rocketmq
-          path: ${{github.workspace}}/rocketmq.zip
+          path: ${{github.workspace}}/
       - run: |
           pwd
-          cp ${{github.workspace}}/rocketmq.zip .
-          unzip rocketmq.zip
+          unzip rocketmq*.zip
           mkdir rocketmq
-          cp -r rocketmq-* rocketmq/
+          cp -r  rocketmq-on-s3/ rocketmq/
           ls
       - uses: actions/checkout@v3
         with:
@@ -58,7 +57,8 @@ jobs:
           version=${{ github.event.pull_request.number || github.ref_name }}-$(uuidgen)
           mkdir versionlist
           touch versionlist/"${version}-`echo ${{ matrix.base-image }} | sed -e "s/:/-/g"`"
-          sh ./build-image.sh ${version} ${DOCKER_REPO}
+          sh ./build-image.sh ${version}
+          docker push ${DOCKER_REPO}:${version}
       - uses: actions/upload-artifact@v3
         name: Upload distribution tar
         with:
