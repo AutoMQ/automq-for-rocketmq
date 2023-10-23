@@ -492,4 +492,22 @@ public class TopicManager {
     private void notifyOnResourceChange(Set<Integer> nodes) {
 
     }
+
+    public int ownerNode(long topicId, int queueId) {
+        Map<Integer, QueueAssignment> map = assignmentCache.byTopicId(topicId);
+        if (null != map) {
+            QueueAssignment assignment = map.get(queueId);
+            if (null != assignment) {
+                switch (assignment.getStatus()) {
+                    case ASSIGNMENT_STATUS_ASSIGNED -> {
+                        return assignment.getDstNodeId();
+                    }
+                    case ASSIGNMENT_STATUS_YIELDING -> {
+                        return assignment.getSrcNodeId();
+                    }
+                }
+            }
+        }
+        return 0;
+    }
 }

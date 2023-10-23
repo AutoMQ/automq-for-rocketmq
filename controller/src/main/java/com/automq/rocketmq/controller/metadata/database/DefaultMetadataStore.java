@@ -402,6 +402,11 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
+    public int ownerNode(long topicId, int queueId) {
+        return topicManager.ownerNode(topicId, queueId);
+    }
+
+    @Override
     public CompletableFuture<List<QueueAssignment>> listAssignments(Long topicId, Integer srcNodeId, Integer dstNodeId,
         AssignmentStatus status) {
         CompletableFuture<List<QueueAssignment>> future = new CompletableFuture<>();

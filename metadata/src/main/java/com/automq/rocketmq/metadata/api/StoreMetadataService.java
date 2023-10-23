@@ -181,4 +181,6 @@ public interface StoreMetadataService {
      */
     CompletableFuture<Pair<List<S3StreamObject>, List<S3WALObject>>> listObjects(long streamId, long startOffset,
         long endOffset, int limit);
+
+    int ownerNode(long topicId, int queueId);
 }

@@ -140,4 +140,9 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
         long endOffset, int limit) {
         return metadataStore.listObjects(streamId, startOffset, endOffset, limit);
     }
+
+    @Override
+    public int ownerNode(long topicId, int queueId) {
+        return metadataStore.ownerNode(topicId, queueId);
+    }
 }
