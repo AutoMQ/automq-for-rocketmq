@@ -59,24 +59,20 @@ public class SlidingWindowService {
     private final WALChannel walChannel;
     private final WALHeaderFlusher walHeaderFlusher;
     private final WindowCoreData windowCoreData = new WindowCoreData();
-    private ExecutorService executorService;
-    private Semaphore semaphore;
-
     /**
      * The lock of {@link #pendingBlocks}, {@link #writingBlocks}, {@link #currentBlock}.
      */
     private final Lock blockLock = new ReentrantLock();
-
     /**
      * Blocks that are waiting to be written.
      */
     private final Queue<Block> pendingBlocks = new LinkedList<>();
-
     /**
      * Blocks that are being written.
      */
     private final TreeSet<Long> writingBlocks = new TreeSet<>();
-
+    private ExecutorService executorService;
+    private Semaphore semaphore;
     /**
      * The current block, records are added to this block.
      */
@@ -312,6 +308,10 @@ public class SlidingWindowService {
         return true;
     }
 
+    public interface WALHeaderFlusher {
+        void flush(long windowMaxLength) throws IOException;
+    }
+
     public static class RecordHeaderCoreData {
         private int magicCode0 = RECORD_HEADER_MAGIC_CODE;
         private int recordBodyLength1;
@@ -371,11 +371,6 @@ public class SlidingWindowService {
             return recordHeaderCRC4;
         }
 
-        public RecordHeaderCoreData setRecordHeaderCRC(int recordHeaderCRC) {
-            this.recordHeaderCRC4 = recordHeaderCRC;
-            return this;
-        }
-
         @Override
         public String toString() {
             return "RecordHeaderCoreData{" +
@@ -430,10 +425,6 @@ public class SlidingWindowService {
 
         public void setWindowNextWriteOffset(long windowNextWriteOffset) {
             this.windowNextWriteOffset.set(windowNextWriteOffset);
-        }
-
-        public boolean compareAndSetWindowNextWriteOffset(long expect, long update) {
-            return this.windowNextWriteOffset.compareAndSet(expect, update);
         }
 
         public long getWindowStartOffset() {
@@ -511,9 +502,5 @@ public class SlidingWindowService {
                 block.release();
             }
         }
-    }
-
-    public interface WALHeaderFlusher {
-        void flush(long windowMaxLength) throws IOException;
     }
 }

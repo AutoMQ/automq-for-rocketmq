@@ -41,14 +41,13 @@ public class BlockImpl implements Block {
      * Any try to add a record to this block will fail if the size of this block exceeds this limit.
      */
     private final long maxSize;
-
+    private final CompositeByteBuf data = DirectByteBufAlloc.compositeByteBuffer();
+    private final List<CompletableFuture<WriteAheadLog.AppendResult.CallbackResult>> futures = new LinkedList<>();
     /**
      * The next offset to write in this block.
      * Align to {@link WALUtil#BLOCK_SIZE}
      */
     private long nextOffset = 0;
-    private final CompositeByteBuf data = DirectByteBufAlloc.compositeByteBuffer();
-    private final List<CompletableFuture<WriteAheadLog.AppendResult.CallbackResult>> futures = new LinkedList<>();
 
     /**
      * Create a block.

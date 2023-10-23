@@ -168,6 +168,11 @@ public class WriteBench implements AutoCloseable {
         System.out.printf("Append task %d finished\n", index);
     }
 
+    @Override
+    public void close() {
+        log.shutdownGracefully();
+    }
+
     static class Config {
         // following fields are WAL configuration
         final String path;
@@ -237,10 +242,5 @@ public class WriteBench implements AutoCloseable {
             this.recordSizeBytes = config.recordSizeBytes;
             this.durationSeconds = config.durationSeconds;
         }
-    }
-
-    @Override
-    public void close() {
-        log.shutdownGracefully();
     }
 }

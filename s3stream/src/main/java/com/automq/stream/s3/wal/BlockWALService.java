@@ -125,7 +125,6 @@ import java.util.concurrent.locks.Lock;
  * used to verify the correctness of the record header
  */
 public class BlockWALService implements WriteAheadLog {
-    private static final Logger LOGGER = LoggerFactory.getLogger(BlockWALService.class);
     public static final int RECORD_HEADER_SIZE = 4 + 4 + 8 + 4 + 4;
     public static final int RECORD_HEADER_WITHOUT_CRC_SIZE = RECORD_HEADER_SIZE - 4;
     public static final int RECORD_HEADER_MAGIC_CODE = 0x87654321;
@@ -135,14 +134,19 @@ public class BlockWALService implements WriteAheadLog {
     public static final int WAL_HEADER_COUNT = 2;
     public static final int WAL_HEADER_CAPACITY = WALUtil.BLOCK_SIZE;
     public static final int WAL_HEADER_TOTAL_CAPACITY = WAL_HEADER_CAPACITY * WAL_HEADER_COUNT;
-    private int walHeaderFlushIntervalSeconds;
-    private long initialWindowSize;
+    private static final Logger LOGGER = LoggerFactory.getLogger(BlockWALService.class);
     private final AtomicBoolean readyToServe = new AtomicBoolean(false);
     private final AtomicLong writeHeaderRoundTimes = new AtomicLong(0);
+    private int walHeaderFlushIntervalSeconds;
+    private long initialWindowSize;
     private ScheduledExecutorService flushWALHeaderScheduler;
     private WALChannel walChannel;
     private SlidingWindowService slidingWindowService;
     private WALHeaderCoreData walHeaderCoreData;
+
+    public static BlockWALServiceBuilder builder(String blockDevicePath, long capacity) {
+        return new BlockWALServiceBuilder(blockDevicePath, capacity);
+    }
 
     private void startFlushWALHeaderScheduler() {
         this.flushWALHeaderScheduler = Threads.newSingleThreadScheduledExecutor(
@@ -234,7 +238,6 @@ public class BlockWALService implements WriteAheadLog {
                     String.format("magic code mismatch: expected %d, actual %d, recoverStartOffset: %d", RECORD_HEADER_MAGIC_CODE, readRecordHeader.getMagicCode(), recoverStartOffset)
             );
         }
-
 
         int recordHeaderCRC = readRecordHeader.getRecordHeaderCRC();
         int calculatedRecordHeaderCRC = WALUtil.crc32(recordHeader, RECORD_HEADER_WITHOUT_CRC_SIZE);
@@ -455,7 +458,7 @@ public class BlockWALService implements WriteAheadLog {
         return appendResult;
     }
 
-    private static ByteBuf recordHeader(ByteBuf body, int crc, long start) {
+    private ByteBuf recordHeader(ByteBuf body, int crc, long start) {
         return new SlidingWindowService.RecordHeaderCoreData()
                 .setMagicCode(RECORD_HEADER_MAGIC_CODE)
                 .setRecordBodyLength(body.readableBytes())
@@ -464,7 +467,7 @@ public class BlockWALService implements WriteAheadLog {
                 .marshal();
     }
 
-    private static ByteBuf record(ByteBuf body, int crc, long start) {
+    private ByteBuf record(ByteBuf body, int crc, long start) {
         CompositeByteBuf record = DirectByteBufAlloc.compositeByteBuffer();
         record.addComponents(true, recordHeader(body, crc, start), body);
         return record;
@@ -623,10 +626,6 @@ public class BlockWALService implements WriteAheadLog {
             this.flushedTrimOffset.set(flushedTrimOffset);
         }
 
-        public long getLastWriteTimestamp() {
-            return lastWriteTimestamp3;
-        }
-
         public WALHeaderCoreData setLastWriteTimestamp(long lastWriteTimestamp) {
             this.lastWriteTimestamp3 = lastWriteTimestamp;
             return this;
@@ -694,10 +693,6 @@ public class BlockWALService implements WriteAheadLog {
             buf.writeInt(crc8);
             return buf;
         }
-    }
-
-    public static BlockWALServiceBuilder builder(String blockDevicePath, long capacity) {
-        return new BlockWALServiceBuilder(blockDevicePath, capacity);
     }
 
     public static class BlockWALServiceBuilder {
@@ -790,24 +785,7 @@ public class BlockWALService implements WriteAheadLog {
         }
     }
 
-    static class AppendResultImpl implements AppendResult {
-        private final long recordOffset;
-        private final CompletableFuture<CallbackResult> future;
-
-        public AppendResultImpl(long recordOffset, CompletableFuture<CallbackResult> future) {
-            this.recordOffset = recordOffset;
-            this.future = future;
-        }
-
-        @Override
-        public long recordOffset() {
-            return recordOffset;
-        }
-
-        @Override
-        public CompletableFuture<CallbackResult> future() {
-            return future;
-        }
+    record AppendResultImpl(long recordOffset, CompletableFuture<CallbackResult> future) implements AppendResult {
 
         @Override
         public String toString() {
@@ -815,24 +793,7 @@ public class BlockWALService implements WriteAheadLog {
         }
     }
 
-    static class RecoverResultImpl implements RecoverResult {
-        private final ByteBuf record;
-        private final long recordOffset;
-
-        public RecoverResultImpl(ByteBuf record, long recordOffset) {
-            this.record = record;
-            this.recordOffset = recordOffset;
-        }
-
-        @Override
-        public ByteBuf record() {
-            return record;
-        }
-
-        @Override
-        public long recordOffset() {
-            return recordOffset;
-        }
+    record RecoverResultImpl(ByteBuf record, long recordOffset) implements RecoverResult {
 
         @Override
         public String toString() {
@@ -840,6 +801,25 @@ public class BlockWALService implements WriteAheadLog {
                     + "record=" + record
                     + ", recordOffset=" + recordOffset
                     + '}';
+        }
+    }
+
+    static class ReadRecordException extends Exception {
+        long jumpNextRecoverOffset;
+
+        public ReadRecordException(long offset, String message) {
+            super(message);
+            this.jumpNextRecoverOffset = offset;
+        }
+
+        public long getJumpNextRecoverOffset() {
+            return jumpNextRecoverOffset;
+        }
+    }
+
+    static class UnmarshalException extends Exception {
+        public UnmarshalException(String message) {
+            super(message);
         }
     }
 
@@ -898,25 +878,6 @@ public class BlockWALService implements WriteAheadLog {
                 }
             } while (nextRecoverOffset < walHeaderCoreData.getSlidingWindowNextWriteOffset());
             return false;
-        }
-    }
-
-    static class ReadRecordException extends Exception {
-        long jumpNextRecoverOffset;
-
-        public ReadRecordException(long offset, String message) {
-            super(message);
-            this.jumpNextRecoverOffset = offset;
-        }
-
-        public long getJumpNextRecoverOffset() {
-            return jumpNextRecoverOffset;
-        }
-    }
-
-    static class UnmarshalException extends Exception {
-        public UnmarshalException(String message) {
-            super(message);
         }
     }
 }

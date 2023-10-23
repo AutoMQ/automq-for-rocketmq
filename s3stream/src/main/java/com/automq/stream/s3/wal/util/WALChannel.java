@@ -27,6 +27,10 @@ import java.io.IOException;
  * 2. WALBlockDeviceChannel based on block device, which uses O_DIRECT to bypass page cache.
  */
 public interface WALChannel {
+    static WALChannelBuilder builder(String path, long capacity) {
+        return new WALChannelBuilder(path, capacity);
+    }
+
     void open() throws IOException;
 
     void close();
@@ -48,10 +52,6 @@ public interface WALChannel {
      * This method will not change the reader index of the given buffer.
      */
     int read(ByteBuf dst, long position) throws IOException;
-
-    static WALChannelBuilder builder(String path, long capacity) {
-        return new WALChannelBuilder(path, capacity);
-    }
 
     class WALChannelBuilder {
         private final String path;
