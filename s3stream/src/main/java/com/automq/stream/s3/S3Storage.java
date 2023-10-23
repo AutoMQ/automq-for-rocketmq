@@ -33,7 +33,6 @@ import com.automq.stream.utils.FutureUtil;
 import com.automq.stream.utils.ThreadUtils;
 import com.automq.stream.utils.Threads;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -160,7 +159,7 @@ public class S3Storage implements Storage {
         while (it.hasNext()) {
             WriteAheadLog.RecoverResult recoverResult = it.next();
             logEndOffset = recoverResult.recordOffset();
-            ByteBuf recordBuf = Unpooled.wrappedBuffer(recoverResult.record());
+            ByteBuf recordBuf = recoverResult.record();
             StreamRecordBatch streamRecordBatch = StreamRecordBatchCodec.decode(recordBuf);
             long streamId = streamRecordBatch.getStreamId();
             Long openingStreamEndOffset = openingStreamEndOffsets.get(streamId);

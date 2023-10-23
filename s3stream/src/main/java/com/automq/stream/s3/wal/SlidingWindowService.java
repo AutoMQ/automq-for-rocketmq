@@ -17,16 +17,17 @@
 
 package com.automq.stream.s3.wal;
 
+import com.automq.stream.s3.DirectByteBufAlloc;
 import com.automq.stream.s3.wal.util.WALChannel;
 import com.automq.stream.s3.wal.util.WALUtil;
 import com.automq.stream.utils.FutureUtil;
 import com.automq.stream.utils.ThreadUtils;
 import com.automq.stream.utils.Threads;
+import io.netty.buffer.ByteBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.LinkedList;
 import java.util.Queue;
 import java.util.TreeSet;
@@ -204,7 +205,7 @@ public class SlidingWindowService {
      * Get the start offset of the next block.
      */
     private long nextBlockStartOffset(Block block) {
-        return block.startOffset() + WALUtil.alignLargeByBlockSize(block.data().limit());
+        return block.startOffset() + WALUtil.alignLargeByBlockSize(block.data().readableBytes());
     }
 
     /**
@@ -282,7 +283,7 @@ public class SlidingWindowService {
     }
 
     private boolean makeWriteOffsetMatchWindow(final Block block) throws IOException {
-        long newWindowEndOffset = block.startOffset() + block.data().limit();
+        long newWindowEndOffset = block.startOffset() + block.data().readableBytes();
         // align to block size
         newWindowEndOffset = WALUtil.alignLargeByBlockSize(newWindowEndOffset);
         long windowStartOffset = windowCoreData.getWindowStartOffset();
@@ -315,13 +316,13 @@ public class SlidingWindowService {
         private int recordBodyCRC3;
         private int recordHeaderCRC4;
 
-        public static RecordHeaderCoreData unmarshal(ByteBuffer byteBuffer) {
+        public static RecordHeaderCoreData unmarshal(ByteBuf byteBuf) {
             RecordHeaderCoreData recordHeaderCoreData = new RecordHeaderCoreData();
-            recordHeaderCoreData.magicCode0 = byteBuffer.getInt();
-            recordHeaderCoreData.recordBodyLength1 = byteBuffer.getInt();
-            recordHeaderCoreData.recordBodyOffset2 = byteBuffer.getLong();
-            recordHeaderCoreData.recordBodyCRC3 = byteBuffer.getInt();
-            recordHeaderCoreData.recordHeaderCRC4 = byteBuffer.getInt();
+            recordHeaderCoreData.magicCode0 = byteBuf.readInt();
+            recordHeaderCoreData.recordBodyLength1 = byteBuf.readInt();
+            recordHeaderCoreData.recordBodyOffset2 = byteBuf.readLong();
+            recordHeaderCoreData.recordBodyCRC3 = byteBuf.readInt();
+            recordHeaderCoreData.recordHeaderCRC4 = byteBuf.readInt();
             return recordHeaderCoreData;
         }
 
@@ -381,19 +382,19 @@ public class SlidingWindowService {
                     '}';
         }
 
-        private ByteBuffer marshalHeaderExceptCRC() {
-            ByteBuffer byteBuffer = ByteBuffer.allocate(RECORD_HEADER_SIZE);
-            byteBuffer.putInt(magicCode0);
-            byteBuffer.putInt(recordBodyLength1);
-            byteBuffer.putLong(recordBodyOffset2);
-            byteBuffer.putInt(recordBodyCRC3);
-            return byteBuffer;
+        private ByteBuf marshalHeaderExceptCRC() {
+            ByteBuf buf = DirectByteBufAlloc.byteBuffer(RECORD_HEADER_SIZE);
+            buf.writeInt(magicCode0);
+            buf.writeInt(recordBodyLength1);
+            buf.writeLong(recordBodyOffset2);
+            buf.writeInt(recordBodyCRC3);
+            return buf;
         }
 
-        public ByteBuffer marshal() {
-            ByteBuffer byteBuffer = marshalHeaderExceptCRC();
-            byteBuffer.putInt(WALUtil.crc32(byteBuffer, RECORD_HEADER_WITHOUT_CRC_SIZE));
-            return byteBuffer.position(0);
+        public ByteBuf marshal() {
+            ByteBuf buf = marshalHeaderExceptCRC();
+            buf.writeInt(WALUtil.crc32(buf, RECORD_HEADER_WITHOUT_CRC_SIZE));
+            return buf;
         }
     }
 

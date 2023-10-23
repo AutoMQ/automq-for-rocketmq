@@ -21,7 +21,6 @@ package com.automq.stream.s3.wal;
 import io.netty.buffer.ByteBuf;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.concurrent.CompletableFuture;
 
@@ -74,7 +73,7 @@ public interface WriteAheadLog {
     }
 
     interface RecoverResult {
-        ByteBuffer record();
+        ByteBuf record();
 
         /**
          * @see AppendResult#recordOffset()
