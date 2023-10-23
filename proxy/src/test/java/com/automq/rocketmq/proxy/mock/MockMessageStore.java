@@ -28,6 +28,7 @@ import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
 import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PopResult;
 import com.automq.rocketmq.store.model.message.PutResult;
+import com.automq.rocketmq.store.model.message.ResetConsumeOffsetResult;
 import com.automq.rocketmq.store.service.InflightService;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -154,5 +155,12 @@ public class MockMessageStore implements MessageStore {
     @Override
     public CompletableFuture<Long> getConsumeOffset(long consumerGroupId, long topicId, int queueId) {
         return CompletableFuture.completedFuture(consumerOffsetMap.getOrDefault(Pair.of(topicId, queueId), 0L));
+    }
+
+    @Override
+    public CompletableFuture<ResetConsumeOffsetResult> resetConsumeOffset(long consumerGroupId, long topicId,
+        int queueId, long offset) {
+        consumerOffsetMap.put(Pair.of(topicId, queueId), offset);
+        return CompletableFuture.completedFuture(new ResetConsumeOffsetResult(ResetConsumeOffsetResult.Status.SUCCESS));
     }
 }

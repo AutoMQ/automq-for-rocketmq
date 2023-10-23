@@ -19,44 +19,36 @@ package com.automq.rocketmq.store.model.operation;
 
 import com.automq.rocketmq.store.api.MessageStateMachine;
 
-public abstract class Operation {
-    protected long topicId;
-    protected int queueId;
-    protected long operationStreamId;
-    protected long snapshotStreamId;
-    protected MessageStateMachine stateMachine;
-    protected long operationTimestamp;
+public class ResetConsumeOffsetOperation extends Operation {
 
-    public abstract OperationType operationType();
+    private final long consumerGroupId;
+    private final long offset;
 
-    public enum OperationType {
-        POP,
-        ACK,
-        CHANGE_INVISIBLE_DURATION,
-        RESET_CONSUME_OFFSET
+
+    public ResetConsumeOffsetOperation(long topicId, int queueId, long operationStreamId, long snapshotStreamId,
+        MessageStateMachine stateMachine, long operationTimestamp,
+        long consumerGroupId, long offset) {
+        this.topicId = topicId;
+        this.queueId = queueId;
+        this.operationStreamId = operationStreamId;
+        this.snapshotStreamId = snapshotStreamId;
+        this.stateMachine = stateMachine;
+        this.operationTimestamp = operationTimestamp;
+        this.consumerGroupId = consumerGroupId;
+        this.offset = offset;
     }
 
-    public long topicId() {
-        return topicId;
+    @Override
+    public OperationType operationType() {
+        return OperationType.RESET_CONSUME_OFFSET;
     }
 
-    public int queueId() {
-        return queueId;
+    public long consumerGroupId() {
+        return consumerGroupId;
     }
 
-    public long operationStreamId() {
-        return operationStreamId;
+    public long offset() {
+        return offset;
     }
 
-    public long snapshotStreamId() {
-        return snapshotStreamId;
-    }
-
-    public MessageStateMachine stateMachine() {
-        return stateMachine;
-    }
-
-    public long operationTimestamp() {
-        return operationTimestamp;
-    }
 }

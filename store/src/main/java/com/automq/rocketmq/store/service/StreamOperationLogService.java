@@ -26,6 +26,7 @@ import com.automq.rocketmq.store.model.operation.AckOperation;
 import com.automq.rocketmq.store.model.operation.ChangeInvisibleDurationOperation;
 import com.automq.rocketmq.store.model.operation.Operation;
 import com.automq.rocketmq.store.model.operation.PopOperation;
+import com.automq.rocketmq.store.model.operation.ResetConsumeOffsetOperation;
 import com.automq.rocketmq.store.model.stream.SingleRecord;
 import com.automq.rocketmq.store.service.api.OperationLogService;
 import com.automq.rocketmq.store.util.SerializeUtil;
@@ -87,7 +88,7 @@ public class StreamOperationLogService implements OperationLogService {
                         // TODO: operation may be null
                         replay(batchWithContext.baseOffset(), operation);
                     } catch (StoreException e) {
-                        LOGGER.error("Topic {}, queue: {}: Replay operation:{} failed when recover", stateMachine.topicId(), stateMachine.queueId(), operation, e);
+                        LOGGER.error("Topic {}, queue: {}: Replay operation: {} failed when recover", stateMachine.topicId(), stateMachine.queueId(), operation, e);
                         if (e.code() != StoreErrorCode.ILLEGAL_ARGUMENT) {
                             throw new CompletionException(e);
                         }
@@ -104,7 +105,7 @@ public class StreamOperationLogService implements OperationLogService {
                 try {
                     return doReplay(result, operation);
                 } catch (StoreException e) {
-                    LOGGER.error("Topic {}, queue: {}: Replay pop operation failed", operation.topicId(), operation.queueId(), e);
+                    LOGGER.error("Topic {}, queue: {}: Replay pop operation: {} failed", operation.topicId(), operation.queueId(), operation, e);
                     throw new CompletionException(e);
                 }
             });
@@ -118,7 +119,7 @@ public class StreamOperationLogService implements OperationLogService {
                 try {
                     return doReplay(result, operation);
                 } catch (StoreException e) {
-                    LOGGER.error("Topic {}, queue: {}: Replay ack operation failed", operation.topicId(), operation.queueId(), e);
+                    LOGGER.error("Topic {}, queue: {}: Replay ack operation: {} failed", operation.topicId(), operation.queueId(), operation, e);
                     throw new CompletionException(e);
                 }
             });
@@ -133,7 +134,21 @@ public class StreamOperationLogService implements OperationLogService {
                 try {
                     return doReplay(result, operation);
                 } catch (StoreException e) {
-                    LOGGER.error("Topic {}, queue: {}: Replay change invisible duration operation failed", operation.topicId(), operation.queueId(), e);
+                    LOGGER.error("Topic {}, queue: {}: Replay change invisible duration operation: {} failed", operation.topicId(), operation.queueId(), operation, e);
+                    throw new CompletionException(e);
+                }
+            });
+    }
+
+    @Override
+    public CompletableFuture<LogResult> logResetConsumeOffsetOperation(ResetConsumeOffsetOperation operation) {
+        return streamStore.append(operation.operationStreamId(),
+                new SingleRecord(ByteBuffer.wrap(SerializeUtil.encodeResetConsumeOffsetOperation(operation))))
+            .thenApply(result -> {
+                try {
+                    return doReplay(result, operation);
+                } catch (StoreException e) {
+                    LOGGER.error("Topic {}, queue: {}: Replay reset consume offset operation: {} failed", operation.topicId(), operation.queueId(), operation, e);
                     throw new CompletionException(e);
                 }
             });
@@ -183,6 +198,8 @@ public class StreamOperationLogService implements OperationLogService {
             case ACK -> operation.stateMachine().replayAckOperation(operationOffset, (AckOperation) operation);
             case CHANGE_INVISIBLE_DURATION ->
                 operation.stateMachine().replayChangeInvisibleDurationOperation(operationOffset, (ChangeInvisibleDurationOperation) operation);
+            case RESET_CONSUME_OFFSET ->
+                operation.stateMachine().replayResetConsumeOffsetOperation(operationOffset, (ResetConsumeOffsetOperation) operation);
             default -> throw new IllegalStateException("Unexpected value: " + operation.operationType());
         }
         return logResult;

@@ -21,6 +21,7 @@ import com.automq.rocketmq.store.api.MessageStateMachine;
 import com.automq.rocketmq.store.model.operation.AckOperation;
 import com.automq.rocketmq.store.model.operation.ChangeInvisibleDurationOperation;
 import com.automq.rocketmq.store.model.operation.PopOperation;
+import com.automq.rocketmq.store.model.operation.ResetConsumeOffsetOperation;
 import java.util.concurrent.CompletableFuture;
 
 public interface OperationLogService {
@@ -41,6 +42,12 @@ public interface OperationLogService {
      * Each queue has its own operation log.
      */
     CompletableFuture<LogResult> logChangeInvisibleDurationOperation(ChangeInvisibleDurationOperation operation);
+
+    /**
+     * Log reset consume offset operation to WAL.
+     * Each queue has its own operation log.
+     */
+    CompletableFuture<LogResult> logResetConsumeOffsetOperation(ResetConsumeOffsetOperation operation);
 
     /**
      * Recover.

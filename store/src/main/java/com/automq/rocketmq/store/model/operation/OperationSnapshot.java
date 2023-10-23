@@ -91,8 +91,9 @@ public class OperationSnapshot {
         public ConsumerGroupMetadataSnapshot(long consumerGroupId, long consumeOffset, long ackOffset,
             long retryConsumeOffset, long retryAckOffset,
             byte[] ackOffsetBitmapBuffer, byte[] retryAckOffsetBitmapBuffer,
-            ConcurrentSkipListMap<Long, Integer> consumeTimes) {
-            super(consumerGroupId, consumeOffset, ackOffset, retryConsumeOffset, retryAckOffset, consumeTimes);
+            ConcurrentSkipListMap<Long, Integer> consumeTimes,
+            long version) {
+            super(consumerGroupId, consumeOffset, ackOffset, retryConsumeOffset, retryAckOffset, consumeTimes, version);
             this.ackOffsetBitmapBuffer = ackOffsetBitmapBuffer;
             this.retryAckOffsetBitmapBuffer = retryAckOffsetBitmapBuffer;
         }

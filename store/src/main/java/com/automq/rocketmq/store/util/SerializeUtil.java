@@ -26,6 +26,7 @@ import com.automq.rocketmq.store.model.operation.ChangeInvisibleDurationOperatio
 import com.automq.rocketmq.store.model.operation.Operation;
 import com.automq.rocketmq.store.model.operation.OperationSnapshot;
 import com.automq.rocketmq.store.model.operation.PopOperation;
+import com.automq.rocketmq.store.model.operation.ResetConsumeOffsetOperation;
 import com.google.flatbuffers.FlatBufferBuilder;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -36,18 +37,28 @@ import java.util.concurrent.ConcurrentSkipListMap;
 public class SerializeUtil {
 
     // <topicId><queueId>
-    public static byte[] buildCheckPointPrefix(long topicId, int queueId) {
+    public static byte[] buildCheckPointQueuePrefix(long topicId, int queueId) {
         ByteBuffer buffer = ByteBuffer.allocate(12);
         buffer.putLong(topicId);
         buffer.putInt(queueId);
         return buffer.array();
     }
 
-    // <topicId><queueId><operationId>
-    public static byte[] buildCheckPointKey(long topicId, int queueId, long operationId) {
+    // <topicId><queueId><consumerGroupId>
+    public static byte[] buildCheckPointGroupPrefix(long topicId, int queueId, long consumerGroupId) {
         ByteBuffer buffer = ByteBuffer.allocate(20);
         buffer.putLong(topicId);
         buffer.putInt(queueId);
+        buffer.putLong(consumerGroupId);
+        return buffer.array();
+    }
+
+    // <topicId><queueId><consumerGroupId><operationId>
+    public static byte[] buildCheckPointKey(long topicId, int queueId, long consumerGroupId, long operationId) {
+        ByteBuffer buffer = ByteBuffer.allocate(28);
+        buffer.putLong(topicId);
+        buffer.putInt(queueId);
+        buffer.putLong(consumerGroupId);
         buffer.putLong(operationId);
         return buffer.array();
     }
@@ -172,7 +183,8 @@ public class SerializeUtil {
                 consumerGroupMetadata.getConsumerGroupId(), consumerGroupMetadata.getConsumeOffset(), consumerGroupMetadata.getAckOffset(),
                 ackOffsetBitmapOffset,
                 consumerGroupMetadata.getRetryConsumeOffset(), consumerGroupMetadata.getRetryAckOffset(),
-                retryAckOffsetBitmapOffset, consumeTimesVectorOffset);
+                retryAckOffsetBitmapOffset, consumeTimesVectorOffset,
+                consumerGroupMetadata.getVersion());
             consumerGroupMetadataOffsets[i] = consumerGroupMetadataOffset;
         }
         int consumerGroupMetadataVectorOffset = com.automq.rocketmq.store.model.generated.OperationSnapshot.createConsumerGroupMetadatasVector(builder, consumerGroupMetadataOffsets);
@@ -205,7 +217,8 @@ public class SerializeUtil {
             consumerGroupMetadata.retryAckBitMapAsByteBuffer().get(retryAckBitMap);
             consumerGroupMetadataList.add(new OperationSnapshot.ConsumerGroupMetadataSnapshot(consumerGroupMetadata.consumerGroupId(),
                 consumerGroupMetadata.consumeOffset(), consumerGroupMetadata.ackOffset(), consumerGroupMetadata.retryConsumeOffset(), consumerGroupMetadata.retryAckOffset(),
-                ackBitMap, retryAckBitMap, consumeTimes));
+                ackBitMap, retryAckBitMap, consumeTimes,
+                consumerGroupMetadata.version()));
         }
         List<CheckPoint> checkPointList = new ArrayList<>(snapshot.checkPointsLength());
         for (int i = 0; i < snapshot.checkPointsLength(); i++) {
@@ -233,6 +246,14 @@ public class SerializeUtil {
         int receiptHandleId = ReceiptHandle.createReceiptHandle(builder, durationOperation.consumerGroupId(), durationOperation.topicId(), durationOperation.queueId(), durationOperation.operationId());
         int operation = com.automq.rocketmq.store.model.generated.ChangeInvisibleDurationOperation.createChangeInvisibleDurationOperation(builder, receiptHandleId, durationOperation.invisibleDuration(), durationOperation.operationTimestamp());
         int root = OperationLogItem.createOperationLogItem(builder, com.automq.rocketmq.store.model.generated.Operation.ChangeInvisibleDurationOperation, operation);
+        builder.finish(root);
+        return builder.sizedByteArray();
+    }
+
+    public static byte[] encodeResetConsumeOffsetOperation(ResetConsumeOffsetOperation resetConsumeOffsetOperation) {
+        FlatBufferBuilder builder = new FlatBufferBuilder();
+        int operation = com.automq.rocketmq.store.model.generated.ResetConsumeOffsetOperation.createResetConsumeOffsetOperation(builder, resetConsumeOffsetOperation.consumerGroupId(), resetConsumeOffsetOperation.topicId(), resetConsumeOffsetOperation.queueId(), resetConsumeOffsetOperation.offset(), resetConsumeOffsetOperation.operationTimestamp());
+        int root = OperationLogItem.createOperationLogItem(builder, com.automq.rocketmq.store.model.generated.Operation.ResetConsumeOffsetOperation, operation);
         builder.finish(root);
         return builder.sizedByteArray();
     }

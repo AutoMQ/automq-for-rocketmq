@@ -27,20 +27,24 @@ public class ConsumerGroupMetadata {
     private long retryConsumeOffset;
     private long retryAckOffset;
     private final ConcurrentSkipListMap<Long/*offset*/, Integer/*times*/> consumeTimes;
+    private final long version;
 
     public ConsumerGroupMetadata(long consumerGroupId) {
         this.consumerGroupId = consumerGroupId;
         this.consumeTimes = new ConcurrentSkipListMap<>();
+        this.version = 0;
     }
 
     public ConsumerGroupMetadata(long consumerGroupId, long consumeOffset, long ackOffset, long retryConsumeOffset,
-        long retryAckOffset, ConcurrentSkipListMap<Long, Integer> consumeTimes) {
+        long retryAckOffset, ConcurrentSkipListMap<Long, Integer> consumeTimes,
+        long version) {
         this.consumerGroupId = consumerGroupId;
         this.consumeOffset = consumeOffset;
         this.ackOffset = ackOffset;
         this.retryConsumeOffset = retryConsumeOffset;
         this.retryAckOffset = retryAckOffset;
         this.consumeTimes = consumeTimes;
+        this.version = version;
     }
 
     public long getConsumeOffset() {
@@ -85,6 +89,10 @@ public class ConsumerGroupMetadata {
         return consumeTimes;
     }
 
+    public long getVersion() {
+        return version;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o)
@@ -92,11 +100,11 @@ public class ConsumerGroupMetadata {
         if (o == null || getClass() != o.getClass())
             return false;
         ConsumerGroupMetadata metadata = (ConsumerGroupMetadata) o;
-        return consumerGroupId == metadata.consumerGroupId && consumeOffset == metadata.consumeOffset && ackOffset == metadata.ackOffset && retryConsumeOffset == metadata.retryConsumeOffset && retryAckOffset == metadata.retryAckOffset && Objects.equals(consumeTimes, metadata.consumeTimes);
+        return consumerGroupId == metadata.consumerGroupId && consumeOffset == metadata.consumeOffset && ackOffset == metadata.ackOffset && retryConsumeOffset == metadata.retryConsumeOffset && retryAckOffset == metadata.retryAckOffset && version == metadata.version && Objects.equals(consumeTimes, metadata.consumeTimes);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(consumerGroupId, consumeOffset, ackOffset, retryConsumeOffset, retryAckOffset, consumeTimes);
+        return Objects.hash(consumerGroupId, consumeOffset, ackOffset, retryConsumeOffset, retryAckOffset, consumeTimes, version);
     }
 }

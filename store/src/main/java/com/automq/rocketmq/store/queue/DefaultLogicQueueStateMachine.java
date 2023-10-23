@@ -30,6 +30,7 @@ import com.automq.rocketmq.store.model.operation.AckOperation;
 import com.automq.rocketmq.store.model.operation.ChangeInvisibleDurationOperation;
 import com.automq.rocketmq.store.model.operation.OperationSnapshot;
 import com.automq.rocketmq.store.model.operation.PopOperation;
+import com.automq.rocketmq.store.model.operation.ResetConsumeOffsetOperation;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.util.SerializeUtil;
 import com.automq.stream.utils.FutureUtil;
@@ -41,6 +42,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -119,8 +121,8 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
         long nextVisibleTimestamp = operation.operationTimestamp() + operation.invisibleDuration();
         int count = operation.count();
 
-        LOGGER.trace("Replay pop operation: topicId={}, queueId={}, offset={}, consumerGroupId={}, operationId={}, operationTimestamp={}, nextVisibleTimestamp={}",
-            topicId, queueId, offset, consumerGroupId, operationId, operationTimestamp, nextVisibleTimestamp);
+        LOGGER.trace("Replay pop normal operation: topicId={}, queueId={}, offset={}, consumerGroupId={}, operationId={}, operationTimestamp={}, nextVisibleTimestamp={} at offset: {}",
+            topicId, queueId, offset, consumerGroupId, operationId, operationTimestamp, nextVisibleTimestamp, operationOffset);
 
         // update consume offset, data or retry stream
         ConsumerGroupMetadata metadata = this.consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId));
@@ -140,7 +142,7 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
         List<BatchRequest> requestList = new ArrayList<>();
         // write a ck for this offset
         BatchWriteRequest writeCheckPointRequest = new BatchWriteRequest(KV_NAMESPACE_CHECK_POINT,
-            buildCheckPointKey(topicId, queueId, operationId),
+            buildCheckPointKey(topicId, queueId, consumerGroupId, operationId),
             buildCheckPointValue(topicId, queueId, offset,
                 count,
                 consumerGroupId, operationId, operation.popOperationType(), operationTimestamp, nextVisibleTimestamp));
@@ -170,8 +172,8 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
         long nextVisibleTimestamp = operation.operationTimestamp() + operation.invisibleDuration();
         int count = operation.count();
 
-        LOGGER.trace("Replay pop retry operation: topicId={}, queueId={}, offset={}, consumerGroupId={}, operationId={}, operationTimestamp={}, nextVisibleTimestamp={}",
-            topicId, queueId, offset, consumerGroupId, operationId, operationTimestamp, nextVisibleTimestamp);
+        LOGGER.trace("Replay pop retry operation: topicId={}, queueId={}, offset={}, consumerGroupId={}, operationId={}, operationTimestamp={}, nextVisibleTimestamp={} at offset: {}",
+            topicId, queueId, offset, consumerGroupId, operationId, operationTimestamp, nextVisibleTimestamp, operationOffset);
 
         // update consume offset, data or retry stream
         ConsumerGroupMetadata metadata = this.consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId));
@@ -191,7 +193,7 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
         List<BatchRequest> requestList = new ArrayList<>();
         // write a ck for this offset
         BatchWriteRequest writeCheckPointRequest = new BatchWriteRequest(KV_NAMESPACE_CHECK_POINT,
-            buildCheckPointKey(topicId, queueId, operationId),
+            buildCheckPointKey(topicId, queueId, consumerGroupId, operationId),
             buildCheckPointValue(topicId, queueId, offset,
                 count,
                 consumerGroupId, operationId, operation.popOperationType(), operationTimestamp, nextVisibleTimestamp));
@@ -218,8 +220,8 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
 
         int count = operation.count();
 
-        LOGGER.trace("Replay pop fifo operation: topicId={}, queueId={}, offset={}, consumerGroupId={}, operationId={}, operationTimestamp={}, nextVisibleTimestamp={}",
-            topicId, queueId, offset, consumerGroupId, operationId, operationTimestamp, nextVisibleTimestamp);
+        LOGGER.trace("Replay pop fifo operation: topicId={}, queueId={}, offset={}, consumerGroupId={}, operationId={}, operationTimestamp={}, nextVisibleTimestamp={} at offset: {}",
+            topicId, queueId, offset, consumerGroupId, operationId, operationTimestamp, nextVisibleTimestamp, operationOffset);
 
         // update consume offset
         ConsumerGroupMetadata metadata = this.consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId));
@@ -239,7 +241,7 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
         List<BatchRequest> requestList = new ArrayList<>();
         // write a ck for this offset
         BatchWriteRequest writeCheckPointRequest = new BatchWriteRequest(KV_NAMESPACE_CHECK_POINT,
-            buildCheckPointKey(topicId, queueId, operationId),
+            buildCheckPointKey(topicId, queueId, consumerGroupId, operationId),
             buildCheckPointValue(topicId, queueId, offset,
                 count,
                 consumerGroupId, operationId, operation.popOperationType(), operationTimestamp, nextVisibleTimestamp));
@@ -290,32 +292,30 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
         long topicId = operation.topicId();
         int queueId = operation.queueId();
         long operationId = operation.operationId();
+        long consumerGroupId = operation.consumerGroupId();
         AckOperation.AckOperationType type = operation.ackOperationType();
 
-        LOGGER.trace("Replay ack operation: topicId={}, queueId={}, operationId={}, type={}",
-            topicId, queueId, operationId, type);
+        LOGGER.trace("Replay ack operation: topicId={}, queueId={}, operationId={}, type={} at offset: {}",
+            topicId, queueId, operationId, type, operationOffset);
 
         reentrantLock.lock();
         try {
             currentOperationOffset = operationOffset;
+            // check if this ack is stale
+            ConsumerGroupMetadata metadata = this.consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId));
+            if (metadata.getVersion() > operationId) {
+                LOGGER.info("{}: Ack operation is stale, ignore it. topicId={}, queueId={}, operationId={}, type={} at offset: {}",
+                    identity, topicId, queueId, operationId, type, operationOffset);
+                return;
+            }
             // check if ck exists
-            byte[] ckKey = buildCheckPointKey(topicId, queueId, operationId);
+            byte[] ckKey = buildCheckPointKey(topicId, queueId, consumerGroupId, operationId);
             byte[] ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, ckKey);
             if (ckValue == null) {
                 throw new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "Ack operation failed, check point not found");
             }
             CheckPoint ck = CheckPoint.getRootAsCheckPoint(ByteBuffer.wrap(ckValue));
-            List<BatchRequest> requestList = new ArrayList<>();
             int count = ck.count();
-
-            // delete ck, timer tag
-            BatchDeleteRequest deleteCheckPointRequest = new BatchDeleteRequest(KV_NAMESPACE_CHECK_POINT, ckKey);
-            requestList.add(deleteCheckPointRequest);
-
-            BatchDeleteRequest deleteTimerTagRequest = new BatchDeleteRequest(KV_NAMESPACE_TIMER_TAG,
-                buildTimerTagKey(ck.nextVisibleTimestamp(), topicId, queueId, operationId));
-            requestList.add(deleteTimerTagRequest);
-            long consumerGroupId = ck.consumerGroupId();
             long baseOffset = ck.messageOffset() - count + 1;
             for (int i = 0; i < count; i++) {
                 long currOffset = baseOffset + i;
@@ -326,15 +326,8 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
                 if (ck.popOperationType() == PopOperation.PopOperationType.POP_RETRY.ordinal()) {
                     this.getRetryAckCommitter(consumerGroupId).commitAck(currOffset);
                 }
-                // delete order index
-                if (ck.popOperationType() == PopOperation.PopOperationType.POP_ORDER.ordinal()) {
-                    BatchDeleteRequest deleteOrderIndexRequest = new BatchDeleteRequest(KV_NAMESPACE_FIFO_INDEX,
-                        buildOrderIndexKey(ck.consumerGroupId(), topicId, queueId, currOffset));
-                    requestList.add(deleteOrderIndexRequest);
-                }
             }
-
-            kvService.batch(requestList.toArray(new BatchRequest[0]));
+            deleteCheckPointAndRelatedStates(ck);
         } finally {
             reentrantLock.unlock();
         }
@@ -348,16 +341,17 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
         long topic = operation.topicId();
         int queue = operation.queueId();
         long operationId = operation.operationId();
+        long consumerGroupId = operation.consumerGroupId();
         long nextInvisibleTimestamp = operationTimestamp + invisibleDuration;
 
-        LOGGER.trace("Replay change invisible duration operation: topicId={}, queueId={}, operationId={}, invisibleDuration={}, operationTimestamp={}, nextInvisibleTimestamp={}",
-            topic, queue, operationId, invisibleDuration, operationTimestamp, nextInvisibleTimestamp);
+        LOGGER.trace("Replay change invisible duration operation: topicId={}, queueId={}, operationId={}, invisibleDuration={}, operationTimestamp={}, nextInvisibleTimestamp={} at offset: {}",
+            topic, queue, operationId, invisibleDuration, operationTimestamp, nextInvisibleTimestamp, operationOffset);
 
         reentrantLock.lock();
         try {
             currentOperationOffset = operationOffset;
             // Check if check point exists.
-            byte[] checkPointKey = buildCheckPointKey(topic, queue, operationId);
+            byte[] checkPointKey = buildCheckPointKey(topic, queue, consumerGroupId, operationId);
             byte[] buffer = kvService.get(KV_NAMESPACE_CHECK_POINT, checkPointKey);
             if (buffer == null) {
                 throw new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "Change invisible duration operation failed, check point not found");
@@ -369,7 +363,7 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
 
             // Write new check point and timer tag.
             BatchWriteRequest writeCheckPointRequest = new BatchWriteRequest(KV_NAMESPACE_CHECK_POINT,
-                buildCheckPointKey(checkPoint.topicId(), checkPoint.queueId(), checkPoint.operationId()),
+                buildCheckPointKey(checkPoint.topicId(), checkPoint.queueId(), checkPoint.consumerGroupId(), checkPoint.operationId()),
                 buildCheckPointValue(checkPoint.topicId(), checkPoint.queueId(), checkPoint.messageOffset(), checkPoint.count(),
                     checkPoint.consumerGroupId(), checkPoint.operationId(), PopOperation.PopOperationType.valueOf(checkPoint.popOperationType()),
                     checkPoint.deliveryTimestamp(), nextInvisibleTimestamp));
@@ -389,6 +383,122 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
     }
 
     @Override
+    public void replayResetConsumeOffsetOperation(long operationOffset, ResetConsumeOffsetOperation operation) {
+        long consumerGroupId = operation.consumerGroupId();
+        long newConsumeOffset = operation.offset();
+        long topicId = operation.topicId();
+        int queuedId = operation.queueId();
+        long operationTimestamp = operation.operationTimestamp();
+
+        LOGGER.trace("Replay reset consume offset operation: topicId={}, queueId={}, consumerGroupId={}, newConsumeOffset={}, operationTimestamp={} at offset: {}",
+            topicId, queuedId, consumerGroupId, newConsumeOffset, operationTimestamp, operationOffset);
+        reentrantLock.lock();
+        try {
+            currentOperationOffset = operationOffset;
+            // Create a new consumer group with a new version.
+            ConsumerGroupMetadata metadata = this.consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId));
+            ConsumerGroupMetadata newMetadata = new ConsumerGroupMetadata(
+                metadata.getConsumerGroupId(), newConsumeOffset, newConsumeOffset, metadata.getRetryConsumeOffset(), metadata.getRetryAckOffset(),
+                new ConcurrentSkipListMap<>(), operationOffset);
+            this.consumerGroupMetadataMap.put(consumerGroupId, newMetadata);
+
+            // Delete all check points and related states about this consumer group
+            List<CheckPoint> checkPoints = new ArrayList<>();
+            byte[] prefix = SerializeUtil.buildCheckPointGroupPrefix(topicId, queueId, consumerGroupId);
+            kvService.iterate(KV_NAMESPACE_CHECK_POINT, prefix, null, null, (key, value) -> {
+                CheckPoint checkPoint = SerializeUtil.decodeCheckPoint(ByteBuffer.wrap(value));
+                checkPoints.add(checkPoint);
+            });
+            deleteCheckPointsAndRelatedStates(checkPoints);
+        } catch (StoreException e) {
+            LOGGER.error("{}: Replay reset consume offset operation failed", identity, e);
+            CompletableFuture.failedFuture(e);
+        } finally {
+            reentrantLock.unlock();
+        }
+
+    }
+
+    private void deleteCheckPointsAndRelatedStates(List<CheckPoint> checkPointList) throws StoreException {
+        List<BatchRequest> batchRequests = checkPointList.stream().map(this::deleteCheckPointAndRelatedStatesReqs).flatMap(List::stream).collect(Collectors.toList());
+        if (!batchRequests.isEmpty()) {
+            kvService.batch(batchRequests.toArray(new BatchRequest[0]));
+        }
+    }
+
+    private void deleteCheckPointAndRelatedStates(CheckPoint checkPoint) throws StoreException {
+        List<BatchRequest> batchRequests = deleteCheckPointAndRelatedStatesReqs(checkPoint);
+        if (!batchRequests.isEmpty()) {
+            kvService.batch(batchRequests.toArray(new BatchRequest[0]));
+        }
+    }
+
+    private List<BatchRequest> deleteCheckPointAndRelatedStatesReqs(CheckPoint checkPoint) {
+        List<BatchRequest> requestList = new ArrayList<>();
+
+        BatchDeleteRequest deleteCheckPointRequest = new BatchDeleteRequest(KV_NAMESPACE_CHECK_POINT,
+            buildCheckPointKey(checkPoint.topicId(), checkPoint.queueId(), checkPoint.consumerGroupId(), checkPoint.operationId()));
+        requestList.add(deleteCheckPointRequest);
+
+        BatchDeleteRequest deleteTimerTagRequest = new BatchDeleteRequest(KV_NAMESPACE_TIMER_TAG,
+            buildTimerTagKey(checkPoint.nextVisibleTimestamp(), checkPoint.topicId(), checkPoint.queueId(), checkPoint.operationId()));
+        requestList.add(deleteTimerTagRequest);
+
+        if (checkPoint.popOperationType() == PopOperation.PopOperationType.POP_ORDER.value()) {
+            long baseOffset = checkPoint.messageOffset() - checkPoint.count() + 1;
+            for (int i = 0; i < checkPoint.count(); i++) {
+                long currOffset = baseOffset + i;
+                BatchDeleteRequest deleteOrderIndexRequest = new BatchDeleteRequest(KV_NAMESPACE_FIFO_INDEX,
+                    buildOrderIndexKey(checkPoint.consumerGroupId(), checkPoint.topicId(), checkPoint.queueId(), currOffset));
+                requestList.add(deleteOrderIndexRequest);
+            }
+        }
+        return requestList;
+    }
+
+    private void writeCheckPointsAndRelatedStates(List<CheckPoint> checkPointList) throws StoreException {
+        List<BatchRequest> batchRequests = checkPointList.stream().map(this::writeCheckPointAndRelatedStatesReqs).flatMap(List::stream).collect(Collectors.toList());
+        if (!batchRequests.isEmpty()) {
+            kvService.batch(batchRequests.toArray(new BatchRequest[0]));
+        }
+    }
+
+    private void writeCheckPointAndRelatedStates(CheckPoint checkPoint) throws StoreException {
+        List<BatchRequest> batchRequests = writeCheckPointAndRelatedStatesReqs(checkPoint);
+        if (!batchRequests.isEmpty()) {
+            kvService.batch(batchRequests.toArray(new BatchRequest[0]));
+        }
+    }
+
+    private List<BatchRequest> writeCheckPointAndRelatedStatesReqs(CheckPoint checkPoint) {
+        List<BatchRequest> requestList = new ArrayList<>();
+        // write ck
+        BatchWriteRequest writeCheckPointRequest = new BatchWriteRequest(KV_NAMESPACE_CHECK_POINT,
+            buildCheckPointKey(checkPoint.topicId(), checkPoint.queueId(), checkPoint.consumerGroupId(), checkPoint.operationId()),
+            buildCheckPointValue(checkPoint.topicId(), checkPoint.queueId(), checkPoint.messageOffset(), checkPoint.count(),
+                checkPoint.consumerGroupId(), checkPoint.operationId(), PopOperation.PopOperationType.valueOf(checkPoint.popOperationType()),
+                checkPoint.deliveryTimestamp(), checkPoint.nextVisibleTimestamp()));
+        requestList.add(writeCheckPointRequest);
+        // write timer tag
+        BatchWriteRequest writeTimerTagRequest = new BatchWriteRequest(KV_NAMESPACE_TIMER_TAG,
+            buildTimerTagKey(checkPoint.nextVisibleTimestamp(), checkPoint.topicId(), checkPoint.queueId(), checkPoint.operationId()),
+            buildReceiptHandle(checkPoint.consumerGroupId(), checkPoint.topicId(), checkPoint.queueId(), checkPoint.operationId()));
+        requestList.add(writeTimerTagRequest);
+        // write order index
+        if (checkPoint.popOperationType() == PopOperation.PopOperationType.POP_ORDER.ordinal()) {
+            long baseOffset = checkPoint.messageOffset() - checkPoint.count() + 1;
+            for (int i = 0; i < checkPoint.count(); i++) {
+                long currOffset = baseOffset + i;
+                BatchWriteRequest writeOrderIndexRequest = new BatchWriteRequest(KV_NAMESPACE_FIFO_INDEX,
+                    buildOrderIndexKey(checkPoint.consumerGroupId(), checkPoint.topicId(), checkPoint.queueId(), currOffset), buildOrderIndexValue(checkPoint.operationId()));
+                requestList.add(writeOrderIndexRequest);
+            }
+        }
+        return requestList;
+    }
+
+
+    @Override
     public OperationSnapshot takeSnapshot() throws StoreException {
         exclusiveLock.lock();
         try {
@@ -398,7 +508,7 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
                         metadata.getRetryConsumeOffset(), metadata.getRetryAckOffset(),
                         getAckCommitter(metadata.getConsumerGroupId()).getAckBitmapBuffer().array(),
                         getRetryAckCommitter(metadata.getConsumerGroupId()).getAckBitmapBuffer().array(),
-                        metadata.getConsumeTimes());
+                        metadata.getConsumeTimes(), metadata.getVersion());
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
@@ -418,7 +528,8 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
             this.consumerGroupMetadataMap = snapshot.getConsumerGroupMetadataList().stream().collect(Collectors.toMap(
                 ConsumerGroupMetadata::getConsumerGroupId, metadataSnapshot ->
                     new ConsumerGroupMetadata(metadataSnapshot.getConsumerGroupId(), metadataSnapshot.getConsumeOffset(), metadataSnapshot.getAckOffset(),
-                        metadataSnapshot.getRetryConsumeOffset(), metadataSnapshot.getRetryAckOffset(), metadataSnapshot.getConsumeTimes())));
+                        metadataSnapshot.getRetryConsumeOffset(), metadataSnapshot.getRetryAckOffset(), metadataSnapshot.getConsumeTimes(),
+                        metadataSnapshot.getVersion())));
             snapshot.getConsumerGroupMetadataList().forEach(metadataSnapshot -> {
                 RoaringBitmap bitmap = new RoaringBitmap(new ImmutableRoaringBitmap(ByteBuffer.wrap(metadataSnapshot.getAckOffsetBitmapBuffer())));
                 getAckCommitter(metadataSnapshot.getConsumerGroupId(), bitmap);
@@ -427,39 +538,7 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
             });
             this.currentOperationOffset = snapshot.getSnapshotEndOffset();
             // recover states in kv service
-            snapshot.getCheckPoints().forEach(checkPoint -> {
-                try {
-                    List<BatchRequest> requestList = new ArrayList<>();
-                    // write ck
-                    BatchWriteRequest writeCheckPointRequest = new BatchWriteRequest(KV_NAMESPACE_CHECK_POINT,
-                        buildCheckPointKey(checkPoint.topicId(), checkPoint.queueId(), checkPoint.operationId()),
-                        buildCheckPointValue(checkPoint.topicId(), checkPoint.queueId(), checkPoint.messageOffset(), checkPoint.count(),
-                            checkPoint.consumerGroupId(), checkPoint.operationId(), PopOperation.PopOperationType.valueOf(checkPoint.popOperationType()),
-                            checkPoint.deliveryTimestamp(), checkPoint.nextVisibleTimestamp()));
-                    requestList.add(writeCheckPointRequest);
-                    // write timer tag
-                    BatchWriteRequest writeTimerTagRequest = new BatchWriteRequest(KV_NAMESPACE_TIMER_TAG,
-                        buildTimerTagKey(checkPoint.nextVisibleTimestamp(), checkPoint.topicId(), checkPoint.queueId(), checkPoint.operationId()),
-                        buildReceiptHandle(checkPoint.consumerGroupId(), checkPoint.topicId(), checkPoint.queueId(), checkPoint.operationId()));
-                    requestList.add(writeTimerTagRequest);
-                    // write order index
-                    if (checkPoint.popOperationType() == PopOperation.PopOperationType.POP_ORDER.ordinal()) {
-                        long baseOffset = checkPoint.messageOffset() - checkPoint.count() + 1;
-                        for (int i = 0; i < checkPoint.count(); i++) {
-                            long currOffset = baseOffset + i;
-                            BatchWriteRequest writeOrderIndexRequest = new BatchWriteRequest(KV_NAMESPACE_FIFO_INDEX,
-                                buildOrderIndexKey(checkPoint.consumerGroupId(), checkPoint.topicId(), checkPoint.queueId(), currOffset), buildOrderIndexValue(checkPoint.operationId()));
-                            requestList.add(writeOrderIndexRequest);
-                        }
-                    }
-                    if (!requestList.isEmpty()) {
-                        kvService.batch(requestList.toArray(new BatchRequest[0]));
-                    }
-                } catch (StoreException e) {
-                    LOGGER.error("{}: Recover from snapshot: {} failed", identity, snapshot, e);
-                    throw new RuntimeException(e);
-                }
-            });
+            writeCheckPointsAndRelatedStates(snapshot.getCheckPoints());
         } catch (Exception e) {
             Throwable cause = FutureUtil.cause(e);
             LOGGER.error("{}: Load snapshot:{} failed", identity, snapshot, cause);
@@ -480,35 +559,12 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
             this.retryAckCommitterMap.clear();
             this.currentOperationOffset = -1;
             List<CheckPoint> checkPointList = new ArrayList<>();
-            byte[] tqPrefix = SerializeUtil.buildCheckPointPrefix(topicId, queueId);
+            byte[] tqPrefix = SerializeUtil.buildCheckPointQueuePrefix(topicId, queueId);
             kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, tqPrefix, null, null, (key, value) -> {
                 CheckPoint checkPoint = SerializeUtil.decodeCheckPoint(ByteBuffer.wrap(value));
                 checkPointList.add(checkPoint);
             });
-            // clear ck, timer tag, order index
-            List<BatchRequest> requestList = new ArrayList<>();
-            checkPointList.forEach(checkPoint -> {
-                BatchDeleteRequest deleteCheckPointRequest = new BatchDeleteRequest(KV_NAMESPACE_CHECK_POINT,
-                    buildCheckPointKey(checkPoint.topicId(), checkPoint.queueId(), checkPoint.operationId()));
-                requestList.add(deleteCheckPointRequest);
-
-                BatchDeleteRequest deleteTimerTagRequest = new BatchDeleteRequest(KV_NAMESPACE_TIMER_TAG,
-                    buildTimerTagKey(checkPoint.nextVisibleTimestamp(), checkPoint.topicId(), checkPoint.queueId(), checkPoint.operationId()));
-                requestList.add(deleteTimerTagRequest);
-
-                if (checkPoint.popOperationType() == PopOperation.PopOperationType.POP_ORDER.ordinal()) {
-                    long baseOffset = checkPoint.messageOffset() - checkPoint.count() + 1;
-                    for (int i = 0; i < checkPoint.count(); i++) {
-                        long currOffset = baseOffset + i;
-                        BatchDeleteRequest deleteOrderIndexRequest = new BatchDeleteRequest(KV_NAMESPACE_FIFO_INDEX,
-                            buildOrderIndexKey(checkPoint.consumerGroupId(), checkPoint.topicId(), checkPoint.queueId(), currOffset));
-                        requestList.add(deleteOrderIndexRequest);
-                    }
-                }
-            });
-            if (!requestList.isEmpty()) {
-                kvService.batch(requestList.toArray(new BatchRequest[0]));
-            }
+            deleteCheckPointsAndRelatedStates(checkPointList);
         } finally {
             exclusiveLock.unlock();
         }

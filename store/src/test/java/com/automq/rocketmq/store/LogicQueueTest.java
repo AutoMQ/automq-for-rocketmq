@@ -289,7 +289,7 @@ public class LogicQueueTest {
 
         // 4. check ck
         ReceiptHandle handle0 = SerializeUtil.decodeReceiptHandle(receiptHandle0);
-        byte[] bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle0.operationId()));
+        byte[] bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle0.consumerGroupId(), handle0.operationId()));
         assertNull(bytes);
 
         // 5. pop 1 message
@@ -343,7 +343,7 @@ public class LogicQueueTest {
 
         // 4. check ck
         ReceiptHandle handle0 = SerializeUtil.decodeReceiptHandle(receiptHandle0);
-        byte[] bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle0.operationId()));
+        byte[] bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle0.consumerGroupId(), handle0.operationId()));
         assertNull(bytes);
 
         // 5. pop 1 message
@@ -396,7 +396,7 @@ public class LogicQueueTest {
 
         // 4. check ck
         ReceiptHandle handle1 = SerializeUtil.decodeReceiptHandle(receiptHandle1);
-        byte[] bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle1.operationId()));
+        byte[] bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle1.consumerGroupId(), handle1.operationId()));
         assertNull(bytes);
 
         // 5. pop 1 message
@@ -538,7 +538,7 @@ public class LogicQueueTest {
         assertFalse(popResult.messageList().isEmpty());
         assertEquals(1, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
         ReceiptHandle handle = SerializeUtil.decodeReceiptHandle(popResult.messageList().get(0).receiptHandle().get());
-        byte[] checkPointKey = SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.operationId());
+        byte[] checkPointKey = SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.consumerGroupId(), handle.operationId());
         byte[] bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, checkPointKey);
         assertNotNull(bytes);
 
@@ -725,7 +725,7 @@ public class LogicQueueTest {
     private void checkCkExist(String receiptHandle, boolean expectExist) {
         try {
             ReceiptHandle handle0 = SerializeUtil.decodeReceiptHandle(receiptHandle);
-            byte[] bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle0.operationId()));
+            byte[] bytes = kvService.get(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle0.consumerGroupId(), handle0.operationId()));
             if (expectExist) {
                 assertNotNull(bytes);
             } else {

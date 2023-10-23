@@ -25,7 +25,7 @@ table ReceiptHandle {
   operation_id:long;
 }
 
-union Operation { PopOperation, AckOperation, ChangeInvisibleDurationOperation }
+union Operation { PopOperation, AckOperation, ChangeInvisibleDurationOperation, ResetConsumeOffsetOperation }
 
 table OperationLogItem {
   operation:Operation;
@@ -60,6 +60,14 @@ table ChangeInvisibleDurationOperation {
   operation_timestamp:long;
 }
 
+table ResetConsumeOffsetOperation {
+  consumer_group_id:long;
+  topic_id:long;
+  queue_id:int;
+  offset:long;
+  operation_timestamp:long;
+}
+
 table OperationSnapshot {
   snapshot_end_offset:long;
   check_points:[CheckPoint];
@@ -75,6 +83,8 @@ table ConsumerGroupMetadata {
   retry_ack_offset:long;
   retry_ack_bit_map:[byte];
   consume_times:[ConsumeTimes];
+  // for identify the consumer group metadata version, usually it is the first operation id when the consumer group metadata is created or reset
+  version: long;
 }
 
 table ConsumeTimes {

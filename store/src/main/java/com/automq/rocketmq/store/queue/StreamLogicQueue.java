@@ -33,9 +33,11 @@ import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PopResult;
 import com.automq.rocketmq.store.model.message.PullResult;
 import com.automq.rocketmq.store.model.message.PutResult;
+import com.automq.rocketmq.store.model.message.ResetConsumeOffsetResult;
 import com.automq.rocketmq.store.model.operation.AckOperation;
 import com.automq.rocketmq.store.model.operation.ChangeInvisibleDurationOperation;
 import com.automq.rocketmq.store.model.operation.PopOperation;
+import com.automq.rocketmq.store.model.operation.ResetConsumeOffsetOperation;
 import com.automq.rocketmq.store.model.stream.SingleRecord;
 import com.automq.rocketmq.store.service.InflightService;
 import com.automq.rocketmq.store.service.api.OperationLogService;
@@ -456,9 +458,21 @@ public class StreamLogicQueue extends LogicQueue {
         ChangeInvisibleDurationOperation operation = new ChangeInvisibleDurationOperation(handle.topicId(),
             handle.queueId(), operationStreamId, snapshotStreamId, stateMachine, handle.consumerGroupId(),
             handle.operationId(), invisibleDuration, System.currentTimeMillis());
-        return operationLogService.logChangeInvisibleDurationOperation(operation).thenApply(nil ->
-                new ChangeInvisibleDurationResult(ChangeInvisibleDurationResult.Status.SUCCESS))
+        return operationLogService.logChangeInvisibleDurationOperation(operation)
+            .thenApply(nil -> new ChangeInvisibleDurationResult(ChangeInvisibleDurationResult.Status.SUCCESS))
             .exceptionally(throwable -> new ChangeInvisibleDurationResult(ChangeInvisibleDurationResult.Status.ERROR));
+    }
+
+    @Override
+    public CompletableFuture<ResetConsumeOffsetResult> resetConsumeOffset(long consumerGroupId, long offset) {
+        if (state.get() != State.OPENED) {
+            return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.QUEUE_NOT_OPENED, "Topic queue not opened"));
+        }
+        ResetConsumeOffsetOperation operation = new ResetConsumeOffsetOperation(topicId, queueId, operationStreamId,
+            snapshotStreamId, stateMachine, consumerGroupId, offset, System.currentTimeMillis());
+        return operationLogService.logResetConsumeOffsetOperation(operation)
+            .thenApply(logResult -> new ResetConsumeOffsetResult(ResetConsumeOffsetResult.Status.SUCCESS))
+            .exceptionally(throwable -> new ResetConsumeOffsetResult(ResetConsumeOffsetResult.Status.ERROR));
     }
 
     @Override

@@ -24,7 +24,6 @@ public class ChangeInvisibleDurationOperation extends Operation {
     private final long consumerGroupId;
     private final long operationId;
     private final long invisibleDuration;
-    private final long operationTimestamp;
 
     public ChangeInvisibleDurationOperation(long topicId, int queueId, long operationStreamId, long snapshotStreamId,
         MessageStateMachine messageStateMachine, long consumerGroupId, long operationId, long invisibleDuration,
@@ -50,10 +49,6 @@ public class ChangeInvisibleDurationOperation extends Operation {
 
     public long invisibleDuration() {
         return invisibleDuration;
-    }
-
-    public long operationTimestamp() {
-        return operationTimestamp;
     }
 
     @Override

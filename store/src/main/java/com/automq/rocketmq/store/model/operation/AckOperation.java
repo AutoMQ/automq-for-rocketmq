@@ -23,7 +23,6 @@ import java.util.Objects;
 public class AckOperation extends Operation {
     private final long consumerGroupId;
     private final long operationId;
-    private final long operationTimestamp;
     private final AckOperationType ackOperationType;
 
     public AckOperation(long topicId, int queueId, long operationStreamId, long snapshotStreamId,
@@ -48,10 +47,6 @@ public class AckOperation extends Operation {
     public enum AckOperationType {
         ACK_NORMAL,
         ACK_TIMEOUT
-    }
-
-    public long operationTimestamp() {
-        return operationTimestamp;
     }
 
     public long operationId() {

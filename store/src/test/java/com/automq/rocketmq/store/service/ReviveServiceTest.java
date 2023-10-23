@@ -122,11 +122,11 @@ class ReviveServiceTest {
         assertEquals(1, popResult.messageList().size());
         // check ck exist
         ReceiptHandle handle = SerializeUtil.decodeReceiptHandle(popResult.messageList().get(0).receiptHandle().get());
-        byte[] ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.operationId()));
+        byte[] ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.consumerGroupId(), handle.operationId()));
         assertNotNull(ckValue);
         // now revive but can't clear ck
         reviveService.tryRevive();
-        ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.operationId()));
+        ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.consumerGroupId(), handle.operationId()));
         assertNotNull(ckValue);
         // after 1s revive can clear ck
         long reviveTimestamp = System.currentTimeMillis() + invisibleDuration;
@@ -135,7 +135,7 @@ class ReviveServiceTest {
             return reviveService.reviveTimestamp() >= reviveTimestamp && reviveService.inflightReviveCount() == 0;
         });
 
-        ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.operationId()));
+        ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.consumerGroupId(), handle.operationId()));
         assertNull(ckValue);
 
         // check if this message has been appended to retry stream
@@ -190,11 +190,11 @@ class ReviveServiceTest {
         assertEquals(1, popResult.messageList().size());
         // check ck exist
         ReceiptHandle handle = SerializeUtil.decodeReceiptHandle(popResult.messageList().get(0).receiptHandle().get());
-        byte[] ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.operationId()));
+        byte[] ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.consumerGroupId(), handle.operationId()));
         assertNotNull(ckValue);
         // now revive but can't clear ck
         reviveService.tryRevive();
-        ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.operationId()));
+        ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.consumerGroupId(), handle.operationId()));
         assertNotNull(ckValue);
         // after 1s revive can clear ck
         long reviveTimestamp = System.currentTimeMillis() + invisibleDuration;
@@ -203,7 +203,7 @@ class ReviveServiceTest {
             return reviveService.reviveTimestamp() >= reviveTimestamp && reviveService.inflightReviveCount() == 0;
         });
 
-        ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.operationId()));
+        ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.consumerGroupId(), handle.operationId()));
         assertNull(ckValue);
 
         // pop again
@@ -260,11 +260,11 @@ class ReviveServiceTest {
         assertEquals(1, popResult.messageList().size());
         // check ck exist
         ReceiptHandle handle = SerializeUtil.decodeReceiptHandle(popResult.messageList().get(0).receiptHandle().get());
-        byte[] ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.operationId()));
+        byte[] ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID,handle.consumerGroupId(), handle.operationId()));
         assertNotNull(ckValue);
         // now revive but can't clear ck
         reviveService.tryRevive();
-        ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.operationId()));
+        ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.consumerGroupId(), handle.operationId()));
         assertNotNull(ckValue);
         // after 1s revive can clear ck
         long reviveTimestamp = System.currentTimeMillis() + invisibleDuration;
@@ -273,7 +273,7 @@ class ReviveServiceTest {
             return reviveService.reviveTimestamp() >= reviveTimestamp && reviveService.inflightReviveCount() == 0;
         });
 
-        ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.operationId()));
+        ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.consumerGroupId(), handle.operationId()));
         assertNull(ckValue);
 
         // check if this message has been appended to retry stream
@@ -308,7 +308,7 @@ class ReviveServiceTest {
         Mockito.verify(dlqSender, Mockito.times(0)).send(Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
         // check ck still exist
         handle = SerializeUtil.decodeReceiptHandle(retryPopResult.messageList().get(0).receiptHandle().get());
-        ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.operationId()));
+        ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.consumerGroupId(), handle.operationId()));
         assertNotNull(ckValue);
 
         // mock that queue is closed
@@ -326,7 +326,7 @@ class ReviveServiceTest {
         Mockito.verify(dlqSender, Mockito.times(0)).send(Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
         // check ck still exist
         handle = SerializeUtil.decodeReceiptHandle(retryPopResult.messageList().get(0).receiptHandle().get());
-        ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.operationId()));
+        ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.consumerGroupId(), handle.operationId()));
         assertNotNull(ckValue);
 
         // mock that queue is opened
@@ -344,7 +344,7 @@ class ReviveServiceTest {
         Mockito.verify(dlqSender, Mockito.times(1)).send(Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
         // check ck not exist
         handle = SerializeUtil.decodeReceiptHandle(retryPopResult.messageList().get(0).receiptHandle().get());
-        ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.operationId()));
+        ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.consumerGroupId(), handle.operationId()));
         assertNull(ckValue);
     }
 
