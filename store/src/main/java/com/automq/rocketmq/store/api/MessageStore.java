@@ -21,6 +21,7 @@ import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.common.util.Lifecycle;
 import com.automq.rocketmq.store.model.message.AckResult;
 import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
+import com.automq.rocketmq.store.model.message.ClearRetryMessagesResult;
 import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PopResult;
 import com.automq.rocketmq.store.model.message.PullResult;
@@ -132,4 +133,14 @@ public interface MessageStore extends Lifecycle {
      * @return reset result, see {@link ResetConsumeOffsetResult}
      */
     CompletableFuture<ResetConsumeOffsetResult> resetConsumeOffset(long consumerGroupId, long topicId, int queueId, long offset);
+
+    /**
+     * Clear all retry messages of specified consumer group, topic and queue.
+     *
+     * @param consumerGroupId consumer group id
+     * @param topicId         topic id
+     * @param queueId         queue id
+     * @return clear result, see {@link ClearRetryMessagesResult}
+     */
+    CompletableFuture<ClearRetryMessagesResult> clearRetryMessages(long consumerGroupId, long topicId, int queueId);
 }

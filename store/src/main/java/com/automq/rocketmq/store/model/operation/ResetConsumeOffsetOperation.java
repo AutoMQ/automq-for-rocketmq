@@ -26,8 +26,7 @@ public class ResetConsumeOffsetOperation extends Operation {
 
 
     public ResetConsumeOffsetOperation(long topicId, int queueId, long operationStreamId, long snapshotStreamId,
-        MessageStateMachine stateMachine, long operationTimestamp,
-        long consumerGroupId, long offset) {
+        MessageStateMachine stateMachine, long consumerGroupId, long offset, long operationTimestamp) {
         this.topicId = topicId;
         this.queueId = queueId;
         this.operationStreamId = operationStreamId;
