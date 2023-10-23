@@ -34,6 +34,8 @@ jobs:
           name: rocketmq
           path: ${{github.workspace}}/rocketmq.zip
       - run: |
+          pwd
+          cp ${{github.workspace}}/rocketmq.zip .
           unzip rocketmq.zip
           mkdir rocketmq
           cp -r rocketmq-* rocketmq/
