@@ -46,7 +46,7 @@ jobs:
                archive_format: 'zip',
             });
             var fs = require('fs');
-            fs.writeFileSync('${{github.workspace}}/rocketmq.zip', Buffer.from(download.data));
+            fs.writeFileSync('${{github.workspace}}/rocketmq-on-s3.zip', Buffer.from(download.data));
       - run: |
           unzip rocketmq-on-s3.zip
           mkdir rocketmq
