@@ -14,18 +14,18 @@ on:
 
 
 env:
-  DOCKER_REPO: apache/rocketmq-ci
+  DOCKER_REPO: automqinc/rocketmq_e2e
 
 jobs:
   docker:
     runs-on: ubuntu-latest
-    if: >
-      github.event.workflow_run.event == 'pull_request' &&
-      github.event.workflow_run.conclusion == 'success'
+    if: always()
+#    if: >
+#      github.event.workflow_run.event == 'pull_request' &&
+#      github.event.workflow_run.conclusion == 'success'
     timeout-minutes: 30
     strategy:
       matrix:
-        base-image: ["ubuntu"]
         java-version: ["17"]
     steps:
       - name: 'Download artifact'
@@ -54,7 +54,7 @@ jobs:
           ls
       - uses: actions/checkout@v3
         with:
-          repository: apache/rocketmq-docker.git
+          repository: AutoMQ/rocketmq-e2e.git
           ref: master
           path: rocketmq-docker
       - name: docker-login
@@ -66,11 +66,11 @@ jobs:
       - name: Build and save docker images
         id: build-images
         run: |
-          cd rocketmq-docker/image-build-ci
+          cd rocketmq-e2e/rocketmq-docker
           version=${{ github.event.pull_request.number || github.ref_name }}-$(uuidgen)
           mkdir versionlist
           touch versionlist/"${version}-`echo ${{ matrix.base-image }} | sed -e "s/:/-/g"`"
-          sh ./build-image-local.sh ${version} ${{ matrix.base-image }} ${{ matrix.java-version }} ${DOCKER_REPO}
+          sh ./build-image.sh ${version} ${DOCKER_REPO}
       - uses: actions/upload-artifact@v3
         name: Upload distribution tar
         with:

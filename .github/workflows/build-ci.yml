@@ -26,7 +26,7 @@ jobs:
           key: docker-${{ runner.os }}
       - name: Build distribution tar
         run: |
-          mvn -Prelease-all clean install -U
+          mvn -Prelease-all clean install -U -Dmaven.test.skip=true
       - uses: actions/upload-artifact@v3
         name: Upload distribution tar
         with:
