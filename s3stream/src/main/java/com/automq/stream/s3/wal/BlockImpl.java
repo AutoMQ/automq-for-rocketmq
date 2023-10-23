@@ -36,8 +36,7 @@ public class BlockImpl implements Block {
     private final long startOffset;
     /**
      * The max size of this block.
-     * Any try to add a record to this block will fail and throw {@link BlockFullException} if the size of this block
-     * exceeds this limit.
+     * Any try to add a record to this block will fail if the size of this block exceeds this limit.
      */
     private final long maxSize;
 

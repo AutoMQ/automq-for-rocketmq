@@ -505,7 +505,7 @@ public class SlidingWindowService {
         }
     }
 
-    interface WALHeaderFlusher {
+    public interface WALHeaderFlusher {
         void flush(long windowMaxLength) throws IOException;
     }
 }
