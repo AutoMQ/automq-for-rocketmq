@@ -162,6 +162,12 @@ public class SerializeUtil {
                     changeInvisibleDurationOperation.receiptHandle().operationId(), changeInvisibleDurationOperation.invisibleDuration(),
                     changeInvisibleDurationOperation.operationTimestamp());
             }
+            case com.automq.rocketmq.store.model.generated.Operation.ResetConsumeOffsetOperation -> {
+                com.automq.rocketmq.store.model.generated.ResetConsumeOffsetOperation resetConsumeOffsetOperation = (com.automq.rocketmq.store.model.generated.ResetConsumeOffsetOperation) operationLogItem.operation(new com.automq.rocketmq.store.model.generated.ResetConsumeOffsetOperation());
+                return new ResetConsumeOffsetOperation(resetConsumeOffsetOperation.topicId(), resetConsumeOffsetOperation.queueId(),
+                    operationStreamId, snapshotStreamId, stateMachine,
+                    resetConsumeOffsetOperation.operationTimestamp(), resetConsumeOffsetOperation.consumerGroupId(), resetConsumeOffsetOperation.offset());
+            }
             default -> throw new IllegalStateException("Unexpected value: " + operationLogItem.operationType());
         }
     }

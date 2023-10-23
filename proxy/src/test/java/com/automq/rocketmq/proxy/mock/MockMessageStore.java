@@ -25,6 +25,7 @@ import com.automq.rocketmq.store.api.MessageStore;
 import com.automq.rocketmq.store.api.S3ObjectOperator;
 import com.automq.rocketmq.store.model.message.AckResult;
 import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
+import com.automq.rocketmq.store.model.message.ClearRetryMessagesResult;
 import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PopResult;
 import com.automq.rocketmq.store.model.message.PutResult;
@@ -162,5 +163,11 @@ public class MockMessageStore implements MessageStore {
         int queueId, long offset) {
         consumerOffsetMap.put(Pair.of(topicId, queueId), offset);
         return CompletableFuture.completedFuture(new ResetConsumeOffsetResult(ResetConsumeOffsetResult.Status.SUCCESS));
+    }
+
+    @Override
+    public CompletableFuture<ClearRetryMessagesResult> clearRetryMessages(long consumerGroupId, long topicId,
+        int queueId) {
+        throw new UnsupportedOperationException("Not implemented yet");
     }
 }

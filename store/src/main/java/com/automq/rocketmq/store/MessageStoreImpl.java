@@ -29,6 +29,7 @@ import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.generated.ReceiptHandle;
 import com.automq.rocketmq.store.model.message.AckResult;
 import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
+import com.automq.rocketmq.store.model.message.ClearRetryMessagesResult;
 import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PopResult;
 import com.automq.rocketmq.store.model.message.PutResult;
@@ -196,5 +197,11 @@ public class MessageStoreImpl implements MessageStore {
         int queueId, long offset) {
         return logicQueueManager.getOrCreate(topicId, queueId)
             .thenCompose(topicQueue -> topicQueue.resetConsumeOffset(consumerGroupId, offset));
+    }
+
+    @Override
+    public CompletableFuture<ClearRetryMessagesResult> clearRetryMessages(long consumerGroupId, long topicId,
+        int queueId) {
+        throw new UnsupportedOperationException("Not implemented yet");
     }
 }
