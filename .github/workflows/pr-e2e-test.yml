@@ -2,12 +2,16 @@ name: E2E test for pull request
 
 # read-write repo token
 # access to secrets
+#on:
+#  workflow_run:
+#    workflows: ["BUILD-CI"]
+#    types:
+#      - completed
+#    branches: ['**']
+
 on:
-  workflow_run:
-    workflows: ["BUILD-CI"]
-    types:
-      - completed
-    branches: ['**']
+  workflow_call:
+
 
 env:
   DOCKER_REPO: apache/rocketmq-ci
@@ -33,7 +37,7 @@ jobs:
                repo: context.repo.repo,
             });
             var matchArtifactRmq = artifacts.data.artifacts.filter((artifact) => {
-              return artifact.name == "rocketmq"
+              return artifact.name == "rocketmq-on-s3"
             })[0];
             var download = await github.actions.downloadArtifact({
                owner: context.repo.owner,
@@ -44,7 +48,7 @@ jobs:
             var fs = require('fs');
             fs.writeFileSync('${{github.workspace}}/rocketmq.zip', Buffer.from(download.data));
       - run: |
-          unzip rocketmq.zip
+          unzip rocketmq-on-s3.zip
           mkdir rocketmq
           cp -r rocketmq-* rocketmq/
           ls
