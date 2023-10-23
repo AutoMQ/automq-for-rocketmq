@@ -29,7 +29,7 @@
         </RollingFile>
 
         <RollingFile name="controllerAppender" fileName="${LOG_DIR}/controller.log" filePattern="${LOG_DIR}/controller.%i.log">
-            <PatternLayout pattern = "%d{yyyy-MM-dd HH:mm:ss} %-5p %m%n"/>
+            <PatternLayout pattern = "%d{yyyy-MM-dd HH:mm:ss,SSS} %-5p %m%n"/>
             <SizeBasedTriggeringPolicy size="100MB" />
             <DefaultRolloverStrategy max="10"/>
         </RollingFile>

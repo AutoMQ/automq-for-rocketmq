@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.metadata.database;
+package com.automq.rocketmq.controller.metadata.database.cache;
 
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import java.util.HashMap;
