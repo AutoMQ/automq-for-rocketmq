@@ -43,8 +43,7 @@ public interface Block {
      * @param recordSize The size of this record.
      * @param recordSupplier The supplier of this record which receives the start offset of this record as the parameter.
      * @param future The future of this record, which will be completed when the record is written to the WAL.
-     * @return The start offset of this record.
-     * @throws BlockFullException If the size of this block exceeds the limit.
+     * @return The start offset of this record. If the size of this block exceeds the limit, return -1.
      */
     long addRecord(long recordSize, Function<Long, ByteBuffer> recordSupplier, CompletableFuture<AppendResult.CallbackResult> future);
 
@@ -61,10 +60,4 @@ public interface Block {
      * The content of this block, which contains multiple records.
      */
     ByteBuffer data();
-
-    class BlockFullException extends RuntimeException {
-        public BlockFullException(String message) {
-            super(message);
-        }
-    }
 }

@@ -413,9 +413,8 @@ public class BlockWALService implements WriteAheadLog {
         lock.lock();
         try {
             Block block = slidingWindowService.getCurrentBlockLocked();
-            try {
-                expectedWriteOffset = block.addRecord(recordSize, (offset) -> record(body, recordBodyCRC, offset), appendResultFuture);
-            } catch (Block.BlockFullException e) {
+            expectedWriteOffset = block.addRecord(recordSize, (offset) -> record(body, recordBodyCRC, offset), appendResultFuture);
+            if (expectedWriteOffset < 0) {
                 // this block is full, create a new one
                 block = slidingWindowService.sealAndNewBlockLocked(block, recordSize, walHeaderCoreData.getFlushedTrimOffset(), walHeaderCoreData.getCapacity() - WAL_HEADER_TOTAL_CAPACITY);
                 expectedWriteOffset = block.addRecord(recordSize, (offset) -> record(body, recordBodyCRC, offset), appendResultFuture);

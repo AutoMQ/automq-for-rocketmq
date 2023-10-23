@@ -59,18 +59,21 @@ public class BlockImpl implements Block {
         return startOffset;
     }
 
+    /**
+     * Note: this method is NOT thread safe.
+     */
     @Override
-    public long addRecord(long recordSize, Function<Long, ByteBuffer> recordSupplier, CompletableFuture<WriteAheadLog.AppendResult.CallbackResult> future) throws BlockFullException {
+    public long addRecord(long recordSize, Function<Long, ByteBuffer> recordSupplier, CompletableFuture<WriteAheadLog.AppendResult.CallbackResult> future) {
         // TODO no need to align to block size
         long requiredSize = WALUtil.alignLargeByBlockSize(recordSize);
         long requiredCapacity = nextOffset + requiredSize;
 
         if (requiredCapacity > maxSize) {
-            throw new BlockFullException("The block is full. Required capacity: " + requiredCapacity + ", max size: " + maxSize);
+            return -1;
         }
         // if there is no record in this block, we can write a record larger than SOFT_BLOCK_SIZE_LIMIT
         if (requiredCapacity > SOFT_BLOCK_SIZE_LIMIT && !futures.isEmpty()) {
-            throw new BlockFullException("The block is almost full. Required capacity: " + requiredCapacity + ", max size: " + maxSize);
+            return -1;
         }
 
         // scale up the buffer
