@@ -61,6 +61,7 @@ import com.automq.rocketmq.controller.tasks.HeartbeatTask;
 import com.automq.rocketmq.controller.tasks.LeaseTask;
 import com.automq.rocketmq.controller.tasks.ReclaimS3ObjectTask;
 import com.automq.rocketmq.controller.tasks.RecycleGroupTask;
+import com.automq.rocketmq.controller.tasks.RecycleS3Task;
 import com.automq.rocketmq.controller.tasks.RecycleTopicTask;
 import com.automq.rocketmq.controller.tasks.ScanAssignmentTask;
 import com.automq.rocketmq.controller.tasks.ScanGroupTask;
@@ -188,6 +189,8 @@ public class DefaultMetadataStore implements MetadataStore {
             config.scanIntervalInSecs(), TimeUnit.SECONDS);
         this.scheduledExecutorService.scheduleWithFixedDelay(new ScanAssignmentTask(this), 1,
             config.scanIntervalInSecs(), TimeUnit.SECONDS);
+        this.scheduledExecutorService.scheduleWithFixedDelay(new RecycleS3Task(this),
+            config.recycleS3IntervalInSecs(), config.recycleS3IntervalInSecs(), TimeUnit.SECONDS);
         LOGGER.info("MetadataStore tasks scheduled");
     }
 

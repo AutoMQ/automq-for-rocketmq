@@ -143,4 +143,41 @@ public class S3StreamObjectTest extends DatabaseTestBase {
             Assertions.assertTrue(s3StreamObjectMapper.list(null, null, null, null, null).isEmpty());
         }
     }
+
+    @Test
+    public void testListRecyclable() throws IOException {
+        try (SqlSession session = this.getSessionFactory().openSession()) {
+            S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
+            S3StreamObject s3StreamObject = new S3StreamObject();
+            s3StreamObject.setObjectId(11L);
+            s3StreamObject.setObjectSize(123L);
+            s3StreamObject.setStreamId(111L);
+            s3StreamObject.setStartOffset(1234L);
+            s3StreamObject.setEndOffset(2345L);
+
+            Calendar calendar = Calendar.getInstance();
+            calendar.add(Calendar.SECOND, 30);
+            long time = calendar.getTime().getTime();
+
+            s3StreamObject.setCommittedTimestamp(time);
+            s3StreamObjectMapper.commit(s3StreamObject);
+            session.commit();
+
+            Calendar threshold = Calendar.getInstance();
+            threshold.add(Calendar.HOUR, 1);
+            Assertions.assertTrue(threshold.getTimeInMillis() > time);
+
+            List<S3StreamObject> objects = s3StreamObjectMapper.list(null, null, null, null, null);
+            Assertions.assertTrue(objects.get(0).getCommittedTimestamp() < threshold.getTimeInMillis());
+            Assertions.assertEquals(111, objects.get(0).getStreamId());
+
+            List<Long> ids = s3StreamObjectMapper.recyclable(List.of(111L), threshold.getTimeInMillis());
+            Assertions.assertEquals(1, ids.size());
+
+            threshold = Calendar.getInstance();
+            threshold.add(Calendar.HOUR, -80);
+            ids = s3StreamObjectMapper.recyclable(List.of(111L), threshold.getTimeInMillis());
+            Assertions.assertTrue(ids.isEmpty());
+        }
+    }
 }
