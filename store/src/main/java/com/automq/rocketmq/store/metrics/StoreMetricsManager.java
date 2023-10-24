@@ -137,7 +137,17 @@ public class StoreMetricsManager extends ServiceThread implements MetricsManager
     }
 
     @Override
-    public void initMetrics(Meter meter, Supplier<AttributesBuilder> attributesBuilderSupplier) {
+    public void initAttributesBuilder(Supplier<AttributesBuilder> attributesBuilderSupplier) {
+        StoreMetricsManager.attributesBuilderSupplier = attributesBuilderSupplier;
+    }
+
+    @Override
+    public void initStaticMetrics(Meter meter) {
+
+    }
+
+    @Override
+    public void initDynamicMetrics(Meter meter) {
         StoreMetricsManager.attributesBuilderSupplier = attributesBuilderSupplier;
         consumerLagMessages = meter.gaugeBuilder(GAUGE_CONSUMER_LAG_MESSAGES)
             .setDescription("Consumer lag messages")

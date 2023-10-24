@@ -130,8 +130,12 @@ public class ProxyMetricsManager implements MetricsManager {
     }
 
     @Override
-    public void initMetrics(Meter meter, Supplier<AttributesBuilder> attributesBuilderSupplier) {
+    public void initAttributesBuilder(Supplier<AttributesBuilder> attributesBuilderSupplier) {
         ProxyMetricsManager.attributesBuilderSupplier = attributesBuilderSupplier;
+    }
+
+    @Override
+    public void initStaticMetrics(Meter meter) {
         rpcLatency = meter.histogramBuilder(HISTOGRAM_RPC_LATENCY)
             .setDescription("Rpc latency")
             .setUnit("milliseconds")
@@ -158,7 +162,10 @@ public class ProxyMetricsManager implements MetricsManager {
             .setDescription("Incoming messages size")
             .ofLongs()
             .build();
+    }
 
+    @Override
+    public void initDynamicMetrics(Meter meter) {
         producerConnection = meter.gaugeBuilder(GAUGE_PRODUCER_CONNECTIONS)
             .setDescription("Producer connections")
             .ofLongs()

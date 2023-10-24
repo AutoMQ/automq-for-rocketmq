@@ -15,14 +15,37 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.common;
+package com.automq.rocketmq.store.metrics;
 
+import com.automq.stream.s3.metrics.Counter;
 import io.opentelemetry.api.common.AttributesBuilder;
+import io.opentelemetry.api.metrics.LongCounter;
 import io.opentelemetry.api.metrics.Meter;
+import java.util.Map;
 import java.util.function.Supplier;
 
-public interface MetricsManager {
-    void initAttributesBuilder(Supplier<AttributesBuilder> attributesBuilderSupplier);
-    void initStaticMetrics(Meter meter);
-    void initDynamicMetrics(Meter meter);
+public class StreamMetricsCounter extends BaseStreamMetrics implements Counter {
+    private final LongCounter counter;
+
+    public StreamMetricsCounter(String type, String name, Map<String, String> tags,
+        Meter meter, Supplier<AttributesBuilder> attributesBuilderSupplier) {
+        super(type, name, tags, meter, attributesBuilderSupplier);
+        this.counter = this.meter.counterBuilder(this.metricsName)
+            .build();
+    }
+
+    @Override
+    public void inc() {
+        inc(1);
+    }
+
+    @Override
+    public void inc(long n) {
+        counter.add(n, newAttributesBuilder().build());
+    }
+
+    @Override
+    public long count() {
+        throw new UnsupportedOperationException();
+    }
 }

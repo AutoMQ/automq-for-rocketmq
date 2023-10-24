@@ -15,14 +15,20 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.common;
+package com.automq.rocketmq.store.metrics;
 
+import com.automq.stream.s3.metrics.Gauge;
 import io.opentelemetry.api.common.AttributesBuilder;
 import io.opentelemetry.api.metrics.Meter;
+import java.util.Map;
 import java.util.function.Supplier;
 
-public interface MetricsManager {
-    void initAttributesBuilder(Supplier<AttributesBuilder> attributesBuilderSupplier);
-    void initStaticMetrics(Meter meter);
-    void initDynamicMetrics(Meter meter);
+public class StreamMetricsGauge extends BaseStreamMetrics {
+
+    public StreamMetricsGauge(String type, String name, Map<String, String> tags,
+        Meter meter, Supplier<AttributesBuilder> attributesBuilderSupplier, Gauge gauge) {
+        super(type, name, tags, meter, attributesBuilderSupplier);
+        this.meter.gaugeBuilder(this.metricsName)
+            .buildWithCallback(measurement -> measurement.record(gauge.value(), newAttributesBuilder().build()));
+    }
 }
