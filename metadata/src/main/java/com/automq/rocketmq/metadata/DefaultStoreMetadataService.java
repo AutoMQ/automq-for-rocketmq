@@ -27,8 +27,8 @@ import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.DefaultMetadataStore;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
-
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
@@ -143,7 +143,7 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
     }
 
     @Override
-    public int ownerNode(long topicId, int queueId) {
+    public Optional<Integer> ownerNode(long topicId, int queueId) {
         return metadataStore.ownerNode(topicId, queueId);
     }
 

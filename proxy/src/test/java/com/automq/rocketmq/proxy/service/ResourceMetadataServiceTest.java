@@ -75,11 +75,11 @@ class ResourceMetadataServiceTest {
 
         when(proxyMetadataService.topicOf(topicName)).thenReturn(CompletableFuture.completedFuture(createTopic(topicName, MessageType.NORMAL, MessageType.FIFO)));
         messageType = resourceMetadataService.getTopicMessageType(null, topicName);
-        assertEquals(TopicMessageType.NORMAL, messageType);
+        assertEquals(TopicMessageType.UNSPECIFIED, messageType);
 
         when(proxyMetadataService.topicOf(topicName)).thenReturn(CompletableFuture.failedFuture(new RuntimeException("Topic not found")));
         messageType = resourceMetadataService.getTopicMessageType(null, topicName);
-        assertEquals(TopicMessageType.NORMAL, messageType);
+        assertEquals(TopicMessageType.UNSPECIFIED, messageType);
     }
 
     @Test

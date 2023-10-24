@@ -50,11 +50,6 @@ public class ExtendConsumerManagerActivity extends ConsumerManagerActivity imple
     @Override
     protected RemotingCommand processRequest0(ChannelHandlerContext ctx, RemotingCommand request,
         ProxyContext context) throws Exception {
-        RemotingCommand response = checkVersion(request);
-        if (response != null) {
-            return response;
-        }
-
         switch (request.getCode()) {
             case RequestCode.GET_CONSUMER_CONNECTION_LIST,
                  RequestCode.UNLOCK_BATCH_MQ,
@@ -100,7 +95,7 @@ public class ExtendConsumerManagerActivity extends ConsumerManagerActivity imple
 
     @Override
     protected RemotingCommand lockBatchMQ(ChannelHandlerContext ctx, RemotingCommand request,
-        ProxyContext context) throws Exception {
+        ProxyContext context) {
         LockBatchRequestBody lockQueueRequest = LockBatchRequestBody.decode(request.getBody(), LockBatchRequestBody.class);
 
         CompletableFuture<Set<MessageQueue>> lockCf = messagingProcessor.lockBatchMQ(
@@ -128,7 +123,7 @@ public class ExtendConsumerManagerActivity extends ConsumerManagerActivity imple
 
     @Override
     protected RemotingCommand unlockBatchMQ(ChannelHandlerContext ctx, RemotingCommand request,
-        ProxyContext context) throws Exception {
+        ProxyContext context) {
         UnlockBatchRequestBody unlockQueueRequest = UnlockBatchRequestBody.decode(request.getBody(), UnlockBatchRequestBody.class);
         final RemotingCommand response = RemotingUtil.buildResponseCommand(request, ResponseCode.SUCCESS);
 

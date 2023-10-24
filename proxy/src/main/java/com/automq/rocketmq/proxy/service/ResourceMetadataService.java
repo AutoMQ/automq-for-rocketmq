@@ -71,8 +71,8 @@ public class ResourceMetadataService implements MetadataService {
         } catch (Exception e) {
             LOGGER.error("Failed to get topic message type for {}", topic, e);
         }
-        LOGGER.warn("Topic {} has no message type specified, use normal message type as default", topic);
-        return TopicMessageType.NORMAL;
+        LOGGER.warn("Topic {} has no message type specified, use unspecified message type as default", topic);
+        return TopicMessageType.UNSPECIFIED;
     }
 
     @Override

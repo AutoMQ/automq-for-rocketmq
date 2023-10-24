@@ -30,7 +30,7 @@ public class RemotingUtil {
      * Generates a code not supported response command.
      */
     public static RemotingCommand codeNotSupportedResponse(RemotingCommand request) {
-        String error = " request type " + request.getCode() + " not supported";
+        String error = "request type " + request.getCode() + " not supported";
         return RemotingCommand.createResponseCommand(RemotingSysResponseCode.REQUEST_CODE_NOT_SUPPORTED, error);
     }
 
@@ -38,7 +38,7 @@ public class RemotingUtil {
      * Generates a version not supported response command.
      */
     public static RemotingCommand versionNotSupportedResponse(RemotingCommand request) {
-        String error = " request version " + request.getVersion() + " not supported";
+        String error = "client version " + request.getVersion() + " not supported";
         return RemotingCommand.createResponseCommand(ResponseCode.VERSION_NOT_SUPPORTED, error);
     }
 

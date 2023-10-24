@@ -19,11 +19,14 @@ package com.automq.rocketmq.proxy.remoting.activity;
 
 import com.automq.rocketmq.proxy.remoting.RemotingUtil;
 import io.netty.channel.ChannelHandlerContext;
+import java.net.InetSocketAddress;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.rocketmq.client.producer.SendResult;
 import org.apache.rocketmq.common.message.Message;
 import org.apache.rocketmq.common.message.MessageAccessor;
+import org.apache.rocketmq.common.message.MessageConst;
 import org.apache.rocketmq.common.message.MessageDecoder;
 import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.common.topic.TopicValidator;
@@ -51,9 +54,9 @@ public class ExtendSendMessageActivity extends SendMessageActivity implements Co
     @Override
     protected RemotingCommand processRequest0(ChannelHandlerContext ctx, RemotingCommand request,
         ProxyContext context) throws Exception {
-        RemotingCommand response = checkVersion(request);
-        if (response != null) {
-            return response;
+        Optional<RemotingCommand> response = checkVersion(request);
+        if (response.isPresent()) {
+            return response.get();
         }
 
         switch (request.getCode()) {
@@ -101,18 +104,25 @@ public class ExtendSendMessageActivity extends SendMessageActivity implements Co
 
         final byte[] body = request.getBody();
         Message message = new Message(requestHeader.getTopic(), body);
-        Map<String, String> oriProps = MessageDecoder.string2messageProperties(requestHeader.getProperties());
+        Map<String, String> originProperties = MessageDecoder.string2messageProperties(requestHeader.getProperties());
         message.setFlag(requestHeader.getFlag());
-        MessageAccessor.setProperties(message, oriProps);
+        MessageAccessor.setProperties(message, originProperties);
+        String bornHost = "";
+        try {
+            bornHost = ((InetSocketAddress) ctx.channel().remoteAddress()).getAddress().getHostAddress();
+        } catch (Exception ignore) {
+        }
+        message.getProperties().put(MessageConst.PROPERTY_BORN_HOST, bornHost);
 
         // TODO: Do we need handle more properties here?
         messagingProcessor.sendMessage(context,
-            new SendMessageQueueSelector(dstBrokerName, requestHeader),
-            // For v4 remoting protocol, we honor the producer group in the request header.
-            requestHeader.getProducerGroup(),
-            requestHeader.getSysFlag(),
-            Collections.singletonList(message),
-            context.getRemainingMs()).whenComplete((sendResults, throwable) -> {
+                new SendMessageQueueSelector(dstBrokerName, requestHeader),
+                // For v4 remoting protocol, we honor the producer group in the request header.
+                requestHeader.getProducerGroup(),
+                requestHeader.getSysFlag(),
+                Collections.singletonList(message),
+                context.getRemainingMs())
+            .whenComplete((sendResults, throwable) -> {
                 if (throwable != null) {
                     writeErrResponse(ctx, context, request, throwable);
                     return;

@@ -51,6 +51,7 @@ import org.apache.rocketmq.client.consumer.AckStatus;
 import org.apache.rocketmq.client.consumer.PopResult;
 import org.apache.rocketmq.client.consumer.PopStatus;
 import org.apache.rocketmq.client.consumer.PullResult;
+import org.apache.rocketmq.client.consumer.PullStatus;
 import org.apache.rocketmq.client.exception.MQBrokerException;
 import org.apache.rocketmq.client.producer.SendResult;
 import org.apache.rocketmq.client.producer.SendStatus;
@@ -388,8 +389,40 @@ public class MessageServiceImpl implements MessageService {
     @Override
     public CompletableFuture<PullResult> pullMessage(ProxyContext ctx, AddressableMessageQueue messageQueue,
         PullMessageRequestHeader requestHeader, long timeoutMillis) {
-        // TODO: Support in the next iteration
-        throw new UnsupportedOperationException();
+        VirtualQueue virtualQueue = new VirtualQueue(messageQueue);
+        CompletableFuture<Topic> topicFuture = metadataService.topicOf(requestHeader.getTopic());
+        CompletableFuture<ConsumerGroup> groupFuture = metadataService.consumerGroupOf(requestHeader.getConsumerGroup());
+
+        return topicFuture.thenCombine(groupFuture, Pair::of)
+            .thenCompose(pair -> {
+                Topic topic = pair.getLeft();
+                ConsumerGroup group = pair.getRight();
+
+                Filter filter;
+                if (StringUtils.isNotBlank(requestHeader.getExpressionType())) {
+                    filter = switch (requestHeader.getExpressionType()) {
+                        case ExpressionType.TAG ->
+                            requestHeader.getSubscription().contains(TagFilter.SUB_ALL) ? Filter.DEFAULT_FILTER : new TagFilter(requestHeader.getSubscription());
+                        case ExpressionType.SQL92 -> new SQLFilter(requestHeader.getSubscription());
+                        default -> Filter.DEFAULT_FILTER;
+                    };
+                } else {
+                    filter = Filter.DEFAULT_FILTER;
+                }
+
+                return store.pull(group.getGroupId(), topic.getTopicId(), virtualQueue.physicalQueueId(), filter, requestHeader.getQueueOffset(), requestHeader.getMaxMsgNums(), false);
+            })
+            .thenApply(result -> {
+                if (result.messageList().isEmpty()) {
+                    if (result.maxOffset() - result.nextBeginOffset() > 0) {
+                        // This means there are messages in the queue but not match the filter. So we should prevent long polling.
+                        return new PullResult(PullStatus.NO_MATCHED_MSG, result.nextBeginOffset(), result.minOffset(), result.maxOffset(), Collections.emptyList());
+                    } else {
+                        return new PullResult(PullStatus.NO_NEW_MSG, result.nextBeginOffset(), result.minOffset(), result.maxOffset(), Collections.emptyList());
+                    }
+                }
+                return new PullResult(PullStatus.FOUND, result.nextBeginOffset(), result.minOffset(), result.maxOffset(), FlatMessageUtil.convertTo(result.messageList(), requestHeader.getTopic(), 0));
+            });
     }
 
     @Override

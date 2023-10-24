@@ -20,10 +20,12 @@ package com.automq.rocketmq.store.mock;
 import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
+import com.automq.rocketmq.common.config.BrokerConfig;
 import com.automq.rocketmq.common.config.ControllerConfig;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -139,13 +141,13 @@ public class MockStoreMetadataService implements StoreMetadataService {
     }
 
     @Override
-    public int ownerNode(long topicId, int queueId) {
-        return 0;
+    public Optional<Integer> ownerNode(long topicId, int queueId) {
+        return Optional.of(0);
     }
 
     @Override
     public ControllerConfig nodeConfig() {
-        return null;
+        return new BrokerConfig();
     }
 
     @Override

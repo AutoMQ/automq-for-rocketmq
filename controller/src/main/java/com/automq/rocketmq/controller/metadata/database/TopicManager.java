@@ -54,6 +54,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -494,21 +495,21 @@ public class TopicManager {
 
     }
 
-    public int ownerNode(long topicId, int queueId) {
+    public Optional<Integer> ownerNode(long topicId, int queueId) {
         Map<Integer, QueueAssignment> map = assignmentCache.byTopicId(topicId);
         if (null != map) {
             QueueAssignment assignment = map.get(queueId);
             if (null != assignment) {
                 switch (assignment.getStatus()) {
                     case ASSIGNMENT_STATUS_ASSIGNED -> {
-                        return assignment.getDstNodeId();
+                        return Optional.of(assignment.getDstNodeId());
                     }
                     case ASSIGNMENT_STATUS_YIELDING -> {
-                        return assignment.getSrcNodeId();
+                        return Optional.of(assignment.getSrcNodeId());
                     }
                 }
             }
         }
-        return 0;
+        return Optional.empty();
     }
 }
