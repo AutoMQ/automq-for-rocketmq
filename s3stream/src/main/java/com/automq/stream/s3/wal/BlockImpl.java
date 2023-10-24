@@ -69,10 +69,7 @@ public class BlockImpl implements Block {
      */
     @Override
     public long addRecord(long recordSize, Function<Long, ByteBuf> recordSupplier, CompletableFuture<WriteAheadLog.AppendResult.CallbackResult> future) {
-        // TODO no need to align to block size
-        long requiredSize = WALUtil.alignLargeByBlockSize(recordSize);
-        long requiredCapacity = nextOffset + requiredSize;
-
+        long requiredCapacity = nextOffset + recordSize;
         if (requiredCapacity > maxSize) {
             return -1;
         }
@@ -83,15 +80,8 @@ public class BlockImpl implements Block {
 
         long recordOffset = startOffset + nextOffset;
         ByteBuf record = recordSupplier.apply(recordOffset);
-        // padding record to required size
-        // TODO no need to align to block size
-        if (record.readableBytes() < requiredSize) {
-            ByteBuf padding = DirectByteBufAlloc.byteBuffer((int) (requiredSize - record.readableBytes()));
-            padding.writeZero(padding.capacity());
-            record = DirectByteBufAlloc.compositeByteBuffer().addComponents(true, record, padding);
-        }
         data.addComponent(true, record);
-        nextOffset += requiredSize;
+        nextOffset += recordSize;
         futures.add(future);
 
         return recordOffset;
