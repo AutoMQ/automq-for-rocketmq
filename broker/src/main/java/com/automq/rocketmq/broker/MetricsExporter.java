@@ -24,6 +24,8 @@ import com.automq.rocketmq.proxy.metrics.ProxyMetricsManager;
 import com.automq.rocketmq.proxy.processor.ExtendMessagingProcessor;
 import com.automq.rocketmq.store.MessageStoreImpl;
 import com.automq.rocketmq.store.metrics.StoreMetricsManager;
+import com.automq.rocketmq.store.metrics.StreamMetricsManager;
+import com.automq.stream.s3.metrics.S3StreamMetricsRegistry;
 import com.google.common.base.Splitter;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.common.AttributesBuilder;
@@ -73,6 +75,7 @@ public class MetricsExporter implements Lifecycle {
 
     private final ProxyMetricsManager proxyMetricsManager;
     private final StoreMetricsManager storeMetricsManager;
+    private final StreamMetricsManager streamMetricsManager;
 
     public static Supplier<AttributesBuilder> attributesBuilderSupplier = Attributes::builder;
 
@@ -82,6 +85,9 @@ public class MetricsExporter implements Lifecycle {
         this.metricsConfig = brokerConfig.metrics();
         this.proxyMetricsManager = new ProxyMetricsManager(messagingProcessor);
         this.storeMetricsManager = new StoreMetricsManager(metricsConfig, messageStore);
+        this.streamMetricsManager = new StreamMetricsManager();
+        init();
+        S3StreamMetricsRegistry.setMetricsGroup(this.streamMetricsManager);
     }
 
     public static AttributesBuilder newAttributesBuilder() {
@@ -110,8 +116,7 @@ public class MetricsExporter implements Lifecycle {
         };
     }
 
-    @Override
-    public void start() {
+    private void init() {
         MetricsExporterType metricsExporterType = MetricsExporterType.valueOf(metricsConfig.exporterType());
         if (metricsExporterType == MetricsExporterType.DISABLE) {
             return;
@@ -212,9 +217,34 @@ public class MetricsExporter implements Lifecycle {
             .build()
             .getMeter("rocketmq-meter");
 
-        initMetrics();
+        initAttributesBuilder();
+        initStaticMetrics();
+    }
 
-        this.started = true;
+
+    private void initAttributesBuilder() {
+        streamMetricsManager.initAttributesBuilder(MetricsExporter::newAttributesBuilder);
+        storeMetricsManager.initAttributesBuilder(MetricsExporter::newAttributesBuilder);
+        proxyMetricsManager.initAttributesBuilder(MetricsExporter::newAttributesBuilder);
+    }
+
+    private void initStaticMetrics() {
+        streamMetricsManager.initStaticMetrics(brokerMeter);
+        storeMetricsManager.initStaticMetrics(brokerMeter);
+        proxyMetricsManager.initStaticMetrics(brokerMeter);
+    }
+
+    private void initDynamicMetrics() {
+        streamMetricsManager.initDynamicMetrics(brokerMeter);
+        storeMetricsManager.initDynamicMetrics(brokerMeter);
+        proxyMetricsManager.initDynamicMetrics(brokerMeter);
+        storeMetricsManager.start();
+    }
+
+    @Override
+    public void start() {
+        initDynamicMetrics();
+        this.started = true
     }
 
     private void registerMetricsView(SdkMeterProviderBuilder providerBuilder) {
@@ -225,13 +255,6 @@ public class MetricsExporter implements Lifecycle {
         for (Pair<InstrumentSelector, View> selectorViewPair : StoreMetricsManager.getMetricsView()) {
             providerBuilder.registerView(selectorViewPair.getLeft(), selectorViewPair.getRight());
         }
-    }
-
-    private void initMetrics() {
-        proxyMetricsManager.initMetrics(brokerMeter, MetricsExporter::newAttributesBuilder);
-
-        storeMetricsManager.initMetrics(brokerMeter, MetricsExporter::newAttributesBuilder);
-        storeMetricsManager.start();
     }
 
     @Override
