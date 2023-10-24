@@ -35,6 +35,7 @@ import com.automq.stream.s3.cache.DefaultS3BlockCache;
 import com.automq.stream.s3.cache.S3BlockCache;
 import com.automq.stream.s3.compact.CompactionManager;
 import com.automq.stream.s3.objects.ObjectManager;
+import com.automq.stream.s3.network.AsyncNetworkBandwidthLimiter;
 import com.automq.stream.s3.operator.S3Operator;
 import com.automq.stream.s3.streams.StreamManager;
 import com.automq.stream.s3.wal.BlockWALService;
@@ -57,8 +58,12 @@ public class S3StreamStore implements StreamStore {
     private final CompactionManager compactionManager;
     private final ThreadPoolExecutor storeWorkingThreadPool;
 
-    public S3StreamStore(StoreConfig storeConfig, S3StreamConfig streamConfig, StoreMetadataService metadataService,
-        S3Operator operator) {
+    public S3StreamStore(StoreConfig storeConfig, S3StreamConfig streamConfig, StoreMetadataService metadataService, S3Operator operator) {
+        this(storeConfig, streamConfig, metadataService, operator, null, null);
+    }
+
+    public S3StreamStore(StoreConfig storeConfig, S3StreamConfig streamConfig, StoreMetadataService metadataService, S3Operator operator,
+                         AsyncNetworkBandwidthLimiter networkInboundBucket, AsyncNetworkBandwidthLimiter networkOutboundBucket) {
         this.s3Config = configFrom(streamConfig);
 
         // Build meta service and related manager
@@ -74,7 +79,7 @@ public class S3StreamStore implements StreamStore {
         // Build the compaction manager
         this.compactionManager = new CompactionManager(s3Config, objectManager, operator);
 
-        this.streamClient = new S3StreamClient(streamManager, storage, objectManager, operator, s3Config);
+        this.streamClient = new S3StreamClient(streamManager, storage, objectManager, operator, s3Config, networkInboundBucket, networkOutboundBucket);
         this.storeWorkingThreadPool = ThreadPoolMonitor.createAndMonitor(
             storeConfig.workingThreadPoolNums(),
             storeConfig.workingThreadQueueCapacity(),
