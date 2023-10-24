@@ -2425,4 +2425,61 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         }
     }
 
+    @Test
+    public void testGetStreams() throws IOException, ExecutionException, InterruptedException {
+        int nodeId = 1;
+        int count = 5;
+        List<Long> streamIds = new ArrayList<>();
+        try (SqlSession session = this.getSessionFactory().openSession()) {
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+            RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
+            long startOffset = 1234;
+            for (int i = 0; i < count; i++) {
+                com.automq.rocketmq.controller.metadata.database.dao.Stream stream = new com.automq.rocketmq.controller.metadata.database.dao.Stream();
+                stream.setSrcNodeId(nodeId);
+                stream.setDstNodeId(nodeId);
+                stream.setStartOffset(startOffset);
+                stream.setEpoch(i);
+                stream.setRangeId(i + 1);
+                stream.setState(StreamState.OPEN);
+                stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
+                streamMapper.create(stream);
+                long streamId = stream.getId();
+                streamIds.add(streamId);
+
+                Range range = new Range();
+                range.setRangeId(i + 1);
+                range.setStreamId(streamId);
+                range.setEpoch(0L);
+                range.setStartOffset(startOffset);
+                range.setEndOffset(startOffset + 100);
+                range.setNodeId(nodeId);
+                rangeMapper.create(range);
+
+                startOffset += 100;
+            }
+            session.commit();
+        }
+
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            Assertions.assertNull(metadataStore.getLease());
+            Lease lease = new Lease();
+            lease.setNodeId(config.nodeId());
+            metadataStore.setLease(lease);
+            metadataStore.setRole(Role.Leader);
+            List<StreamMetadata> streams = metadataStore.getStreams(streamIds).get();
+
+            Assertions.assertFalse(streams.isEmpty());
+            Assertions.assertEquals(count, streams.size());
+            long startOffset = 1234;
+            for (int i = 0; i < count; i++) {
+                StreamMetadata streamMetadata = streams.get(i);
+                Assertions.assertEquals(startOffset, streamMetadata.getStartOffset());
+                Assertions.assertEquals(startOffset + 100, streamMetadata.getEndOffset());
+                startOffset += 100;
+            }
+        }
+
+    }
+
 }

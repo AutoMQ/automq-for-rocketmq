@@ -181,4 +181,13 @@ public interface StoreMetadataService {
      */
     CompletableFuture<Pair<List<S3StreamObject>, List<S3WALObject>>> listObjects(long streamId, long startOffset,
         long endOffset, int limit);
+
+    int ownerNode(long topicId, int queueId);
+
+    /**
+     * Get the stream metadata for the specified list of stream ids.
+     * @param streamIds list of specified stream ids
+     * @return list of {@link StreamMetadata}
+     */
+    CompletableFuture<List<StreamMetadata>> getStreams(List<Long> streamIds);
 }

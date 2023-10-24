@@ -359,8 +359,15 @@ public class MessageServiceImpl implements MessageService {
         CompletableFuture<ConsumerGroup> consumeGroupFuture = metadataService.consumerGroupOf(requestHeader.getConsumerGroup());
         CompletableFuture<Topic> topicFuture = metadataService.topicOf(requestHeader.getTopic());
 
+        // TODO：Implement the bellow logic in the next iteration.
+        // If the consumer doesn't have offset record on the specified queue:
+        // * If the consumer never consume any message of the topic, return -1, means QUERY_NOT_FOUND.
+        // * If the consumer has consumed some messages of the topic, return the MIN_OFFSET of the specified queue.
         return consumeGroupFuture.thenCombine(topicFuture, Pair::of)
-            .thenCompose(pair -> metadataService.consumerOffsetOf(pair.getLeft().getGroupId(), pair.getRight().getTopicId(), requestHeader.getQueueId()));
+            .thenCompose(pair -> metadataService.consumerOffsetOf(
+                pair.getLeft().getGroupId(),
+                pair.getRight().getTopicId(),
+                requestHeader.getQueueId()));
     }
 
     @Override
@@ -368,9 +375,14 @@ public class MessageServiceImpl implements MessageService {
         UpdateConsumerOffsetRequestHeader requestHeader, long timeoutMillis) {
         CompletableFuture<ConsumerGroup> consumeGroupFuture = metadataService.consumerGroupOf(requestHeader.getConsumerGroup());
         CompletableFuture<Topic> topicFuture = metadataService.topicOf(requestHeader.getTopic());
-        // TODO: support retry topic.
+        VirtualQueue virtualQueue = new VirtualQueue(messageQueue);
+
         return consumeGroupFuture.thenCombine(topicFuture, Pair::of)
-            .thenCompose(pair -> metadataService.updateConsumerOffset(pair.getLeft().getGroupId(), pair.getRight().getTopicId(), requestHeader.getQueueId(), requestHeader.getCommitOffset()));
+            .thenCompose(pair -> metadataService.updateConsumerOffset(
+                pair.getLeft().getGroupId(),
+                pair.getRight().getTopicId(),
+                virtualQueue.physicalQueueId(),
+                requestHeader.getCommitOffset()));
     }
 
     @Override

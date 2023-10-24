@@ -53,4 +53,6 @@ public interface StreamMapper {
         @Param("queueId") int queueId,
         @Param("srcNodeId") int src,
         @Param("dstNodeId") int dst);
+
+    List<Stream> listByStreamIds(@Param("streamIds") List<Long> streamIds);
 }

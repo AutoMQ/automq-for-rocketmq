@@ -61,6 +61,7 @@ import com.automq.rocketmq.controller.tasks.HeartbeatTask;
 import com.automq.rocketmq.controller.tasks.LeaseTask;
 import com.automq.rocketmq.controller.tasks.ReclaimS3ObjectTask;
 import com.automq.rocketmq.controller.tasks.RecycleGroupTask;
+import com.automq.rocketmq.controller.tasks.RecycleS3Task;
 import com.automq.rocketmq.controller.tasks.RecycleTopicTask;
 import com.automq.rocketmq.controller.tasks.ScanAssignmentTask;
 import com.automq.rocketmq.controller.tasks.ScanGroupTask;
@@ -188,6 +189,8 @@ public class DefaultMetadataStore implements MetadataStore {
             config.scanIntervalInSecs(), TimeUnit.SECONDS);
         this.scheduledExecutorService.scheduleWithFixedDelay(new ScanAssignmentTask(this), 1,
             config.scanIntervalInSecs(), TimeUnit.SECONDS);
+        this.scheduledExecutorService.scheduleWithFixedDelay(new RecycleS3Task(this),
+            config.recycleS3IntervalInSecs(), config.recycleS3IntervalInSecs(), TimeUnit.SECONDS);
         LOGGER.info("MetadataStore tasks scheduled");
     }
 
@@ -396,6 +399,11 @@ public class DefaultMetadataStore implements MetadataStore {
     @Override
     public ConcurrentMap<Integer, BrokerNode> allNodes() {
         return nodes;
+    }
+
+    @Override
+    public int ownerNode(long topicId, int queueId) {
+        return topicManager.ownerNode(topicId, queueId);
     }
 
     @Override
@@ -947,22 +955,7 @@ public class DefaultMetadataStore implements MetadataStore {
                         continue;
                     }
                     StreamMapper streamMapper = session.getMapper(StreamMapper.class);
-                    RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
-                    List<StreamMetadata> streams = streamMapper.listByNode(nodeId, StreamState.OPEN)
-                        .stream()
-                        .map(stream -> {
-                            int rangeId = stream.getRangeId();
-                            Range range = rangeMapper.get(rangeId, stream.getId(), null);
-                            return StreamMetadata.newBuilder()
-                                .setStreamId(stream.getId())
-                                .setStartOffset(stream.getStartOffset())
-                                .setEndOffset(null == range ? 0 : range.getEndOffset())
-                                .setEpoch(stream.getEpoch())
-                                .setState(stream.getState())
-                                .setRangeId(stream.getRangeId())
-                                .build();
-                        })
-                        .toList();
+                    List<StreamMetadata> streams = buildStreamMetadata(streamMapper.listByNode(nodeId, StreamState.OPEN), session);
                     future.complete(streams);
                     break;
                 }
@@ -980,6 +973,35 @@ public class DefaultMetadataStore implements MetadataStore {
             }
         }
         return future;
+    }
+
+    private List<StreamMetadata> buildStreamMetadata(List<Stream> streams, SqlSession session) {
+        RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
+        return streams.stream()
+            .map(stream -> {
+                int rangeId = stream.getRangeId();
+                Range range = rangeMapper.get(rangeId, stream.getId(), null);
+                return StreamMetadata.newBuilder()
+                    .setStreamId(stream.getId())
+                    .setStartOffset(stream.getStartOffset())
+                    .setEndOffset(null == range ? 0 : range.getEndOffset())
+                    .setEpoch(stream.getEpoch())
+                    .setState(stream.getState())
+                    .setRangeId(stream.getRangeId())
+                    .build();
+            })
+            .toList();
+    }
+
+    @Override
+    public CompletableFuture<List<StreamMetadata>> getStreams(List<Long> streamIds) {
+        return CompletableFuture.supplyAsync(() -> {
+            try (SqlSession session = openSession()) {
+                StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+                List<Stream> streams = streamMapper.listByStreamIds(streamIds);
+                return buildStreamMetadata(streams, session);
+            }
+        }, asyncExecutorService);
     }
 
     @Override

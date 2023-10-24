@@ -207,4 +207,14 @@ public interface MetadataStore extends Closeable {
 
     ConcurrentMap<Integer, BrokerNode> allNodes();
 
+    /**
+     * Query owner node id of the given topic/queue.
+     *
+     * @param topicId Topic ID
+     * @param queueId Queue ID
+     * @return Owner node id if found in cache; 0 otherise.
+     */
+    int ownerNode(long topicId, int queueId);
+
+    CompletableFuture<List<StreamMetadata>> getStreams(List<Long> streamIds);
 }

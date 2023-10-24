@@ -20,6 +20,7 @@ package com.automq.rocketmq.store.service;
 import com.automq.rocketmq.common.config.StoreConfig;
 import com.automq.rocketmq.store.api.MessageStateMachine;
 import com.automq.rocketmq.store.api.StreamStore;
+import com.automq.rocketmq.store.exception.StoreErrorCode;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.operation.AckOperation;
 import com.automq.rocketmq.store.model.operation.ChangeInvisibleDurationOperation;
@@ -87,7 +88,9 @@ public class StreamOperationLogService implements OperationLogService {
                         replay(batchWithContext.baseOffset(), operation);
                     } catch (StoreException e) {
                         LOGGER.error("Topic {}, queue: {}: Replay operation:{} failed when recover", stateMachine.topicId(), stateMachine.queueId(), operation, e);
-                        throw new CompletionException(e);
+                        if (e.code() != StoreErrorCode.ILLEGAL_ARGUMENT) {
+                            throw new CompletionException(e);
+                        }
                     }
                 }
             }));
@@ -122,7 +125,8 @@ public class StreamOperationLogService implements OperationLogService {
     }
 
     @Override
-    public CompletableFuture<LogResult> logChangeInvisibleDurationOperation(ChangeInvisibleDurationOperation operation) {
+    public CompletableFuture<LogResult> logChangeInvisibleDurationOperation(
+        ChangeInvisibleDurationOperation operation) {
         return streamStore.append(operation.operationStreamId(),
                 new SingleRecord(ByteBuffer.wrap(SerializeUtil.encodeChangeInvisibleDurationOperation(operation))))
             .thenApply(result -> {

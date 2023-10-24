@@ -30,6 +30,9 @@ import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.BrokerNode;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
+import com.automq.rocketmq.controller.metadata.database.cache.AssignmentCache;
+import com.automq.rocketmq.controller.metadata.database.cache.Inflight;
+import com.automq.rocketmq.controller.metadata.database.cache.TopicCache;
 import com.automq.rocketmq.controller.metadata.database.dao.Group;
 import com.automq.rocketmq.controller.metadata.database.dao.GroupCriteria;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
@@ -53,6 +56,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.stream.IntStream;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -72,6 +77,9 @@ public class TopicManager {
 
     final AssignmentCache assignmentCache;
 
+    final ConcurrentMap<Long, Inflight<apache.rocketmq.controller.v1.Topic>> topicIdRequests;
+    final ConcurrentMap<String, Inflight<apache.rocketmq.controller.v1.Topic>> topicNameRequests;
+
     public TopicManager(MetadataStore metadataStore) {
         this.metadataStore = metadataStore;
         this.gson = new GsonBuilder()
@@ -81,6 +89,8 @@ public class TopicManager {
 
         this.topicCache = new TopicCache();
         this.assignmentCache = new AssignmentCache();
+        this.topicIdRequests = new ConcurrentHashMap<>();
+        this.topicNameRequests = new ConcurrentHashMap<>();
     }
 
     public CompletableFuture<Long> createTopic(String topicName, int queueNum,
@@ -293,6 +303,34 @@ public class TopicManager {
         }, metadataStore.asyncExecutor());
     }
 
+    private void completeTopicDescription(@Nonnull apache.rocketmq.controller.v1.Topic topic) {
+        Inflight<apache.rocketmq.controller.v1.Topic> idInflight = topicIdRequests.remove(topic.getTopicId());
+        if (null != idInflight) {
+            idInflight.complete(topic);
+        }
+
+        Inflight<apache.rocketmq.controller.v1.Topic> nameInflight = topicNameRequests.remove(topic.getName());
+        if (null != nameInflight) {
+            nameInflight.complete(topic);
+        }
+    }
+
+    private void completeTopicDescriptionExceptionally(Long topicId, String topicName, Throwable e) {
+        if (null != topicId) {
+            Inflight<apache.rocketmq.controller.v1.Topic> idInflight = topicIdRequests.remove(topicId);
+            if (null != idInflight) {
+                idInflight.completeExceptionally(e);
+            }
+        }
+
+        if (!Strings.isNullOrEmpty(topicName)) {
+            Inflight<apache.rocketmq.controller.v1.Topic> nameInflight = topicNameRequests.remove(topicName);
+            if (null != nameInflight) {
+                nameInflight.completeExceptionally(e);
+            }
+        }
+    }
+
     public CompletableFuture<apache.rocketmq.controller.v1.Topic> describeTopic(Long topicId,
         String topicName) {
 
@@ -308,35 +346,55 @@ public class TopicManager {
             Map<Integer, QueueAssignment> assignmentMap = assignmentCache.byTopicId(topicMetadataCache.getId());
             if (null != assignmentMap && !assignmentMap.isEmpty()) {
                 apache.rocketmq.controller.v1.Topic topic =
-                    GrpcHelper.buildTopic(gson, topicMetadataCache, assignmentMap.values());
+                    Helper.buildTopic(gson, topicMetadataCache, assignmentMap.values());
                 return CompletableFuture.completedFuture(topic);
             }
         }
 
-        return CompletableFuture.supplyAsync(() -> {
-            if (metadataStore.isLeader()) {
+        CompletableFuture<apache.rocketmq.controller.v1.Topic> future = new CompletableFuture<>();
+        boolean queryNow = false;
+        if (null != topicId) {
+            switch (Helper.addFuture(topicId, future, topicIdRequests)) {
+                case COMPLETED -> {
+                    return describeTopic(topicId, topicName);
+                }
+                case LEADER -> queryNow = true;
+            }
+        }
+
+        if (!Strings.isNullOrEmpty(topicName)) {
+            switch (Helper.addFuture(topicName, future, topicNameRequests)) {
+                case COMPLETED -> {
+                    return describeTopic(topicId, topicName);
+                }
+                case LEADER -> queryNow = true;
+            }
+        }
+
+        if (queryNow) {
+            metadataStore.asyncExecutor().submit(() -> {
                 try (SqlSession session = metadataStore.openSession()) {
                     TopicMapper topicMapper = session.getMapper(TopicMapper.class);
                     Topic topic = topicMapper.get(topicId, topicName);
-
                     if (null == topic) {
                         ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE,
                             String.format("Topic not found for topic-id=%d, topic-name=%s", topicId, topicName));
-                        throw new CompletionException(e);
+                        completeTopicDescriptionExceptionally(topicId, topicName, e);
+                        return;
                     }
 
                     QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
                     List<QueueAssignment> assignments = assignmentMapper.list(topic.getId(), null, null, null, null);
-                    return GrpcHelper.buildTopic(gson, topic, assignments);
+                    // Update cache
+                    topicCache.apply(List.of(topic));
+                    assignmentCache.apply(assignments);
+                    apache.rocketmq.controller.v1.Topic result = Helper.buildTopic(gson, topic, assignments);
+                    completeTopicDescription(result);
                 }
-            } else {
-                try {
-                    return metadataStore.controllerClient().describeTopic(metadataStore.leaderAddress(), topicId, topicName).join();
-                } catch (ControllerException e) {
-                    throw new CompletionException(e);
-                }
-            }
-        }, metadataStore.asyncExecutor());
+            });
+        }
+
+        return future;
     }
 
     public CompletableFuture<List<apache.rocketmq.controller.v1.Topic>> listTopics() {
@@ -433,5 +491,23 @@ public class TopicManager {
      */
     private void notifyOnResourceChange(Set<Integer> nodes) {
 
+    }
+
+    public int ownerNode(long topicId, int queueId) {
+        Map<Integer, QueueAssignment> map = assignmentCache.byTopicId(topicId);
+        if (null != map) {
+            QueueAssignment assignment = map.get(queueId);
+            if (null != assignment) {
+                switch (assignment.getStatus()) {
+                    case ASSIGNMENT_STATUS_ASSIGNED -> {
+                        return assignment.getDstNodeId();
+                    }
+                    case ASSIGNMENT_STATUS_YIELDING -> {
+                        return assignment.getSrcNodeId();
+                    }
+                }
+            }
+        }
+        return 0;
     }
 }

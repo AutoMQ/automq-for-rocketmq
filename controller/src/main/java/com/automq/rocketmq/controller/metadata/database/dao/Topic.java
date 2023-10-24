@@ -25,11 +25,18 @@ public class Topic {
     private long id;
     private String name;
     private Integer queueNum;
+
+    private Integer retentionHours;
+
     private TopicStatus status = TopicStatus.TOPIC_STATUS_ACTIVE;
     private Date createTime;
     private Date updateTime;
 
     private String acceptMessageTypes;
+
+    public Topic() {
+        retentionHours = 72;
+    }
 
     public long getId() {
         return id;
@@ -53,6 +60,14 @@ public class Topic {
 
     public void setQueueNum(Integer queueNum) {
         this.queueNum = queueNum;
+    }
+
+    public Integer getRetentionHours() {
+        return retentionHours;
+    }
+
+    public void setRetentionHours(Integer retentionHours) {
+        this.retentionHours = retentionHours;
     }
 
     public TopicStatus getStatus() {

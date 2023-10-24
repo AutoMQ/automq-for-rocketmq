@@ -23,4 +23,6 @@ public interface S3StreamMetricsGroup {
     Counter newCounter(String type, String name, Map<String, String> tags);
 
     Histogram newHistogram(String type, String name, Map<String, String> tags);
+
+    void newGauge(String type, String name, Map<String, String> tags, Gauge gauge);
 }

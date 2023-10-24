@@ -15,24 +15,9 @@
  * limitations under the License.
  */
 
-package com.automq.stream.s3.wal;
+package com.automq.stream.s3.network;
 
-
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.concurrent.CompletableFuture;
-
-import static com.automq.stream.s3.wal.WriteAheadLog.AppendResult;
-
-public interface WriteRecordTask {
-    // Align to {@link WALUtil#BLOCK_SIZE}
-    long startOffset();
-
-    CompletableFuture<AppendResult.CallbackResult> future();
-
-    ByteBuffer recordHeader();
-
-    ByteBuffer recordBody();
-
-    void flushWALHeader(long windowMaxLength) throws IOException;
+public enum ThrottleStrategy {
+    BYPASS,
+    THROTTLE
 }

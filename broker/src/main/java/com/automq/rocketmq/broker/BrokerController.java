@@ -76,7 +76,7 @@ public class BrokerController implements Lifecycle {
         metadataStore.setDataStore(dataStore);
 
 
-        serviceManager = new DefaultServiceManager(brokerConfig.proxy(), proxyMetadataService, dlqService, messageStore);
+        serviceManager = new DefaultServiceManager(brokerConfig, proxyMetadataService, dlqService, messageStore);
         messagingProcessor = ExtendMessagingProcessor.createForS3RocketMQ(serviceManager);
 
         // TODO: Split controller to a separate port

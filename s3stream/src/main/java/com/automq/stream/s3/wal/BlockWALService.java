@@ -17,29 +17,31 @@
 
 package com.automq.stream.s3.wal;
 
+import com.automq.stream.s3.Config;
+import com.automq.stream.s3.DirectByteBufAlloc;
 import com.automq.stream.s3.metrics.TimerUtil;
 import com.automq.stream.s3.metrics.operations.S3Operation;
 import com.automq.stream.s3.metrics.stats.OperationMetricsStats;
-import com.automq.stream.s3.Config;
-import com.automq.stream.s3.wal.util.ThreadFactoryImpl;
 import com.automq.stream.s3.wal.util.WALChannel;
 import com.automq.stream.s3.wal.util.WALUtil;
+import com.automq.stream.utils.ThreadUtils;
+import com.automq.stream.utils.Threads;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.CompositeByteBuf;
 import org.apache.commons.lang3.time.StopWatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.Lock;
 
 /**
  * /**
@@ -123,7 +125,6 @@ import java.util.concurrent.atomic.AtomicLong;
  * used to verify the correctness of the record header
  */
 public class BlockWALService implements WriteAheadLog {
-    private static final Logger LOGGER = LoggerFactory.getLogger(BlockWALService.class);
     public static final int RECORD_HEADER_SIZE = 4 + 4 + 8 + 4 + 4;
     public static final int RECORD_HEADER_WITHOUT_CRC_SIZE = RECORD_HEADER_SIZE - 4;
     public static final int RECORD_HEADER_MAGIC_CODE = 0x87654321;
@@ -133,17 +134,23 @@ public class BlockWALService implements WriteAheadLog {
     public static final int WAL_HEADER_COUNT = 2;
     public static final int WAL_HEADER_CAPACITY = WALUtil.BLOCK_SIZE;
     public static final int WAL_HEADER_TOTAL_CAPACITY = WAL_HEADER_CAPACITY * WAL_HEADER_COUNT;
-    private int walHeaderFlushIntervalSeconds;
-    private long initialWindowSize;
+    private static final Logger LOGGER = LoggerFactory.getLogger(BlockWALService.class);
     private final AtomicBoolean readyToServe = new AtomicBoolean(false);
     private final AtomicLong writeHeaderRoundTimes = new AtomicLong(0);
+    private int walHeaderFlushIntervalSeconds;
+    private long initialWindowSize;
     private ScheduledExecutorService flushWALHeaderScheduler;
     private WALChannel walChannel;
     private SlidingWindowService slidingWindowService;
     private WALHeaderCoreData walHeaderCoreData;
 
+    public static BlockWALServiceBuilder builder(String blockDevicePath, long capacity) {
+        return new BlockWALServiceBuilder(blockDevicePath, capacity);
+    }
+
     private void startFlushWALHeaderScheduler() {
-        this.flushWALHeaderScheduler = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryImpl("flush-wal-header-thread-"));
+        this.flushWALHeaderScheduler = Threads.newSingleThreadScheduledExecutor(
+                ThreadUtils.createThreadFactory("flush-wal-header-thread-%d", true), LOGGER);
         this.flushWALHeaderScheduler.scheduleAtFixedRate(() -> {
             try {
                 BlockWALService.this.flushWALHeader(
@@ -175,7 +182,9 @@ public class BlockWALService implements WriteAheadLog {
         try {
             walHeaderCoreData.setLastWriteTimestamp(System.nanoTime());
             long trimOffset = walHeaderCoreData.getTrimOffset();
-            this.walChannel.write(walHeaderCoreData.marshal(), position);
+            ByteBuf buf = walHeaderCoreData.marshal();
+            this.walChannel.write(buf, position);
+            buf.release();
             walHeaderCoreData.setFlushedTrimOffset(trimOffset);
             LOGGER.debug("WAL header flushed, position: {}, header: {}", position, walHeaderCoreData);
         } catch (IOException e) {
@@ -184,8 +193,27 @@ public class BlockWALService implements WriteAheadLog {
         }
     }
 
-    private ByteBuffer readRecord(WALHeaderCoreData paramWALHeader, long recoverStartOffset) throws ReadRecordException {
-        final ByteBuffer recordHeader = ByteBuffer.allocate(RECORD_HEADER_SIZE);
+    private ByteBuf readRecord(WALHeaderCoreData paramWALHeader, long recoverStartOffset) throws ReadRecordException {
+        final ByteBuf recordHeader = DirectByteBufAlloc.byteBuffer(RECORD_HEADER_SIZE);
+        SlidingWindowService.RecordHeaderCoreData readRecordHeader;
+        try {
+            readRecordHeader = parseRecordHeader(paramWALHeader, recoverStartOffset, recordHeader);
+        } finally {
+            recordHeader.release();
+        }
+
+        int recordBodyLength = readRecordHeader.getRecordBodyLength();
+        ByteBuf recordBody = DirectByteBufAlloc.byteBuffer(recordBodyLength);
+        try {
+            parseRecordBody(paramWALHeader, recoverStartOffset, readRecordHeader, recordBody);
+        } finally {
+            recordBody.release();
+        }
+
+        return recordBody;
+    }
+
+    private SlidingWindowService.RecordHeaderCoreData parseRecordHeader(WALHeaderCoreData paramWALHeader, long recoverStartOffset, ByteBuf recordHeader) throws ReadRecordException {
         final long position = WALUtil.recordOffsetToPosition(recoverStartOffset, paramWALHeader.recordSectionCapacity(), WAL_HEADER_TOTAL_CAPACITY);
         try {
             int read = walChannel.read(recordHeader, position);
@@ -203,7 +231,7 @@ public class BlockWALService implements WriteAheadLog {
             );
         }
 
-        SlidingWindowService.RecordHeaderCoreData readRecordHeader = SlidingWindowService.RecordHeaderCoreData.unmarshal(recordHeader.position(0).limit(RECORD_HEADER_SIZE));
+        SlidingWindowService.RecordHeaderCoreData readRecordHeader = SlidingWindowService.RecordHeaderCoreData.unmarshal(recordHeader);
         if (readRecordHeader.getMagicCode() != RECORD_HEADER_MAGIC_CODE) {
             throw new ReadRecordException(
                     WALUtil.alignNextBlock(recoverStartOffset),
@@ -211,11 +239,7 @@ public class BlockWALService implements WriteAheadLog {
             );
         }
 
-        int recordBodyLength = readRecordHeader.getRecordBodyLength();
-        long recordBodyOffset = readRecordHeader.getRecordBodyOffset();
-        int recordBodyCRC = readRecordHeader.getRecordBodyCRC();
         int recordHeaderCRC = readRecordHeader.getRecordHeaderCRC();
-
         int calculatedRecordHeaderCRC = WALUtil.crc32(recordHeader, RECORD_HEADER_WITHOUT_CRC_SIZE);
         if (recordHeaderCRC != calculatedRecordHeaderCRC) {
             throw new ReadRecordException(
@@ -224,6 +248,7 @@ public class BlockWALService implements WriteAheadLog {
             );
         }
 
+        int recordBodyLength = readRecordHeader.getRecordBodyLength();
         if (recordBodyLength <= 0) {
             throw new ReadRecordException(
                     WALUtil.alignNextBlock(recoverStartOffset),
@@ -231,14 +256,19 @@ public class BlockWALService implements WriteAheadLog {
             );
         }
 
+        long recordBodyOffset = readRecordHeader.getRecordBodyOffset();
         if (recordBodyOffset != recoverStartOffset + RECORD_HEADER_SIZE) {
             throw new ReadRecordException(
                     WALUtil.alignNextBlock(recoverStartOffset),
                     String.format("invalid record body offset: expected %d, actual %d, recoverStartOffset: %d", recoverStartOffset + RECORD_HEADER_SIZE, recordBodyOffset, recoverStartOffset)
             );
         }
+        return readRecordHeader;
+    }
 
-        ByteBuffer recordBody = ByteBuffer.allocate(recordBodyLength);
+    private void parseRecordBody(WALHeaderCoreData paramWALHeader, long recoverStartOffset, SlidingWindowService.RecordHeaderCoreData readRecordHeader, ByteBuf recordBody) throws ReadRecordException {
+        long recordBodyOffset = readRecordHeader.getRecordBodyOffset();
+        int recordBodyLength = readRecordHeader.getRecordBodyLength();
         try {
             int read = walChannel.read(recordBody, WALUtil.recordOffsetToPosition(recordBodyOffset, paramWALHeader.recordSectionCapacity(), WAL_HEADER_TOTAL_CAPACITY));
             if (read != recordBodyLength) {
@@ -255,8 +285,7 @@ public class BlockWALService implements WriteAheadLog {
             );
         }
 
-        recordBody.position(0).limit(recordBodyLength);
-
+        int recordBodyCRC = readRecordHeader.getRecordBodyCRC();
         int calculatedRecordBodyCRC = WALUtil.crc32(recordBody);
         if (recordBodyCRC != calculatedRecordBodyCRC) {
             throw new ReadRecordException(
@@ -264,8 +293,6 @@ public class BlockWALService implements WriteAheadLog {
                     String.format("record body crc mismatch: expected %d, actual %d, recoverStartOffset: %d", calculatedRecordBodyCRC, recordBodyCRC, recoverStartOffset)
             );
         }
-
-        return recordBody.position(0);
     }
 
     private WALHeaderCoreData recoverEntireWALAndCorrectWALHeader(WALHeaderCoreData paramWALHeader) {
@@ -288,8 +315,8 @@ public class BlockWALService implements WriteAheadLog {
             long nextRecoverStartOffset;
 
             try {
-                ByteBuffer body = readRecord(paramWALHeader, recoverStartOffset);
-                nextRecoverStartOffset = WALUtil.alignLargeByBlockSize(recoverStartOffset + RECORD_HEADER_SIZE + body.limit());
+                ByteBuf body = readRecord(paramWALHeader, recoverStartOffset);
+                nextRecoverStartOffset = WALUtil.alignLargeByBlockSize(recoverStartOffset + RECORD_HEADER_SIZE + body.readableBytes());
             } catch (ReadRecordException e) {
                 nextRecoverStartOffset = e.getJumpNextRecoverOffset();
                 LOGGER.debug("failed to read record, try next, recoverStartOffset: {}, meetIllegalRecordTimes: {}, recoverRemainingBytes: {}, error: {}",
@@ -310,18 +337,20 @@ public class BlockWALService implements WriteAheadLog {
         WALHeaderCoreData walHeaderCoreDataAvailable = null;
 
         for (int i = 0; i < WAL_HEADER_COUNT; i++) {
+            ByteBuf buf = DirectByteBufAlloc.byteBuffer(WAL_HEADER_SIZE);
             try {
-                final ByteBuffer byteBuffer = ByteBuffer.allocate(WAL_HEADER_SIZE);
-                int read = walChannel.read(byteBuffer, i * WAL_HEADER_CAPACITY);
+                int read = walChannel.read(buf, i * WAL_HEADER_CAPACITY);
                 if (read != WAL_HEADER_SIZE) {
                     continue;
                 }
-                WALHeaderCoreData walHeaderCoreData = WALHeaderCoreData.unmarshal(byteBuffer.position(0).limit(WAL_HEADER_SIZE));
+                WALHeaderCoreData walHeaderCoreData = WALHeaderCoreData.unmarshal(buf);
                 if (walHeaderCoreDataAvailable == null || walHeaderCoreDataAvailable.lastWriteTimestamp3 < walHeaderCoreData.lastWriteTimestamp3) {
                     walHeaderCoreDataAvailable = walHeaderCoreData;
                 }
             } catch (IOException | UnmarshalException ignored) {
                 // failed to parse WALHeader, ignore
+            } finally {
+                buf.release();
             }
         }
 
@@ -392,67 +421,57 @@ public class BlockWALService implements WriteAheadLog {
         try {
             return append0(buf, crc);
         } catch (OverCapacityException ex) {
+            buf.release();
             OperationMetricsStats.getOrCreateOperationMetrics(S3Operation.APPEND_STORAGE_WAL_FULL).operationCount.inc();
             throw ex;
         }
     }
 
-    public AppendResult append0(ByteBuf buf, int crc) throws OverCapacityException {
+    public AppendResult append0(ByteBuf body, int crc) throws OverCapacityException {
         TimerUtil timerUtil = new TimerUtil();
         checkReadyToServe();
 
-        ByteBuffer record = buf.nioBuffer();
-
-        final int recordBodyCRC = 0 == crc ? WALUtil.crc32(record) : crc;
-        final long expectedWriteOffset = slidingWindowService.allocateWriteOffset(record.limit(), walHeaderCoreData.getFlushedTrimOffset(), walHeaderCoreData.getCapacity() - WAL_HEADER_TOTAL_CAPACITY);
+        final long recordSize = RECORD_HEADER_SIZE + body.readableBytes();
+        final int recordBodyCRC = 0 == crc ? WALUtil.crc32(body) : crc;
         final CompletableFuture<AppendResult.CallbackResult> appendResultFuture = new CompletableFuture<>();
+        long expectedWriteOffset;
+
+        Lock lock = slidingWindowService.getBlockLock();
+        lock.lock();
+        try {
+            Block block = slidingWindowService.getCurrentBlockLocked();
+            expectedWriteOffset = block.addRecord(recordSize, (offset) -> record(body, recordBodyCRC, offset), appendResultFuture);
+            if (expectedWriteOffset < 0) {
+                // this block is full, create a new one
+                block = slidingWindowService.sealAndNewBlockLocked(block, recordSize, walHeaderCoreData.getFlushedTrimOffset(), walHeaderCoreData.getCapacity() - WAL_HEADER_TOTAL_CAPACITY);
+                expectedWriteOffset = block.addRecord(recordSize, (offset) -> record(body, recordBodyCRC, offset), appendResultFuture);
+            }
+        } finally {
+            lock.unlock();
+        }
+        slidingWindowService.tryWriteBlock();
+
         final AppendResult appendResult = new AppendResultImpl(expectedWriteOffset, appendResultFuture);
-
-        // submit write task
-        slidingWindowService.submitWriteRecordTask(new WriteRecordTask() {
-            @Override
-            public long startOffset() {
-                return expectedWriteOffset;
-            }
-
-            @Override
-            public CompletableFuture<AppendResult.CallbackResult> future() {
-                return appendResultFuture;
-            }
-
-            @Override
-            public ByteBuffer recordHeader() {
-                SlidingWindowService.RecordHeaderCoreData recordHeaderCoreData = new SlidingWindowService.RecordHeaderCoreData();
-                recordHeaderCoreData
-                        .setMagicCode(RECORD_HEADER_MAGIC_CODE)
-                        .setRecordBodyLength(record.limit())
-                        .setRecordBodyOffset(expectedWriteOffset + RECORD_HEADER_SIZE)
-                        .setRecordBodyCRC(recordBodyCRC);
-                return recordHeaderCoreData.marshal();
-            }
-
-            @Override
-            public ByteBuffer recordBody() {
-                return record;
-            }
-
-            @Override
-            public void flushWALHeader(long windowMaxLength) throws IOException {
-                BlockWALService.this.flushWALHeader(
-                        slidingWindowService.getWindowCoreData().getWindowStartOffset(),
-                        windowMaxLength,
-                        slidingWindowService.getWindowCoreData().getWindowNextWriteOffset(),
-                        ShutdownType.UNGRACEFULLY
-                );
-            }
-        });
-
         appendResult.future().whenComplete((nil, ex) -> {
             OperationMetricsStats.getOrCreateOperationMetrics(S3Operation.APPEND_STORAGE_WAL).operationCount.inc();
             OperationMetricsStats.getOrCreateOperationMetrics(S3Operation.APPEND_STORAGE_WAL).operationTime.update(timerUtil.elapsed());
         });
-
         return appendResult;
+    }
+
+    private ByteBuf recordHeader(ByteBuf body, int crc, long start) {
+        return new SlidingWindowService.RecordHeaderCoreData()
+                .setMagicCode(RECORD_HEADER_MAGIC_CODE)
+                .setRecordBodyLength(body.readableBytes())
+                .setRecordBodyOffset(start + RECORD_HEADER_SIZE)
+                .setRecordBodyCRC(crc)
+                .marshal();
+    }
+
+    private ByteBuf record(ByteBuf body, int crc, long start) {
+        CompositeByteBuf record = DirectByteBufAlloc.compositeByteBuffer();
+        record.addComponents(true, recordHeader(body, crc, start), body);
+        return record;
     }
 
     @Override
@@ -482,8 +501,7 @@ public class BlockWALService implements WriteAheadLog {
         checkReadyToServe();
 
         long previousNextWriteOffset = slidingWindowService.getWindowCoreData().getWindowNextWriteOffset();
-        slidingWindowService.getWindowCoreData().setWindowStartOffset(previousNextWriteOffset + WALUtil.BLOCK_SIZE);
-        slidingWindowService.getWindowCoreData().setWindowNextWriteOffset(previousNextWriteOffset + WALUtil.BLOCK_SIZE);
+        slidingWindowService.resetWindow(previousNextWriteOffset + WALUtil.BLOCK_SIZE);
         LOGGER.info("reset sliding window and trim WAL to offset: {}", previousNextWriteOffset);
         return trim(previousNextWriteOffset);
     }
@@ -516,6 +534,15 @@ public class BlockWALService implements WriteAheadLog {
         }
     }
 
+    private SlidingWindowService.WALHeaderFlusher flusher() {
+        return windowMaxLength -> flushWALHeader(
+                slidingWindowService.getWindowCoreData().getWindowStartOffset(),
+                windowMaxLength,
+                slidingWindowService.getWindowCoreData().getWindowNextWriteOffset(),
+                ShutdownType.UNGRACEFULLY
+        );
+    }
+
     static class WALHeaderCoreData {
         private final AtomicLong trimOffset2 = new AtomicLong(0);
         private final AtomicLong flushedTrimOffset = new AtomicLong(0);
@@ -528,24 +555,25 @@ public class BlockWALService implements WriteAheadLog {
         private ShutdownType shutdownType7 = ShutdownType.UNGRACEFULLY;
         private int crc8;
 
-        public static WALHeaderCoreData unmarshal(ByteBuffer byteBuffer) throws UnmarshalException {
+        public static WALHeaderCoreData unmarshal(ByteBuf buf) throws UnmarshalException {
             WALHeaderCoreData walHeaderCoreData = new WALHeaderCoreData();
-            walHeaderCoreData.magicCode0 = byteBuffer.getInt();
-            walHeaderCoreData.capacity1 = byteBuffer.getLong();
-            walHeaderCoreData.trimOffset2.set(byteBuffer.getLong());
-            walHeaderCoreData.lastWriteTimestamp3 = byteBuffer.getLong();
-            walHeaderCoreData.slidingWindowNextWriteOffset4.set(byteBuffer.getLong());
-            walHeaderCoreData.slidingWindowStartOffset5.set(byteBuffer.getLong());
-            walHeaderCoreData.slidingWindowMaxLength6.set(byteBuffer.getLong());
-            walHeaderCoreData.shutdownType7 = ShutdownType.fromCode(byteBuffer.getInt());
-            walHeaderCoreData.crc8 = byteBuffer.getInt();
+            buf.markReaderIndex();
+            walHeaderCoreData.magicCode0 = buf.readInt();
+            walHeaderCoreData.capacity1 = buf.readLong();
+            walHeaderCoreData.trimOffset2.set(buf.readLong());
+            walHeaderCoreData.lastWriteTimestamp3 = buf.readLong();
+            walHeaderCoreData.slidingWindowNextWriteOffset4.set(buf.readLong());
+            walHeaderCoreData.slidingWindowStartOffset5.set(buf.readLong());
+            walHeaderCoreData.slidingWindowMaxLength6.set(buf.readLong());
+            walHeaderCoreData.shutdownType7 = ShutdownType.fromCode(buf.readInt());
+            walHeaderCoreData.crc8 = buf.readInt();
+            buf.resetReaderIndex();
 
             if (walHeaderCoreData.magicCode0 != WAL_HEADER_MAGIC_CODE) {
                 throw new UnmarshalException(String.format("WALHeader MagicCode not match, Recovered: [%d] expect: [%d]", walHeaderCoreData.magicCode0, WAL_HEADER_MAGIC_CODE));
             }
 
-            ByteBuffer headerExceptCRC = walHeaderCoreData.marshalHeaderExceptCRC();
-            int crc = WALUtil.crc32(headerExceptCRC, WAL_HEADER_WITHOUT_CRC_SIZE);
+            int crc = WALUtil.crc32(buf, WAL_HEADER_WITHOUT_CRC_SIZE);
             if (crc != walHeaderCoreData.crc8) {
                 throw new UnmarshalException(String.format("WALHeader CRC not match, Recovered: [%d] expect: [%d]", walHeaderCoreData.crc8, crc));
             }
@@ -599,10 +627,6 @@ public class BlockWALService implements WriteAheadLog {
             this.flushedTrimOffset.set(flushedTrimOffset);
         }
 
-        public long getLastWriteTimestamp() {
-            return lastWriteTimestamp3;
-        }
-
         public WALHeaderCoreData setLastWriteTimestamp(long lastWriteTimestamp) {
             this.lastWriteTimestamp3 = lastWriteTimestamp;
             return this;
@@ -650,30 +674,26 @@ public class BlockWALService implements WriteAheadLog {
                     + '}';
         }
 
-        private ByteBuffer marshalHeaderExceptCRC() {
-            ByteBuffer byteBuffer = ByteBuffer.allocate(WAL_HEADER_SIZE);
-            byteBuffer.putInt(magicCode0);
-            byteBuffer.putLong(capacity1);
-            byteBuffer.putLong(trimOffset2.get());
-            byteBuffer.putLong(lastWriteTimestamp3);
-            byteBuffer.putLong(slidingWindowNextWriteOffset4.get());
-            byteBuffer.putLong(slidingWindowStartOffset5.get());
-            byteBuffer.putLong(slidingWindowMaxLength6.get());
-            byteBuffer.putInt(shutdownType7.getCode());
+        private ByteBuf marshalHeaderExceptCRC() {
+            ByteBuf buf = DirectByteBufAlloc.byteBuffer(WAL_HEADER_SIZE);
+            buf.writeInt(magicCode0);
+            buf.writeLong(capacity1);
+            buf.writeLong(trimOffset2.get());
+            buf.writeLong(lastWriteTimestamp3);
+            buf.writeLong(slidingWindowNextWriteOffset4.get());
+            buf.writeLong(slidingWindowStartOffset5.get());
+            buf.writeLong(slidingWindowMaxLength6.get());
+            buf.writeInt(shutdownType7.getCode());
 
-            return byteBuffer;
+            return buf;
         }
 
-        ByteBuffer marshal() {
-            ByteBuffer byteBuffer = marshalHeaderExceptCRC();
-            this.crc8 = WALUtil.crc32(byteBuffer, WAL_HEADER_WITHOUT_CRC_SIZE);
-            byteBuffer.putInt(crc8);
-            return byteBuffer.position(0);
+        ByteBuf marshal() {
+            ByteBuf buf = marshalHeaderExceptCRC();
+            this.crc8 = WALUtil.crc32(buf, WAL_HEADER_WITHOUT_CRC_SIZE);
+            buf.writeInt(crc8);
+            return buf;
         }
-    }
-
-    public static BlockWALServiceBuilder builder(String blockDevicePath, long capacity) {
-        return new BlockWALServiceBuilder(blockDevicePath, capacity);
     }
 
     public static class BlockWALServiceBuilder {
@@ -684,7 +704,6 @@ public class BlockWALService implements WriteAheadLog {
         private long slidingWindowInitialSize = 1 << 20;
         private long slidingWindowUpperLimit = 512 << 20;
         private long slidingWindowScaleUnit = 4 << 20;
-        private int writeQueueCapacity = 10000;
 
         BlockWALServiceBuilder(String blockDevicePath, long capacity) {
             this.blockDevicePath = blockDevicePath;
@@ -697,8 +716,7 @@ public class BlockWALService implements WriteAheadLog {
                     .ioThreadNums(config.s3WALThread())
                     .slidingWindowInitialSize(config.s3WALWindowInitial())
                     .slidingWindowScaleUnit(config.s3WALWindowIncrement())
-                    .slidingWindowUpperLimit(config.s3WALWindowMax())
-                    .writeQueueCapacity(config.s3WALQueue());
+                    .slidingWindowUpperLimit(config.s3WALWindowMax());
         }
 
         public BlockWALServiceBuilder flushHeaderIntervalSeconds(int flushHeaderIntervalSeconds) {
@@ -726,11 +744,6 @@ public class BlockWALService implements WriteAheadLog {
             return this;
         }
 
-        public BlockWALServiceBuilder writeQueueCapacity(int writeQueueCapacity) {
-            this.writeQueueCapacity = writeQueueCapacity;
-            return this;
-        }
-
         public BlockWALService build() {
             BlockWALService blockWALService = new BlockWALService();
 
@@ -751,7 +764,7 @@ public class BlockWALService implements WriteAheadLog {
                     ioThreadNums,
                     slidingWindowUpperLimit,
                     slidingWindowScaleUnit,
-                    writeQueueCapacity
+                    blockWALService.flusher()
             );
 
             LOGGER.info("build BlockWALService: {}", this);
@@ -769,29 +782,11 @@ public class BlockWALService implements WriteAheadLog {
                     + ", slidingWindowInitialSize=" + slidingWindowInitialSize
                     + ", slidingWindowUpperLimit=" + slidingWindowUpperLimit
                     + ", slidingWindowScaleUnit=" + slidingWindowScaleUnit
-                    + ", writeQueueCapacity=" + writeQueueCapacity
                     + '}';
         }
     }
 
-    static class AppendResultImpl implements AppendResult {
-        private final long recordOffset;
-        private final CompletableFuture<CallbackResult> future;
-
-        public AppendResultImpl(long recordOffset, CompletableFuture<CallbackResult> future) {
-            this.recordOffset = recordOffset;
-            this.future = future;
-        }
-
-        @Override
-        public long recordOffset() {
-            return recordOffset;
-        }
-
-        @Override
-        public CompletableFuture<CallbackResult> future() {
-            return future;
-        }
+    record AppendResultImpl(long recordOffset, CompletableFuture<CallbackResult> future) implements AppendResult {
 
         @Override
         public String toString() {
@@ -799,24 +794,7 @@ public class BlockWALService implements WriteAheadLog {
         }
     }
 
-    static class RecoverResultImpl implements RecoverResult {
-        private final ByteBuffer record;
-        private final long recordOffset;
-
-        public RecoverResultImpl(ByteBuffer record, long recordOffset) {
-            this.record = record;
-            this.recordOffset = recordOffset;
-        }
-
-        @Override
-        public ByteBuffer record() {
-            return record;
-        }
-
-        @Override
-        public long recordOffset() {
-            return recordOffset;
-        }
+    record RecoverResultImpl(ByteBuf record, long recordOffset) implements RecoverResult {
 
         @Override
         public String toString() {
@@ -824,6 +802,25 @@ public class BlockWALService implements WriteAheadLog {
                     + "record=" + record
                     + ", recordOffset=" + recordOffset
                     + '}';
+        }
+    }
+
+    static class ReadRecordException extends Exception {
+        long jumpNextRecoverOffset;
+
+        public ReadRecordException(long offset, String message) {
+            super(message);
+            this.jumpNextRecoverOffset = offset;
+        }
+
+        public long getJumpNextRecoverOffset() {
+            return jumpNextRecoverOffset;
+        }
+    }
+
+    static class UnmarshalException extends Exception {
+        public UnmarshalException(String message) {
+            super(message);
         }
     }
 
@@ -869,9 +866,9 @@ public class BlockWALService implements WriteAheadLog {
             do {
                 try {
                     boolean skip = nextRecoverOffset == skipRecordAtOffset;
-                    ByteBuffer nextRecordBody = readRecord(walHeaderCoreData, nextRecoverOffset);
+                    ByteBuf nextRecordBody = readRecord(walHeaderCoreData, nextRecoverOffset);
                     RecoverResultImpl recoverResult = new RecoverResultImpl(nextRecordBody, nextRecoverOffset);
-                    nextRecoverOffset = WALUtil.alignLargeByBlockSize(nextRecoverOffset + RECORD_HEADER_SIZE + nextRecordBody.limit());
+                    nextRecoverOffset = WALUtil.alignLargeByBlockSize(nextRecoverOffset + RECORD_HEADER_SIZE + nextRecordBody.readableBytes());
                     if (skip) {
                         continue;
                     }
@@ -882,25 +879,6 @@ public class BlockWALService implements WriteAheadLog {
                 }
             } while (nextRecoverOffset < walHeaderCoreData.getSlidingWindowNextWriteOffset());
             return false;
-        }
-    }
-
-    static class ReadRecordException extends Exception {
-        long jumpNextRecoverOffset;
-
-        public ReadRecordException(long offset, String message) {
-            super(message);
-            this.jumpNextRecoverOffset = offset;
-        }
-
-        public long getJumpNextRecoverOffset() {
-            return jumpNextRecoverOffset;
-        }
-    }
-
-    static class UnmarshalException extends Exception {
-        public UnmarshalException(String message) {
-            super(message);
         }
     }
 }

@@ -25,6 +25,7 @@ public class StoreMetricsConstant {
     public static final String COUNTER_CONSUMER_SEND_TO_DLQ_MESSAGES_TOTAL = "rocketmq_send_to_dlq_messages_total";
 
     public static final String LABEL_TOPIC = "topic";
+    public static final String LABEL_QUEUE_ID = "queue_id";
     public static final String LABEL_CONSUMER_GROUP = "consumer_group";
     public static final String LABEL_IS_RETRY = "is_retry";
 

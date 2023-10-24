@@ -76,6 +76,7 @@ public class CompactionManagerTest extends CompactionTestBase {
         when(config.s3ObjectCompactionMaxObjectNum()).thenReturn(100);
         when(config.s3ObjectMaxStreamNumPerWAL()).thenReturn(100);
         when(config.s3ObjectMaxStreamObjectNumPerCommit()).thenReturn(100);
+//        when(config.networkInboundBaselineBandwidth()).thenReturn(1000L);
         compactionAnalyzer = new CompactionAnalyzer(config.s3ObjectCompactionCacheSize(), config.s3ObjectCompactionStreamSplitSize(),
                 config.s3ObjectMaxStreamNumPerWAL(), config.s3ObjectMaxStreamObjectNumPerCommit());
     }

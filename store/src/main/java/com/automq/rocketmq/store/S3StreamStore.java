@@ -35,11 +35,13 @@ import com.automq.stream.s3.cache.DefaultS3BlockCache;
 import com.automq.stream.s3.cache.S3BlockCache;
 import com.automq.stream.s3.compact.CompactionManager;
 import com.automq.stream.s3.objects.ObjectManager;
+import com.automq.stream.s3.network.AsyncNetworkBandwidthLimiter;
 import com.automq.stream.s3.operator.S3Operator;
 import com.automq.stream.s3.streams.StreamManager;
 import com.automq.stream.s3.wal.BlockWALService;
 import com.automq.stream.s3.wal.WriteAheadLog;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -52,28 +54,24 @@ public class S3StreamStore implements StreamStore {
     private static final Logger LOGGER = LoggerFactory.getLogger(S3StreamStore.class);
     private final Config s3Config;
     private final StreamClient streamClient;
-    private final StoreMetadataService metadataService;
-    private final StreamManager streamManager;
-    private final ObjectManager objectManager;
-    private final WriteAheadLog writeAheadLog;
-    private final S3Operator operator;
     private final Storage storage;
     private final CompactionManager compactionManager;
-    private final S3BlockCache blockCache;
     private final ThreadPoolExecutor storeWorkingThreadPool;
 
-    public S3StreamStore(StoreConfig storeConfig, S3StreamConfig streamConfig, StoreMetadataService metadataService,
-        S3Operator operator) {
+    public S3StreamStore(StoreConfig storeConfig, S3StreamConfig streamConfig, StoreMetadataService metadataService, S3Operator operator) {
+        this(storeConfig, streamConfig, metadataService, operator, null, null);
+    }
+
+    public S3StreamStore(StoreConfig storeConfig, S3StreamConfig streamConfig, StoreMetadataService metadataService, S3Operator operator,
+                         AsyncNetworkBandwidthLimiter networkInboundBucket, AsyncNetworkBandwidthLimiter networkOutboundBucket) {
         this.s3Config = configFrom(streamConfig);
 
         // Build meta service and related manager
-        this.metadataService = metadataService;
-        this.streamManager = new S3StreamManager(metadataService);
-        this.objectManager = new S3ObjectManager(metadataService);
+        StreamManager streamManager = new S3StreamManager(metadataService);
+        ObjectManager objectManager = new S3ObjectManager(metadataService);
 
-        this.operator = operator;
-        this.writeAheadLog = BlockWALService.builder(s3Config.s3WALPath(), s3Config.s3WALCapacity()).config(s3Config).build();
-        this.blockCache = new DefaultS3BlockCache(s3Config.s3CacheSize(), objectManager, operator);
+        WriteAheadLog writeAheadLog = BlockWALService.builder(s3Config.s3WALPath(), s3Config.s3WALCapacity()).config(s3Config).build();
+        S3BlockCache blockCache = new DefaultS3BlockCache(s3Config.s3CacheSize(), objectManager, operator);
 
         // Build the s3 storage
         this.storage = new S3Storage(s3Config, writeAheadLog, streamManager, objectManager, blockCache, operator);
@@ -81,7 +79,7 @@ public class S3StreamStore implements StreamStore {
         // Build the compaction manager
         this.compactionManager = new CompactionManager(s3Config, objectManager, streamManager, operator);
 
-        this.streamClient = new S3StreamClient(streamManager, storage, objectManager, operator, s3Config);
+        this.streamClient = new S3StreamClient(streamManager, storage, objectManager, operator, s3Config, networkInboundBucket, networkOutboundBucket);
         this.storeWorkingThreadPool = ThreadPoolMonitor.createAndMonitor(
             storeConfig.workingThreadPoolNums(),
             storeConfig.workingThreadQueueCapacity(),
@@ -117,13 +115,10 @@ public class S3StreamStore implements StreamStore {
         List<CompletableFuture<Void>> futureList = streamIds.stream()
             .map(streamId -> {
                 Optional<Stream> stream = streamClient.getStream(streamId);
-                if (stream.isEmpty()) {
-                    return stream.get().close();
-                }
-                return null;
+                return stream.map(Stream::close).orElse(null);
             })
-            .filter(x -> x != null)
-            .collect(java.util.stream.Collectors.toList());
+            .filter(Objects::nonNull)
+            .toList();
         return CompletableFuture.allOf(futureList.toArray(new CompletableFuture[0]))
             .thenApplyAsync(result -> result, storeWorkingThreadPool);
     }

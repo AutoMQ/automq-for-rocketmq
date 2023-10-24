@@ -30,7 +30,6 @@ import com.automq.stream.s3.objects.CommitWALObjectRequest;
 import com.automq.stream.s3.objects.ObjectManager;
 import com.automq.stream.s3.objects.ObjectStreamRange;
 import com.automq.stream.s3.objects.StreamObject;
-import com.automq.stream.s3.operator.DefaultS3Operator;
 import com.automq.stream.s3.operator.S3Operator;
 import com.automq.stream.s3.streams.StreamManager;
 import com.automq.stream.utils.LogContext;
@@ -73,13 +72,8 @@ public class CompactionManager {
     private final int forceSplitObjectPeriod;
     private final int maxStreamNumPerWAL;
     private final int maxStreamObjectNumPerCommit;
+    private final long networkInboundBandwidth;
     private final boolean s3ObjectLogEnable;
-    private final TokenBucketThrottle networkInThrottle;
-
-    public CompactionManager(Config config, ObjectManager objectManager, StreamManager streamManager) {
-        this(config, objectManager, streamManager, new DefaultS3Operator(config.s3Endpoint(), config.s3Region(),
-            config.s3Bucket(), config.s3ForcePathStyle(), config.s3AccessKey(), config.s3SecretKey()));
-    }
 
     public CompactionManager(Config config, ObjectManager objectManager, StreamManager streamManager, S3Operator s3Operator) {
         String logPrefix = String.format("[CompactionManager id=%d] ", config.brokerId());
@@ -93,7 +87,7 @@ public class CompactionManager {
         this.forceSplitObjectPeriod = config.s3ObjectCompactionForceSplitPeriod();
         this.maxObjectNumToCompact = config.s3ObjectCompactionMaxObjectNum();
         this.s3ObjectLogEnable = config.s3ObjectLogEnable();
-        this.networkInThrottle = new TokenBucketThrottle(config.s3ObjectCompactionNWInBandwidth());
+        this.networkInboundBandwidth = config.networkInboundBaselineBandwidth();
         this.uploader = new CompactionUploader(objectManager, s3Operator, config);
         long compactionCacheSize = config.s3ObjectCompactionCacheSize();
         long streamSplitSize = config.s3ObjectCompactionStreamSplitSize();
@@ -130,9 +124,6 @@ public class CompactionManager {
 
     public void shutdown() {
         this.scheduledExecutorService.shutdown();
-        this.compactThreadPool.shutdown();
-        this.forceSplitThreadPool.shutdown();
-        this.networkInThrottle.stop();
         this.uploader.stop();
     }
 
@@ -510,7 +501,7 @@ public class CompactionManager {
                 S3ObjectMetadata metadata = s3ObjectMetadataMap.get(streamDataBlocEntry.getKey());
                 List<StreamDataBlock> streamDataBlocks = streamDataBlocEntry.getValue();
                 DataBlockReader reader = new DataBlockReader(metadata, s3Operator);
-                reader.readBlocks(streamDataBlocks, networkInThrottle);
+                reader.readBlocks(streamDataBlocks, networkInboundBandwidth);
             }
             List<CompletableFuture<StreamObject>> streamObjectCFList = new ArrayList<>();
             CompletableFuture<Void> walObjectCF = null;

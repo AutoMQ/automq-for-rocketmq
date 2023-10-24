@@ -33,7 +33,6 @@ import com.automq.stream.utils.FutureUtil;
 import com.automq.stream.utils.ThreadUtils;
 import com.automq.stream.utils.Threads;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,6 +50,7 @@ import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -81,7 +81,7 @@ public class S3Storage implements Storage {
             ThreadUtils.createThreadFactory("s3-storage-main-read", false), LOGGER);
     private final ScheduledExecutorService backgroundExecutor = Threads.newSingleThreadScheduledExecutor(
             ThreadUtils.createThreadFactory("s3-storage-background", true), LOGGER);
-    private final ScheduledExecutorService uploadWALExecutor = Threads.newFixedThreadPool(
+    private final ExecutorService uploadWALExecutor = Threads.newFixedThreadPool(
             4, ThreadUtils.createThreadFactory("s3-storage-upload-wal", true), LOGGER);
 
     private final Queue<BackoffRecord> backoffRecords = new LinkedBlockingQueue<>();
@@ -159,16 +159,18 @@ public class S3Storage implements Storage {
         while (it.hasNext()) {
             WriteAheadLog.RecoverResult recoverResult = it.next();
             logEndOffset = recoverResult.recordOffset();
-            ByteBuf recordBuf = Unpooled.wrappedBuffer(recoverResult.record());
+            ByteBuf recordBuf = recoverResult.record().duplicate();
             StreamRecordBatch streamRecordBatch = StreamRecordBatchCodec.decode(recordBuf);
             long streamId = streamRecordBatch.getStreamId();
             Long openingStreamEndOffset = openingStreamEndOffsets.get(streamId);
             if (openingStreamEndOffset == null) {
                 // stream is already safe closed. so skip the stream records.
+                recordBuf.release();
                 continue;
             }
             if (streamRecordBatch.getBaseOffset() < openingStreamEndOffset) {
                 // filter committed records.
+                recordBuf.release();
                 continue;
             }
             Long expectNextOffset = streamNextOffsets.get(streamId);
@@ -227,6 +229,8 @@ public class S3Storage implements Storage {
         }
         WriteAheadLog.AppendResult appendResult;
         try {
+            streamRecord.encoded();
+            streamRecord.retain();
             appendResult = log.append(streamRecord.encoded());
         } catch (WriteAheadLog.OverCapacityException e) {
             // the WAL write data align with block, 'WAL is full but LogCacheBlock is not full' may happen.

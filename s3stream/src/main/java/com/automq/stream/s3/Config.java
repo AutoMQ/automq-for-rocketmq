@@ -31,7 +31,6 @@ public class Config {
     private long s3WALCapacity = 1024L * 1024 * 1024;
     private int s3WALHeaderFlushIntervalSeconds = 10;
     private int s3WALThread = 8;
-    private int s3WALQueue = 10000;
     private long s3WALWindowInitial = 1048576L;
     private long s3WALWindowIncrement = 4194304L;
     private long s3WALWindowMax = 536870912L;
@@ -59,6 +58,15 @@ public class Config {
     private int s3ObjectMaxStreamObjectNumPerCommit = 10000;
     private boolean s3MockEnable = false;
     private boolean s3ObjectLogEnable = false;
+    // 100MB/s
+    private long networkInboundBaselineBandwidth = 100 * 1024 * 1024;
+    // 10 Times burst
+    private long networkInboundBurstBandwidth = 10 * networkInboundBaselineBandwidth;
+    // 100MB/s
+    private long networkOutboundBaselineBandwidth = 100 * 1024 * 1024;
+    // 10 Times burst
+    private long networkOutboundBurstBandwidth = 10 * networkOutboundBaselineBandwidth;
+    private int refillPeriodMs = 1000;
 
     public int brokerId() {
         return brokerId;
@@ -98,10 +106,6 @@ public class Config {
 
     public int s3WALThread() {
         return s3WALThread;
-    }
-
-    public int s3WALQueue() {
-        return s3WALQueue;
     }
 
     public long s3WALWindowInitial() {
@@ -220,6 +224,26 @@ public class Config {
         return s3SecretKey;
     }
 
+    public long networkInboundBaselineBandwidth() {
+        return networkInboundBaselineBandwidth;
+    }
+
+    public long networkInboundBurstBandwidth() {
+        return networkInboundBurstBandwidth;
+    }
+
+    public long networkOutboundBaselineBandwidth() {
+        return networkOutboundBaselineBandwidth;
+    }
+
+    public long networkOutboundBurstBandwidth() {
+        return networkOutboundBurstBandwidth;
+    }
+
+    public int refillPeriodMs() {
+        return refillPeriodMs;
+    }
+
     public Config brokerId(int brokerId) {
         this.brokerId = brokerId;
         return this;
@@ -267,11 +291,6 @@ public class Config {
 
     public Config s3WALThread(int s3WALThread) {
         this.s3WALThread = s3WALThread;
-        return this;
-    }
-
-    public Config s3WALQueue(int s3WALQueue) {
-        this.s3WALQueue = s3WALQueue;
         return this;
     }
 
@@ -417,6 +436,31 @@ public class Config {
 
     public Config s3StreamObjectsCompactionNWInBandwidth(long s3StreamObjectsCompactionNWInBandwidth) {
         this.s3StreamObjectsCompactionNWInBandwidth = s3StreamObjectsCompactionNWInBandwidth;
+        return this;
+    }
+
+    public Config networkInboundBaselineBandwidth(long networkInboundBaselineBandwidth) {
+        this.networkInboundBaselineBandwidth = networkInboundBaselineBandwidth;
+        return this;
+    }
+
+    public Config networkInboundBurstBandwidth(long networkInboundBurstBandwidth) {
+        this.networkInboundBurstBandwidth = networkInboundBurstBandwidth;
+        return this;
+    }
+
+    public Config networkOutboundBaselineBandwidth(long networkOutboundBaselineBandwidth) {
+        this.networkOutboundBaselineBandwidth = networkOutboundBaselineBandwidth;
+        return this;
+    }
+
+    public Config networkOutboundBurstBandwidth(long networkOutboundBurstBandwidth) {
+        this.networkOutboundBurstBandwidth = networkOutboundBurstBandwidth;
+        return this;
+    }
+
+    public Config refillPeriodMs(int refillPeriodMs) {
+        this.refillPeriodMs = refillPeriodMs;
         return this;
     }
 }

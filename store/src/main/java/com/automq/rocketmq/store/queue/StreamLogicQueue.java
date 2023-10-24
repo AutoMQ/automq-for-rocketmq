@@ -424,10 +424,11 @@ public class StreamLogicQueue extends LogicQueue {
         AckOperation operation = new AckOperation(handle.topicId(), handle.queueId(), operationStreamId,
             snapshotStreamId, stateMachine, handle.consumerGroupId(), handle.operationId(), System.currentTimeMillis(),
             AckOperation.AckOperationType.ACK_NORMAL);
-        return operationLogService.logAckOperation(operation).thenApply(nil -> {
-            inflightService.decreaseInflightCount(handle.consumerGroupId(), handle.topicId(), handle.queueId(), 1);
-            return new AckResult(AckResult.Status.SUCCESS);
-        }).exceptionally(throwable -> new AckResult(AckResult.Status.ERROR));
+        return operationLogService.logAckOperation(operation)
+            .thenApply(nil -> {
+                inflightService.decreaseInflightCount(handle.consumerGroupId(), handle.topicId(), handle.queueId(), 1);
+                return new AckResult(AckResult.Status.SUCCESS);
+            }).exceptionally(throwable -> new AckResult(AckResult.Status.ERROR));
     }
 
     @Override

@@ -25,10 +25,11 @@ message Topic {
   string name = 1;
   int64 topic_id = 2;
   int32 count = 3;
-  repeated MessageType accept_message_types = 4;
-  repeated MessageQueueAssignment assignments = 5;
+  int32 retention_hours = 4;
+  repeated MessageType accept_message_types = 5;
+  repeated MessageQueueAssignment assignments = 6;
   // Message queues that are in the progress of reassignment
-  repeated OngoingMessageQueueReassignment reassignments = 6;
+  repeated OngoingMessageQueueReassignment reassignments = 7;
 }
 
 message MessageQueue {
