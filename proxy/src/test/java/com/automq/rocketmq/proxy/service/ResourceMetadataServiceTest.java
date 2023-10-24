@@ -17,11 +17,13 @@
 
 package com.automq.rocketmq.proxy.service;
 
+import apache.rocketmq.controller.v1.AcceptTypes;
 import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.GroupType;
 import apache.rocketmq.controller.v1.MessageType;
 import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.metadata.api.ProxyMetadataService;
+import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
 import org.apache.rocketmq.common.attribute.TopicMessageType;
 import org.apache.rocketmq.remoting.protocol.subscription.SubscriptionGroupConfig;
@@ -106,9 +108,10 @@ class ResourceMetadataServiceTest {
     private Topic createTopic(String topicName, MessageType... messageTypes) {
         Topic.Builder builder = Topic.newBuilder();
         builder.setName(topicName);
-        for (MessageType messageType : messageTypes) {
-            builder.addAcceptMessageTypes(messageType);
-        }
+        AcceptTypes acceptTypes = AcceptTypes.newBuilder()
+            .addAllTypes(Arrays.asList(messageTypes))
+            .build();
+        builder.setAcceptTypes(acceptTypes);
         return builder.build();
     }
 

@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.proxy.service;
 
+import apache.rocketmq.controller.v1.AcceptTypes;
 import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.GroupType;
 import apache.rocketmq.controller.v1.MessageType;
@@ -72,7 +73,7 @@ public class DLQServiceTest {
         Topic dlqTopic = Topic.newBuilder()
             .setTopicId(DLQ_TOPIC_ID)
             .setName(DLQ_TOPIC_NAME)
-            .addAcceptMessageTypes(MessageType.NORMAL)
+            .setAcceptTypes(AcceptTypes.newBuilder().addTypes(MessageType.NORMAL).build())
             .build();
         ConsumerGroup consumerGroup = ConsumerGroup.newBuilder()
             .setGroupId(CONSUMER_GROUP_ID)
@@ -110,7 +111,7 @@ public class DLQServiceTest {
         Topic dlqTopic = Topic.newBuilder()
             .setTopicId(DLQ_TOPIC_ID)
             .setName(DLQ_TOPIC_NAME)
-            .addAcceptMessageTypes(MessageType.NORMAL)
+            .setAcceptTypes(AcceptTypes.newBuilder().addTypes(MessageType.NORMAL).build())
             .build();
         ConsumerGroup consumerGroup = ConsumerGroup.newBuilder()
             .setGroupId(CONSUMER_GROUP_ID)
@@ -146,7 +147,7 @@ public class DLQServiceTest {
         dlqTopic = Topic.newBuilder()
             .setTopicId(DLQ_TOPIC_ID)
             .setName(DLQ_TOPIC_NAME)
-            .addAcceptMessageTypes(MessageType.TRANSACTION)
+            .setAcceptTypes(AcceptTypes.newBuilder().addTypes(MessageType.TRANSACTION).build())
             .build();
         consumerGroup = ConsumerGroup.newBuilder()
             .setGroupId(CONSUMER_GROUP_ID)

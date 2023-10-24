@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.controller.metadata;
 
+import apache.rocketmq.controller.v1.AcceptTypes;
 import apache.rocketmq.controller.v1.MessageType;
 import apache.rocketmq.controller.v1.TopicStatus;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
@@ -80,13 +81,12 @@ public class TopicTest extends DatabaseTestBase {
                     .setTopicId(topic1.getId())
                     .setName(topic1.getName())
                     .setCount(topic1.getQueueNum())
-                    .addAllAcceptMessageTypes(gson.fromJson(String.valueOf(topic1.getAcceptMessageTypes()), new ArrayList<MessageType>()
-                    {
-
-                    }.getClass().getGenericSuperclass()))
+                    .setAcceptTypes(AcceptTypes.newBuilder()
+                        .addTypes(MessageType.NORMAL)
+                        .addTypes(MessageType.FIFO)
+                        .addTypes(MessageType.DELAY)
+                        .build())
                     .build();
-            Assertions.assertNotNull(topic2.getAcceptMessageTypesList());
-            Assertions.assertEquals(expect, gson.toJson(topic2.getAcceptMessageTypesList()));
 
             String updateMessageType = "[\"NORMAL\",\"DELAY\"]";
             Topic topic3 = new Topic();

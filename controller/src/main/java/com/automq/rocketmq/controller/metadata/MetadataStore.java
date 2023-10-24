@@ -19,13 +19,14 @@ package com.automq.rocketmq.controller.metadata;
 
 import apache.rocketmq.controller.v1.AssignmentStatus;
 import apache.rocketmq.controller.v1.ConsumerGroup;
+import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.GroupType;
 import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.Topic;
 import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
-import apache.rocketmq.controller.v1.MessageType;
+import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.common.api.DataStore;
 import com.automq.rocketmq.common.config.ControllerConfig;
 import com.automq.rocketmq.controller.exception.ControllerException;
@@ -38,8 +39,6 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.ibatis.session.SqlSession;
 
@@ -102,8 +101,7 @@ public interface MetadataStore extends Closeable {
      */
     void heartbeat();
 
-    CompletableFuture<Long> createTopic(String topicName, int queueNum,
-        List<MessageType> acceptMessageTypesList) throws ControllerException;
+    CompletableFuture<Long> createTopic(CreateTopicRequest request);
 
     CompletableFuture<Void> deleteTopic(long topicId);
 
@@ -111,10 +109,7 @@ public interface MetadataStore extends Closeable {
 
     CompletableFuture<List<Topic>> listTopics();
 
-    CompletableFuture<Topic> updateTopic(long topicId,
-        @Nullable String topicName,
-        @Nullable Integer queueNumber,
-        @Nonnull List<MessageType> acceptMessageTypesList) throws ControllerException;
+    CompletableFuture<Topic> updateTopic(UpdateTopicRequest request);
 
     /**
      * Check if current controller is playing leader role
@@ -212,7 +207,7 @@ public interface MetadataStore extends Closeable {
      *
      * @param topicId Topic ID
      * @param queueId Queue ID
-     * @return Owner node id if found in cache; 0 otherise.
+     * @return Owner node id if found in cache; 0 otherwise.
      */
     int ownerNode(long topicId, int queueId);
 

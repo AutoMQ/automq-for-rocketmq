@@ -17,11 +17,11 @@
 
 package com.automq.rocketmq.controller.metadata.database;
 
+import apache.rocketmq.controller.v1.AcceptTypes;
 import apache.rocketmq.controller.v1.AssignmentStatus;
 import apache.rocketmq.controller.v1.Code;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.GroupStatus;
-import apache.rocketmq.controller.v1.MessageType;
 import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.StreamState;
 import apache.rocketmq.controller.v1.SubStream;
@@ -48,7 +48,8 @@ import com.automq.rocketmq.controller.metadata.database.serde.SubStreamSerialize
 import com.google.common.base.Strings;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.reflect.TypeToken;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.util.JsonFormat;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -60,7 +61,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.stream.IntStream;
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import org.apache.ibatis.session.SqlSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -93,8 +93,7 @@ public class TopicManager {
         this.topicNameRequests = new ConcurrentHashMap<>();
     }
 
-    public CompletableFuture<Long> createTopic(String topicName, int queueNum,
-        List<MessageType> acceptMessageTypesList) throws ControllerException {
+    public CompletableFuture<Long> createTopic(CreateTopicRequest request) {
         CompletableFuture<Long> future = new CompletableFuture<>();
         for (; ; ) {
             if (metadataStore.isLeader()) {
@@ -104,35 +103,33 @@ public class TopicManager {
                     }
 
                     TopicMapper topicMapper = session.getMapper(TopicMapper.class);
-                    if (null != topicMapper.get(null, topicName)) {
-                        ControllerException e = new ControllerException(Code.DUPLICATED_VALUE, String.format("Topic %s was taken", topicName));
+                    if (null != topicMapper.get(null, request.getTopic())) {
+                        ControllerException e = new ControllerException(Code.DUPLICATED_VALUE,
+                            String.format("Topic %s was taken", request.getTopic()));
                         future.completeExceptionally(e);
                         return future;
                     }
 
                     Topic topic = new Topic();
-                    topic.setName(topicName);
-                    topic.setQueueNum(queueNum);
+                    topic.setName(request.getTopic());
+                    topic.setQueueNum(request.getCount());
                     topic.setStatus(TopicStatus.TOPIC_STATUS_ACTIVE);
-                    topic.setAcceptMessageTypes(gson.toJson(acceptMessageTypesList));
+                    topic.setAcceptMessageTypes(JsonFormat.printer().print(request.getAcceptTypes()));
                     topicMapper.create(topic);
                     long topicId = topic.getId();
-                    List<QueueAssignment> assignments = createQueues(IntStream.range(0, queueNum), topicId, session);
+                    List<QueueAssignment> assignments = createQueues(IntStream.range(0, request.getCount()),
+                        topicId, session);
                     // Commit transaction
                     session.commit();
 
                     // Cache new topic and queue assignments immediately
                     topicCache.apply(List.of(topic));
                     assignmentCache.apply(assignments);
-
                     future.complete(topicId);
+                } catch (ControllerException | InvalidProtocolBufferException e) {
+                    future.completeExceptionally(e);
                 }
             } else {
-                CreateTopicRequest request = CreateTopicRequest.newBuilder()
-                    .setTopic(topicName)
-                    .setCount(queueNum)
-                    .addAllAcceptMessageTypes(acceptMessageTypesList)
-                    .build();
                 try {
                     metadataStore.controllerClient().createTopic(metadataStore.leaderAddress(), request).whenComplete((res, e) -> {
                         if (null != e) {
@@ -150,10 +147,7 @@ public class TopicManager {
         return future;
     }
 
-    public CompletableFuture<apache.rocketmq.controller.v1.Topic> updateTopic(long topicId,
-        @Nullable String topicName,
-        @Nullable Integer queueNumber,
-        @Nonnull List<MessageType> acceptMessageTypesList) throws ControllerException {
+    public CompletableFuture<apache.rocketmq.controller.v1.Topic> updateTopic(UpdateTopicRequest request) {
         CompletableFuture<apache.rocketmq.controller.v1.Topic> future = new CompletableFuture<>();
         for (; ; ) {
             if (metadataStore.isLeader()) {
@@ -163,11 +157,12 @@ public class TopicManager {
                     }
 
                     TopicMapper topicMapper = session.getMapper(TopicMapper.class);
-                    Topic topic = topicMapper.get(topicId, null);
+                    Topic topic = topicMapper.get(request.getTopicId(), null);
 
                     if (null == topic) {
                         ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE,
-                            String.format("Topic not found for topic-id=%d, topic-name=%s", topicId, topicName));
+                            String.format("Topic not found for topic-id=%d, topic-name=%s", request.getTopicId(),
+                                request.getName()));
                         future.completeExceptionally(e);
                         return future;
                     }
@@ -175,8 +170,8 @@ public class TopicManager {
                     boolean changed = false;
 
                     // Update accepted message types
-                    if (!acceptMessageTypesList.isEmpty()) {
-                        String types = gson.toJson(acceptMessageTypesList);
+                    if (!request.getAcceptTypes().getTypesList().isEmpty()) {
+                        String types = JsonFormat.printer().print(request.getAcceptTypes());
                         if (!types.equals(topic.getAcceptMessageTypes())) {
                             topic.setAcceptMessageTypes(types);
                             changed = true;
@@ -184,18 +179,18 @@ public class TopicManager {
                     }
 
                     // Update topic name
-                    if (!Strings.isNullOrEmpty(topicName) && !topic.getName().equals(topicName)) {
-                        topic.setName(topicName);
+                    if (!Strings.isNullOrEmpty(request.getName()) && !topic.getName().equals(request.getName())) {
+                        topic.setName(request.getName());
                         changed = true;
                     }
 
                     // Update queue number
-                    if (null != queueNumber && !queueNumber.equals(topic.getQueueNum())) {
-                        if (queueNumber > topic.getQueueNum()) {
-                            IntStream range = IntStream.range(topic.getQueueNum(), queueNumber);
+                    if (request.getCount() > 0 && request.getCount() != topic.getQueueNum()) {
+                        if (request.getCount() > topic.getQueueNum()) {
+                            IntStream range = IntStream.range(topic.getQueueNum(), request.getCount());
                             List<QueueAssignment> assignments = createQueues(range, topic.getId(), session);
                             assignmentCache.apply(assignments);
-                            topic.setQueueNum(queueNumber);
+                            topic.setQueueNum(request.getCount());
                             changed = true;
                         } else {
                             // Ignore queue number field if not enlarged
@@ -214,16 +209,13 @@ public class TopicManager {
                         .setTopicId(topic.getId())
                         .setCount(topic.getQueueNum())
                         .setName(topic.getName())
-                        .addAllAcceptMessageTypes(acceptMessageTypesList)
+                        .setAcceptTypes(request.getAcceptTypes())
                         .build();
                     future.complete(uTopic);
+                } catch (ControllerException | InvalidProtocolBufferException e) {
+                    future.completeExceptionally(e);
                 }
             } else {
-                UpdateTopicRequest request = UpdateTopicRequest.newBuilder()
-                    .setTopicId(topicId)
-                    .setName(topicName)
-                    .addAllAcceptMessageTypes(acceptMessageTypesList)
-                    .build();
                 try {
                     metadataStore.controllerClient().updateTopic(metadataStore.leaderAddress(), request).whenComplete((topic, e) -> {
                         if (null != e) {
@@ -345,9 +337,13 @@ public class TopicManager {
         if (null != topicMetadataCache) {
             Map<Integer, QueueAssignment> assignmentMap = assignmentCache.byTopicId(topicMetadataCache.getId());
             if (null != assignmentMap && !assignmentMap.isEmpty()) {
-                apache.rocketmq.controller.v1.Topic topic =
-                    Helper.buildTopic(gson, topicMetadataCache, assignmentMap.values());
-                return CompletableFuture.completedFuture(topic);
+                try {
+                    apache.rocketmq.controller.v1.Topic topic =
+                        Helper.buildTopic(topicMetadataCache, assignmentMap.values());
+                    return CompletableFuture.completedFuture(topic);
+                } catch (InvalidProtocolBufferException e) {
+                    return CompletableFuture.failedFuture(e);
+                }
             }
         }
 
@@ -388,8 +384,10 @@ public class TopicManager {
                     // Update cache
                     topicCache.apply(List.of(topic));
                     assignmentCache.apply(assignments);
-                    apache.rocketmq.controller.v1.Topic result = Helper.buildTopic(gson, topic, assignments);
+                    apache.rocketmq.controller.v1.Topic result = Helper.buildTopic(topic, assignments);
                     completeTopicDescription(result);
+                } catch (InvalidProtocolBufferException e) {
+                    completeTopicDescriptionExceptionally(topicId, topicName, e);
                 }
             });
         }
@@ -407,16 +405,19 @@ public class TopicManager {
                 if (TopicStatus.TOPIC_STATUS_DELETED == topic.getStatus()) {
                     continue;
                 }
+                AcceptTypes.Builder builder = AcceptTypes.newBuilder();
+                JsonFormat.parser().ignoringUnknownFields().merge(topic.getAcceptMessageTypes(), builder);
                 apache.rocketmq.controller.v1.Topic t = apache.rocketmq.controller.v1.Topic.newBuilder()
                     .setTopicId(topic.getId())
                     .setName(topic.getName())
                     .setCount(topic.getQueueNum())
-                    .addAllAcceptMessageTypes(gson.fromJson(topic.getAcceptMessageTypes(), new TypeToken<List<MessageType>>() {
-                    }.getType()))
+                    .setAcceptTypes(builder.build())
                     .build();
                 result.add(t);
             }
             future.complete(result);
+        } catch (InvalidProtocolBufferException e) {
+            future.completeExceptionally(e);
         }
         return future;
     }

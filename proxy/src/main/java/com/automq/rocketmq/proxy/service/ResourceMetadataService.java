@@ -46,8 +46,8 @@ public class ResourceMetadataService implements MetadataService {
         CompletableFuture<Topic> topicFuture = metadataService.topicOf(topic);
         try {
             Topic topicObj = topicFuture.get();
-            if (topicObj.getAcceptMessageTypesCount() == 1) {
-                MessageType type = topicObj.getAcceptMessageTypes(0);
+            if (topicObj.getAcceptTypes().getTypesList().size() == 1) {
+                MessageType type = topicObj.getAcceptTypes().getTypesList().get(0);
                 switch (type) {
                     case NORMAL -> {
                         return TopicMessageType.NORMAL;
