@@ -77,7 +77,7 @@ public class S3StreamStore implements StreamStore {
         this.storage = new S3Storage(s3Config, writeAheadLog, streamManager, objectManager, blockCache, operator);
 
         // Build the compaction manager
-        this.compactionManager = new CompactionManager(s3Config, objectManager, operator);
+        this.compactionManager = new CompactionManager(s3Config, objectManager, streamManager, operator);
 
         this.streamClient = new S3StreamClient(streamManager, storage, objectManager, operator, s3Config, networkInboundBucket, networkOutboundBucket);
         this.storeWorkingThreadPool = ThreadPoolMonitor.createAndMonitor(
