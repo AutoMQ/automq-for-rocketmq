@@ -43,7 +43,7 @@ jobs:
         with:
           repository: AutoMQ/rocketmq-e2e
           ref: master
-          path: rocketmq-docker
+          path: rocketmq-e2e
           token: ${{ secrets.PAT_E2E }}
       - name: docker-login
         uses: docker/login-action@v2
@@ -54,12 +54,13 @@ jobs:
       - name: Build and save docker images
         id: build-images
         run: |
-          ls
-          cd rocketmq-docker
+          pwd
+          cd rocketmq-e2e/rocketmq-docker
           version=${{ github.event.pull_request.number || github.ref_name }}-$(uuidgen)
           mkdir versionlist
           touch versionlist/"${version}-`echo ${{ matrix.base-image }} | sed -e "s/:/-/g"`"
-          sh ./build-image.sh ${version}
+          ls
+          sh build-image.sh ${version}
           docker push ${DOCKER_REPO}:${version}
       - uses: actions/upload-artifact@v3
         name: Upload distribution tar
