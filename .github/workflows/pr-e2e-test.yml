@@ -61,8 +61,8 @@ jobs:
           touch versionlist/"${version}-`echo ${{ matrix.base-image }} | sed -e "s/:/-/g"`"
           pwd
           sh build-image.sh ${version}
-          docker tag ${DOCKER_REPO}:${version} ${DOCKER_REPO}_e2e:latest
-          docker push ${DOCKER_REPO}_e2e:latest
+          docker tag ${DOCKER_REPO}:${version} ${DOCKER_REPO}_e2e:${version}
+          docker push ${DOCKER_REPO}_e2e:${version}
       - uses: actions/upload-artifact@v3
         name: Upload distribution tar
         with:
