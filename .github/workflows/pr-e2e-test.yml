@@ -14,7 +14,7 @@ on:
 
 
 env:
-  DOCKER_REPO: automqinc/rocketmq_e2e
+  DOCKER_REPO: automqinc/rocketmq
 
 jobs:
   docker:
@@ -61,7 +61,8 @@ jobs:
           touch versionlist/"${version}-`echo ${{ matrix.base-image }} | sed -e "s/:/-/g"`"
           pwd
           sh build-image.sh ${version}
-          docker push ${DOCKER_REPO}:${version}
+          docker tag ${DOCKER_REPO}:${version} ${DOCKER_REPO}_e2e:latest
+          docker push ${DOCKER_REPO}_e2e:latest
       - uses: actions/upload-artifact@v3
         name: Upload distribution tar
         with:
