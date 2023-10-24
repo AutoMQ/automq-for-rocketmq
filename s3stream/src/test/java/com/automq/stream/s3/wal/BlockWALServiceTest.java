@@ -327,10 +327,10 @@ class BlockWALServiceTest {
 
     @ParameterizedTest(name = "Test {index}: shutdown={0}, overCapacity={1}")
     @CsvSource({
-            "true, false",
-            "true, true",
-            "false, false",
-            "false, true",
+        "true, false",
+        "true, true",
+        "false, false",
+        "false, true",
     })
     public void testRecoverAfterMergeWrite(boolean shutdown, boolean overCapacity) throws IOException {
         final int recordSize = 1024 + 1;
