@@ -41,9 +41,10 @@ jobs:
           ls
       - uses: actions/checkout@v3
         with:
-          repository: AutoMQ/rocketmq-e2e.git
+          repository: AutoMQ/rocketmq-e2e
           ref: master
           path: rocketmq-docker
+          token: ${{ secrets.PAT_E2E }}
       - name: docker-login
         uses: docker/login-action@v2
         with:
@@ -53,7 +54,8 @@ jobs:
       - name: Build and save docker images
         id: build-images
         run: |
-          cd rocketmq-e2e/rocketmq-docker
+          ls
+          cd rocketmq-docker
           version=${{ github.event.pull_request.number || github.ref_name }}-$(uuidgen)
           mkdir versionlist
           touch versionlist/"${version}-`echo ${{ matrix.base-image }} | sed -e "s/:/-/g"`"
@@ -99,14 +101,15 @@ jobs:
         name: Deploy rocketmq
         with:
           action: "deploy"
-          ask-config: "${{ secrets.ASK_CONFIG_VIRGINA }}"
+          ask-config: "${{ secrets.KUBE_CONFIG }}"
           test-version: "${{ matrix.version }}"
-          chart-git: "https://ghproxy.com/https://github.com/apache/rocketmq-docker.git"
+          chart-git: "https://github.com/AutoMQ/rocketmq-e2e.git"
           chart-branch: "master"
           chart-path: "./rocketmq-k8s-helm"
           job-id: ${{ strategy.job-index }}
           helm-values: |
             broker:
+              ci: true
               image:
                 repository: ${{env.DOCKER_REPO}}
                 tag: ${{ matrix.version }}
