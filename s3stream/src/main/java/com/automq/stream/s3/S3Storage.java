@@ -165,10 +165,12 @@ public class S3Storage implements Storage {
             Long openingStreamEndOffset = openingStreamEndOffsets.get(streamId);
             if (openingStreamEndOffset == null) {
                 // stream is already safe closed. so skip the stream records.
+                recordBuf.release();
                 continue;
             }
             if (streamRecordBatch.getBaseOffset() < openingStreamEndOffset) {
                 // filter committed records.
+                recordBuf.release();
                 continue;
             }
             Long expectNextOffset = streamNextOffsets.get(streamId);
