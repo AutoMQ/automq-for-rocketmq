@@ -63,11 +63,12 @@ jobs:
           pwd
           sh build-image.sh ${version} ${DOCKER_REPO}
           docker push ${DOCKER_REPO}:${version}
+          ls versionlist/
       - uses: actions/upload-artifact@v3
         name: Upload distribution tar
         with:
           name: versionlist
-          path: rocketmq-docker/image-build-ci/versionlist/*
+          path: rocketmq-e2e/rocketmq-docker/versionlist/*
   
   list-version:
     if: always()
