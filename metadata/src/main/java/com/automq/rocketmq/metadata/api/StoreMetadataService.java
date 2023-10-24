@@ -20,6 +20,7 @@ package com.automq.rocketmq.metadata.api;
 import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
+import com.automq.rocketmq.common.config.ControllerConfig;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import org.apache.commons.lang3.tuple.Pair;
@@ -183,4 +184,13 @@ public interface StoreMetadataService {
         long endOffset, int limit);
 
     int ownerNode(long topicId, int queueId);
+
+    ControllerConfig nodeConfig();
+
+    /**
+     * Get the stream metadata for the specified list of stream ids.
+     * @param streamIds list of specified stream ids
+     * @return list of {@link StreamMetadata}
+     */
+    CompletableFuture<List<StreamMetadata>> getStreams(List<Long> streamIds);
 }

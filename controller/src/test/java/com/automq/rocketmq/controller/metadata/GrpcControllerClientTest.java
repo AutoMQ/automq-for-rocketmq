@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.controller.metadata;
 
+import apache.rocketmq.controller.v1.AcceptTypes;
 import apache.rocketmq.controller.v1.Code;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.MessageType;
@@ -26,8 +27,6 @@ import com.automq.rocketmq.controller.ControllerTestServer;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.Assertions;
@@ -119,12 +118,8 @@ class GrpcControllerClientTest {
     public void testCreateTopic() throws ControllerException, IOException, ExecutionException, InterruptedException {
         String topicName = "t1";
         int queueNum = 4;
-        List<MessageType> messageTypeList = new ArrayList<>();
-        messageTypeList.add(MessageType.NORMAL);
-        messageTypeList.add(MessageType.FIFO);
-        messageTypeList.add(MessageType.DELAY);
         MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
-        Mockito.when(metadataStore.createTopic(ArgumentMatchers.anyString(), ArgumentMatchers.anyInt(), ArgumentMatchers.anyList())).thenReturn(CompletableFuture.completedFuture(1L));
+        Mockito.when(metadataStore.createTopic(ArgumentMatchers.any())).thenReturn(CompletableFuture.completedFuture(1L));
         ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
         try (ControllerTestServer testServer = new ControllerTestServer(0, svc);
              ControllerClient client = new GrpcControllerClient()
@@ -134,7 +129,11 @@ class GrpcControllerClientTest {
             CreateTopicRequest request = CreateTopicRequest.newBuilder()
                 .setTopic(topicName)
                 .setCount(queueNum)
-                .addAllAcceptMessageTypes(messageTypeList)
+                .setAcceptTypes(AcceptTypes.newBuilder()
+                    .addTypes(MessageType.NORMAL)
+                    .addTypes(MessageType.FIFO)
+                    .addTypes(MessageType.DELAY)
+                    .build())
                 .build();
             long topicId = client.createTopic(String.format("localhost:%d", port), request).get();
             Assertions.assertEquals(1, topicId);
@@ -142,16 +141,10 @@ class GrpcControllerClientTest {
     }
 
     @Test
-    public void testCreateTopic_duplicate() throws IOException, ControllerException {
+    public void testCreateTopic_duplicate() throws IOException {
         String topicName = "t1";
         int queueNum = 4;
-        List<MessageType> messageTypeList = new ArrayList<>();
-        messageTypeList.add(MessageType.NORMAL);
-        messageTypeList.add(MessageType.FIFO);
-        messageTypeList.add(MessageType.DELAY);
         MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
-        Mockito.when(metadataStore.createTopic(ArgumentMatchers.anyString(), ArgumentMatchers.anyInt(), ArgumentMatchers.anyList()))
-            .thenThrow(new ControllerException(Code.DUPLICATED_VALUE, "Topic name is taken"));
         ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
         try (ControllerTestServer testServer = new ControllerTestServer(0, svc);
              ControllerClient client = new GrpcControllerClient()
@@ -161,7 +154,11 @@ class GrpcControllerClientTest {
             CreateTopicRequest request = CreateTopicRequest.newBuilder()
                 .setTopic(topicName)
                 .setCount(queueNum)
-                .addAllAcceptMessageTypes(messageTypeList)
+                .setAcceptTypes(AcceptTypes.newBuilder()
+                    .addTypes(MessageType.NORMAL)
+                    .addTypes(MessageType.FIFO)
+                    .addTypes(MessageType.DELAY)
+                    .build())
                 .build();
             Assertions.assertThrows(ExecutionException.class,
                 () -> client.createTopic(String.format("localhost:%d", port), request).get());
@@ -188,7 +185,7 @@ class GrpcControllerClientTest {
     }
 
     @Test
-    public void testDeleteTopic_NotFound() throws ControllerException, IOException {
+    public void testDeleteTopic_NotFound() throws IOException {
         long topicId = 1;
         MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
         Mockito.doAnswer(invocation -> {
@@ -208,7 +205,7 @@ class GrpcControllerClientTest {
     }
 
     @Test
-    public void testDescribeTopic() throws IOException, ControllerException, ExecutionException, InterruptedException {
+    public void testDescribeTopic() throws IOException, ExecutionException, InterruptedException {
         long topicId = 1L;
         String topicName = "T-abc";
         MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
@@ -234,7 +231,7 @@ class GrpcControllerClientTest {
     }
 
     @Test
-    public void testDescribeTopic_NotFound() throws IOException, ControllerException {
+    public void testDescribeTopic_NotFound() throws IOException {
         long topicId = 1L;
         String topicName = "T-abc";
         MetadataStore metadataStore = Mockito.mock(MetadataStore.class);

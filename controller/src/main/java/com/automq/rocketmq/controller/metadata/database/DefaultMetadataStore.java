@@ -21,11 +21,11 @@ import apache.rocketmq.controller.v1.AssignmentStatus;
 import apache.rocketmq.controller.v1.CloseStreamRequest;
 import apache.rocketmq.controller.v1.Code;
 import apache.rocketmq.controller.v1.ConsumerGroup;
+import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.GroupStatus;
 import apache.rocketmq.controller.v1.GroupType;
 import apache.rocketmq.controller.v1.ListOpenStreamsRequest;
 import apache.rocketmq.controller.v1.ListOpenStreamsReply;
-import apache.rocketmq.controller.v1.MessageType;
 import apache.rocketmq.controller.v1.OpenStreamReply;
 import apache.rocketmq.controller.v1.OpenStreamRequest;
 import apache.rocketmq.controller.v1.S3StreamObject;
@@ -33,6 +33,7 @@ import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.StreamState;
+import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.common.PrefixThreadFactory;
 import com.automq.rocketmq.common.api.DataStore;
 import com.automq.rocketmq.controller.exception.ControllerException;
@@ -84,8 +85,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
@@ -355,9 +354,8 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public CompletableFuture<Long> createTopic(String topicName, int queueNum,
-        List<MessageType> acceptMessageTypesList) throws ControllerException {
-        return topicManager.createTopic(topicName, queueNum, acceptMessageTypesList);
+    public CompletableFuture<Long> createTopic(CreateTopicRequest request) {
+        return topicManager.createTopic(request);
     }
 
     @Override
@@ -376,9 +374,8 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public CompletableFuture<apache.rocketmq.controller.v1.Topic> updateTopic(long topicId, @Nullable String topicName,
-        @Nullable Integer queueNumber, @Nonnull List<MessageType> acceptMessageTypesList) throws ControllerException {
-        return topicManager.updateTopic(topicId, topicName, queueNumber, acceptMessageTypesList);
+    public CompletableFuture<apache.rocketmq.controller.v1.Topic> updateTopic(UpdateTopicRequest request) {
+        return topicManager.updateTopic(request);
     }
 
     @Override
@@ -955,22 +952,7 @@ public class DefaultMetadataStore implements MetadataStore {
                         continue;
                     }
                     StreamMapper streamMapper = session.getMapper(StreamMapper.class);
-                    RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
-                    List<StreamMetadata> streams = streamMapper.listByNode(nodeId, StreamState.OPEN)
-                        .stream()
-                        .map(stream -> {
-                            int rangeId = stream.getRangeId();
-                            Range range = rangeMapper.get(rangeId, stream.getId(), null);
-                            return StreamMetadata.newBuilder()
-                                .setStreamId(stream.getId())
-                                .setStartOffset(stream.getStartOffset())
-                                .setEndOffset(null == range ? 0 : range.getEndOffset())
-                                .setEpoch(stream.getEpoch())
-                                .setState(stream.getState())
-                                .setRangeId(stream.getRangeId())
-                                .build();
-                        })
-                        .toList();
+                    List<StreamMetadata> streams = buildStreamMetadata(streamMapper.listByNode(nodeId, StreamState.OPEN), session);
                     future.complete(streams);
                     break;
                 }
@@ -988,6 +970,35 @@ public class DefaultMetadataStore implements MetadataStore {
             }
         }
         return future;
+    }
+
+    private List<StreamMetadata> buildStreamMetadata(List<Stream> streams, SqlSession session) {
+        RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
+        return streams.stream()
+            .map(stream -> {
+                int rangeId = stream.getRangeId();
+                Range range = rangeMapper.get(rangeId, stream.getId(), null);
+                return StreamMetadata.newBuilder()
+                    .setStreamId(stream.getId())
+                    .setStartOffset(stream.getStartOffset())
+                    .setEndOffset(null == range ? 0 : range.getEndOffset())
+                    .setEpoch(stream.getEpoch())
+                    .setState(stream.getState())
+                    .setRangeId(stream.getRangeId())
+                    .build();
+            })
+            .toList();
+    }
+
+    @Override
+    public CompletableFuture<List<StreamMetadata>> getStreams(List<Long> streamIds) {
+        return CompletableFuture.supplyAsync(() -> {
+            try (SqlSession session = openSession()) {
+                StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+                List<Stream> streams = streamMapper.listByStreamIds(streamIds);
+                return buildStreamMetadata(streams, session);
+            }
+        }, asyncExecutorService);
     }
 
     @Override

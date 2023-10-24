@@ -108,7 +108,7 @@ message CreateTopicRequest {
   int32 retention_hours = 4;
 
   // The message type that the topic accepts
-  repeated MessageType accept_message_types = 5;
+  AcceptTypes accept_types = 5;
 }
 
 message CreateTopicReply {
@@ -149,7 +149,7 @@ message UpdateTopicRequest {
   int32 count = 4;
 
   // Effective if non-empty
-  repeated MessageType accept_message_types = 5;
+  AcceptTypes accept_types = 5;
 }
 
 message UpdateTopicReply {

@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.controller;
 
+import apache.rocketmq.controller.v1.AcceptTypes;
 import apache.rocketmq.controller.v1.AssignmentStatus;
 import apache.rocketmq.controller.v1.CloseStreamReply;
 import apache.rocketmq.controller.v1.CloseStreamRequest;
@@ -82,6 +83,7 @@ import com.automq.rocketmq.controller.metadata.database.mapper.S3StreamObjectMap
 import com.automq.rocketmq.controller.metadata.database.mapper.S3WalObjectMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
+import com.google.protobuf.util.JsonFormat;
 import io.grpc.Grpc;
 import io.grpc.InsecureChannelCredentials;
 import io.grpc.ManagedChannel;
@@ -231,13 +233,17 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
     @Test
     public void testListTopics() throws IOException {
+        AcceptTypes acceptTypes = AcceptTypes.newBuilder()
+            .addTypes(MessageType.NORMAL)
+            .addTypes(MessageType.DELAY)
+            .build();
         try (SqlSession session = getSessionFactory().openSession()) {
             TopicMapper topicMapper = session.getMapper(TopicMapper.class);
             for (int i = 0; i < 3; i++) {
                 Topic topic = new Topic();
                 topic.setStatus(TopicStatus.TOPIC_STATUS_ACTIVE);
                 topic.setName("T" + i);
-                topic.setAcceptMessageTypes("[\"NORMAL\",\"DELAY\"]");
+                topic.setAcceptMessageTypes(JsonFormat.printer().print(acceptTypes));
                 topic.setQueueNum(0);
                 topicMapper.create(topic);
             }
@@ -285,10 +291,11 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
 
-        List<MessageType> messageTypeList = new ArrayList<>();
-        messageTypeList.add(MessageType.NORMAL);
-        messageTypeList.add(MessageType.FIFO);
-        messageTypeList.add(MessageType.DELAY);
+        AcceptTypes acceptTypes = AcceptTypes.newBuilder()
+            .addTypes(MessageType.NORMAL)
+            .addTypes(MessageType.FIFO)
+            .addTypes(MessageType.DELAY)
+            .build();
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), config)) {
             metadataStore.start();
@@ -303,11 +310,11 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 ControllerServiceGrpc.ControllerServiceBlockingStub blockingStub = ControllerServiceGrpc.newBlockingStub(channel);
                 UpdateTopicReply reply = blockingStub.updateTopic(UpdateTopicRequest.newBuilder()
                     .setTopicId(topicId)
-                    .addAllAcceptMessageTypes(messageTypeList)
+                    .setAcceptTypes(acceptTypes)
                     .build());
                 Assertions.assertTrue(reply.getTopic().getName().startsWith("T"));
                 Assertions.assertEquals(Code.OK, reply.getStatus().getCode());
-                Assertions.assertEquals(messageTypeList, reply.getTopic().getAcceptMessageTypesList());
+                Assertions.assertEquals(acceptTypes, reply.getTopic().getAcceptTypes());
                 channel.shutdownNow();
             }
         }
@@ -2166,10 +2173,11 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
         String topicName = "t1";
         int queueNum = 4;
-        List<MessageType> messageTypeList = new ArrayList<>();
-        messageTypeList.add(MessageType.NORMAL);
-        messageTypeList.add(MessageType.FIFO);
-        messageTypeList.add(MessageType.DELAY);
+        AcceptTypes acceptTypes = AcceptTypes.newBuilder()
+            .addTypes(MessageType.NORMAL)
+            .addTypes(MessageType.FIFO)
+            .addTypes(MessageType.DELAY)
+            .build();
 
         try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), config)) {
             metadataStore.start();
@@ -2197,13 +2205,13 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 Long topicId = client.createTopic(String.format("localhost:%d", port), CreateTopicRequest.newBuilder()
                     .setTopic(topicName)
                     .setCount(queueNum)
-                    .addAllAcceptMessageTypes(messageTypeList)
+                    .setAcceptTypes(acceptTypes)
                     .build()).get();
 
                 Assertions.assertThrows(ExecutionException.class, () -> client.createTopic(String.format("localhost:%d", port), CreateTopicRequest.newBuilder()
                     .setTopic(topicName)
                     .setCount(queueNum)
-                    .addAllAcceptMessageTypes(messageTypeList)
+                    .setAcceptTypes(acceptTypes)
                     .build()).get());
 
                 StreamMetadata metadata = metadataStore.getStream(topicId, 0, null, StreamRole.STREAM_ROLE_DATA).get();

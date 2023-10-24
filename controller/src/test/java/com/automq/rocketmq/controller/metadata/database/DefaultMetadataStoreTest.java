@@ -17,8 +17,10 @@
 
 package com.automq.rocketmq.controller.metadata.database;
 
+import apache.rocketmq.controller.v1.AcceptTypes;
 import apache.rocketmq.controller.v1.AssignmentStatus;
 import apache.rocketmq.controller.v1.ConsumerGroup;
+import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.GroupStatus;
 import apache.rocketmq.controller.v1.GroupType;
 import apache.rocketmq.controller.v1.S3ObjectState;
@@ -30,6 +32,7 @@ import apache.rocketmq.controller.v1.StreamState;
 import apache.rocketmq.controller.v1.SubStream;
 import apache.rocketmq.controller.v1.TopicStatus;
 import apache.rocketmq.controller.v1.MessageType;
+import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.common.system.StreamConstants;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.ControllerClient;
@@ -55,6 +58,7 @@ import com.automq.rocketmq.controller.metadata.database.mapper.S3WalObjectMapper
 import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 
+import com.google.protobuf.util.JsonFormat;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -198,7 +202,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    void testCreateTopic() throws IOException, ControllerException, ExecutionException, InterruptedException {
+    void testCreateTopic() throws IOException, ExecutionException, InterruptedException {
         String address = "localhost:1234";
         int nodeId;
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -216,13 +220,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         long topicId;
         int queueNum = 4;
         String topicName = "t1";
-        List<MessageType> messageTypes = new ArrayList<>() {
-            {
-                add(MessageType.NORMAL);
-                add(MessageType.FIFO);
-                add(MessageType.TRANSACTION);
-            }
-        };
         try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with().atMost(10, TimeUnit.SECONDS)
@@ -233,7 +230,16 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
                 .pollInterval(100, TimeUnit.MILLISECONDS)
                 .until(metadataStore::hasAliveBrokerNodes);
 
-            topicId = metadataStore.createTopic(topicName, queueNum, messageTypes).get();
+            CreateTopicRequest request = CreateTopicRequest.newBuilder()
+                .setTopic(topicName)
+                .setCount(queueNum)
+                .setAcceptTypes(AcceptTypes.newBuilder()
+                    .addTypes(MessageType.NORMAL)
+                    .addTypes(MessageType.FIFO)
+                    .addTypes(MessageType.TRANSACTION)
+                    .build())
+                .build();
+            topicId = metadataStore.createTopic(request).get();
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -253,7 +259,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    void testUpdateTopic() throws IOException, ControllerException, ExecutionException, InterruptedException {
+    void testUpdateTopic() throws IOException, ExecutionException, InterruptedException {
         String address = "localhost:1234";
         int nodeId;
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -271,19 +277,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         long topicId;
         int queueNum = 4;
         String topicName = "t1";
-        List<MessageType> messageTypes = new ArrayList<>() {
-            {
-                add(MessageType.NORMAL);
-                add(MessageType.FIFO);
-                add(MessageType.TRANSACTION);
-            }
-        };
-        List<MessageType> updateMessageTypes = new ArrayList<>() {
-            {
-                add(MessageType.NORMAL);
-                add(MessageType.TRANSACTION);
-            }
-        };
 
         try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
@@ -295,9 +288,26 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
                 .pollInterval(100, TimeUnit.MILLISECONDS)
                 .until(metadataStore::hasAliveBrokerNodes);
 
-            topicId = metadataStore.createTopic(topicName, queueNum, messageTypes).get();
+            CreateTopicRequest request = CreateTopicRequest.newBuilder()
+                .setTopic(topicName)
+                .setCount(queueNum)
+                .setAcceptTypes(AcceptTypes.newBuilder()
+                    .addTypes(MessageType.NORMAL)
+                    .addTypes(MessageType.FIFO)
+                    .addTypes(MessageType.TRANSACTION)
+                    .build())
+                .build();
+            topicId = metadataStore.createTopic(request).get();
 
-            metadataStore.updateTopic(topicId, topicName, null, updateMessageTypes).get();
+            UpdateTopicRequest updateTopicRequest = UpdateTopicRequest.newBuilder()
+                .setTopicId(topicId)
+                .setName(topicName)
+                .setAcceptTypes(AcceptTypes.newBuilder()
+                    .addTypes(MessageType.NORMAL)
+                    .addTypes(MessageType.TRANSACTION)
+                    .build())
+                .build();
+            metadataStore.updateTopic(updateTopicRequest).get();
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -305,7 +315,11 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             List<Topic> topics = topicMapper.list(null, null);
             topics.stream().filter(topic -> topic.getName().equals("t1")).forEach(topic -> Assertions.assertEquals(4, topic.getQueueNum()));
 
-            topics.stream().filter(topic -> topic.getName().equals("t1")).forEach(topic -> Assertions.assertEquals(gson.toJson(updateMessageTypes), topic.getAcceptMessageTypes()));
+            String json = JsonFormat.printer().print(AcceptTypes.newBuilder()
+                    .addTypes(MessageType.NORMAL)
+                    .addTypes(MessageType.TRANSACTION)
+                .build());
+            topics.stream().filter(topic -> topic.getName().equals("t1")).forEach(topic -> Assertions.assertEquals(json, topic.getAcceptMessageTypes()));
 
             QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
             List<QueueAssignment> assignments = assignmentMapper.list(topicId, null, null, null, null);
@@ -400,7 +414,11 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     @Test
     public void testDescribeTopic() throws IOException, ExecutionException, InterruptedException {
         long topicId;
-        String messageType = "[\"NORMAL\",\"DELAY\"]";
+        AcceptTypes acceptTypes = AcceptTypes.newBuilder()
+            .addTypes(MessageType.NORMAL)
+            .addTypes(MessageType.DELAY)
+            .build();
+        String messageType = JsonFormat.printer().print(acceptTypes);
         try (SqlSession session = getSessionFactory().openSession()) {
 
             TopicMapper topicMapper = session.getMapper(TopicMapper.class);
@@ -439,7 +457,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Assertions.assertEquals("T1", topic.getName());
             Assertions.assertEquals(1, topic.getAssignmentsCount());
             Assertions.assertEquals(1, topic.getReassignmentsCount());
-            Assertions.assertEquals(messageType, gson.toJson(topic.getAcceptMessageTypesList()));
+            Assertions.assertEquals(messageType, JsonFormat.printer().print(topic.getAcceptTypes()));
         }
     }
 
@@ -1220,7 +1238,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Assertions.assertEquals(10, s3StreamObject.getStartOffset());
             Assertions.assertEquals(20, s3StreamObject.getEndOffset());
 
-
             List<S3WALObject> s3WALObjects = listPair.getRight();
             Assertions.assertEquals(2, s3WALObjects.size());
             S3WALObject s3WALObject = s3WALObjects.get(0);
@@ -1249,6 +1266,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             session.commit();
         }
     }
+
     @Test
     public void testOpenStream_WithCloseStream_AtStart() throws IOException, ExecutionException,
         InterruptedException {
@@ -2008,7 +2026,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             S3Object s3Object1 = s3ObjectMapper.getById(objectId);
             Assertions.assertEquals(S3ObjectState.BOS_WILL_DELETE, s3Object1.getState());
 
-
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
             for (long index = objectId; index < objectId + 2; index++) {
                 com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = s3StreamObjectMapper.getByObjectId(index);
@@ -2070,7 +2087,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             if (object.getBaseDataTimestamp() - time > 5 * 60) {
                 Assertions.fail();
             }
-            Assertions.assertNotNull(object.getCommittedTimestamp());
             Assertions.assertTrue(object.getCommittedTimestamp() > 0);
             Assertions.assertEquals(111L, object.getObjectSize());
             Assertions.assertEquals(streamId, object.getStreamId());
@@ -2211,7 +2227,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         compactedObjects.add(objectId + 2);
         compactedObjects.add(objectId + 3);
 
-
         S3StreamObject s3StreamObject = S3StreamObject.newBuilder()
             .setObjectId(objectId)
             .setStreamId(streamId)
@@ -2220,7 +2235,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             .setStartOffset(111L)
             .setEndOffset(222L)
             .build();
-
 
         S3StreamObject s3StreamObject1 = S3StreamObject.newBuilder()
             .setObjectId(objectId + 1)
@@ -2423,6 +2437,63 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             offset = metadataStore.getConsumerOffset(groupId, topicId, queueId).get();
             Assertions.assertEquals(2000, offset);
         }
+    }
+
+    @Test
+    public void testGetStreams() throws IOException, ExecutionException, InterruptedException {
+        int nodeId = 1;
+        int count = 5;
+        List<Long> streamIds = new ArrayList<>();
+        try (SqlSession session = this.getSessionFactory().openSession()) {
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+            RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
+            long startOffset = 1234;
+            for (int i = 0; i < count; i++) {
+                com.automq.rocketmq.controller.metadata.database.dao.Stream stream = new com.automq.rocketmq.controller.metadata.database.dao.Stream();
+                stream.setSrcNodeId(nodeId);
+                stream.setDstNodeId(nodeId);
+                stream.setStartOffset(startOffset);
+                stream.setEpoch(i);
+                stream.setRangeId(i + 1);
+                stream.setState(StreamState.OPEN);
+                stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
+                streamMapper.create(stream);
+                long streamId = stream.getId();
+                streamIds.add(streamId);
+
+                Range range = new Range();
+                range.setRangeId(i + 1);
+                range.setStreamId(streamId);
+                range.setEpoch(0L);
+                range.setStartOffset(startOffset);
+                range.setEndOffset(startOffset + 100);
+                range.setNodeId(nodeId);
+                rangeMapper.create(range);
+
+                startOffset += 100;
+            }
+            session.commit();
+        }
+
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            Assertions.assertNull(metadataStore.getLease());
+            Lease lease = new Lease();
+            lease.setNodeId(config.nodeId());
+            metadataStore.setLease(lease);
+            metadataStore.setRole(Role.Leader);
+            List<StreamMetadata> streams = metadataStore.getStreams(streamIds).get();
+
+            Assertions.assertFalse(streams.isEmpty());
+            Assertions.assertEquals(count, streams.size());
+            long startOffset = 1234;
+            for (int i = 0; i < count; i++) {
+                StreamMetadata streamMetadata = streams.get(i);
+                Assertions.assertEquals(startOffset, streamMetadata.getStartOffset());
+                Assertions.assertEquals(startOffset + 100, streamMetadata.getEndOffset());
+                startOffset += 100;
+            }
+        }
+
     }
 
 }

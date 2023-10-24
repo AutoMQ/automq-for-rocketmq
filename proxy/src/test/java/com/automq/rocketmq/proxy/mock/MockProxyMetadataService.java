@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.proxy.mock;
 
+import apache.rocketmq.controller.v1.AcceptTypes;
 import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.MessageQueue;
 import apache.rocketmq.controller.v1.MessageQueueAssignment;
@@ -38,7 +39,7 @@ public class MockProxyMetadataService implements ProxyMetadataService {
         topicBuilder.setName(topicName);
         topicBuilder.setTopicId(2);
         topicBuilder.setCount(1);
-        topicBuilder.addAcceptMessageTypes(MessageType.NORMAL);
+        topicBuilder.setAcceptTypes(AcceptTypes.newBuilder().addTypes(MessageType.NORMAL).build());
 
         MessageQueueAssignment.Builder assignmentBuilder = MessageQueueAssignment.newBuilder();
         MessageQueue.Builder queueBuilder = MessageQueue.newBuilder();

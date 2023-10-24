@@ -22,6 +22,7 @@ import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.StreamRole;
+import com.automq.rocketmq.common.config.ControllerConfig;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.DefaultMetadataStore;
@@ -144,5 +145,15 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
     @Override
     public int ownerNode(long topicId, int queueId) {
         return metadataStore.ownerNode(topicId, queueId);
+    }
+
+    @Override
+    public ControllerConfig nodeConfig() {
+        return metadataStore.config();
+    }
+
+    @Override
+    public CompletableFuture<List<StreamMetadata>> getStreams(List<Long> streamIds) {
+        return metadataStore.getStreams(streamIds);
     }
 }
