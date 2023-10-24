@@ -432,7 +432,7 @@ public class CompactionManager {
             S3ObjectMetadata metadata = objectMetadataMap.get(objectId);
             for (StreamOffsetRange streamOffsetRange : metadata.getOffsetRanges()) {
                 if (!streamMetadataMap.containsKey(streamOffsetRange.getStreamId()) ||
-                        streamOffsetRange.getStartOffset() < streamMetadataMap.get(streamOffsetRange.getStreamId()).getStartOffset()) {
+                        streamOffsetRange.getEndOffset() <= streamMetadataMap.get(streamOffsetRange.getStreamId()).getStartOffset()) {
                     // skip stream offset range that has been trimmed
                     continue;
                 }

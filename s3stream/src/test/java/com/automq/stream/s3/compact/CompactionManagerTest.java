@@ -156,6 +156,26 @@ public class CompactionManagerTest extends CompactionTestBase {
     @Test
     public void testCompactWithDataTrimmed() {
         when(streamManager.getStreams(Collections.emptyList())).thenReturn(CompletableFuture.completedFuture(
+                List.of(new StreamMetadata(STREAM_0, 0, 5, 20, StreamState.OPENED),
+                        new StreamMetadata(STREAM_1, 0, 25, 500, StreamState.OPENED),
+                        new StreamMetadata(STREAM_2, 0, 30, 270, StreamState.OPENED))));
+        compactionManager = new CompactionManager(config, objectManager, streamManager, s3Operator);
+        List<StreamMetadata> streamMetadataList = this.streamManager.getStreams(Collections.emptyList()).join();
+        CommitWALObjectRequest request = compactionManager.buildCompactRequest(streamMetadataList, S3_WAL_OBJECT_METADATA_LIST, new HashSet<>());
+
+        assertEquals(List.of(OBJECT_0, OBJECT_1, OBJECT_2), request.getCompactedObjectIds());
+        assertEquals(OBJECT_0, request.getOrderId());
+        assertTrue(request.getObjectId() > OBJECT_2);
+        request.getStreamObjects().forEach(s -> assertTrue(s.getObjectId() > OBJECT_2));
+        assertEquals(3, request.getStreamObjects().size());
+        assertEquals(2, request.getStreamRanges().size());
+
+        Assertions.assertTrue(checkDataIntegrity(streamMetadataList, S3_WAL_OBJECT_METADATA_LIST, request));
+    }
+
+    @Test
+    public void testCompactWithDataTrimmed2() {
+        when(streamManager.getStreams(Collections.emptyList())).thenReturn(CompletableFuture.completedFuture(
                 List.of(new StreamMetadata(STREAM_0, 0, 15, 20, StreamState.OPENED),
                         new StreamMetadata(STREAM_1, 0, 25, 500, StreamState.OPENED),
                         new StreamMetadata(STREAM_2, 0, 30, 270, StreamState.OPENED))));

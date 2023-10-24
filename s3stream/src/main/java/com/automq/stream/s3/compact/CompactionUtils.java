@@ -77,7 +77,7 @@ public class CompactionUtils {
                                 // non-exist stream
                                 continue;
                             }
-                            if (streamDataBlock.getStartOffset() < streamMetadataMap.get(streamDataBlock.getStreamId()).getStartOffset()) {
+                            if (streamDataBlock.getEndOffset() <= streamMetadataMap.get(streamDataBlock.getStreamId()).getStartOffset()) {
                                 // trimmed stream data block
                                 continue;
                             }
