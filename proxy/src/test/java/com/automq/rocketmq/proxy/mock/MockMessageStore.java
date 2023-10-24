@@ -27,6 +27,7 @@ import com.automq.rocketmq.store.model.message.AckResult;
 import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
 import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PopResult;
+import com.automq.rocketmq.store.model.message.PullResult;
 import com.automq.rocketmq.store.model.message.PutResult;
 import com.automq.rocketmq.store.service.InflightService;
 import java.util.ArrayList;
@@ -95,6 +96,12 @@ public class MockMessageStore implements MessageStore {
             inflightService.increaseInflightCount(consumerGroupId, topicId, queueId, messageList.size());
         }
         return CompletableFuture.completedFuture(new PopResult(status, 0L, messageList, messageList.size() - end));
+    }
+
+    @Override
+    public CompletableFuture<PullResult> pull(long consumerGroupId, long topicId, int queueId, Filter filter,
+        long offset, int batchSize, boolean retry) {
+        return null;
     }
 
     @Override

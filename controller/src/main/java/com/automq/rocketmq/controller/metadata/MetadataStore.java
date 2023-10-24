@@ -21,11 +21,11 @@ import apache.rocketmq.controller.v1.AssignmentStatus;
 import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.GroupType;
-import apache.rocketmq.controller.v1.StreamRole;
-import apache.rocketmq.controller.v1.Topic;
 import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
+import apache.rocketmq.controller.v1.StreamRole;
+import apache.rocketmq.controller.v1.Topic;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.common.api.DataStore;
 import com.automq.rocketmq.common.config.ControllerConfig;
@@ -36,6 +36,7 @@ import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import java.io.Closeable;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
@@ -209,7 +210,7 @@ public interface MetadataStore extends Closeable {
      * @param queueId Queue ID
      * @return Owner node id if found in cache; 0 otherwise.
      */
-    int ownerNode(long topicId, int queueId);
+    Optional<Integer> ownerNode(long topicId, int queueId);
 
     CompletableFuture<List<StreamMetadata>> getStreams(List<Long> streamIds);
 }

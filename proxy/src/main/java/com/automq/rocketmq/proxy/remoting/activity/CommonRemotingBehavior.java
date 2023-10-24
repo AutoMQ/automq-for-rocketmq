@@ -20,6 +20,7 @@ package com.automq.rocketmq.proxy.remoting.activity;
 import com.automq.rocketmq.proxy.metrics.ProxyMetricsManager;
 import com.automq.rocketmq.proxy.model.ProxyContextExt;
 import com.automq.rocketmq.proxy.remoting.RemotingUtil;
+import java.util.Optional;
 import org.apache.rocketmq.proxy.common.ProxyContext;
 import org.apache.rocketmq.remoting.common.RemotingHelper;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
@@ -31,6 +32,7 @@ import org.apache.rocketmq.remoting.protocol.RequestCode;
 public interface CommonRemotingBehavior {
     String BROKER_NAME_FIELD = "bname";
     String BROKER_NAME_FIELD_FOR_SEND_MESSAGE_V2 = "n";
+
     default void recordRpcLatency(ProxyContext context, RemotingCommand response) {
         ProxyMetricsManager.recordRpcLatency(context.getProtocolType(), context.getAction(),
             RemotingHelper.getResponseCodeDesc(response.getCode()), ((ProxyContextExt) context).getElapsedTimeNanos());
@@ -63,16 +65,23 @@ public interface CommonRemotingBehavior {
      * @param request The remoting request.
      * @return The error response or null if the version is supported.
      */
-    default RemotingCommand checkVersion(RemotingCommand request) {
-        String brokerName;
-        if (request.getCode() == RequestCode.SEND_MESSAGE_V2) {
-            brokerName = request.getExtFields().get(BROKER_NAME_FIELD_FOR_SEND_MESSAGE_V2);
-        } else {
-            brokerName = request.getExtFields().get(BROKER_NAME_FIELD);
+    default Optional<RemotingCommand> checkVersion(RemotingCommand request) {
+        if (requestNeedBrokerName(request.getCode())) {
+            String brokerName;
+            if (request.getCode() == RequestCode.SEND_MESSAGE_V2) {
+                brokerName = request.getExtFields().get(BROKER_NAME_FIELD_FOR_SEND_MESSAGE_V2);
+            } else {
+                brokerName = request.getExtFields().get(BROKER_NAME_FIELD);
+            }
+            if (brokerName == null) {
+                return Optional.of(RemotingUtil.versionNotSupportedResponse(request));
+            }
         }
-        if (brokerName == null) {
-            return RemotingUtil.versionNotSupportedResponse(request);
-        }
-        return null;
+        return Optional.empty();
+    }
+
+    default boolean requestNeedBrokerName(int requestCode) {
+        return requestCode == RequestCode.SEND_MESSAGE_V2
+            || requestCode == RequestCode.PULL_MESSAGE;
     }
 }

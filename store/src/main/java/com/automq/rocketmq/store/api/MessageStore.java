@@ -23,6 +23,7 @@ import com.automq.rocketmq.store.model.message.AckResult;
 import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
 import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PopResult;
+import com.automq.rocketmq.store.model.message.PullResult;
 import com.automq.rocketmq.store.model.message.PutResult;
 import java.util.concurrent.CompletableFuture;
 
@@ -47,6 +48,20 @@ public interface MessageStore extends Lifecycle {
     CompletableFuture<PopResult> pop(long consumerGroupId, long topicId, int queueId, Filter filter,
         int batchSize, boolean fifo, boolean retry, long invisibleDuration);
 
+    /**
+     * Pull message from specified topic and queue.
+     *
+     * @param consumerGroupId consumer group id that launches this query
+     * @param topicId         topic id to pull message from
+     * @param queueId         queue id to pull message from
+     * @param filter          filter to apply to messages
+     * @param offset          offset to start pulling
+     * @param batchSize       maximum count of messages
+     * @param retry           whether to pull retry messages
+     * @return pull result, see {@link PullResult}
+     */
+    CompletableFuture<PullResult> pull(long consumerGroupId, long topicId, int queueId, Filter filter, long offset,
+        int batchSize, boolean retry);
 
     /**
      * Put a message to the specified topic and queue.
@@ -71,7 +86,8 @@ public interface MessageStore extends Lifecycle {
      * @param invisibleDuration the duration for the next time this batch of messages will be visible, in milliseconds
      * @return change invisible duration result, see {@link ChangeInvisibleDurationResult}
      */
-    CompletableFuture<ChangeInvisibleDurationResult> changeInvisibleDuration(String receiptHandle, long invisibleDuration);
+    CompletableFuture<ChangeInvisibleDurationResult> changeInvisibleDuration(String receiptHandle,
+        long invisibleDuration);
 
     /**
      * Close the specified queue.
@@ -88,6 +104,7 @@ public interface MessageStore extends Lifecycle {
 
     /**
      * Get offset range in queue.
+     *
      * @param topicId topic id
      * @param queueId queue id
      * @return offset range, <code>[startOffset, endOffset)</code>

@@ -26,6 +26,7 @@ import static com.automq.rocketmq.proxy.remoting.activity.CommonRemotingBehavior
 import static com.automq.rocketmq.proxy.remoting.activity.CommonRemotingBehavior.BROKER_NAME_FIELD_FOR_SEND_MESSAGE_V2;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CommonRemotingBehaviorTest {
     private final CommonRemotingBehavior commonRemotingBehavior = new CommonRemotingBehavior() {
@@ -56,19 +57,22 @@ class CommonRemotingBehaviorTest {
     void checkVersion() {
         RemotingCommand request = RemotingCommand.createRequestCommand(RequestCode.SEND_MESSAGE_V2, null);
         request.addExtField("PLACE_HOLDER_KEY", "PLACE_HOLDER_VALUE");
-        assertEquals(commonRemotingBehavior.checkVersion(request).getCode(), ResponseCode.VERSION_NOT_SUPPORTED);
+        assertTrue(commonRemotingBehavior.checkVersion(request).isPresent());
+        assertEquals(commonRemotingBehavior.checkVersion(request).get().getCode(), ResponseCode.VERSION_NOT_SUPPORTED);
 
         request.addExtField(BROKER_NAME_FIELD, "bname");
-        assertEquals(commonRemotingBehavior.checkVersion(request).getCode(), ResponseCode.VERSION_NOT_SUPPORTED);
+        assertTrue(commonRemotingBehavior.checkVersion(request).isPresent());
+        assertEquals(commonRemotingBehavior.checkVersion(request).get().getCode(), ResponseCode.VERSION_NOT_SUPPORTED);
 
         request.addExtField(BROKER_NAME_FIELD_FOR_SEND_MESSAGE_V2, "bname");
-        assertNull(commonRemotingBehavior.checkVersion(request));
+        assertTrue(commonRemotingBehavior.checkVersion(request).isEmpty());
 
-        request = RemotingCommand.createRequestCommand(RequestCode.HEART_BEAT, null);
+        request = RemotingCommand.createRequestCommand(RequestCode.PULL_MESSAGE, null);
         request.addExtField(BROKER_NAME_FIELD_FOR_SEND_MESSAGE_V2, "bname");
-        assertEquals(commonRemotingBehavior.checkVersion(request).getCode(), ResponseCode.VERSION_NOT_SUPPORTED);
+        assertTrue(commonRemotingBehavior.checkVersion(request).isPresent());
+        assertEquals(commonRemotingBehavior.checkVersion(request).get().getCode(), ResponseCode.VERSION_NOT_SUPPORTED);
 
         request.addExtField(BROKER_NAME_FIELD, "bname");
-        assertNull(commonRemotingBehavior.checkVersion(request));
+        assertTrue(commonRemotingBehavior.checkVersion(request).isEmpty());
     }
 }

@@ -31,6 +31,7 @@ import com.automq.rocketmq.store.model.message.AckResult;
 import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
 import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PopResult;
+import com.automq.rocketmq.store.model.message.PullResult;
 import com.automq.rocketmq.store.model.message.PutResult;
 import com.automq.rocketmq.store.service.InflightService;
 import com.automq.rocketmq.store.service.ReviveService;
@@ -122,7 +123,6 @@ public class MessageStoreImpl implements MessageStore {
         kvService.clear(KV_NAMESPACE_FIFO_INDEX);
     }
 
-
     @Override
     public CompletableFuture<PopResult> pop(long consumerGroupId, long topicId, int queueId, Filter filter,
         int batchSize, boolean fifo, boolean retry, long invisibleDuration) {
@@ -138,6 +138,18 @@ public class MessageStoreImpl implements MessageStore {
                     return topicQueue.popRetry(consumerGroupId, filter, batchSize, invisibleDuration);
                 }
                 return topicQueue.popNormal(consumerGroupId, filter, batchSize, invisibleDuration);
+            });
+    }
+
+    @Override
+    public CompletableFuture<PullResult> pull(long consumerGroupId, long topicId, int queueId, Filter filter,
+        long offset, int batchSize, boolean retry) {
+        return logicQueueManager.getOrCreate(topicId, queueId)
+            .thenCompose(topicQueue -> {
+                if (retry) {
+                    return topicQueue.pullRetry(consumerGroupId, filter, offset, batchSize);
+                }
+                return topicQueue.pullNormal(consumerGroupId, filter, offset, batchSize);
             });
     }
 

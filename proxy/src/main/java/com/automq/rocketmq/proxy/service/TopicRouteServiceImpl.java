@@ -106,14 +106,13 @@ public class TopicRouteServiceImpl extends TopicRouteService {
     }
 
     @Override
-    public String getBrokerAddr(ProxyContext ctx, String brokerName) throws Exception {
+    public String getBrokerAddr(ProxyContext ctx, String brokerName) {
         throw new UnsupportedOperationException("No need to implement this method.");
     }
 
     @Override
     public AddressableMessageQueue buildAddressableMessageQueue(ProxyContext ctx,
-        MessageQueue messageQueue) throws Exception {
-        // In local mode, we don't need to know the broker address.
+        MessageQueue messageQueue) {
         return new AddressableMessageQueue(messageQueue, null);
     }
 

@@ -19,15 +19,18 @@ package com.automq.rocketmq.proxy.remoting.activity;
 
 import com.automq.rocketmq.proxy.remoting.RemotingUtil;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.FileRegion;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import org.apache.rocketmq.broker.client.ConsumerGroupInfo;
+import org.apache.rocketmq.broker.pagecache.ManyMessageTransfer;
 import org.apache.rocketmq.client.consumer.PullResult;
 import org.apache.rocketmq.client.consumer.PullStatus;
+import org.apache.rocketmq.common.attribute.TopicMessageType;
 import org.apache.rocketmq.common.help.FAQUrl;
 import org.apache.rocketmq.common.message.MessageDecoder;
 import org.apache.rocketmq.common.message.MessageExt;
@@ -47,11 +50,14 @@ import org.apache.rocketmq.remoting.protocol.header.PullMessageRequestHeader;
 import org.apache.rocketmq.remoting.protocol.header.PullMessageResponseHeader;
 import org.apache.rocketmq.remoting.protocol.heartbeat.SubscriptionData;
 import org.apache.rocketmq.remoting.protocol.subscription.SubscriptionGroupConfig;
+import org.apache.rocketmq.store.GetMessageResult;
+import org.apache.rocketmq.store.SelectMappedBufferResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class ExtendPullMessageActivity extends PullMessageActivity implements CommonRemotingBehavior {
     public static final Logger LOGGER = LoggerFactory.getLogger(ExtendPullMessageActivity.class);
+
     public ExtendPullMessageActivity(RequestPipeline requestPipeline,
         MessagingProcessor messagingProcessor) {
         super(requestPipeline, messagingProcessor);
@@ -60,9 +66,9 @@ public class ExtendPullMessageActivity extends PullMessageActivity implements Co
     @Override
     protected RemotingCommand processRequest0(ChannelHandlerContext ctx, RemotingCommand request,
         ProxyContext context) throws Exception {
-        RemotingCommand response = checkVersion(request);
-        if (response != null) {
-            return response;
+        Optional<RemotingCommand> response = checkVersion(request);
+        if (response.isPresent()) {
+            return response.get();
         }
 
         if (request.getCode() == RequestCode.PULL_MESSAGE || request.getCode() == RequestCode.LITE_PULL_MESSAGE) {
@@ -93,7 +99,8 @@ public class ExtendPullMessageActivity extends PullMessageActivity implements Co
         super.writeResponse(ctx, context, request, response, t);
     }
 
-    private RemotingCommand pullMessage(ChannelHandlerContext ctx, RemotingCommand request, ProxyContext context) throws RemotingCommandException {
+    private RemotingCommand pullMessage(ChannelHandlerContext ctx, RemotingCommand request,
+        ProxyContext context) throws RemotingCommandException {
         // Retrieve the request header.
         final PullMessageRequestHeader requestHeader = (PullMessageRequestHeader)
             request.decodeCommandCustomHeader(PullMessageRequestHeader.class);
@@ -103,11 +110,17 @@ public class ExtendPullMessageActivity extends PullMessageActivity implements Co
             PullMessageResponseHeader.class);
         final PullMessageResponseHeader responseHeader = (PullMessageResponseHeader) response.readCustomHeader();
 
-        SubscriptionGroupConfig groupConfig = messagingProcessor.getSubscriptionGroupConfig(context, requestHeader.getConsumerGroup());
-
         // Check the topic existence.
+        TopicMessageType type = messagingProcessor.getMetadataService().getTopicMessageType(context, requestHeader.getTopic());
+        if (type == TopicMessageType.UNSPECIFIED) {
+            response.setCode(ResponseCode.TOPIC_NOT_EXIST);
+            response.setRemark(String.format("topic [%s] does not exist or message type is not specified, %s",
+                requestHeader.getTopic(), FAQUrl.suggestTodo(FAQUrl.NO_TOPIC_ROUTE_INFO)));
+            return response;
+        }
 
         // Check the subscription group existence.
+        SubscriptionGroupConfig groupConfig = messagingProcessor.getSubscriptionGroupConfig(context, requestHeader.getConsumerGroup());
         if (Objects.isNull(groupConfig)) {
             response.setCode(ResponseCode.SUBSCRIPTION_GROUP_NOT_EXIST);
             response.setRemark(String.format("subscription group [%s] does not exist, %s",
@@ -122,8 +135,6 @@ public class ExtendPullMessageActivity extends PullMessageActivity implements Co
             response.setRemark("subscription group no permission, " + requestHeader.getConsumerGroup());
             return response;
         }
-
-        // TODO: Check the read permission of the topic.
 
         String brokerName = dstBrokerName(request);
         assert brokerName != null;
@@ -170,6 +181,7 @@ public class ExtendPullMessageActivity extends PullMessageActivity implements Co
             }
         }
 
+        // TODO: handle pulling retry message
         CompletableFuture<PullResult> pullCf = messagingProcessor.pullMessage(
             context,
             messageQueue,
@@ -191,6 +203,9 @@ public class ExtendPullMessageActivity extends PullMessageActivity implements Co
             responseHeader.setNextBeginOffset(pullResult.getNextBeginOffset());
             responseHeader.setMinOffset(pullResult.getMinOffset());
             responseHeader.setMaxOffset(pullResult.getMaxOffset());
+            responseHeader.setSuggestWhichBrokerId(0L);
+            responseHeader.setTopicSysFlag(0);
+            responseHeader.setGroupSysFlag(0);
 
             switch (pullResult.getPullStatus()) {
                 case FOUND -> response.setCode(ResponseCode.SUCCESS);
@@ -206,27 +221,28 @@ public class ExtendPullMessageActivity extends PullMessageActivity implements Co
 
             if (pullResult.getPullStatus() == PullStatus.FOUND) {
                 List<MessageExt> msgList = pullResult.getMsgFoundList();
-                // Encode all the messages
-                List<ByteBuffer> buffers = new ArrayList<>();
-                for (MessageExt msg : msgList) {
-                    msg.setBody(null);
+
+                GetMessageResult getMessageResult = new GetMessageResult();
+                for (MessageExt messageExt : msgList) {
+                    byte[] payload;
                     try {
-                        byte[] payload = MessageDecoder.encode(msg, false);
-                        buffers.add(ByteBuffer.wrap(payload));
+                        payload = MessageDecoder.encode(messageExt, false);
                     } catch (Exception e) {
                         // TODO: Rewrite the response for this case.
                         throw new CompletionException(e);
                     }
+                    getMessageResult.addMessage(new SelectMappedBufferResult(0, ByteBuffer.wrap(payload), payload.length, null));
                 }
-
-                // Merge all the messages into one buffer.
-                // TODO: Encode the message list in a batch way.
-                ByteBuffer mergedBuffer = ByteBuffer.allocate(buffers.stream().mapToInt(ByteBuffer::remaining).sum());
-                for (ByteBuffer buffer : buffers) {
-                    mergedBuffer.put(buffer);
-                }
-
-                response.setBody(mergedBuffer.array());
+                FileRegion fileRegion =
+                    new ManyMessageTransfer(response.encodeHeader(getMessageResult.getBufferTotalSize()), getMessageResult);
+                ctx.writeAndFlush(fileRegion)
+                    .addListener(future -> {
+                        recordRpcLatency(context, response);
+                        if (!future.isSuccess()) {
+                            LOGGER.error("Write pull message response failed", future.cause());
+                        }
+                    });
+                return;
             }
             writeResponse(ctx, context, request, response);
         });

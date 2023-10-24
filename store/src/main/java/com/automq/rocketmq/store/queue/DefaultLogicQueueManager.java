@@ -84,6 +84,16 @@ public class DefaultLogicQueueManager implements LogicQueueManager {
 
     @Override
     public CompletableFuture<LogicQueue> getOrCreate(long topicId, int queueId) {
+        Optional<Integer> ownerNode = metadataService.ownerNode(topicId, queueId);
+        if (ownerNode.isEmpty()) {
+            return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.QUEUE_NOT_FOUND, "This node does not own the requested queue"));
+        } else {
+            Integer ownerNodeId = ownerNode.get();
+            if (ownerNodeId != metadataService.nodeConfig().nodeId()) {
+                return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.QUEUE_NOT_FOUND, "This node does not own the requested queue"));
+            }
+        }
+
         TopicQueueId key = new TopicQueueId(topicId, queueId);
         CompletableFuture<LogicQueue> future = logicQueueMap.get(key);
 
@@ -148,12 +158,14 @@ public class DefaultLogicQueueManager implements LogicQueueManager {
             .exceptionally(ex -> {
                 Throwable cause = FutureUtil.cause(ex);
                 LOGGER.error("{}: Open logic queue failed: topic: {} queue: {}", identity, topicId, queueId, cause);
-                if (cause instanceof ControllerException) {
-                    ControllerException controllerException = (ControllerException) cause;
+                if (cause instanceof ControllerException controllerException) {
                     switch (controllerException.getErrorCode()) {
-                        case Code.FENCED_VALUE -> throw new CompletionException(new StoreException(StoreErrorCode.QUEUE_FENCED, cause.getMessage()));
-                        case Code.NOT_FOUND_VALUE -> throw new CompletionException(new StoreException(StoreErrorCode.QUEUE_NOT_FOUND, cause.getMessage()));
-                        default -> throw new CompletionException(new StoreException(StoreErrorCode.INNER_ERROR, cause.getMessage()));
+                        case Code.FENCED_VALUE ->
+                            throw new CompletionException(new StoreException(StoreErrorCode.QUEUE_FENCED, cause.getMessage()));
+                        case Code.NOT_FOUND_VALUE ->
+                            throw new CompletionException(new StoreException(StoreErrorCode.QUEUE_NOT_FOUND, cause.getMessage()));
+                        default ->
+                            throw new CompletionException(new StoreException(StoreErrorCode.INNER_ERROR, cause.getMessage()));
                     }
                 } else if (cause instanceof StoreException) {
                     throw new CompletionException(cause);

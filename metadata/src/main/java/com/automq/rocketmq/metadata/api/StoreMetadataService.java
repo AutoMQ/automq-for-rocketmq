@@ -22,6 +22,7 @@ import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
 import com.automq.rocketmq.common.config.ControllerConfig;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -183,7 +184,7 @@ public interface StoreMetadataService {
     CompletableFuture<Pair<List<S3StreamObject>, List<S3WALObject>>> listObjects(long streamId, long startOffset,
         long endOffset, int limit);
 
-    int ownerNode(long topicId, int queueId);
+    Optional<Integer> ownerNode(long topicId, int queueId);
 
     ControllerConfig nodeConfig();
 
