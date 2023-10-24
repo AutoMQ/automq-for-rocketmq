@@ -34,11 +34,12 @@ jobs:
           name: rocketmq
           path: ${{github.workspace}}/
       - run: |
-          pwd
           unzip rocketmq*.zip
-          mkdir rocketmq
-          cp -r  rocketmq-on-s3/ rocketmq/
-          ls
+          ls rocketmq-on-s3/
+          mv rocketmq-on-s3/ rocketmq/
+          ls rocketmq/
+          ls rocketmq/bin
+          pwd
       - uses: actions/checkout@v3
         with:
           repository: AutoMQ/rocketmq-e2e
@@ -54,12 +55,11 @@ jobs:
       - name: Build and save docker images
         id: build-images
         run: |
-          pwd
           cd rocketmq-e2e/rocketmq-docker
           version=${{ github.event.pull_request.number || github.ref_name }}-$(uuidgen)
           mkdir versionlist
           touch versionlist/"${version}-`echo ${{ matrix.base-image }} | sed -e "s/:/-/g"`"
-          ls
+          pwd
           sh build-image.sh ${version}
           docker push ${DOCKER_REPO}:${version}
       - uses: actions/upload-artifact@v3
