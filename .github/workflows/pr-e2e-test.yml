@@ -14,7 +14,7 @@ on:
 
 
 env:
-  DOCKER_REPO: automqinc/rocketmq
+  DOCKER_REPO: automqinc/rocketmq_e2e
 
 jobs:
   docker:
@@ -43,7 +43,8 @@ jobs:
       - uses: actions/checkout@v3
         with:
           repository: AutoMQ/rocketmq-e2e
-          ref: master
+#          ref: master TODO: change to master until ci success
+          ref: ros_docker
           path: rocketmq-e2e
           token: ${{ secrets.PAT_E2E }}
       - name: docker-login
@@ -60,9 +61,8 @@ jobs:
           mkdir versionlist
           touch versionlist/"${version}-`echo ${{ matrix.base-image }} | sed -e "s/:/-/g"`"
           pwd
-          sh build-image.sh ${version}
-          docker tag ${DOCKER_REPO}:${version} ${DOCKER_REPO}_e2e:${version}
-          docker push ${DOCKER_REPO}_e2e:${version}
+          sh build-image.sh ${version} ${DOCKER_REPO}
+          docker push ${DOCKER_REPO}:${version}
       - uses: actions/upload-artifact@v3
         name: Upload distribution tar
         with:
