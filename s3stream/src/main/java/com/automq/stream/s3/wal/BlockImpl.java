@@ -29,18 +29,18 @@ import java.util.function.Function;
 
 public class BlockImpl implements Block {
 
-    /**
-     * The soft limit of block size. (128 KiB)
-     * TODO make it configurable
-     */
-    private static final long SOFT_BLOCK_SIZE_LIMIT = 1 << 17;
-
     private final long startOffset;
     /**
      * The max size of this block.
      * Any try to add a record to this block will fail if the size of this block exceeds this limit.
      */
     private final long maxSize;
+    /**
+     * The soft limit of this block.
+     * Any try to add a record to this block will fail if the size of this block exceeds this limit,
+     * unless the block is empty.
+     */
+    private final long softLimit;
     private final CompositeByteBuf data = DirectByteBufAlloc.compositeByteBuffer();
     private final List<CompletableFuture<WriteAheadLog.AppendResult.CallbackResult>> futures = new LinkedList<>();
     /**
@@ -53,9 +53,10 @@ public class BlockImpl implements Block {
      * Create a block.
      * {@link #release()} must be called when this block is no longer used.
      */
-    public BlockImpl(long startOffset, long maxSize) {
+    public BlockImpl(long startOffset, long maxSize, long softLimit) {
         this.startOffset = startOffset;
         this.maxSize = maxSize;
+        this.softLimit = softLimit;
     }
 
     @Override
@@ -76,7 +77,7 @@ public class BlockImpl implements Block {
             return -1;
         }
         // if there is no record in this block, we can write a record larger than SOFT_BLOCK_SIZE_LIMIT
-        if (requiredCapacity > SOFT_BLOCK_SIZE_LIMIT && !futures.isEmpty()) {
+        if (requiredCapacity > softLimit && !futures.isEmpty()) {
             return -1;
         }
 

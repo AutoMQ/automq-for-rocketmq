@@ -705,6 +705,7 @@ public class BlockWALService implements WriteAheadLog {
         private long slidingWindowInitialSize = 1 << 20;
         private long slidingWindowUpperLimit = 512 << 20;
         private long slidingWindowScaleUnit = 4 << 20;
+        private long blockSoftLimit = 1 << 17; // 128KiB
 
         BlockWALServiceBuilder(String blockDevicePath, long capacity) {
             this.blockDevicePath = blockDevicePath;
@@ -717,7 +718,8 @@ public class BlockWALService implements WriteAheadLog {
                     .ioThreadNums(config.s3WALThread())
                     .slidingWindowInitialSize(config.s3WALWindowInitial())
                     .slidingWindowScaleUnit(config.s3WALWindowIncrement())
-                    .slidingWindowUpperLimit(config.s3WALWindowMax());
+                    .slidingWindowUpperLimit(config.s3WALWindowMax())
+                    .blockSoftLimit(config.s3WALBlockSoftLimit());
         }
 
         public BlockWALServiceBuilder flushHeaderIntervalSeconds(int flushHeaderIntervalSeconds) {
@@ -745,6 +747,11 @@ public class BlockWALService implements WriteAheadLog {
             return this;
         }
 
+        public BlockWALServiceBuilder blockSoftLimit(long blockSoftLimit) {
+            this.blockSoftLimit = blockSoftLimit;
+            return this;
+        }
+
         public BlockWALService build() {
             BlockWALService blockWALService = new BlockWALService();
 
@@ -765,6 +772,7 @@ public class BlockWALService implements WriteAheadLog {
                     ioThreadNums,
                     slidingWindowUpperLimit,
                     slidingWindowScaleUnit,
+                    blockSoftLimit,
                     blockWALService.flusher()
             );
 
@@ -783,6 +791,7 @@ public class BlockWALService implements WriteAheadLog {
                     + ", slidingWindowInitialSize=" + slidingWindowInitialSize
                     + ", slidingWindowUpperLimit=" + slidingWindowUpperLimit
                     + ", slidingWindowScaleUnit=" + slidingWindowScaleUnit
+                    + ", blockSoftLimit=" + blockSoftLimit
                     + '}';
         }
     }
