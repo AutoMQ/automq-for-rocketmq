@@ -37,7 +37,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -321,6 +323,89 @@ class BlockWALServiceTest {
         } finally {
             wal.shutdownGracefully();
         }
+    }
+
+    @ParameterizedTest(name = "Test {index}: shutdown={0}, overCapacity={1}")
+    @CsvSource({
+            "true, false",
+            "true, true",
+            "false, false",
+            "false, true",
+    })
+    public void testRecoverAfterMergeWrite(boolean shutdown, boolean overCapacity) throws IOException {
+        final int recordSize = 1024 + 1;
+        final int recordCount = 100;
+        long blockDeviceCapacity;
+        if (overCapacity) {
+            blockDeviceCapacity = recordSize * recordCount + WAL_HEADER_TOTAL_CAPACITY;
+        } else {
+            blockDeviceCapacity = WALUtil.alignLargeByBlockSize(recordSize) * recordCount + WAL_HEADER_TOTAL_CAPACITY;
+        }
+        final String tempFilePath = TestUtils.tempFilePath();
+
+        // Append records
+        final WriteAheadLog previousWAL = BlockWALService.builder(tempFilePath, blockDeviceCapacity)
+                .flushHeaderIntervalSeconds(1 << 20)
+                .build()
+                .start();
+        List<Long> appended = appendAsync(previousWAL, recordSize, recordCount);
+        if (shutdown) {
+            previousWAL.shutdownGracefully();
+        }
+
+        // Recover records
+        final WriteAheadLog wal = BlockWALService.builder(tempFilePath, blockDeviceCapacity)
+                .build()
+                .start();
+        try {
+            Iterator<RecoverResult> recover = wal.recover();
+            assertNotNull(recover);
+
+            List<Long> recovered = new ArrayList<>(recordCount);
+            while (recover.hasNext()) {
+                RecoverResult next = recover.next();
+                next.record().release();
+                recovered.add(next.recordOffset());
+            }
+            assertEquals(appended, recovered);
+            wal.reset().join();
+        } finally {
+            wal.shutdownGracefully();
+        }
+    }
+
+    private static List<Long> appendAsync(WriteAheadLog wal, int recordSize, int recordCount) {
+        List<Long> appended = new ArrayList<>(recordCount);
+        List<CompletableFuture<Void>> appendFutures = new LinkedList<>();
+        WriteBench.FlushedOffset flushedOffset = new WriteBench.FlushedOffset();
+        for (int i = 0; i < recordCount; i++) {
+            ByteBuf data = TestUtils.random(recordSize);
+            AppendResult appendResult;
+            try {
+                appendResult = wal.append(data.retainedDuplicate());
+            } catch (OverCapacityException e) {
+                long offset = flushedOffset.get();
+                wal.trim(offset).join();
+                appended = appended.stream()
+                        .filter(recordOffset -> recordOffset > offset)
+                        .collect(Collectors.toList());
+                i--;
+                continue;
+            }
+            appended.add(appendResult.recordOffset());
+            appendFutures.add(appendResult.future().whenComplete((callbackResult, throwable) -> {
+                assertNull(throwable);
+                assertEquals(0, callbackResult.flushedOffset() % WALUtil.BLOCK_SIZE);
+                flushedOffset.update(callbackResult.flushedOffset());
+            }).whenComplete((callbackResult, throwable) -> {
+                if (null != throwable) {
+                    throwable.printStackTrace();
+                    System.exit(1);
+                }
+            }).thenApply(ignored -> null));
+        }
+        CompletableFuture.allOf(appendFutures.toArray(new CompletableFuture[0])).join();
+        return appended;
     }
 
     @Test
