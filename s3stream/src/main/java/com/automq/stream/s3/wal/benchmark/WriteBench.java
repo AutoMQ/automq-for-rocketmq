@@ -251,7 +251,7 @@ public class WriteBench implements AutoCloseable {
         }
     }
 
-    static class FlushedOffset {
+    public static class FlushedOffset {
         private final Lock lock = new ReentrantLock();
         // Offset before which all data has been flushed to disk
         private long flushedOffset = 0;
