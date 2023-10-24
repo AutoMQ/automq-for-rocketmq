@@ -155,45 +155,30 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
             return;
         }
 
-        try {
-            this.metadataStore.createTopic(request.getTopic(), request.getCount(), request.getAcceptMessageTypesList())
-                .whenCompleteAsync((topicId, e) -> {
-                    if (null != e) {
-                        if (e instanceof ControllerException ex) {
-                            CreateTopicReply reply = CreateTopicReply.newBuilder()
-                                .setStatus(Status.newBuilder()
-                                    .setCode(Code.forNumber(ex.getErrorCode()))
-                                    .setMessage(ex.getMessage())
-                                    .build())
-                                .build();
-                            responseObserver.onNext(reply);
-                            responseObserver.onCompleted();
-                        } else {
-                            responseObserver.onError(e);
-                        }
-                    } else {
+        this.metadataStore.createTopic(request)
+            .whenCompleteAsync((topicId, e) -> {
+                if (null != e) {
+                    if (e instanceof ControllerException ex) {
                         CreateTopicReply reply = CreateTopicReply.newBuilder()
-                            .setStatus(Status.newBuilder().setCode(Code.OK).build())
-                            .setTopicId(topicId)
+                            .setStatus(Status.newBuilder()
+                                .setCode(Code.forNumber(ex.getErrorCode()))
+                                .setMessage(ex.getMessage())
+                                .build())
                             .build();
                         responseObserver.onNext(reply);
                         responseObserver.onCompleted();
+                    } else {
+                        responseObserver.onError(e);
                     }
-                });
-        } catch (ControllerException e) {
-            if (Code.DUPLICATED_VALUE == e.getErrorCode()) {
-                CreateTopicReply reply = CreateTopicReply.newBuilder()
-                    .setStatus(Status.newBuilder()
-                        .setCode(Code.DUPLICATED)
-                        .setMessage(String.format("%s is already taken", request.getTopic()))
-                        .build())
-                    .build();
-                responseObserver.onNext(reply);
-                responseObserver.onCompleted();
-                return;
-            }
-            responseObserver.onError(e);
-        }
+                } else {
+                    CreateTopicReply reply = CreateTopicReply.newBuilder()
+                        .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                        .setTopicId(topicId)
+                        .build();
+                    responseObserver.onNext(reply);
+                    responseObserver.onCompleted();
+                }
+            });
     }
 
     @Override
@@ -258,40 +243,22 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
 
     @Override
     public void updateTopic(UpdateTopicRequest request, StreamObserver<UpdateTopicReply> responseObserver) {
-        try {
-            Integer queueNumber = null;
-            if (request.getCount() > 0) {
-                queueNumber = request.getCount();
-            }
-
-            this.metadataStore.updateTopic(request.getTopicId(), request.getName(), queueNumber,
-                    request.getAcceptMessageTypesList())
-                .whenComplete((res, e) -> {
-                    if (null != e) {
-                        responseObserver.onError(e);
-                    } else {
-                        UpdateTopicReply reply = UpdateTopicReply.newBuilder()
-                            .setStatus(
-                                Status.newBuilder()
-                                    .setCode(Code.OK)
-                                    .build()
-                            ).setTopic(res)
-                            .build();
-                        responseObserver.onNext(reply);
-                        responseObserver.onCompleted();
-                    }
-                });
-        } catch (ControllerException e) {
-            if (e.getErrorCode() == Code.NOT_FOUND_VALUE) {
-                UpdateTopicReply reply = UpdateTopicReply.newBuilder()
-                    .setStatus(Status.newBuilder().setCode(Code.NOT_FOUND).build()
-                    ).build();
-                responseObserver.onNext(reply);
-                responseObserver.onCompleted();
-                return;
-            }
-            responseObserver.onError(e);
-        }
+        this.metadataStore.updateTopic(request)
+            .whenComplete((res, e) -> {
+                if (null != e) {
+                    responseObserver.onError(e);
+                } else {
+                    UpdateTopicReply reply = UpdateTopicReply.newBuilder()
+                        .setStatus(
+                            Status.newBuilder()
+                                .setCode(Code.OK)
+                                .build()
+                        ).setTopic(res)
+                        .build();
+                    responseObserver.onNext(reply);
+                    responseObserver.onCompleted();
+                }
+            });
     }
 
     @Override

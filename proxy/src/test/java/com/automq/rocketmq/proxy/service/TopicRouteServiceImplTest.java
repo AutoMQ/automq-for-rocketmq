@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.proxy.service;
 
+import apache.rocketmq.controller.v1.AcceptTypes;
 import apache.rocketmq.controller.v1.MessageQueue;
 import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.MessageType;
@@ -156,7 +157,7 @@ class TopicRouteServiceImplTest {
         topicBuilder.setName(topicName);
         topicBuilder.setTopicId(topicId);
         topicBuilder.setCount(queueNums);
-        topicBuilder.addAcceptMessageTypes(MessageType.NORMAL);
+        topicBuilder.setAcceptTypes(AcceptTypes.newBuilder().addTypes(MessageType.NORMAL).build());
         return topicBuilder;
     }
 

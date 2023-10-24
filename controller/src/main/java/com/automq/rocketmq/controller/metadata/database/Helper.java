@@ -17,32 +17,31 @@
 
 package com.automq.rocketmq.controller.metadata.database;
 
+import apache.rocketmq.controller.v1.AcceptTypes;
 import apache.rocketmq.controller.v1.MessageQueue;
 import apache.rocketmq.controller.v1.MessageQueueAssignment;
-import apache.rocketmq.controller.v1.MessageType;
 import apache.rocketmq.controller.v1.OngoingMessageQueueReassignment;
 import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.controller.metadata.database.cache.Inflight;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.util.JsonFormat;
 import java.util.Collection;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentMap;
 
 public class Helper {
-    public static Topic buildTopic(Gson gson,
-        com.automq.rocketmq.controller.metadata.database.dao.Topic topic,
-        Collection<QueueAssignment> assignments) {
+    public static Topic buildTopic(com.automq.rocketmq.controller.metadata.database.dao.Topic topic,
+        Collection<QueueAssignment> assignments) throws InvalidProtocolBufferException {
+        AcceptTypes.Builder builder = AcceptTypes.newBuilder();
+        JsonFormat.parser().ignoringUnknownFields().merge(topic.getAcceptMessageTypes(), builder);
         apache.rocketmq.controller.v1.Topic.Builder topicBuilder = apache.rocketmq.controller.v1.Topic
             .newBuilder()
             .setTopicId(topic.getId())
             .setName(topic.getName())
             .setCount(topic.getQueueNum())
             .setRetentionHours(topic.getRetentionHours())
-            .addAllAcceptMessageTypes(gson.fromJson(topic.getAcceptMessageTypes(), new TypeToken<List<MessageType>>() {
-            }.getType()));
+            .setAcceptTypes(builder.build());
 
         if (null != assignments) {
             for (QueueAssignment assignment : assignments) {

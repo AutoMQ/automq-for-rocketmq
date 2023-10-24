@@ -101,8 +101,8 @@ public class DLQService implements DLQSender {
                 return CompletableFuture.completedFuture(null);
             }
             // verify dlq topic is valid
-            if (!(dlqTopic.getAcceptMessageTypesList().contains(MessageType.NORMAL)
-                || dlqTopic.getAcceptMessageTypesList().contains(MessageType.FIFO))) {
+            if (!(dlqTopic.getAcceptTypes().getTypesList().contains(MessageType.NORMAL)
+                || dlqTopic.getAcceptTypes().getTypesList().contains(MessageType.FIFO))) {
                 LOGGER.error("Message: {} is dropped because the consumer group: {} has invalid DLQ topic: {}",
                     flatMessageExt, consumerGroupId, dlqTopic);
                 return CompletableFuture.completedFuture(null);

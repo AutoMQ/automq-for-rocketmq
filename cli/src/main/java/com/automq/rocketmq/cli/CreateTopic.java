@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.cli;
 
+import apache.rocketmq.controller.v1.AcceptTypes;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.MessageType;
 import com.automq.rocketmq.controller.metadata.GrpcControllerClient;
@@ -43,7 +44,7 @@ public class CreateTopic implements Callable<Void> {
         CreateTopicRequest request = CreateTopicRequest.newBuilder()
             .setTopic(topicName)
             .setCount(queueNums)
-            .addAcceptMessageTypes(messageType)
+            .setAcceptTypes(AcceptTypes.newBuilder().addTypes(messageType).build())
             .build();
 
         Long topicId = client.createTopic(mqAdmin.endpoint, request).join();
