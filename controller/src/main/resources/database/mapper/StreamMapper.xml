@@ -127,10 +127,11 @@
         SELECT id, topic_id, queue_id, stream_role, group_id, src_node_id, dst_node_id, epoch, range_id, start_offset,
         state
         FROM stream
-        WHERE id IN
-        <foreach item="item" index="index" collection="streamIds" open="(" separator="," close=")">
-            #{item}
-        </foreach>
+        <where>
+            <foreach item="item" index="index" collection="streamIds" open="id IN (" separator="," close=")">
+                #{item}
+            </foreach>
+        </where>
     </select>
 
 </mapper>

@@ -73,7 +73,7 @@ import com.automq.rocketmq.controller.tasks.ScanYieldingQueueTask;
 import com.automq.rocketmq.controller.tasks.SchedulerTask;
 import com.google.common.base.Strings;
 import java.io.IOException;
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -995,10 +995,11 @@ public class DefaultMetadataStore implements MetadataStore {
 
     @Override
     public CompletableFuture<List<StreamMetadata>> getStreams(List<Long> streamIds) {
+        if (null == streamIds || streamIds.isEmpty()) {
+            return CompletableFuture.completedFuture(new ArrayList<>());
+        }
+
         return CompletableFuture.supplyAsync(() -> {
-            if (Objects.isNull(streamIds) || streamIds.isEmpty()) {
-                return Collections.emptyList();
-            }
             try (SqlSession session = openSession()) {
                 StreamMapper streamMapper = session.getMapper(StreamMapper.class);
                 List<Stream> streams = streamMapper.listByStreamIds(streamIds);
