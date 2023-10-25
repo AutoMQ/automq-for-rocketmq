@@ -213,6 +213,11 @@ public class BrokerConfig implements ControllerConfig {
         return terminating;
     }
 
+    @Override
+    public void flagGoingAway() {
+        terminating = true;
+    }
+
     public void setName(String name) {
         this.name = name;
     }

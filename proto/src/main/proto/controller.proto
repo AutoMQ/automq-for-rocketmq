@@ -393,7 +393,8 @@ enum TerminationStage {
 
 // Request a node to terminate gracefully
 message TerminateNodeRequest {
-
+  ControllerRequestContext context = 1;
+  int32 node_id = 2;
 }
 
 message TerminateNodeReply {
@@ -437,7 +438,7 @@ service ControllerService {
 
   rpc commitOffset(CommitOffsetRequest) returns (CommitOffsetReply) {}
 
-  rpc terminateNode(TerminateNodeRequest) returns (TerminateNodeReply) {}
+  rpc terminateNode(TerminateNodeRequest) returns (stream TerminateNodeReply) {}
 
   // Open a stream on a broker.
   // A stream should be opened before it can be written to or read from.

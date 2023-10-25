@@ -31,7 +31,7 @@ public interface Lifecycle {
     /**
      * Shutdown the component.
      *
-     * @throws Exception if the component fails to shutdown
+     * @throws Exception if the component fails to shut down
      */
     void shutdown() throws Exception;
 }

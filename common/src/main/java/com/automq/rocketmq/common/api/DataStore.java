@@ -34,4 +34,8 @@ public interface DataStore {
      */
     CompletableFuture<List<Long>> batchDeleteS3Objects(List<Long> objectIds);
 
+    default void blockingShutdown() {
+
+    }
+
 }

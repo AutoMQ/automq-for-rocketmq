@@ -32,6 +32,8 @@ import apache.rocketmq.controller.v1.OpenStreamReply;
 import apache.rocketmq.controller.v1.OpenStreamRequest;
 import apache.rocketmq.controller.v1.PrepareS3ObjectsReply;
 import apache.rocketmq.controller.v1.PrepareS3ObjectsRequest;
+import apache.rocketmq.controller.v1.TerminateNodeReply;
+import apache.rocketmq.controller.v1.TerminateNodeRequest;
 import apache.rocketmq.controller.v1.Topic;
 import apache.rocketmq.controller.v1.TrimStreamReply;
 import apache.rocketmq.controller.v1.TrimStreamRequest;
@@ -40,6 +42,7 @@ import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 
+import io.grpc.stub.StreamObserver;
 import java.io.Closeable;
 import java.util.concurrent.CompletableFuture;
 
@@ -81,5 +84,7 @@ public interface ControllerClient extends Closeable {
 
     CompletableFuture<CommitWALObjectReply> commitWALObject(String target, CommitWALObjectRequest request);
 
-    CompletableFuture<Topic> updateTopic(String target, UpdateTopicRequest request) throws ControllerException;
+    CompletableFuture<Topic> updateTopic(String target, UpdateTopicRequest request);
+
+    void terminateNode(String target, TerminateNodeRequest request, StreamObserver<TerminateNodeReply> observer);
 }
