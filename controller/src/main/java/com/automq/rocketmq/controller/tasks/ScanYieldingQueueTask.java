@@ -89,8 +89,7 @@ public class ScanYieldingQueueTask extends ScanTask {
                 case STORE_CLOSE -> {
                     LOGGER.info("Invoke DataStore to close queue[topic-id={}, queue-id={}]", assignment.getTopicId(),
                         assignment.getQueueId());
-                    closeQueue(dataStore,
-                        assignment.getTopicId(), assignment.getQueueId());
+                    closeQueue(dataStore, assignment.getTopicId(), assignment.getQueueId());
                 }
 
                 case NOTIFY_LEADER -> {
@@ -149,8 +148,14 @@ public class ScanYieldingQueueTask extends ScanTask {
 
             if (null != dataStore && !assignments.isEmpty()) {
                 for (QueueAssignment assignment : assignments) {
-                    this.assignments.putIfAbsent(new ImmutablePair<>(assignment.getTopicId(), assignment.getQueueId()),
+                    QueueAssignmentStateMachine prev = this.assignments.putIfAbsent(new ImmutablePair<>(assignment.getTopicId(),
+                            assignment.getQueueId()),
                         new QueueAssignmentStateMachine(assignment));
+                    if (null == prev) {
+                        LOGGER.info("Node[node-id={}] starts to yield topic-id={} queue-id={} to node[node-id={}]",
+                            assignment.getSrcNodeId(), assignment.getTopicId(), assignment.getQueueId(),
+                            assignment.getDstNodeId());
+                    }
                 }
             }
 

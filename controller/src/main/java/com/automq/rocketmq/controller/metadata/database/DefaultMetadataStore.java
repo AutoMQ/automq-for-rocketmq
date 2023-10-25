@@ -681,6 +681,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
                     QueueAssignment assignment = assignmentMapper.get(topicId, queueId);
                     assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNED);
+                    assignmentMapper.update(assignment);
 
                     StreamMapper streamMapper = session.getMapper(StreamMapper.class);
                     streamMapper.updateStreamState(null, topicId, queueId, StreamState.CLOSED);
