@@ -6,11 +6,11 @@ innerSecretKey: ""
 s3Stream:
   s3WALPath: "/tmp/s3rocketmq/wal"
   s3Endpoint: "http://minio.hellocorp.test"
-  s3Bucket: "lzh"
+  s3Bucket: "lizhanhui"
   s3Region: "us-east-1"
   s3ForcePathStyle: true
-  s3AccessKey: "mcFoJPLvxNmRq497dhK0"
-  s3SecretKey: "UU7PE0VOo3fRtqYEBeIIQzOSGFT3GctuiLoZg2hY"
+  s3AccessKey: "kicaSWtNBPf7XCCsdW8Z"
+  s3SecretKey: "dgWxasHBEQBBXxAxBpFmp4VWIoQ0XyDU3gGdFnaT"
 db:
   url: "jdbc:mysql://mysql-server:3306/metadata"
   userName: "root"

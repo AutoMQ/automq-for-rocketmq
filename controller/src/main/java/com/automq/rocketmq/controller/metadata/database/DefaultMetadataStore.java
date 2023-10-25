@@ -294,7 +294,7 @@ public class DefaultMetadataStore implements MetadataStore {
 
         try {
             String target = leaderAddress();
-            controllerClient.heartbeat(target, config.nodeId(), config.epoch(), false)
+            controllerClient.heartbeat(target, config.nodeId(), config.epoch(), config.goingAway())
                 .whenComplete((r, e) -> {
                     if (null != e) {
                         LOGGER.error("Failed to maintain heartbeat to {}", target);
