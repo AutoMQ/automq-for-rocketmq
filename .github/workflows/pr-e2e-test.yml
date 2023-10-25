@@ -15,6 +15,13 @@ on:
 
 env:
   DOCKER_REPO: automqinc/rocketmq_e2e
+  DB_USERNAME: "root"
+  DB_PASSWORD: "root"
+  AWS_ACCESS_KEY: foot
+  AWS_SECRET_KEY: bar
+  AWS_DEFAULT_REGION: eu-west-2
+  AWS_S3_ENDPOINT: http://localhost:4566
+  AWS_S3_BUCKET: ros
 
 jobs:
   docker:
@@ -28,6 +35,11 @@ jobs:
       matrix:
         java-version: ["17"]
     steps:
+      - name: 'Download ddl.sql'
+        uses: actions/download-artifact@v2
+        with:
+          name: metadata
+          path: ${{github.workspace}}/
       - name: 'Download artifact'
         uses: actions/download-artifact@v2
         with:
@@ -100,22 +112,74 @@ jobs:
       matrix:
         version: ${{ fromJSON(needs.list-version.outputs.version-json) }}
     steps:
-      - uses: apache/rocketmq-test-tool@7d84d276ad7755b1dc5cf9657a7a9bff6ae6d288
-        name: Deploy rocketmq
+      - uses: helm/kind-action@v1.5.0
+        name: Create k8s Kind Cluster
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
         with:
-          action: "deploy"
-          ask-config: "${{ secrets.KUBE_CONFIG }}"
-          test-version: "${{ matrix.version }}"
-          chart-git: "https://github.com/AutoMQ/rocketmq-e2e.git"
-          chart-branch: "master"
-          chart-path: "./rocketmq-k8s-helm"
-          job-id: ${{ strategy.job-index }}
-          helm-values: |
+          version: v3.12.1
+      - name: Deploy localstack
+        uses: 'deliverybot/helm@v1'
+        with:
+          release: 'localstack'
+          namespace: 'default'
+          chart: 'localstack-charts/localstack'
+          repo: "https://localstack.github.io/helm-charts"
+          values: |
+            enableStartupScripts: true
+            startupScriptContent: |
+              #!/bin/bash
+              set -e
+              export TERM=ansi
+              export AWS_ACCESS_KEY_ID=${{env.AWS_ACCESS_KEY}}
+              export AWS_SECRET_ACCESS_KEY=${{env.AWS_SECRET_KEY}}
+              export AWS_DEFAULT_REGION=${{env.AWS_DEFAULT_REGION}}
+              export PAGER=
+
+              echo "S3 Configuration started"
+
+              aws --endpoint-url=${{env.AWS_S3_ENDPOINT}} s3 mb s3://${{env.AWS_DEFAULT_REGION}}
+              aws --endpoint-url=${{env.AWS_S3_ENDPOINT}} s3 cp /tmp/localstack/test-data/ s3://${{env.AWS_DEFAULT_REGION}}/chart --recursive
+
+              echo "S3 Configured"
+      - name: Deploy mysql
+        uses: 'deliverybot/helm@v1'
+        with:
+          release: 'mysql'
+          namespace: 'default'
+          chart: 'bitnami/mysql'
+          repo: "https://charts.bitnami.com/bitnami"
+          values: |
+            auth
+              rootPassword: ${{env.DB_PASSWORD}}
+              database: metadata
+            initdbScripts: metadata.sql
+      - name: Deploy rocketmq
+        uses: 'deliverybot/helm@v1'
+        with:
+          release: 'rocketmq'
+          namespace: 'default'
+          chart: 'rocketmq-e2e/rocketmq-k8s-helm'
+          token: '${{ secrets.PAT_E2E }}'
+          repo: "https://github.com/AutoMQ/rocketmq-e2e.git"
+          values: |
             broker:
-              ci: true
               image:
                 repository: ${{env.DOCKER_REPO}}
                 tag: ${{ matrix.version }}
+              s3stream:
+                s3WALPath: "/tmp/s3rocketmq/wal"
+                s3Endpoint: ${{env.AWS_S3_ENDPOINT}}
+                s3Bucket: ${{env.AWS_S3_BUCKET}}
+                s3Region: ${{env.AWS_DEFAULT_REGION}}
+                s3ForcePathStyle: true
+                s3AccessKey: ${{env.AWS_ACCESS_KEY}}
+                s3SecretKey: ${{env.AWS_SECRET_KEY}}
+              
+              db:
+                url: "jdbc:mysql://localhost:3306/metadata"
+                userName: ${{env.DB_USERNAME}}
+                password: ${{env.DB_PASSWORD}}
   test-e2e-grpc-java:
     if: ${{ success() }}
     name: Test E2E grpc java
@@ -132,7 +196,7 @@ jobs:
           action: "test"
           ask-config: "${{ secrets.ASK_CONFIG_VIRGINA }}"
           test-version: "${{ matrix.version }}"
-          test-code-git: "https://ghproxy.com/https://github.com/automq/rocketmq-e2e"
+          test-code-git: "https://github.com/AutoMQ/rocketmq-e2e.git"
           test-code-branch: "master"
           test-code-path: java/e2e
           test-cmd: "mvn -B test"
@@ -168,7 +232,7 @@ jobs:
           action: "test"
           ask-config: "${{ secrets.ASK_CONFIG_VIRGINA }}"
           test-version: "${{ matrix.version }}"
-          test-code-git: "https://ghproxy.com/https://github.com/automq/rocketmq-e2e"
+          test-code-git: "https://github.com/AutoMQ/rocketmq-e2e.git"
           test-code-branch: "master"
           test-code-path: golang
           test-cmd: |
@@ -207,7 +271,7 @@ jobs:
           action: "test"
           ask-config: "${{ secrets.ASK_CONFIG_VIRGINA }}"
           test-version: "${{ matrix.version }}"
-          test-code-git: "https://ghproxy.com/https://github.com/automq/rocketmq-e2e"
+          test-code-git: "https://github.com/AutoMQ/rocketmq-e2e.git"
           test-code-branch: "master"
           test-code-path: java/e2e-v4
           test-cmd: "mvn -B test"
