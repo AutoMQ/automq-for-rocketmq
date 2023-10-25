@@ -81,23 +81,24 @@ jobs:
 #          name: versionlist
 #          path: rocketmq-e2e/rocketmq-docker/versionlist/*
   
-#  list-version:
-#    if: always()
-#    name: List version
-#    needs: [docker]
-#    runs-on: ubuntu-latest
-#    timeout-minutes: 30
+  list-version:
+    if: always()
+    name: List version
+    needs: [docker]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
 #    outputs:
 #      version-json: ${{ steps.show_versions.outputs.version-json }}
-#    steps:
+    steps:
 #      - uses: actions/download-artifact@v3
 #        name: Download versionlist
 #        with:
 #          name: versionlist
 #          path: versionlist
-#      - name: Show versions
-#        id: show_versions
-#        run: |
+      - name: Show versions
+        id: show_versions
+        run: |
+          pwd
 #          a=(`ls versionlist`)
 #          printf '%s\n' "${a[@]}" | jq -R . | jq -s .
 #          echo version-json=`printf '%s\n' "${a[@]}" | jq -R . | jq -s .` >> $GITHUB_OUTPUT
@@ -235,7 +236,7 @@ jobs:
   test-e2e-golang:
     if: ${{ success() }}
     name: Test E2E golang
-#    needs: [list-version, deploy]
+    needs: [list-version, deploy]
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
@@ -275,7 +276,7 @@ jobs:
   test-e2e-remoting-java:
     if: ${{ success() }}
     name: Test E2E remoting java
-#    needs: [ list-version, deploy ]
+    needs: [ list-version, deploy ]
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
