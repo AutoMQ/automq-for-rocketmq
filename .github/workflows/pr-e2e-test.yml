@@ -106,20 +106,20 @@ jobs:
     if: ${{ success() }}
     name: Deploy RocketMQ
     needs: [list-version,docker]
-    runs-on: ubuntu-latest
+    runs-on: private-k3s
     timeout-minutes: 60
     strategy:
       matrix:
 #        version: ${{ fromJSON(needs.list-version.outputs.version-json) }}
         version: ["5.1.3-alpine"]
     steps:
-      - name: start minikube
-        id: minikube
-        uses: medyagh/setup-minikube@latest
-      - name: Set up Helm
-        uses: azure/setup-helm@v3
-        with:
-          version: v3.12.1
+#      - name: start minikube
+#        id: minikube
+#        uses: medyagh/setup-minikube@latest
+#      - name: Set up Helm
+#        uses: azure/setup-helm@v3
+#        with:
+#          version: v3.12.1
       - name: Deploy localstack
         uses: vimeda/helm@v1.6.8
         with:
@@ -190,7 +190,7 @@ jobs:
     if: ${{ success() }}
     name: Test E2E grpc java
     needs: [list-version, deploy]
-    runs-on: ubuntu-latest
+    runs-on: private-k3s
     timeout-minutes: 60
     strategy:
       matrix:
@@ -227,7 +227,7 @@ jobs:
     if: ${{ success() }}
     name: Test E2E golang
     needs: [list-version, deploy]
-    runs-on: ubuntu-latest
+    runs-on: private-k3s
     timeout-minutes: 60
     strategy:
       matrix:
@@ -267,7 +267,7 @@ jobs:
     if: ${{ success() }}
     name: Test E2E remoting java
     needs: [ list-version, deploy ]
-    runs-on: ubuntu-latest
+    runs-on: private-k3s
     timeout-minutes: 60
     strategy:
       matrix:
@@ -304,7 +304,7 @@ jobs:
     if: always()
     name: Clean
     needs: [list-version, test-e2e-grpc-java, test-e2e-golang, test-e2e-remoting-java]
-    runs-on: ubuntu-latest
+    runs-on: private-k3s
     timeout-minutes: 60
     strategy:
       matrix:
