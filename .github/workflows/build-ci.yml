@@ -24,14 +24,14 @@ jobs:
         uses: ScribeMD/docker-cache@0.3.6
         with:
           key: docker-${{ runner.os }}
-      - name: Build distribution tar
-        run: |
-          mvn -Prelease-all clean install -U
-      - uses: actions/upload-artifact@v3
-        name: Upload distribution tar
-        with:
-          name: rocketmq
-          path: distribution/target/rocketmq*.zip
+#      - name: Build distribution tar
+#        run: |
+#          mvn -Prelease-all clean install -U
+#      - uses: actions/upload-artifact@v3
+#        name: Upload distribution tar
+#        with:
+#          name: rocketmq
+#          path: distribution/target/rocketmq*.zip
       - uses: actions/upload-artifact@v3
         name: Upload ddl.sql
         with:

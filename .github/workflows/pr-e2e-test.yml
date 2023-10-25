@@ -56,7 +56,7 @@ jobs:
           repository: AutoMQ/rocketmq-e2e
 #          ref: master TODO: change to master until ci success
           ref: ros_docker
-          path: rocketmq-e2e
+          path: rocketmq-e2es
           token: ${{ secrets.PAT_E2E }}
       - name: docker-login
         uses: docker/login-action@v2
@@ -64,43 +64,43 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ secrets.DOCKERHUB_USER }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Build and save docker images
-        id: build-images
-        run: |
-          cd rocketmq-e2e/rocketmq-docker
-          version=${{ github.event.pull_request.number || github.ref_name }}-$(uuidgen)
-          mkdir versionlist
-          touch versionlist/"${version}-`echo ${{ matrix.base-image }} | sed -e "s/:/-/g"`"
-          pwd
-          sh build-image.sh ${version} ${DOCKER_REPO}
-          docker push ${DOCKER_REPO}:${version}
-          ls versionlist/
-      - uses: actions/upload-artifact@v3
-        name: Upload distribution tar
-        with:
-          name: versionlist
-          path: rocketmq-e2e/rocketmq-docker/versionlist/*
+#      - name: Build and save docker images
+#        id: build-images
+#        run: |
+#          cd rocketmq-e2e/rocketmq-docker
+#          version=${{ github.event.pull_request.number || github.ref_name }}-$(uuidgen)
+#          mkdir versionlist
+#          touch versionlist/"${version}-`echo ${{ matrix.base-image }} | sed -e "s/:/-/g"`"
+#          pwd
+#          sh build-image.sh ${version} ${DOCKER_REPO}
+#          docker push ${DOCKER_REPO}:${version}
+#          ls versionlist/
+#      - uses: actions/upload-artifact@v3
+#        name: Upload distribution tar
+#        with:
+#          name: versionlist
+#          path: rocketmq-e2e/rocketmq-docker/versionlist/*
   
-  list-version:
-    if: always()
-    name: List version
-    needs: [docker]
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    outputs:
-      version-json: ${{ steps.show_versions.outputs.version-json }}
-    steps:
-      - uses: actions/download-artifact@v3
-        name: Download versionlist
-        with:
-          name: versionlist
-          path: versionlist
-      - name: Show versions
-        id: show_versions
-        run: | 
-          a=(`ls versionlist`)
-          printf '%s\n' "${a[@]}" | jq -R . | jq -s .
-          echo version-json=`printf '%s\n' "${a[@]}" | jq -R . | jq -s .` >> $GITHUB_OUTPUT
+#  list-version:
+#    if: always()
+#    name: List version
+#    needs: [docker]
+#    runs-on: ubuntu-latest
+#    timeout-minutes: 30
+#    outputs:
+#      version-json: ${{ steps.show_versions.outputs.version-json }}
+#    steps:
+#      - uses: actions/download-artifact@v3
+#        name: Download versionlist
+#        with:
+#          name: versionlist
+#          path: versionlist
+#      - name: Show versions
+#        id: show_versions
+#        run: |
+#          a=(`ls versionlist`)
+#          printf '%s\n' "${a[@]}" | jq -R . | jq -s .
+#          echo version-json=`printf '%s\n' "${a[@]}" | jq -R . | jq -s .` >> $GITHUB_OUTPUT
   deploy:
     if: ${{ success() }}
     name: Deploy RocketMQ
@@ -109,7 +109,8 @@ jobs:
     timeout-minutes: 60
     strategy:
       matrix:
-        version: ${{ fromJSON(needs.list-version.outputs.version-json) }}
+#        version: ${{ fromJSON(needs.list-version.outputs.version-json) }}
+        version: ["5.1.3-alpine"]
     steps:
       - uses: helm/kind-action@v1.5.0
         name: Create k8s Kind Cluster
@@ -147,6 +148,8 @@ jobs:
               aws --endpoint-url=${{env.AWS_S3_ENDPOINT}} s3 cp /tmp/localstack/test-data/ s3://${{env.AWS_DEFAULT_REGION}}/chart --recursive
 
               echo "S3 Configured"
+          env:
+            KUBECONFIG_FILE: '~/.kube/config'
       - name: Deploy mysql
         uses: vimeda/helm@v1.6.8
         with:
@@ -160,6 +163,8 @@ jobs:
               rootPassword: ${{env.DB_PASSWORD}}
               database: metadata
             initdbScripts: ddl.sql
+          env:
+            KUBECONFIG_FILE: '~/.kube/config'
       - name: Deploy rocketmq
         uses: vimeda/helm@v1.6.8
         with:
@@ -187,6 +192,9 @@ jobs:
                 url: "jdbc:mysql://localhost:3306/metadata"
                 userName: ${{env.DB_USERNAME}}
                 password: ${{env.DB_PASSWORD}}
+
+          env:
+            KUBECONFIG_FILE: '~/.kube/config'
   test-e2e-grpc-java:
     if: ${{ success() }}
     name: Test E2E grpc java
