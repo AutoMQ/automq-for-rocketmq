@@ -37,6 +37,9 @@ enum Code {
 
   // Referenced
   REFERENCED_AS_DEAD_LETTER_TOPIC = 1007;
+
+  // Invalid argument value
+  INVALID_ARGUMENT = 1008;
 }
 
 message Status {
