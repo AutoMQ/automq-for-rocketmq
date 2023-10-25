@@ -48,7 +48,7 @@ jobs:
       - run: |
           unzip rocketmq*.zip
           mv rocketmq-on-s3/ rocketmq/
-          ls rocketmq/
+          ls
           ls rocketmq/bin
           pwd
       - uses: actions/checkout@v3
@@ -111,7 +111,6 @@ jobs:
       matrix:
         version: ${{ fromJSON(needs.list-version.outputs.version-json) }}
     steps:
-      - uses: actions/checkout@v1
       - uses: helm/kind-action@v1.5.0
         name: Create k8s Kind Cluster
       - name: Set up Helm
@@ -125,6 +124,7 @@ jobs:
           namespace: 'default'
           chart: 'localstack-charts/localstack'
           repo: "https://localstack.github.io/helm-charts"
+          repo-alias: "localstack-charts"
           values: |
             enableStartupScripts: true
             startupScriptContent: |
@@ -149,11 +149,12 @@ jobs:
           namespace: 'default'
           chart: 'bitnami/mysql'
           repo: "https://charts.bitnami.com/bitnami"
+          repo-alias: "bitnami"
           values: |
             auth
               rootPassword: ${{env.DB_PASSWORD}}
               database: metadata
-            initdbScripts: metadata.sql
+            initdbScripts: ddl.sql
       - name: Deploy rocketmq
         uses: vimeda/helm@v1.6.8
         with:
@@ -162,6 +163,7 @@ jobs:
           chart: 'rocketmq-e2e/rocketmq-k8s-helm'
           token: '${{ secrets.PAT_E2E }}'
           repo: "https://github.com/AutoMQ/rocketmq-e2e.git"
+          repo-alias: "rocketmq-e2e"
           values: |
             broker:
               image:
