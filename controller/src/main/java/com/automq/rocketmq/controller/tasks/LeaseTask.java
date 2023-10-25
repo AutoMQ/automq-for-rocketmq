@@ -53,6 +53,12 @@ public class LeaseTask extends ControllerTask {
                         // Someone must have won the leader election campaign.
                         return;
                     }
+
+                    if (metadataStore.config().goingAway()) {
+                        LOGGER.info("Current node is terminating thus should stop renewing its leadership lease");
+                        return;
+                    }
+
                     Calendar calendar = Calendar.getInstance();
                     calendar.add(Calendar.SECOND, metadataStore.config().leaseLifeSpanInSecs());
                     update.setExpirationTime(calendar.getTime());
@@ -70,6 +76,11 @@ public class LeaseTask extends ControllerTask {
                         lease.getNodeId(), lease.getEpoch(), lease.getExpirationTime());
                 }
             } else {
+                if (metadataStore.config().goingAway()) {
+                    LOGGER.debug("Current node is terminating and will not campaign for leadership");
+                    return;
+                }
+
                 // Perform leader election campaign
                 Lease update = leaseMapper.currentWithWriteLock();
                 if (lease.getEpoch() == update.getEpoch() && lease.getNodeId() == update.getNodeId()) {

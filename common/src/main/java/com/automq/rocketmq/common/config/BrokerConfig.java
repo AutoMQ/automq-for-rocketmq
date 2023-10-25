@@ -66,6 +66,8 @@ public class BrokerConfig implements ControllerConfig {
 
     private final DatabaseConfig db;
 
+    private boolean terminating;
+
     public BrokerConfig() {
         this.metrics = new MetricsConfig();
         this.proxy = new ProxyConfig();
@@ -204,6 +206,11 @@ public class BrokerConfig implements ControllerConfig {
 
     public String advertiseAddress() {
         return advertiseAddress;
+    }
+
+    @Override
+    public boolean goingAway() {
+        return terminating;
     }
 
     public void setName(String name) {

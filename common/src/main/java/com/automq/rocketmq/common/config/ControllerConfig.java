@@ -76,4 +76,6 @@ public interface ControllerConfig {
 
     String dbPassword();
 
+    boolean goingAway();
+
 }
