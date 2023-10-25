@@ -20,6 +20,7 @@ package com.automq.rocketmq.controller.metadata;
 import apache.rocketmq.controller.v1.SubStream;
 import com.automq.rocketmq.common.config.ControllerConfig;
 import com.automq.rocketmq.controller.metadata.database.dao.Lease;
+import com.automq.rocketmq.controller.metadata.database.dao.S3WalObject;
 import com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.GroupProgressMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.LeaseMapper;
@@ -38,7 +39,11 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 import java.util.concurrent.atomic.AtomicLong;
@@ -126,4 +131,53 @@ public class DatabaseTestBase {
             mapper.update(lease);
         }
     }
+
+
+    protected List<com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject> buildS3StreamObjs(long objectId, int count, long startOffset, long interval) {
+        List<com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject> s3StreamObjects = new ArrayList<>();
+
+        for (long i = 0; i < count; i++) {
+            com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject s3StreamObject = new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
+            s3StreamObject.setObjectId(objectId + i);
+            s3StreamObject.setObjectSize(100 + i);
+            s3StreamObject.setStreamId(i + 1);
+            s3StreamObject.setStartOffset(startOffset + i * interval);
+            s3StreamObject.setEndOffset(startOffset + (i + 1) * interval);
+            s3StreamObject.setBaseDataTimestamp(System.currentTimeMillis());
+            s3StreamObjects.add(s3StreamObject);
+        }
+
+        return s3StreamObjects;
+    }
+
+    protected List<S3WalObject> buildS3WalObjs(long objectId, int count) {
+        List<S3WalObject> s3StreamObjects = new ArrayList<>();
+
+        for (long i = 0; i < count; i++) {
+            S3WalObject s3StreamObject = new S3WalObject();
+            s3StreamObject.setObjectId(objectId + i);
+            s3StreamObject.setObjectSize(100 + i);
+            s3StreamObject.setSequenceId(objectId + i);
+            s3StreamObject.setNodeId((int) i + 1);
+            s3StreamObject.setBaseDataTimestamp(System.currentTimeMillis());
+            s3StreamObjects.add(s3StreamObject);
+        }
+
+        return s3StreamObjects;
+    }
+
+    protected Map<Long, SubStream> buildWalSubStreams(int count, long startOffset, long interval) {
+        Map<Long, SubStream> subStreams = new HashMap<>();
+        for (int i = 0; i < count; i++) {
+            SubStream subStream = SubStream.newBuilder()
+                .setStreamId(i + 1)
+                .setStartOffset(startOffset + i * interval)
+                .setEndOffset(startOffset + (i + 1) * interval)
+                .build();
+
+            subStreams.put((long) i + 1, subStream);
+        }
+        return subStreams;
+    }
+
 }

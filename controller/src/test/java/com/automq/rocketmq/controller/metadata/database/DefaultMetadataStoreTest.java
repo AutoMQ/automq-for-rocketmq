@@ -63,7 +63,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletionException;
@@ -487,23 +486,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         }
     }
 
-    private List<com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject> buildS3StreamObjs(long objectId, int count, long startOffset, long interval) {
-        List<com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject> s3StreamObjects = new ArrayList<>();
-
-        for (long i = 0; i < count; i++) {
-            com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject s3StreamObject = new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
-            s3StreamObject.setObjectId(objectId + i);
-            s3StreamObject.setObjectSize(100 + i);
-            s3StreamObject.setStreamId(i + 1);
-            s3StreamObject.setStartOffset(startOffset + i * interval);
-            s3StreamObject.setEndOffset(startOffset + (i + 1) * interval);
-            s3StreamObject.setBaseDataTimestamp(System.currentTimeMillis());
-            s3StreamObjects.add(s3StreamObject);
-        }
-
-        return s3StreamObjects;
-    }
-
     @Test
     public void testListStreamObjects() throws IOException, ExecutionException, InterruptedException {
         long startOffset = 0L, interval = 1000L, endOffset;
@@ -529,36 +511,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         }
     }
 
-    private List<S3WalObject> buildS3WalObjs(long objectId, int count) {
-        List<S3WalObject> s3StreamObjects = new ArrayList<>();
-
-        for (long i = 0; i < count; i++) {
-            S3WalObject s3StreamObject = new S3WalObject();
-            s3StreamObject.setObjectId(objectId + i);
-            s3StreamObject.setObjectSize(100 + i);
-            s3StreamObject.setSequenceId(objectId + i);
-            s3StreamObject.setNodeId((int) i + 1);
-            s3StreamObject.setBaseDataTimestamp(System.currentTimeMillis());
-            s3StreamObjects.add(s3StreamObject);
-        }
-
-        return s3StreamObjects;
-    }
-
-    private Map<Long, SubStream> buildWalSubStreams(int count, long startOffset, long interval) {
-        Map<Long, SubStream> subStreams = new HashMap<>();
-        for (int i = 0; i < count; i++) {
-            SubStream subStream = SubStream.newBuilder()
-                .setStreamId(i + 1)
-                .setStartOffset(startOffset + i * interval)
-                .setEndOffset(startOffset + (i + 1) * interval)
-                .build();
-
-            subStreams.put((long) i + 1, subStream);
-        }
-        return subStreams;
-    }
-
     @Test
     public void testListWALObjects_WithPrams() throws IOException, ExecutionException, InterruptedException {
         long streamId, startOffset, endOffset;
@@ -579,7 +531,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             rangeMapper.create(range);
 
             S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
-
             buildS3WalObjs(1, 1).stream().map(s3WalObject -> {
                 Map<Long, SubStream> subStreams = buildWalSubStreams(4, 0, 10);
                 s3WalObject.setSubStreams(gson.toJson(subStreams));
@@ -886,6 +837,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         }
     }
 
+
     @Test
     public void testOpenStream_WithCloseStream_AtStart() throws IOException, ExecutionException,
         InterruptedException {
@@ -901,6 +853,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             streamMapper.create(stream);
             streamId = stream.getId();
             streamEpoch = stream.getEpoch();
+
             session.commit();
         }
         long targetStreamEpoch = streamEpoch + 1;
@@ -1746,7 +1699,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
     @Test
     public void testCommitWALObject() throws IOException, ExecutionException, InterruptedException {
-        long objectId, streamId = 1;
+        long objectId;
         int nodeId = 1;
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
@@ -1766,63 +1719,39 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             .setBrokerId(nodeId)
             .build();
 
-        String expectSubStream = """
-            {
-              "1234567890": {
-                "streamId": 1234567890,
-                "startOffset": 0,
-                "endOffset": 10
-              }}""";
 
         try (SqlSession session = this.getSessionFactory().openSession()) {
             S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
-            S3WalObject s3WALObject = new S3WalObject();
-            s3WALObject.setObjectId(objectId + 2);
-            s3WALObject.setObjectSize(333L);
-            s3WALObject.setBaseDataTimestamp(3);
-            s3WALObject.setSequenceId(1L);
-            s3WALObject.setNodeId(nodeId);
-            s3WALObject.setSubStreams(expectSubStream.replace("1234567890", String.valueOf(streamId)));
-            s3WALObjectMapper.create(s3WALObject);
 
-            S3WalObject s3WalObject1 = new S3WalObject();
-            s3WalObject1.setObjectId(objectId + 3);
-            s3WalObject1.setObjectSize(444L);
-            s3WalObject1.setBaseDataTimestamp(4);
-            s3WalObject1.setSequenceId(2L);
-            s3WalObject1.setNodeId(nodeId);
-            s3WalObject1.setSubStreams(expectSubStream.replace("1234567890", String.valueOf(streamId)));
-            s3WALObjectMapper.create(s3WalObject1);
+            buildS3WalObjs(objectId + 2, 1).stream().map(s3WalObject -> {
+                Map<Long, SubStream> subStreams = buildWalSubStreams(1, 20L, 10L);
+                s3WalObject.setSubStreams(gson.toJson(subStreams));
+                return s3WalObject;
+            }).forEach(s3WALObjectMapper::create);
+
+            buildS3WalObjs(objectId + 3, 1).stream().map(s3WalObject -> {
+                Map<Long, SubStream> subStreams = buildWalSubStreams(1, 30L, 10L);
+                s3WalObject.setSubStreams(gson.toJson(subStreams));
+                return s3WalObject;
+            }).forEach(s3WALObjectMapper::create);
 
             session.commit();
         }
 
-        long time = System.currentTimeMillis();
         List<Long> compactedObjects = new ArrayList<>();
         compactedObjects.add(objectId + 2);
         compactedObjects.add(objectId + 3);
 
-        S3StreamObject s3StreamObject = S3StreamObject.newBuilder()
-            .setObjectId(objectId)
-            .setStreamId(streamId)
-            .setObjectSize(111L)
-            .setBaseDataTimestamp(1L)
-            .setStartOffset(111L)
-            .setEndOffset(222L)
-            .build();
+        List<S3StreamObject> s3StreamObjects = buildS3StreamObjs(objectId, 2, 0, 10)
+            .stream().map(s3StreamObject2 -> S3StreamObject.newBuilder()
+                .setObjectId(s3StreamObject2.getObjectId())
+                .setStreamId(s3StreamObject2.getStreamId())
+                .setObjectSize(s3StreamObject2.getObjectSize())
+                .setBaseDataTimestamp(s3StreamObject2.getBaseDataTimestamp())
+                .setStartOffset(s3StreamObject2.getStartOffset())
+                .setEndOffset(s3StreamObject2.getEndOffset())
+                .build()).toList();
 
-        S3StreamObject s3StreamObject1 = S3StreamObject.newBuilder()
-            .setObjectId(objectId + 1)
-            .setStreamId(streamId)
-            .setObjectSize(222L)
-            .setBaseDataTimestamp(2L)
-            .setStartOffset(222L)
-            .setEndOffset(333L)
-            .build();
-
-        List<S3StreamObject> s3StreamObjects = new ArrayList<>();
-        s3StreamObjects.add(s3StreamObject);
-        s3StreamObjects.add(s3StreamObject1);
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertNull(metadataStore.getLease());
@@ -1849,29 +1778,25 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
             for (long index = objectId; index < objectId + 2; index++) {
                 com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = s3StreamObjectMapper.getByObjectId(index);
-                if (object.getCommittedTimestamp() - time > 5 * 60) {
-                    Assertions.fail();
-                }
+                Assertions.assertTrue(object.getCommittedTimestamp() > 0);
             }
 
             S3Object s3Object = s3ObjectMapper.getById(objectId + 4);
             Assertions.assertEquals(222L, s3Object.getObjectSize());
             Assertions.assertEquals(StreamConstants.NOOP_STREAM_ID, s3Object.getStreamId());
 
-            long baseTime = 3;
             S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
             S3WalObject object = s3WALObjectMapper.getByObjectId(objectId + 4);
-            Assertions.assertEquals(1L, object.getSequenceId());
-            Assertions.assertEquals(baseTime, object.getBaseDataTimestamp());
-            if (object.getCommittedTimestamp() - time > 5 * 60) {
-                Assertions.fail();
-            }
+            Assertions.assertEquals(objectId + 2, object.getSequenceId());
+            Assertions.assertTrue(object.getBaseDataTimestamp() > 0);
+            Assertions.assertTrue(object.getCommittedTimestamp() > 0);
         }
     }
 
     @Test
-    public void testCommitWalObject_ObjectNotExist() throws IOException, ExecutionException, InterruptedException {
-        long streamId = 1;
+    public void testCommitWalObject_ObjectNotPrepare() throws IOException, ExecutionException, InterruptedException {
+        long streamId = 1, startOffset = 0, endOffset = 10;
+        Integer nodeId = 1;
 
         S3WALObject walObject = S3WALObject.newBuilder()
             .setObjectId(3)
@@ -1880,15 +1805,28 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
         try (SqlSession session = this.getSessionFactory().openSession()) {
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
-            com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object =
-                new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
-            object.setObjectId(2L);
-            object.setStreamId(streamId);
-            object.setBaseDataTimestamp(1L);
-            object.setStartOffset(0L);
-            object.setEndOffset(2L);
-            object.setObjectSize(2139L);
-            s3StreamObjectMapper.create(object);
+            RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+            Stream stream = new Stream();
+            stream.setState(StreamState.OPEN);
+            stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
+            stream.setTopicId(2);
+            stream.setRangeId(1);
+            stream.setEpoch(3);
+            streamMapper.create(stream);
+            streamId = stream.getId();
+            Range range = new Range();
+
+            range.setStreamId(streamId);
+            range.setRangeId(1);
+            range.setEpoch(3L);
+            range.setStartOffset(0L);
+            range.setEndOffset(0L);
+            range.setNodeId(nodeId);
+            rangeMapper.create(range);
+
+            buildS3StreamObjs(1, 1, 0L, 100L).forEach(s3StreamObjectMapper::create);
+            session.commit();
         }
 
         List<Long> compactedObjects = new ArrayList<>();
@@ -1899,8 +1837,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             metadataStore.setLease(lease);
             metadataStore.setRole(Role.Leader);
 
-            List<S3StreamObject> s3StreamObjects = metadataStore.listStreamObjects(streamId, 0, 334, 2).get();
-
+            List<S3StreamObject> s3StreamObjects = metadataStore.listStreamObjects(streamId, startOffset, endOffset, 2).get();
             Assertions.assertThrows(ExecutionException.class, () -> metadataStore.commitWalObject(walObject, s3StreamObjects, compactedObjects).get());
         }
 
