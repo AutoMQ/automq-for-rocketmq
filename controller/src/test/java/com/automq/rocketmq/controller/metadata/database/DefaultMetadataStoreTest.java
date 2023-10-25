@@ -2010,7 +2010,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
 
     @Test
-    public void testGetStreams_IsEmpty() throws IOException {
+    public void testGetStreams_IsEmpty() throws IOException, ExecutionException, InterruptedException {
         List<Long> streamIds = new ArrayList<>();
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
@@ -2019,7 +2019,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             lease.setNodeId(config.nodeId());
             metadataStore.setLease(lease);
             metadataStore.setRole(Role.Leader);
-            Assertions.assertThrows(ExecutionException.class, () -> metadataStore.getStreams(streamIds).get());
+            Assertions.assertTrue(metadataStore.getStreams(streamIds).get().isEmpty());
         }
 
     }

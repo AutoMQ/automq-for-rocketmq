@@ -73,6 +73,7 @@ import com.automq.rocketmq.controller.tasks.ScanYieldingQueueTask;
 import com.automq.rocketmq.controller.tasks.SchedulerTask;
 import com.google.common.base.Strings;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -996,8 +997,7 @@ public class DefaultMetadataStore implements MetadataStore {
     public CompletableFuture<List<StreamMetadata>> getStreams(List<Long> streamIds) {
         return CompletableFuture.supplyAsync(() -> {
             if (Objects.isNull(streamIds) || streamIds.isEmpty()) {
-                ControllerException e = new ControllerException(Code.INVALID_ARGUMENT_VALUE, "stream-ids is null or empty");
-                throw new CompletionException(e);
+                return Collections.emptyList();
             }
             try (SqlSession session = openSession()) {
                 StreamMapper streamMapper = session.getMapper(StreamMapper.class);
