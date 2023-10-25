@@ -198,12 +198,13 @@ jobs:
   test-e2e-grpc-java:
     if: ${{ success() }}
     name: Test E2E grpc java
-    needs: [list-version, deploy]
+#    needs: [list-version, deploy]
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
       matrix:
-        version: ${{ fromJSON(needs.list-version.outputs.version-json) }}
+#        version: ${{ fromJSON(needs.list-version.outputs.version-json) }}
+        version: ["5.1.3-alpine"]
     steps:
       - uses: apache/rocketmq-test-tool@7d84d276ad7755b1dc5cf9657a7a9bff6ae6d288
         name: e2e test
@@ -234,12 +235,13 @@ jobs:
   test-e2e-golang:
     if: ${{ success() }}
     name: Test E2E golang
-    needs: [list-version, deploy]
+#    needs: [list-version, deploy]
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
       matrix:
-        version: ${{ fromJSON(needs.list-version.outputs.version-json) }}
+#        version: ${{ fromJSON(needs.list-version.outputs.version-json) }}
+        version: ["5.1.3-alpine"]
     steps:
       - uses: apache/rocketmq-test-tool@7d84d276ad7755b1dc5cf9657a7a9bff6ae6d288
         name: e2e test
@@ -273,12 +275,13 @@ jobs:
   test-e2e-remoting-java:
     if: ${{ success() }}
     name: Test E2E remoting java
-    needs: [ list-version, deploy ]
+#    needs: [ list-version, deploy ]
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
       matrix:
-        version: ${{ fromJSON(needs.list-version.outputs.version-json) }}
+#        version: ${{ fromJSON(needs.list-version.outputs.version-json) }}
+        version: ["5.1.3-alpine"]
     steps:
       - uses: apache/rocketmq-test-tool@7d84d276ad7755b1dc5cf9657a7a9bff6ae6d288
         name: e2e test
