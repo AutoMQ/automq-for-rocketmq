@@ -168,7 +168,7 @@ public class DefaultMetadataStore implements MetadataStore {
         LeaseTask leaseTask = new LeaseTask(this);
         leaseTask.run();
         this.scheduledExecutorService.scheduleAtFixedRate(leaseTask, 1,
-            config.scanIntervalInSecs(), TimeUnit.SECONDS);
+            config.leaseLifeSpanInSecs() / 2, TimeUnit.SECONDS);
         this.scheduledExecutorService.scheduleWithFixedDelay(new ScanNodeTask(this), 1,
             config.scanIntervalInSecs(), TimeUnit.SECONDS);
         this.scheduledExecutorService.scheduleWithFixedDelay(new ScanYieldingQueueTask(this), 1,

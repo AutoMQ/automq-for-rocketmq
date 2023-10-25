@@ -40,7 +40,7 @@ public interface ControllerConfig {
     }
 
     default int leaseLifeSpanInSecs() {
-        return 60;
+        return 10;
     }
 
     default int nodeAliveIntervalInSecs() {

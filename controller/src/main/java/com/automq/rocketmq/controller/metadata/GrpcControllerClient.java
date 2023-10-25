@@ -186,11 +186,13 @@ public class GrpcControllerClient implements ControllerClient {
     }
 
     @Override
-    public void terminateNode(String target, TerminateNodeRequest request, StreamObserver<TerminateNodeReply> observer) {
+    public void terminateNode(String target, TerminateNodeRequest request,
+        StreamObserver<TerminateNodeReply> observer) {
         ManagedChannel channel = Grpc.newChannelBuilder(target, InsecureChannelCredentials.create())
             .build();
         ControllerServiceGrpc.ControllerServiceStub stub = ControllerServiceGrpc.newStub(channel);
-        stub.terminateNode(request, observer);
+        stub.withDeadlineAfter(60, TimeUnit.SECONDS)
+            .terminateNode(request, observer);
     }
 
     @Override
