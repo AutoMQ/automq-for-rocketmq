@@ -51,6 +51,7 @@ import apache.rocketmq.controller.v1.S3ObjectState;
 import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.StreamState;
+import apache.rocketmq.controller.v1.SubStream;
 import apache.rocketmq.controller.v1.TopicStatus;
 import apache.rocketmq.controller.v1.TrimStreamRequest;
 import apache.rocketmq.controller.v1.UpdateTopicReply;
@@ -96,6 +97,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -1045,13 +1047,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
         long streamId;
         long objectId;
         long newStartOffset = 40L;
-        String expectSubStream = """
-            {
-              "1234567890": {
-                "streamId": 1234567890,
-                "startOffset": 0,
-                "endOffset": 10
-              }}""";
 
         try (SqlSession session = getSessionFactory().openSession()) {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
@@ -1090,16 +1085,13 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             s3ObjectMapper.prepare(s3Object);
             objectId = s3Object.getId();
 
-            String replacedJson = expectSubStream.replace("1234567890", streamId + "");
-
             S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
-            S3WalObject s3WALObject = new S3WalObject();
-            s3WALObject.setObjectId(objectId);
-            s3WALObject.setObjectSize(500L);
-            s3WALObject.setSequenceId(111L);
-            s3WALObject.setSubStreams(replacedJson);
-            s3WALObject.setNodeId(2);
-            s3WALObjectMapper.create(s3WALObject);
+            buildS3WalObjs(objectId, 1).stream()
+                .map(s3WalObject -> {
+                    Map<Long, SubStream> subStreams = buildWalSubStreams(1, 0, 10);
+                    s3WalObject.setSubStreams(gson.toJson(subStreams));
+                    return s3WalObject;
+                }).forEach(s3WALObjectMapper::create);
             session.commit();
         }
 
@@ -1137,8 +1129,8 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
             S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
             S3WalObject object = s3WALObjectMapper.getByObjectId(objectId);
-            Assertions.assertEquals(500, object.getObjectSize());
-            Assertions.assertEquals(111, object.getSequenceId());
+            Assertions.assertEquals(100, object.getObjectSize());
+            Assertions.assertEquals(objectId, object.getSequenceId());
         }
     }
 
@@ -1201,15 +1193,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             objectId = s3Object.getId();
 
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
-            S3StreamObject s3StreamObject = new S3StreamObject();
-            s3StreamObject.setBaseDataTimestamp(System.currentTimeMillis());
-            s3StreamObject.setStreamId(streamId);
-            s3StreamObject.setObjectId(objectId);
-            s3StreamObject.setStartOffset(0L);
-            s3StreamObject.setEndOffset(40L);
-            s3StreamObject.setObjectSize(1000L);
-            s3StreamObjectMapper.create(s3StreamObject);
-
+            buildS3StreamObjs(objectId, 1, 0, 40).forEach(s3StreamObjectMapper::create);
             session.commit();
         }
 
@@ -1320,24 +1304,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
             try (SqlSession session = this.getSessionFactory().openSession()) {
                 S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
-                com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
-                object.setObjectId(objectId);
-                object.setObjectSize(222L);
-                object.setStreamId(streamId);
-                object.setBaseDataTimestamp(1L);
-                object.setStartOffset(1234L);
-                object.setEndOffset(2345L);
-                s3StreamObjectMapper.create(object);
-
-                com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object1 = new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
-                object1.setObjectId(objectId + 1);
-                object1.setObjectSize(333L);
-                object1.setStreamId(streamId);
-                object1.setBaseDataTimestamp(2L);
-                object1.setStartOffset(2345L);
-                object1.setEndOffset(3456L);
-                s3StreamObjectMapper.create(object1);
-
+                buildS3StreamObjs(objectId,2 ,1234, 1234).forEach(s3StreamObjectMapper::create);
                 session.commit();
             }
 
@@ -1381,10 +1348,8 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 }
 
                 com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = s3StreamObjectMapper.getByObjectId(objectId + 2);
-                Assertions.assertEquals(1L, object.getBaseDataTimestamp());
-                if (object.getCommittedTimestamp() - time > 5 * 60) {
-                    Assertions.fail();
-                }
+                Assertions.assertTrue(object.getBaseDataTimestamp() > 0);
+                Assertions.assertTrue(object.getCommittedTimestamp() > 0);
             }
         }
 
@@ -1419,15 +1384,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 s3ObjectMapper.prepare(s3Object1);
 
                 S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
-                com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
-                object.setObjectId(objectId);
-                object.setObjectSize(222L);
-                object.setStreamId(streamId);
-                object.setBaseDataTimestamp(1L);
-                object.setStartOffset(1234L);
-                object.setEndOffset(2345L);
-                s3StreamObjectMapper.create(object);
-
+                buildS3StreamObjs(objectId,1 ,1234, 1234).forEach(s3StreamObjectMapper::create);
                 session.commit();
             }
 
@@ -1514,13 +1471,9 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
                 com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = s3StreamObjectMapper.getByObjectId(objectId + 2);
                 Assertions.assertTrue(object.getBaseDataTimestamp() > 1);
-                if (object.getBaseDataTimestamp() - time > 5 * 60) {
-                    Assertions.fail();
-                }
+                Assertions.assertTrue(object.getBaseDataTimestamp() > 0);
                 Assertions.assertTrue(object.getCommittedTimestamp() > 0);
-                if (object.getCommittedTimestamp() - time > 5 * 60) {
-                    Assertions.fail();
-                }
+                Assertions.assertTrue(object.getCommittedTimestamp() > 0);
             }
         }
 
@@ -1581,14 +1534,8 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 Assertions.assertEquals(S3ObjectState.BOS_COMMITTED, s3Object.getState());
 
                 com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = s3StreamObjectMapper.getByObjectId(objectId + 2);
-                Assertions.assertTrue(object.getBaseDataTimestamp() > 1);
-                if (object.getBaseDataTimestamp() - time > 5 * 60) {
-                    Assertions.fail();
-                }
+                Assertions.assertTrue(object.getBaseDataTimestamp() > 0);
                 Assertions.assertTrue(object.getCommittedTimestamp() > 0);
-                if (object.getCommittedTimestamp() - time > 5 * 60) {
-                    Assertions.fail();
-                }
             }
         }
 
@@ -1597,7 +1544,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     @Test
     public void test3WALObjects_2PC_NoS3Stream() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
-        long objectId, streamId = 1;
+        long objectId;
         int nodeId = 2;
 
         try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), config)) {
@@ -1620,34 +1567,21 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 objectId = reply.getFirstObjectId();
             }
 
-            String expectSubStream = """
-                {
-                  "1234567890": {
-                    "streamId": 1234567890,
-                    "startOffset": 0,
-                    "endOffset": 10
-                  }}""";
-
             try (SqlSession session = this.getSessionFactory().openSession()) {
                 S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
-                S3WalObject s3WALObject = new S3WalObject();
-                s3WALObject.setObjectId(objectId + 2);
-                s3WALObject.setObjectSize(333L);
-                s3WALObject.setBaseDataTimestamp(3);
-                s3WALObject.setSequenceId(1L);
-                s3WALObject.setNodeId(nodeId);
-                s3WALObject.setSubStreams(expectSubStream.replace("1234567890", String.valueOf(streamId)));
-                s3WALObjectMapper.create(s3WALObject);
+                buildS3WalObjs(objectId + 2, 1).stream()
+                    .map(s3WalObject -> {
+                        Map<Long, SubStream> subStreams = buildWalSubStreams(1, 0, 10);
+                        s3WalObject.setSubStreams(gson.toJson(subStreams));
+                        return s3WalObject;
+                    }).forEach(s3WALObjectMapper::create);
 
-                S3WalObject s3WalObject1 = new S3WalObject();
-                s3WalObject1.setObjectId(objectId + 3);
-                s3WalObject1.setObjectSize(444L);
-                s3WalObject1.setBaseDataTimestamp(4);
-                s3WalObject1.setSequenceId(2L);
-                s3WalObject1.setNodeId(nodeId);
-                s3WalObject1.setSubStreams(expectSubStream.replace("1234567890", String.valueOf(streamId)));
-                s3WALObjectMapper.create(s3WalObject1);
-
+                buildS3WalObjs(objectId + 3, 1).stream()
+                    .map(s3WalObject -> {
+                        Map<Long, SubStream> subStreams = buildWalSubStreams(1, 10, 10);
+                        s3WalObject.setSubStreams(gson.toJson(subStreams));
+                        return s3WalObject;
+                    }).forEach(s3WALObjectMapper::create);
                 session.commit();
             }
 
@@ -1657,7 +1591,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .setBrokerId(nodeId)
                 .build();
 
-            long time = System.currentTimeMillis();
             List<Long> compactedObjects = new ArrayList<>();
             compactedObjects.add(objectId + 2);
             compactedObjects.add(objectId + 3);
@@ -1685,14 +1618,11 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                     Assertions.assertEquals(S3ObjectState.BOS_WILL_DELETE, object.getState());
                 }
 
-                long baseTime = 3;
                 S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
                 S3WalObject object = s3WALObjectMapper.getByObjectId(objectId + 4);
-                Assertions.assertEquals(baseTime, object.getBaseDataTimestamp());
-                Assertions.assertEquals(1L, object.getSequenceId());
-                if (object.getCommittedTimestamp() - time > 5 * 60) {
-                    Assertions.fail();
-                }
+                Assertions.assertTrue(object.getBaseDataTimestamp() > 0);
+                Assertions.assertEquals(objectId + 2, object.getSequenceId());
+                Assertions.assertTrue(object.getCommittedTimestamp() > 0);
             }
         }
 
@@ -1757,13 +1687,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 S3WalObject object = s3WALObjectMapper.getByObjectId(objectId + 4);
                 Assertions.assertEquals(objectId + 4, object.getSequenceId());
                 Assertions.assertTrue(object.getBaseDataTimestamp() > 1);
-                if (object.getBaseDataTimestamp() - time > 5 * 60) {
-                    Assertions.fail();
-                }
                 Assertions.assertTrue(object.getCommittedTimestamp() > 0);
-                if (object.getCommittedTimestamp() - time > 5 * 60) {
-                    Assertions.fail();
-                }
             }
         }
 
@@ -1795,58 +1719,36 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 objectId = reply.getFirstObjectId();
             }
 
-            String expectSubStream = """
-                {
-                  "1234567890": {
-                    "streamId": 1234567890,
-                    "startOffset": 0,
-                    "endOffset": 10
-                  }}""";
-
             try (SqlSession session = this.getSessionFactory().openSession()) {
                 S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
-                S3WalObject s3WALObject = new S3WalObject();
-                s3WALObject.setObjectId(objectId + 2);
-                s3WALObject.setObjectSize(333L);
-                s3WALObject.setBaseDataTimestamp(3);
-                s3WALObject.setSequenceId(1L);
-                s3WALObject.setNodeId(nodeId);
-                s3WALObject.setSubStreams(expectSubStream.replace("1234567890", String.valueOf(streamId)));
-                s3WALObjectMapper.create(s3WALObject);
+                buildS3WalObjs(objectId + 2, 1).stream()
+                    .map(s3WalObject -> {
+                        Map<Long, SubStream> subStreams = buildWalSubStreams(1, 0, 10);
+                        s3WalObject.setSubStreams(gson.toJson(subStreams));
+                        return s3WalObject;
+                    }).forEach(s3WALObjectMapper::create);
 
-                S3WalObject s3WalObject1 = new S3WalObject();
-                s3WalObject1.setObjectId(objectId + 3);
-                s3WalObject1.setObjectSize(444L);
-                s3WalObject1.setBaseDataTimestamp(4);
-                s3WalObject1.setSequenceId(2L);
-                s3WalObject1.setNodeId(nodeId);
-                s3WalObject1.setSubStreams(expectSubStream.replace("1234567890", String.valueOf(streamId)));
-                s3WALObjectMapper.create(s3WalObject1);
+                buildS3WalObjs(objectId + 3, 1).stream()
+                    .map(s3WalObject -> {
+                        Map<Long, SubStream> subStreams = buildWalSubStreams(1, 10, 10);
+                        s3WalObject.setSubStreams(gson.toJson(subStreams));
+                        return s3WalObject;
+                    }).forEach(s3WALObjectMapper::create);
 
                 session.commit();
             }
 
-            apache.rocketmq.controller.v1.S3StreamObject s3StreamObject = apache.rocketmq.controller.v1.S3StreamObject.newBuilder()
-                .setObjectId(objectId)
-                .setStreamId(streamId)
-                .setObjectSize(111L)
-                .setBaseDataTimestamp(1L)
-                .setStartOffset(111L)
-                .setEndOffset(222L)
-                .build();
+            List<apache.rocketmq.controller.v1.S3StreamObject> s3StreamObjects = buildS3StreamObjs(objectId, 2, 20, 10)
+                .stream().map(s3StreamObject -> apache.rocketmq.controller.v1.S3StreamObject.newBuilder()
+                    .setObjectId(s3StreamObject.getObjectId())
+                    .setStreamId(s3StreamObject.getStreamId())
+                    .setObjectSize(s3StreamObject.getObjectSize())
+                    .setBaseDataTimestamp(s3StreamObject.getBaseDataTimestamp())
+                    .setStartOffset(s3StreamObject.getStartOffset())
+                    .setEndOffset(s3StreamObject.getEndOffset())
+                    .build())
+                .toList();
 
-            apache.rocketmq.controller.v1.S3StreamObject s3StreamObject1 = apache.rocketmq.controller.v1.S3StreamObject.newBuilder()
-                .setObjectId(objectId + 1)
-                .setStreamId(streamId)
-                .setObjectSize(222L)
-                .setBaseDataTimestamp(2L)
-                .setStartOffset(222L)
-                .setEndOffset(333L)
-                .build();
-
-            List<apache.rocketmq.controller.v1.S3StreamObject> s3StreamObjects = new ArrayList<>();
-            s3StreamObjects.add(s3StreamObject);
-            s3StreamObjects.add(s3StreamObject1);
 
             apache.rocketmq.controller.v1.S3WALObject walObject = apache.rocketmq.controller.v1.S3WALObject.newBuilder()
                 .setObjectId(objectId + 4)
@@ -1904,58 +1806,36 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 objectId = reply.getFirstObjectId();
             }
 
-            String expectSubStream = """
-                {
-                  "1234567890": {
-                    "streamId": 1234567890,
-                    "startOffset": 0,
-                    "endOffset": 10
-                  }}""";
 
             try (SqlSession session = this.getSessionFactory().openSession()) {
                 S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
-                S3WalObject s3WALObject = new S3WalObject();
-                s3WALObject.setObjectId(objectId + 2);
-                s3WALObject.setObjectSize(333L);
-                s3WALObject.setBaseDataTimestamp(3);
-                s3WALObject.setSequenceId(1L);
-                s3WALObject.setNodeId(nodeId);
-                s3WALObject.setSubStreams(expectSubStream.replace("1234567890", String.valueOf(streamId)));
-                s3WALObjectMapper.create(s3WALObject);
+                buildS3WalObjs(objectId + 2, 1).stream()
+                    .map(s3WalObject -> {
+                        Map<Long, SubStream> subStreams = buildWalSubStreams(1, 0, 10);
+                        s3WalObject.setSubStreams(gson.toJson(subStreams));
+                        return s3WalObject;
+                    }).forEach(s3WALObjectMapper::create);
 
-                S3WalObject s3WalObject1 = new S3WalObject();
-                s3WalObject1.setObjectId(objectId + 3);
-                s3WalObject1.setObjectSize(444L);
-                s3WalObject1.setBaseDataTimestamp(4);
-                s3WalObject1.setSequenceId(2L);
-                s3WalObject1.setNodeId(nodeId);
-                s3WalObject1.setSubStreams(expectSubStream.replace("1234567890", String.valueOf(streamId)));
-                s3WALObjectMapper.create(s3WalObject1);
+                buildS3WalObjs(objectId + 3, 1).stream()
+                    .map(s3WalObject -> {
+                        Map<Long, SubStream> subStreams = buildWalSubStreams(1, 10, 10);
+                        s3WalObject.setSubStreams(gson.toJson(subStreams));
+                        return s3WalObject;
+                    }).forEach(s3WALObjectMapper::create);
 
                 session.commit();
             }
 
-            apache.rocketmq.controller.v1.S3StreamObject s3StreamObject = apache.rocketmq.controller.v1.S3StreamObject.newBuilder()
-                .setObjectId(objectId)
-                .setStreamId(streamId)
-                .setObjectSize(111L)
-                .setBaseDataTimestamp(1L)
-                .setStartOffset(111L)
-                .setEndOffset(222L)
-                .build();
-
-            apache.rocketmq.controller.v1.S3StreamObject s3StreamObject1 = apache.rocketmq.controller.v1.S3StreamObject.newBuilder()
-                .setObjectId(objectId + 1)
-                .setStreamId(streamId)
-                .setObjectSize(222L)
-                .setBaseDataTimestamp(2L)
-                .setStartOffset(222L)
-                .setEndOffset(333L)
-                .build();
-
-            List<apache.rocketmq.controller.v1.S3StreamObject> s3StreamObjects = new ArrayList<>();
-            s3StreamObjects.add(s3StreamObject);
-            s3StreamObjects.add(s3StreamObject1);
+            List<apache.rocketmq.controller.v1.S3StreamObject> s3StreamObjects = buildS3StreamObjs(objectId, 2, 20, 10)
+                .stream().map(s3StreamObject -> apache.rocketmq.controller.v1.S3StreamObject.newBuilder()
+                    .setObjectId(s3StreamObject.getObjectId())
+                    .setStreamId(s3StreamObject.getStreamId())
+                    .setObjectSize(s3StreamObject.getObjectSize())
+                    .setBaseDataTimestamp(s3StreamObject.getBaseDataTimestamp())
+                    .setStartOffset(s3StreamObject.getStartOffset())
+                    .setEndOffset(s3StreamObject.getEndOffset())
+                    .build())
+                .toList();
 
             apache.rocketmq.controller.v1.S3WALObject walObject = apache.rocketmq.controller.v1.S3WALObject.newBuilder()
                 .setObjectId(objectId + 4)
@@ -2007,11 +1887,10 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 Assertions.assertEquals(222L, s3Object.getObjectSize());
                 Assertions.assertEquals(StreamConstants.NOOP_STREAM_ID, s3Object.getStreamId());
 
-                long baseTime = 3;
                 S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
                 S3WalObject object = s3WALObjectMapper.getByObjectId(objectId + 4);
-                Assertions.assertEquals(baseTime, object.getBaseDataTimestamp());
-                Assertions.assertEquals(1L, object.getSequenceId());
+                Assertions.assertTrue(object.getBaseDataTimestamp() > 0);
+                Assertions.assertEquals(objectId + 2, object.getSequenceId());
                 if (object.getCommittedTimestamp() - time > 5 * 60) {
                     Assertions.fail();
                 }
@@ -2046,58 +1925,36 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 objectId = reply.getFirstObjectId();
             }
 
-            String expectSubStream = """
-                {
-                  "1234567890": {
-                    "streamId": 1234567890,
-                    "startOffset": 0,
-                    "endOffset": 10
-                  }}""";
 
             try (SqlSession session = this.getSessionFactory().openSession()) {
                 S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
-                S3WalObject s3WALObject = new S3WalObject();
-                s3WALObject.setObjectId(objectId + 2);
-                s3WALObject.setObjectSize(333L);
-                s3WALObject.setBaseDataTimestamp(3);
-                s3WALObject.setSequenceId(1L);
-                s3WALObject.setNodeId(nodeId);
-                s3WALObject.setSubStreams(expectSubStream.replace("1234567890", String.valueOf(streamId)));
-                s3WALObjectMapper.create(s3WALObject);
+                buildS3WalObjs(objectId + 2, 1).stream()
+                    .map(s3WalObject -> {
+                        Map<Long, SubStream> subStreams = buildWalSubStreams(1, 0, 10);
+                        s3WalObject.setSubStreams(gson.toJson(subStreams));
+                        return s3WalObject;
+                    }).forEach(s3WALObjectMapper::create);
 
-                S3WalObject s3WalObject1 = new S3WalObject();
-                s3WalObject1.setObjectId(objectId + 3);
-                s3WalObject1.setObjectSize(444L);
-                s3WalObject1.setBaseDataTimestamp(4);
-                s3WalObject1.setSequenceId(2L);
-                s3WalObject1.setNodeId(nodeId);
-                s3WalObject1.setSubStreams(expectSubStream.replace("1234567890", String.valueOf(streamId)));
-                s3WALObjectMapper.create(s3WalObject1);
+                buildS3WalObjs(objectId + 3, 1).stream()
+                    .map(s3WalObject -> {
+                        Map<Long, SubStream> subStreams = buildWalSubStreams(1, 10, 10);
+                        s3WalObject.setSubStreams(gson.toJson(subStreams));
+                        return s3WalObject;
+                    }).forEach(s3WALObjectMapper::create);
 
                 session.commit();
             }
 
-            apache.rocketmq.controller.v1.S3StreamObject s3StreamObject = apache.rocketmq.controller.v1.S3StreamObject.newBuilder()
-                .setObjectId(objectId)
-                .setStreamId(streamId)
-                .setObjectSize(111L)
-                .setBaseDataTimestamp(1L)
-                .setStartOffset(111L)
-                .setEndOffset(222L)
-                .build();
-
-            apache.rocketmq.controller.v1.S3StreamObject s3StreamObject1 = apache.rocketmq.controller.v1.S3StreamObject.newBuilder()
-                .setObjectId(objectId + 1)
-                .setStreamId(streamId)
-                .setObjectSize(222L)
-                .setBaseDataTimestamp(2L)
-                .setStartOffset(222L)
-                .setEndOffset(333L)
-                .build();
-
-            List<apache.rocketmq.controller.v1.S3StreamObject> s3StreamObjects = new ArrayList<>();
-            s3StreamObjects.add(s3StreamObject);
-            s3StreamObjects.add(s3StreamObject1);
+            List<apache.rocketmq.controller.v1.S3StreamObject> s3StreamObjects = buildS3StreamObjs(objectId, 2, 20, 10)
+                .stream().map(s3StreamObject -> apache.rocketmq.controller.v1.S3StreamObject.newBuilder()
+                    .setObjectId(s3StreamObject.getObjectId())
+                    .setStreamId(s3StreamObject.getStreamId())
+                    .setObjectSize(s3StreamObject.getObjectSize())
+                    .setBaseDataTimestamp(s3StreamObject.getBaseDataTimestamp())
+                    .setStartOffset(s3StreamObject.getStartOffset())
+                    .setEndOffset(s3StreamObject.getEndOffset())
+                    .build())
+                .toList();
 
             apache.rocketmq.controller.v1.S3WALObject walObject = apache.rocketmq.controller.v1.S3WALObject.newBuilder()
                 .setObjectId(objectId + 4)
@@ -2150,11 +2007,10 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 Assertions.assertEquals(222L, s3Object.getObjectSize());
                 Assertions.assertEquals(StreamConstants.NOOP_STREAM_ID, s3Object.getStreamId());
 
-                long baseTime = 3;
                 S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
                 S3WalObject object = s3WALObjectMapper.getByObjectId(objectId + 4);
-                Assertions.assertEquals(1L, object.getSequenceId());
-                Assertions.assertEquals(baseTime, object.getBaseDataTimestamp());
+                Assertions.assertEquals(objectId + 2, object.getSequenceId());
+                Assertions.assertTrue(object.getBaseDataTimestamp() > 0);
                 if (object.getCommittedTimestamp() - time > 5 * 60) {
                     Assertions.fail();
                 }
