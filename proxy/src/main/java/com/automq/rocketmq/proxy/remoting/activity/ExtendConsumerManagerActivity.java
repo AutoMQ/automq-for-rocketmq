@@ -19,6 +19,7 @@ package com.automq.rocketmq.proxy.remoting.activity;
 
 import com.automq.rocketmq.proxy.remoting.RemotingUtil;
 import io.netty.channel.ChannelHandlerContext;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import org.apache.rocketmq.common.message.MessageQueue;
@@ -50,6 +51,11 @@ public class ExtendConsumerManagerActivity extends ConsumerManagerActivity imple
     @Override
     protected RemotingCommand processRequest0(ChannelHandlerContext ctx, RemotingCommand request,
         ProxyContext context) throws Exception {
+        Optional<RemotingCommand> response = checkClientVersion(request);
+        if (response.isPresent()) {
+            return response.get();
+        }
+
         switch (request.getCode()) {
             case RequestCode.GET_CONSUMER_CONNECTION_LIST,
                  RequestCode.UNLOCK_BATCH_MQ,

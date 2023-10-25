@@ -21,8 +21,10 @@ import com.automq.rocketmq.proxy.metrics.ProxyMetricsManager;
 import com.automq.rocketmq.proxy.model.ProxyContextExt;
 import com.automq.rocketmq.proxy.remoting.RemotingUtil;
 import java.util.Optional;
+import org.apache.rocketmq.common.MQVersion;
 import org.apache.rocketmq.proxy.common.ProxyContext;
 import org.apache.rocketmq.remoting.common.RemotingHelper;
+import org.apache.rocketmq.remoting.protocol.LanguageCode;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 import org.apache.rocketmq.remoting.protocol.RequestCode;
 
@@ -56,6 +58,17 @@ public interface CommonRemotingBehavior {
         }
     }
 
+    default Optional<RemotingCommand> checkClientVersion(RemotingCommand request) {
+        if (request.getLanguage() != LanguageCode.JAVA) {
+            return Optional.of(RemotingUtil.clientNotSupportedResponse(request));
+        }
+
+        if (request.getVersion() < MQVersion.Version.V4_9_5.ordinal()) {
+            return Optional.of(RemotingUtil.clientNotSupportedResponse(request));
+        }
+        return Optional.empty();
+    }
+
     /**
      * Check the version of the request.
      * <p>
@@ -65,7 +78,7 @@ public interface CommonRemotingBehavior {
      * @param request The remoting request.
      * @return The error response or null if the version is supported.
      */
-    default Optional<RemotingCommand> checkVersion(RemotingCommand request) {
+    default Optional<RemotingCommand> checkRequiredField(RemotingCommand request) {
         if (requestNeedBrokerName(request.getCode())) {
             String brokerName;
             if (request.getCode() == RequestCode.SEND_MESSAGE_V2) {
@@ -74,7 +87,7 @@ public interface CommonRemotingBehavior {
                 brokerName = request.getExtFields().get(BROKER_NAME_FIELD);
             }
             if (brokerName == null) {
-                return Optional.of(RemotingUtil.versionNotSupportedResponse(request));
+                return Optional.of(RemotingUtil.clientNotSupportedResponse(request));
             }
         }
         return Optional.empty();
@@ -82,6 +95,7 @@ public interface CommonRemotingBehavior {
 
     default boolean requestNeedBrokerName(int requestCode) {
         return requestCode == RequestCode.SEND_MESSAGE_V2
-            || requestCode == RequestCode.PULL_MESSAGE;
+            || requestCode == RequestCode.PULL_MESSAGE
+            || requestCode == RequestCode.CONSUMER_SEND_MSG_BACK;
     }
 }
