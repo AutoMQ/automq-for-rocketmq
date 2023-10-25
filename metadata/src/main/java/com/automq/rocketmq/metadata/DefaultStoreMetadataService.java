@@ -154,6 +154,9 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
 
     @Override
     public CompletableFuture<List<StreamMetadata>> getStreams(List<Long> streamIds) {
+        if (streamIds == null || streamIds.isEmpty()) {
+            return CompletableFuture.completedFuture(List.of());
+        }
         return metadataStore.getStreams(streamIds);
     }
 }

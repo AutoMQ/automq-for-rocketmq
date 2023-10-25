@@ -244,7 +244,7 @@ public class MetricsExporter implements Lifecycle {
     @Override
     public void start() {
         initDynamicMetrics();
-        this.started = true
+        this.started = true;
     }
 
     private void registerMetricsView(SdkMeterProviderBuilder providerBuilder) {

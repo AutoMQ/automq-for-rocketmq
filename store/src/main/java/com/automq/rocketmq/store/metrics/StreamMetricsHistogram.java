@@ -19,18 +19,19 @@ package com.automq.rocketmq.store.metrics;
 
 import com.automq.stream.s3.metrics.Histogram;
 import io.opentelemetry.api.common.AttributesBuilder;
-import io.opentelemetry.api.metrics.DoubleHistogram;
+import io.opentelemetry.api.metrics.LongHistogram;
 import io.opentelemetry.api.metrics.Meter;
 import java.util.Map;
 import java.util.function.Supplier;
 
 public class StreamMetricsHistogram extends BaseStreamMetrics implements Histogram {
-    private final DoubleHistogram histogram;
+    private final LongHistogram histogram;
 
     public StreamMetricsHistogram(String type, String name, Map<String, String> tags,
         Meter meter, Supplier<AttributesBuilder> attributesBuilderSupplier) {
         super(type, name, tags, meter, attributesBuilderSupplier);
         histogram = this.meter.histogramBuilder(this.metricsName)
+            .ofLongs()
             .build();
     }
 
