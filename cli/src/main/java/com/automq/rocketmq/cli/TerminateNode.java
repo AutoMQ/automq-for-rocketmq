@@ -66,7 +66,7 @@ public class TerminateNode implements Callable<Void> {
                 }
             });
         }
-        boolean reachedZero = latch.await(60, TimeUnit.SECONDS);
+        boolean reachedZero = latch.await(3, TimeUnit.MINUTES);
         if (!reachedZero) {
             System.err.println("Timeout before broker node termination completes");
         }

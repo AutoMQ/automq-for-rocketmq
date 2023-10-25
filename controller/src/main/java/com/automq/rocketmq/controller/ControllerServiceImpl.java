@@ -69,11 +69,17 @@ import apache.rocketmq.controller.v1.TrimStreamReply;
 import apache.rocketmq.controller.v1.TrimStreamRequest;
 import apache.rocketmq.controller.v1.UpdateTopicReply;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
+import com.automq.rocketmq.common.PrefixThreadFactory;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
+import com.automq.rocketmq.controller.tasks.TerminationStageTask;
 import com.google.protobuf.TextFormat;
+import io.grpc.Context;
 import io.grpc.stub.StreamObserver;
 
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
@@ -85,8 +91,11 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
 
     private final MetadataStore metadataStore;
 
+    private final ScheduledExecutorService executorService;
+
     public ControllerServiceImpl(MetadataStore metadataStore) {
         this.metadataStore = metadataStore;
+        executorService = Executors.newSingleThreadScheduledExecutor(new PrefixThreadFactory("ControllerService_"));
     }
 
     @Override
@@ -652,7 +661,7 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
                 request.getNodeId(), metadataStore.config().nodeId());
             TerminateNodeReply reply = TerminateNodeReply.newBuilder()
                 .setStatus(Status.newBuilder()
-                    .setCode(Code.DUPLICATED).setMessage(message).build())
+                    .setCode(Code.BAD_REQUEST).setMessage(message).build())
                 .build();
             responseObserver.onNext(reply);
             responseObserver.onCompleted();
@@ -666,7 +675,8 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
             .build();
         responseObserver.onNext(reply);
 
-        // TODO: observer and graceful shutdown progress and write back to client
-        responseObserver.onCompleted();
+        Context context = Context.current();
+        Runnable task = new TerminationStageTask(metadataStore, executorService, context, responseObserver);
+        this.executorService.schedule(task, 1, TimeUnit.SECONDS);
     }
 }

@@ -392,6 +392,7 @@ enum TerminationStage {
   TS_TRANSFERRING_LEADERSHIP = 1;
   TS_TRANSFERRING_STREAM = 2;
   TS_CLOSING_STREAM = 3;
+  TS_TERMINATED = 4;
 }
 
 // Request a node to terminate gracefully
