@@ -61,7 +61,7 @@ import static com.automq.rocketmq.broker.MetricsConstant.LABEL_NODE_NAME;
 
 public class MetricsExporter implements Lifecycle {
     private static final Logger LOGGER = LoggerFactory.getLogger(MetricsExporter.class);
-
+    private volatile boolean started = false;
     private final BrokerConfig brokerConfig;
     private final MetricsConfig metricsConfig;
     private final static Map<String, String> LABEL_MAP = new HashMap<>();
@@ -213,6 +213,8 @@ public class MetricsExporter implements Lifecycle {
             .getMeter("rocketmq-meter");
 
         initMetrics();
+
+        this.started = true;
     }
 
     private void registerMetricsView(SdkMeterProviderBuilder providerBuilder) {
@@ -234,6 +236,9 @@ public class MetricsExporter implements Lifecycle {
 
     @Override
     public void shutdown() {
+        if (!started) {
+            return;
+        }
         MetricsExporterType exporterType = MetricsExporterType.valueOf(metricsConfig.exporterType());
         if (exporterType == MetricsExporterType.OTLP_GRPC) {
             periodicMetricReader.forceFlush();

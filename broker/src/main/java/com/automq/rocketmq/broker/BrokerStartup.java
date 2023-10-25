@@ -18,15 +18,19 @@
 package com.automq.rocketmq.broker;
 
 import com.automq.rocketmq.common.config.BrokerConfig;
+import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
+import org.apache.logging.log4j.LogManager;
 import org.apache.rocketmq.logging.ch.qos.logback.classic.ClassicConstants;
 import org.apache.rocketmq.srvutil.ServerUtil;
 import org.slf4j.Logger;
@@ -77,15 +81,23 @@ public class BrokerStartup {
 
         brokerConfig.validate();
 
-        start(buildBrokerController(brokerConfig));
+        BrokerController controller = buildBrokerController(brokerConfig);
+
+        // Register shutdown hook
+        Runtime.getRuntime().addShutdownHook(new Thread(buildShutdownHook(controller), "ShutdownHook"));
+
+        // Start the broker
+        start(controller);
+
         LOGGER.info("Broker started, costs {} ms", System.currentTimeMillis() - start);
     }
 
-    private static void start(BrokerController controller) {
+    private static void start(BrokerController controller) throws Exception {
         try {
             controller.start();
         } catch (Exception e) {
-            LOGGER.error("Failed to start broker", e);
+            LOGGER.error("Failed to start broker, try to shutdown", e);
+            controller.shutdown();
             System.exit(-1);
         }
     }
@@ -113,6 +125,31 @@ public class BrokerStartup {
         } else {
             LOGGER.info("Load the logback config for the kernel of rocketmq from the specific file: {}", logConfig);
         }
+    }
+
+    public static Runnable buildShutdownHook(BrokerController brokerController) {
+        return new Runnable() {
+            private volatile boolean hasShutdown = false;
+            private final AtomicInteger shutdownTimes = new AtomicInteger(0);
+
+            @Override
+            public void run() {
+                synchronized (this) {
+                    LOGGER.info("Shutdown hook was invoked, {}", this.shutdownTimes.incrementAndGet());
+                    if (!this.hasShutdown) {
+                        this.hasShutdown = true;
+                        Stopwatch stopwatch = Stopwatch.createStarted();
+                        try {
+                            brokerController.shutdown();
+                        } catch (Exception e) {
+                            LOGGER.error("Shutdown exception", e);
+                        }
+                        LOGGER.info("Shutdown hook over, consuming total time(ms): {}", stopwatch.elapsed(TimeUnit.MILLISECONDS));
+                        LogManager.shutdown();
+                    }
+                }
+            }
+        };
     }
 
     private static Options buildCommandlineOptions() {

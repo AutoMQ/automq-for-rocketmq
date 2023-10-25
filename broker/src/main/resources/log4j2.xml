@@ -16,7 +16,7 @@
   ~ limitations under the License.
   -->
 
-<Configuration>
+<Configuration shutdownHook="disable">
     <Properties>
         <Property name="LOG_DIR">${sys:user.home}${sys:file.separator}logs${sys:file.separator}rocketmqlogs</Property>
     </Properties>

@@ -168,9 +168,9 @@ public class S3StreamStore implements StreamStore {
 
     @Override
     public void shutdown() throws Exception {
-        this.storage.shutdown();
-        this.compactionManager.shutdown();
         this.streamClient.shutdown();
+        this.compactionManager.shutdown();
+        this.storage.shutdown();
     }
 
     @Override
