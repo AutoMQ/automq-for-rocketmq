@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.function.Supplier;
 
 public class BaseStreamMetrics {
+    private static final String STREAM_METRICS_PREFIX = "rocketmq_stream_";
 
     protected final Meter meter;
     protected final Supplier<AttributesBuilder> attributesBuilderSupplier;
@@ -51,6 +52,6 @@ public class BaseStreamMetrics {
     }
 
     protected String metricsName(String type, String name) {
-        return type + "_" + name;
+        return STREAM_METRICS_PREFIX + type + "_" + name;
     }
 }

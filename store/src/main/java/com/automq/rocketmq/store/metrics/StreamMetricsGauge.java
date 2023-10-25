@@ -29,6 +29,7 @@ public class StreamMetricsGauge extends BaseStreamMetrics {
         Meter meter, Supplier<AttributesBuilder> attributesBuilderSupplier, Gauge gauge) {
         super(type, name, tags, meter, attributesBuilderSupplier);
         this.meter.gaugeBuilder(this.metricsName)
+            .ofLongs()
             .buildWithCallback(measurement -> measurement.record(gauge.value(), newAttributesBuilder().build()));
     }
 }
