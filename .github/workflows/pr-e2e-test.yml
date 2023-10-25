@@ -113,6 +113,7 @@ jobs:
     steps:
       - uses: helm/kind-action@v1.5.0
         name: Create k8s Kind Cluster
+      - name: Export kubeconfig
         run: |
           kind export kubeconfig --name kind-chart-testing
       - name: Set up Helm
