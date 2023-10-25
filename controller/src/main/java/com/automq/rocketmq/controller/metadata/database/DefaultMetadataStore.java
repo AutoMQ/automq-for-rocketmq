@@ -33,6 +33,7 @@ import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.StreamState;
+import apache.rocketmq.controller.v1.TerminationStage;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.common.PrefixThreadFactory;
 import com.automq.rocketmq.common.api.DataStore;
@@ -999,6 +1000,19 @@ public class DefaultMetadataStore implements MetadataStore {
                 return buildStreamMetadata(streams, session);
             }
         }, asyncExecutorService);
+    }
+
+    @Override
+    public TerminationStage fireClose() {
+        config.flagGoingAway();
+        if (isLeader()) {
+            // TODO: yield leadership
+            return TerminationStage.TS_TRANSFERRING_LEADERSHIP;
+        } else {
+            // Notify leader that this node is going away shortly
+            heartbeat();
+            return TerminationStage.TS_TRANSFERRING_STREAM;
+        }
     }
 
     @Override

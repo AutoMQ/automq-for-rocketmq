@@ -25,6 +25,7 @@ import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.StreamRole;
+import apache.rocketmq.controller.v1.TerminationStage;
 import apache.rocketmq.controller.v1.Topic;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.common.api.DataStore;
@@ -213,4 +214,6 @@ public interface MetadataStore extends Closeable {
     Optional<Integer> ownerNode(long topicId, int queueId);
 
     CompletableFuture<List<StreamMetadata>> getStreams(List<Long> streamIds);
+
+    TerminationStage fireClose();
 }

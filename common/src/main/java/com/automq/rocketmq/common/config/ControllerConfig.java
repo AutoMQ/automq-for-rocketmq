@@ -78,4 +78,6 @@ public interface ControllerConfig {
 
     boolean goingAway();
 
+    void flagGoingAway();
+
 }

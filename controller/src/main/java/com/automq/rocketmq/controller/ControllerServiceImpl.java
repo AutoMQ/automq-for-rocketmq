@@ -61,6 +61,9 @@ import apache.rocketmq.controller.v1.PrepareS3ObjectsRequest;
 import apache.rocketmq.controller.v1.ReassignMessageQueueReply;
 import apache.rocketmq.controller.v1.ReassignMessageQueueRequest;
 import apache.rocketmq.controller.v1.Status;
+import apache.rocketmq.controller.v1.TerminateNodeReply;
+import apache.rocketmq.controller.v1.TerminateNodeRequest;
+import apache.rocketmq.controller.v1.TerminationStage;
 import apache.rocketmq.controller.v1.Topic;
 import apache.rocketmq.controller.v1.TrimStreamReply;
 import apache.rocketmq.controller.v1.TrimStreamRequest;
@@ -640,5 +643,30 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
             responseObserver.onNext(reply);
             responseObserver.onCompleted();
         }
+    }
+
+    @Override
+    public void terminateNode(TerminateNodeRequest request, StreamObserver<TerminateNodeReply> responseObserver) {
+        if (request.getNodeId() != metadataStore.config().nodeId()) {
+            String message = String.format("Target node-id=%d, actual node-id=%d",
+                request.getNodeId(), metadataStore.config().nodeId());
+            TerminateNodeReply reply = TerminateNodeReply.newBuilder()
+                .setStatus(Status.newBuilder()
+                    .setCode(Code.DUPLICATED).setMessage(message).build())
+                .build();
+            responseObserver.onNext(reply);
+            responseObserver.onCompleted();
+            return;
+        }
+
+        TerminationStage stage = metadataStore.fireClose();
+        TerminateNodeReply reply = TerminateNodeReply.newBuilder()
+            .setStatus(Status.newBuilder().setCode(Code.OK).build())
+            .setStage(stage)
+            .build();
+        responseObserver.onNext(reply);
+
+        // TODO: observer and graceful shutdown progress and write back to client
+        responseObserver.onCompleted();
     }
 }

@@ -55,6 +55,8 @@ import apache.rocketmq.controller.v1.PrepareS3ObjectsReply;
 import apache.rocketmq.controller.v1.PrepareS3ObjectsRequest;
 import apache.rocketmq.controller.v1.ReassignMessageQueueReply;
 import apache.rocketmq.controller.v1.ReassignMessageQueueRequest;
+import apache.rocketmq.controller.v1.TerminateNodeReply;
+import apache.rocketmq.controller.v1.TerminateNodeRequest;
 import apache.rocketmq.controller.v1.Topic;
 import apache.rocketmq.controller.v1.TrimStreamReply;
 import apache.rocketmq.controller.v1.TrimStreamRequest;
@@ -72,6 +74,7 @@ import io.grpc.Grpc;
 import io.grpc.InsecureChannelCredentials;
 import io.grpc.ManagedChannel;
 
+import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -180,6 +183,14 @@ public class GrpcControllerClient implements ControllerClient {
             }
         }, MoreExecutors.directExecutor());
         return future;
+    }
+
+    @Override
+    public void terminateNode(String target, TerminateNodeRequest request, StreamObserver<TerminateNodeReply> observer) {
+        ManagedChannel channel = Grpc.newChannelBuilder(target, InsecureChannelCredentials.create())
+            .build();
+        ControllerServiceGrpc.ControllerServiceStub stub = ControllerServiceGrpc.newStub(channel);
+        stub.terminateNode(request, observer);
     }
 
     @Override
