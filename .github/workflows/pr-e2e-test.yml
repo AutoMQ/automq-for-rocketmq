@@ -120,6 +120,11 @@ jobs:
 #        uses: azure/setup-helm@v3
 #        with:
 #          version: v3.12.1
+      - name: Get kubeconfig
+        env:
+          KUBECONFIG_FILE: '${{ secrets.KUBE_CONFIG }}'
+        run: |
+          echo $KUBECONFIG_FILE | base64 -d > /tmp/config
       - name: Deploy localstack
         uses: vimeda/helm@v1.6.8
         with:
@@ -145,6 +150,8 @@ jobs:
               aws --endpoint-url=${{env.AWS_S3_ENDPOINT}} s3 cp /tmp/localstack/test-data/ s3://${{env.AWS_DEFAULT_REGION}}/chart --recursive
 
               echo "S3 Configured"
+        env:
+          KUBECONFIG_FILE: /tmp/config
       - name: Deploy mysql
         uses: vimeda/helm@v1.6.8
         with:
@@ -158,6 +165,8 @@ jobs:
               rootPassword: ${{env.DB_PASSWORD}}
               database: metadata
             initdbScripts: ddl.sql
+        env:
+          KUBECONFIG_FILE: /tmp/config
       - name: Deploy rocketmq
         uses: vimeda/helm@v1.6.8
         with:
@@ -185,7 +194,8 @@ jobs:
                 url: "jdbc:mysql://localhost:3306/metadata"
                 userName: ${{env.DB_USERNAME}}
                 password: ${{env.DB_PASSWORD}}
-
+        env:
+          KUBECONFIG_FILE: /tmp/config
   test-e2e-grpc-java:
     if: ${{ success() }}
     name: Test E2E grpc java
