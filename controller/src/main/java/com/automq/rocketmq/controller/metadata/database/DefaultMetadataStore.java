@@ -995,6 +995,10 @@ public class DefaultMetadataStore implements MetadataStore {
     @Override
     public CompletableFuture<List<StreamMetadata>> getStreams(List<Long> streamIds) {
         return CompletableFuture.supplyAsync(() -> {
+            if (Objects.isNull(streamIds) || streamIds.isEmpty()) {
+                ControllerException e = new ControllerException(Code.INVALID_ARGUMENT_VALUE, "stream-ids is null or empty");
+                throw new CompletionException(e);
+            }
             try (SqlSession session = openSession()) {
                 StreamMapper streamMapper = session.getMapper(StreamMapper.class);
                 List<Stream> streams = streamMapper.listByStreamIds(streamIds);

@@ -2008,4 +2008,19 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
     }
 
+
+    @Test
+    public void testGetStreams_IsEmpty() throws IOException {
+        List<Long> streamIds = new ArrayList<>();
+
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            Assertions.assertNull(metadataStore.getLease());
+            Lease lease = new Lease();
+            lease.setNodeId(config.nodeId());
+            metadataStore.setLease(lease);
+            metadataStore.setRole(Role.Leader);
+            Assertions.assertThrows(ExecutionException.class, () -> metadataStore.getStreams(streamIds).get());
+        }
+
+    }
 }
