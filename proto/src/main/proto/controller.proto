@@ -384,6 +384,24 @@ message DeleteGroupReply {
   Status status = 1;
 }
 
+enum TerminationStage {
+  TS_UNSPECIFIED = 0;
+  TS_TRANSFERRING_LEADERSHIP = 1;
+  TS_TRANSFERRING_STREAM = 2;
+  TS_CLOSING_STREAM = 3;
+}
+
+// Request a node to terminate gracefully
+message TerminateNodeRequest {
+
+}
+
+message TerminateNodeReply {
+  Status status = 1;
+  TerminationStage stage = 2;
+  string context = 3;
+}
+
 service ControllerService {
   rpc registerNode(NodeRegistrationRequest) returns (NodeRegistrationReply) {}
 
@@ -418,6 +436,8 @@ service ControllerService {
   rpc deleteGroup(DeleteGroupRequest) returns (DeleteGroupReply) {}
 
   rpc commitOffset(CommitOffsetRequest) returns (CommitOffsetReply) {}
+
+  rpc terminateNode(TerminateNodeRequest) returns (TerminateNodeReply) {}
 
   // Open a stream on a broker.
   // A stream should be opened before it can be written to or read from.
