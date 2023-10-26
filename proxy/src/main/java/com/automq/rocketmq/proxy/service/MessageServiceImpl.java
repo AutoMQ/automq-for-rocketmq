@@ -93,7 +93,7 @@ public class MessageServiceImpl implements MessageService {
     private final ProxyMetadataService metadataService;
     private final MessageStore store;
     private final LockService lockService;
-    private final SuspendPopRequestService suspendPopRequestService;
+    private final SuspendRequestService suspendRequestService;
 
     public MessageServiceImpl(ProxyConfig config, MessageStore store, ProxyMetadataService metadataService,
         LockService lockService) {
@@ -101,7 +101,7 @@ public class MessageServiceImpl implements MessageService {
         this.store = store;
         this.metadataService = metadataService;
         this.lockService = lockService;
-        this.suspendPopRequestService = SuspendPopRequestService.getInstance();
+        this.suspendRequestService = SuspendRequestService.getInstance();
     }
 
     public TopicMessageType getMessageType(SendMessageRequestHeader requestHeader) {
@@ -145,7 +145,7 @@ public class MessageServiceImpl implements MessageService {
 
         return putFuture.thenApply(putResult -> {
             // Wakeup the suspended pop request if there is any message arrival.
-            suspendPopRequestService.notifyMessageArrival(requestHeader.getTopic(), virtualQueue.physicalQueueId(), message.getTags());
+            suspendRequestService.notifyMessageArrival(requestHeader.getTopic(), virtualQueue.physicalQueueId(), message.getTags());
 
             ProxyMetricsManager.recordIncomingMessages(requestHeader.getTopic(), getMessageType(requestHeader), 1, message.getBody().length);
 
@@ -173,7 +173,11 @@ public class MessageServiceImpl implements MessageService {
     record InnerPopResult(
         long restMessageCount,
         List<FlatMessageExt> messageList
-    ) {
+    ) implements SuspendRequestService.GetMessageResult {
+        @Override
+        public boolean needWriteResponse() {
+            return restMessageCount > 0 || !messageList.isEmpty();
+        }
     }
 
     private CompletableFuture<InnerPopResult> popSpecifiedQueueUnsafe(ConsumerGroup consumerGroup, Topic topic,
@@ -273,16 +277,25 @@ public class MessageServiceImpl implements MessageService {
         }).thenCompose(nil -> popSpecifiedQueue(consumerGroupReference.get(), clientId, topicReference.get(), virtualQueue.physicalQueueId(), filter,
             requestHeader.getMaxMsgNums(), requestHeader.isOrder(), requestHeader.getInvisibleTime(), timeoutMillis));
 
-        return popMessageFuture.thenApply(result -> {
+        return popMessageFuture.thenCompose(result -> {
             if (result.messageList.isEmpty()) {
                 if (result.restMessageCount > 0) {
                     // This means there are messages in the queue but not match the filter. So we should prevent long polling.
-                    return new PopResult(PopStatus.POLLING_NOT_FOUND, Collections.emptyList());
+                    return CompletableFuture.completedFuture(new PopResult(PopStatus.POLLING_NOT_FOUND, Collections.emptyList()));
                 } else {
-                    return new PopResult(PopStatus.NO_NEW_MSG, Collections.emptyList());
+                    return suspendRequestService.suspendRequest(ctx, requestHeader.getTopic(), virtualQueue.physicalQueueId(), filter, timeoutMillis,
+                            // Function to pop message later.
+                            timeout -> popSpecifiedQueue(consumerGroupReference.get(), clientId, topicReference.get(), virtualQueue.physicalQueueId(), filter,
+                                requestHeader.getMaxMsgNums(), requestHeader.isOrder(), requestHeader.getInvisibleTime(), timeout))
+                        .thenApply(suspendResult -> {
+                            if (suspendResult.isEmpty() || suspendResult.get().messageList().isEmpty()) {
+                                return new PopResult(PopStatus.POLLING_NOT_FOUND, Collections.emptyList());
+                            }
+                            return new PopResult(PopStatus.FOUND, FlatMessageUtil.convertTo(suspendResult.get().messageList(), requestHeader.getTopic(), requestHeader.getInvisibleTime()));
+                        });
                 }
             }
-            return new PopResult(PopStatus.FOUND, FlatMessageUtil.convertTo(result.messageList, requestHeader.getTopic(), requestHeader.getInvisibleTime()));
+            return CompletableFuture.completedFuture(new PopResult(PopStatus.FOUND, FlatMessageUtil.convertTo(result.messageList, requestHeader.getTopic(), requestHeader.getInvisibleTime())));
         });
     }
 
@@ -396,6 +409,15 @@ public class MessageServiceImpl implements MessageService {
             });
     }
 
+    record PullResultWrapper(
+        com.automq.rocketmq.store.model.message.PullResult inner
+    ) implements SuspendRequestService.GetMessageResult {
+        @Override
+        public boolean needWriteResponse() {
+            return inner.maxOffset() > inner.nextBeginOffset() || !inner.messageList().isEmpty();
+        }
+    }
+
     @Override
     public CompletableFuture<PullResult> pullMessage(ProxyContext ctx, AddressableMessageQueue messageQueue,
         PullMessageRequestHeader requestHeader, long timeoutMillis) {
@@ -403,35 +425,56 @@ public class MessageServiceImpl implements MessageService {
         CompletableFuture<Topic> topicFuture = metadataService.topicOf(requestHeader.getTopic());
         CompletableFuture<ConsumerGroup> groupFuture = metadataService.consumerGroupOf(requestHeader.getConsumerGroup());
 
+        AtomicReference<Topic> topicReference = new AtomicReference<>();
+        AtomicReference<ConsumerGroup> consumerGroupReference = new AtomicReference<>();
+
+        Filter filter;
+        if (StringUtils.isNotBlank(requestHeader.getExpressionType())) {
+            filter = switch (requestHeader.getExpressionType()) {
+                case ExpressionType.TAG ->
+                    requestHeader.getSubscription().contains(TagFilter.SUB_ALL) ? Filter.DEFAULT_FILTER : new TagFilter(requestHeader.getSubscription());
+                case ExpressionType.SQL92 -> new SQLFilter(requestHeader.getSubscription());
+                default -> Filter.DEFAULT_FILTER;
+            };
+        } else {
+            filter = Filter.DEFAULT_FILTER;
+        }
+
         return topicFuture.thenCombine(groupFuture, Pair::of)
             .thenCompose(pair -> {
                 Topic topic = pair.getLeft();
                 ConsumerGroup group = pair.getRight();
 
-                Filter filter;
-                if (StringUtils.isNotBlank(requestHeader.getExpressionType())) {
-                    filter = switch (requestHeader.getExpressionType()) {
-                        case ExpressionType.TAG ->
-                            requestHeader.getSubscription().contains(TagFilter.SUB_ALL) ? Filter.DEFAULT_FILTER : new TagFilter(requestHeader.getSubscription());
-                        case ExpressionType.SQL92 -> new SQLFilter(requestHeader.getSubscription());
-                        default -> Filter.DEFAULT_FILTER;
-                    };
-                } else {
-                    filter = Filter.DEFAULT_FILTER;
-                }
+                topicReference.set(topic);
+                consumerGroupReference.set(group);
 
                 return store.pull(group.getGroupId(), topic.getTopicId(), virtualQueue.physicalQueueId(), filter, requestHeader.getQueueOffset(), requestHeader.getMaxMsgNums(), false);
             })
-            .thenApply(result -> {
+            .thenCompose(result -> {
                 if (result.messageList().isEmpty()) {
                     if (result.maxOffset() - result.nextBeginOffset() > 0) {
                         // This means there are messages in the queue but not match the filter. So we should prevent long polling.
-                        return new PullResult(PullStatus.NO_MATCHED_MSG, result.nextBeginOffset(), result.minOffset(), result.maxOffset(), Collections.emptyList());
+                        return CompletableFuture.completedFuture(new PullResult(PullStatus.NO_MATCHED_MSG, result.nextBeginOffset(), result.minOffset(), result.maxOffset(), Collections.emptyList()));
                     } else {
-                        return new PullResult(PullStatus.NO_NEW_MSG, result.nextBeginOffset(), result.minOffset(), result.maxOffset(), Collections.emptyList());
+                        return suspendRequestService.suspendRequest(ctx, requestHeader.getTopic(), virtualQueue.physicalQueueId(), filter, timeoutMillis,
+                                // Function to pull message later.
+                                timeout -> store.pull(consumerGroupReference.get().getGroupId(), topicReference.get().getTopicId(), virtualQueue.physicalQueueId(), filter,
+                                        requestHeader.getQueueOffset(), requestHeader.getMaxMsgNums(), false)
+                                    .thenApply(PullResultWrapper::new))
+                            .thenApply(resultWrapper -> {
+                                if (resultWrapper.isEmpty() || resultWrapper.get().inner().messageList().isEmpty()) {
+                                    return new PullResult(PullStatus.NO_MATCHED_MSG, result.nextBeginOffset(), result.minOffset(), result.maxOffset(), Collections.emptyList());
+                                }
+                                com.automq.rocketmq.store.model.message.PullResult suspendResult = resultWrapper.get().inner();
+                                return new PullResult(PullStatus.FOUND, suspendResult.nextBeginOffset(), suspendResult.minOffset(), suspendResult.maxOffset(),
+                                    FlatMessageUtil.convertTo(suspendResult.messageList(), requestHeader.getTopic(), 0));
+                            });
                     }
                 }
-                return new PullResult(PullStatus.FOUND, result.nextBeginOffset(), result.minOffset(), result.maxOffset(), FlatMessageUtil.convertTo(result.messageList(), requestHeader.getTopic(), 0));
+                return CompletableFuture.completedFuture(
+                    new PullResult(PullStatus.FOUND, result.nextBeginOffset(), result.minOffset(), result.maxOffset(),
+                        FlatMessageUtil.convertTo(result.messageList(), requestHeader.getTopic(), 0))
+                );
             });
     }
 
