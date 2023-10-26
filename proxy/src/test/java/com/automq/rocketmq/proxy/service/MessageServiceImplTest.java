@@ -123,7 +123,7 @@ class MessageServiceImplTest {
         AddressableMessageQueue messageQueue = new AddressableMessageQueue(new MessageQueue(topicName, virtualQueue.brokerName(), 0), null);
 
         PopResult result = messageService.popMessage(ProxyContextExt.create(), messageQueue, header, 0L).join();
-        assertEquals(PopStatus.NO_NEW_MSG, result.getPopStatus());
+        assertEquals(PopStatus.POLLING_NOT_FOUND, result.getPopStatus());
 
         header.setExpType(ExpressionType.TAG);
         header.setExp(TagFilter.SUB_ALL);
@@ -140,7 +140,7 @@ class MessageServiceImplTest {
 
         // Pop again.
         result = messageService.popMessage(ProxyContextExt.create(), messageQueue, header, 0L).join();
-        assertEquals(PopStatus.NO_NEW_MSG, result.getPopStatus());
+        assertEquals(PopStatus.POLLING_NOT_FOUND, result.getPopStatus());
         assertEquals(0, result.getMsgFoundList().size());
     }
 
@@ -178,7 +178,7 @@ class MessageServiceImplTest {
         // Pop with client id "client2".
         context.setClientID("client2");
         result = messageService.popMessage(context, messageQueue, header, 0L).join();
-        assertEquals(PopStatus.NO_NEW_MSG, result.getPopStatus());
+        assertEquals(PopStatus.POLLING_NOT_FOUND, result.getPopStatus());
         assertEquals(0, result.getMsgFoundList().size());
 
         AckMessageRequestHeader ackHeader = new AckMessageRequestHeader();
