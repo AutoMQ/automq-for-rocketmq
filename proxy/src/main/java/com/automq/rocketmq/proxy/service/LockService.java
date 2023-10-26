@@ -38,9 +38,13 @@ public class LockService {
     }
 
     public boolean tryLock(long topicId, int queueId, String clientId, boolean fifo) {
+        return tryLock(topicId, queueId, clientId, fifo, config.lockExpireTime());
+    }
+
+    public boolean tryLock(long topicId, int queueId, String clientId, boolean fifo, long expireTime) {
         Lock lock = getLock(topicId, queueId);
         if (fifo) {
-            return lock.tryPreempt(clientId, config.lockExpireTime());
+            return lock.tryPreempt(clientId, expireTime);
         }
         return lock.tryLock(clientId);
     }
