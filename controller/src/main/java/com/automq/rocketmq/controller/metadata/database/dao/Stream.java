@@ -24,19 +24,20 @@ import java.util.Date;
 
 public class Stream {
 
-    private long id;
+    private Long id;
+
     /**
      * Epoch of the current stream. Each registration increase it by one when open stream.
      */
-    private long epoch;
+    private Long epoch;
 
-    private int rangeId;
+    private Integer rangeId;
 
-    private long startOffset;
+    private Long startOffset;
 
-    private long topicId;
+    private Long topicId;
 
-    private int queueId;
+    private Integer queueId;
 
     private StreamRole streamRole;
 
@@ -62,51 +63,51 @@ public class Stream {
         startOffset = 0L;
     }
 
-    public long getId() {
+    public Long getId() {
         return id;
     }
 
-    public void setId(long id) {
+    public void setId(Long id) {
         this.id = id;
     }
 
-    public long getEpoch() {
+    public Long getEpoch() {
         return epoch;
     }
 
-    public void setEpoch(long epoch) {
+    public void setEpoch(Long epoch) {
         this.epoch = epoch;
     }
 
-    public int getRangeId() {
+    public Integer getRangeId() {
         return rangeId;
     }
 
-    public void setRangeId(int rangeId) {
+    public void setRangeId(Integer rangeId) {
         this.rangeId = rangeId;
     }
 
-    public long getStartOffset() {
+    public Long getStartOffset() {
         return startOffset;
     }
 
-    public void setStartOffset(long startOffset) {
+    public void setStartOffset(Long startOffset) {
         this.startOffset = startOffset;
     }
 
-    public long getTopicId() {
+    public Long getTopicId() {
         return topicId;
     }
 
-    public void setTopicId(long topicId) {
+    public void setTopicId(Long topicId) {
         this.topicId = topicId;
     }
 
-    public int getQueueId() {
+    public Integer getQueueId() {
         return queueId;
     }
 
-    public void setQueueId(int queueId) {
+    public void setQueueId(Integer queueId) {
         this.queueId = queueId;
     }
 

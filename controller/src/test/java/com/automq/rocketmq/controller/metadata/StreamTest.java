@@ -40,7 +40,7 @@ public class StreamTest extends DatabaseTestBase {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
             Stream stream = new Stream();
-            stream.setTopicId(1);
+            stream.setTopicId(1L);
             stream.setQueueId(2);
             stream.setStreamRole(StreamRole.STREAM_ROLE_OPS);
             stream.setStartOffset(1234L);
@@ -74,10 +74,12 @@ public class StreamTest extends DatabaseTestBase {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
             Stream stream = new Stream();
-            stream.setId(123);
+            stream.setId(123L);
             stream.setStartOffset(1234L);
             stream.setEpoch(1L);
             stream.setRangeId(2);
+            stream.setTopicId(1L);
+            stream.setQueueId(2);
             stream.setState(StreamState.OPEN);
             stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
 
@@ -101,10 +103,12 @@ public class StreamTest extends DatabaseTestBase {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
             Stream stream = new Stream();
-            stream.setId(123);
+            stream.setId(123L);
             stream.setStartOffset(1234L);
             stream.setEpoch(1L);
             stream.setRangeId(2);
+            stream.setTopicId(1L);
+            stream.setQueueId(2);
             stream.setState(StreamState.OPEN);
             stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
             int affectedRows = streamMapper.create(stream);
@@ -127,10 +131,12 @@ public class StreamTest extends DatabaseTestBase {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
             Stream stream = new Stream();
-            stream.setId(123);
+            stream.setId(123L);
             stream.setStartOffset(1234L);
             stream.setEpoch(1L);
             stream.setRangeId(2);
+            stream.setTopicId(1L);
+            stream.setQueueId(2);
             stream.setState(StreamState.OPEN);
             stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
             int affectedRows = streamMapper.create(stream);

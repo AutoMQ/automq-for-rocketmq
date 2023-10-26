@@ -666,7 +666,7 @@ public class S3MetadataManager {
                         if (newStartOffset <= range.getStartOffset()) {
                             return;
                         }
-                        if (stream.getRangeId() == range.getRangeId()) {
+                        if (stream.getRangeId().equals(range.getRangeId())) {
                             // current range, update start offset
                             // if current range is [50, 100)
                             // 1. try to trim to 40, then current range will be [50, 100)
