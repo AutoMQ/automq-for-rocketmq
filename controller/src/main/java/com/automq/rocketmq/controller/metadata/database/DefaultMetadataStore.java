@@ -51,6 +51,7 @@ import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import com.automq.rocketmq.controller.metadata.database.dao.Range;
 import com.automq.rocketmq.controller.metadata.database.dao.Stream;
+import com.automq.rocketmq.controller.metadata.database.dao.StreamCriteria;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
 import com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.GroupProgressMapper;
@@ -653,6 +654,12 @@ public class DefaultMetadataStore implements MetadataStore {
                         case CLOSING, OPEN, CLOSED -> {
                             RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
                             Range range = rangeMapper.get(stream.getRangeId(), stream.getId(), null);
+                            if (null == range) {
+                                LOGGER.error("Expected range[range-id={}] of stream[topic-id={}, queue-id={}, " +
+                                        "stream-id={}, stream-state={}, role={}] is NOT found", stream.getRangeId(),
+                                    stream.getTopicId(), stream.getQueueId(), stream.getId(), stream.getState(),
+                                    stream.getStreamRole());
+                            }
                             assert null != range;
                             endOffset = range.getEndOffset();
                         }
@@ -685,7 +692,12 @@ public class DefaultMetadataStore implements MetadataStore {
                     assignmentMapper.update(assignment);
 
                     StreamMapper streamMapper = session.getMapper(StreamMapper.class);
-                    streamMapper.updateStreamState(null, topicId, queueId, StreamState.CLOSED);
+                    StreamCriteria criteria = StreamCriteria.newBuilder()
+                        .withTopicId(topicId)
+                        .withQueueId(queueId)
+                        .withState(StreamState.CLOSING)
+                        .build();
+                    streamMapper.updateStreamState(criteria, StreamState.CLOSED);
                     session.commit();
                     LOGGER.info("Update status of queue assignment and stream since all its belonging streams are closed," +
                         " having topic-id={}, queue-id={}", topicId, queueId);

@@ -73,9 +73,10 @@
         UPDATE stream
         SET state = #{state}
         <where>
-            <if test="null != id">id = #{id}</if>
-            <if test="null != topicId">AND topic_id = #{topicId}</if>
-            <if test="null != queueId">AND queue_id = #{queueId}</if>
+            <if test="null != criteria.id">id = #{criteria.id}</if>
+            <if test="null != criteria.topicId">AND topic_id = #{criteria.topicId}</if>
+            <if test="null != criteria.queueId">AND queue_id = #{criteria.queueId}</if>
+            <if test="null != criteria.state">AND state = #{criteria.state}</if>
         </where>
     </update>
 
@@ -83,10 +84,13 @@
         UPDATE stream
         SET src_node_id = #{srcNodeId},
             dst_node_id = #{dstNodeId},
-            state = 3
-        WHERE topic_id = #{topicId}
-         AND queue_id = #{queueId}
-         AND state in (1, 2, 4)
+            state = #{state}
+        <where>
+            <if test="null != criteria.id">id = #{criteria.id}</if>
+            <if test="null != criteria.topicId">AND topic_id = #{criteria.topicId}</if>
+            <if test="null != criteria.queueId">AND queue_id = #{criteria.queueId}</if>
+            <if test="null != criteria.state">AND state = #{criteria.state}</if>
+        </where>
     </update>
 
     <delete id="delete">

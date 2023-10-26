@@ -38,6 +38,7 @@ import com.automq.rocketmq.controller.metadata.database.dao.GroupCriteria;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import com.automq.rocketmq.controller.metadata.database.dao.Stream;
+import com.automq.rocketmq.controller.metadata.database.dao.StreamCriteria;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
 import com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper;
@@ -280,7 +281,10 @@ public class TopicManager {
                                 assignmentMapper.update(assignment);
                             });
                         StreamMapper streamMapper = session.getMapper(StreamMapper.class);
-                        streamMapper.updateStreamState(null, topicId, null, StreamState.DELETED);
+                        StreamCriteria criteria = StreamCriteria.newBuilder()
+                            .withTopicId(topicId)
+                            .build();
+                        streamMapper.updateStreamState(criteria, StreamState.DELETED);
                         session.commit();
                     }
                     notifyOnResourceChange(toNotify);
