@@ -18,9 +18,11 @@
 package com.automq.rocketmq.controller.tasks;
 
 import apache.rocketmq.controller.v1.AssignmentStatus;
+import apache.rocketmq.controller.v1.StreamState;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
+import com.automq.rocketmq.controller.metadata.database.dao.StreamCriteria;
 import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
 import java.util.ArrayList;
@@ -129,11 +131,7 @@ public class SchedulerTask extends ControllerTask {
                     LOGGER.info("Let Node[node-id={}] yield queue[topic-id={}, queue-id={}] to Node[node-id={}]",
                         assignment.getSrcNodeId(), assignment.getTopicId(), assignment.getQueueId(),
                         assignment.getDstNodeId());
-                    int cnt = streamMapper.planMove(assignment.getTopicId(), assignment.getQueueId(), assignment.getSrcNodeId(),
-                        assignment.getDstNodeId());
-                    LOGGER.info("Moved Queue[topic-id={}, queue-id={}], containing {} streams, from Node[node-id={}] to Node[node-id={}]",
-                        assignment.getTopicId(), assignment.getQueueId(), cnt, assignment.getSrcNodeId(), assignment.getDstNodeId());
-                    changed.set(true);
+                    moveStreams(changed, streamMapper, assignment);
                 });
         }
 
@@ -183,11 +181,7 @@ public class SchedulerTask extends ControllerTask {
                     min.add(assignment);
 
                     assignmentMapper.update(assignment);
-                    int cnt = streamMapper.planMove(assignment.getTopicId(), assignment.getQueueId(), assignment.getSrcNodeId(),
-                        assignment.getDstNodeId());
-                    LOGGER.info("Moved Queue[topic-id={}, queue-id={}], containing {} streams, from Node[node-id={}] to Node[node-id={}]",
-                        assignment.getTopicId(), assignment.getQueueId(), cnt, assignment.getSrcNodeId(), assignment.getDstNodeId());
-                    changed.set(true);
+                    moveStreams(changed, streamMapper, assignment);
                     reassign = true;
                     break;
                 }
@@ -200,5 +194,24 @@ public class SchedulerTask extends ControllerTask {
         }
 
         return changed.get();
+    }
+
+    private void moveStreams(AtomicBoolean changed, StreamMapper streamMapper, QueueAssignment assignment) {
+        List<StreamState> movableStates = List.of(StreamState.UNINITIALIZED, StreamState.OPEN, StreamState.CLOSED);
+        for (StreamState state : movableStates) {
+            StreamCriteria criteria = StreamCriteria.newBuilder()
+                .withTopicId(assignment.getTopicId())
+                .withQueueId(assignment.getQueueId())
+                .withState(state)
+                .build();
+            int cnt = streamMapper.planMove(criteria, assignment.getSrcNodeId(), assignment.getDstNodeId(),
+                StreamState.OPEN == state ? StreamState.CLOSING : state);
+            LOGGER.info("Moved {} streams of with topic-id={}, queue-id={}, state={} from Node[node-id={}] to Node[node-id={}]",
+                cnt, assignment.getTopicId(), assignment.getQueueId(), state, assignment.getSrcNodeId(),
+                assignment.getDstNodeId());
+            if (cnt > 0) {
+                changed.set(true);
+            }
+        }
     }
 }

@@ -20,6 +20,7 @@ package com.automq.rocketmq.controller.metadata;
 import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.StreamState;
 import com.automq.rocketmq.controller.metadata.database.dao.Stream;
+import com.automq.rocketmq.controller.metadata.database.dao.StreamCriteria;
 import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
@@ -144,7 +145,12 @@ public class StreamTest extends DatabaseTestBase {
 
             Stream stream1 = streamMapper.getByStreamId(stream.getId());
             Assertions.assertEquals(StreamState.OPEN, stream1.getState());
-            affectedRows = streamMapper.updateStreamState(stream1.getId(), null, null, StreamState.CLOSED);
+
+            StreamCriteria criteria = StreamCriteria.newBuilder()
+                .withStreamId(stream1.getId())
+                .withState(StreamState.OPEN)
+                .build();
+            affectedRows = streamMapper.updateStreamState(criteria, StreamState.CLOSED);
             Assertions.assertEquals(1, affectedRows);
 
             stream1 = streamMapper.getByStreamId(stream.getId());

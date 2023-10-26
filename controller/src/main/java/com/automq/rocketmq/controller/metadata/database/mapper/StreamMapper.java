@@ -20,6 +20,7 @@ package com.automq.rocketmq.controller.metadata.database.mapper;
 
 import apache.rocketmq.controller.v1.StreamState;
 import com.automq.rocketmq.controller.metadata.database.dao.Stream;
+import com.automq.rocketmq.controller.metadata.database.dao.StreamCriteria;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
@@ -34,8 +35,7 @@ public interface StreamMapper {
 
     int updateLastRange(@Param("id") long id, @Param("lastRangeId") int lastRangeId);
 
-    int updateStreamState(@Param("id") Long id, @Param("topicId") Long topicId, @Param("queueId") Integer queueId,
-        @Param("state") StreamState state);
+    int updateStreamState(@Param("criteria") StreamCriteria criteria, @Param("state") StreamState state);
 
     int delete(@Param("id") Long id);
 
@@ -49,10 +49,10 @@ public interface StreamMapper {
         @Param("queueId") long queueId);
 
 
-    int planMove(@Param("topicId") long topicId,
-        @Param("queueId") int queueId,
+    int planMove(@Param("criteria") StreamCriteria criteria,
         @Param("srcNodeId") int src,
-        @Param("dstNodeId") int dst);
+        @Param("dstNodeId") int dst,
+        @Param("state") StreamState state);
 
     List<Stream> listByStreamIds(@Param("streamIds") List<Long> streamIds);
 }

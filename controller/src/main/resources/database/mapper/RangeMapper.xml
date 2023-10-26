@@ -67,10 +67,8 @@
         SELECT id, range_id, stream_id, epoch, start_offset, end_offset, node_id
         FROM `range`
         <where>
-            <if test="null != streamId and null != rangeId">
-                stream_id = #{streamId}
-                AND range_id = #{rangeId}
-            </if>
+            <if test="null != streamId">stream_id = #{streamId}</if>
+            <if test="null != rangeId">AND range_id = #{rangeId}</if>
             <if test="null != nodeId">AND node_id = #{nodeId}</if>
         </where>
     </select>
