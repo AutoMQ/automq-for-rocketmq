@@ -314,8 +314,8 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             topics.stream().filter(topic -> topic.getName().equals("t1")).forEach(topic -> Assertions.assertEquals(4, topic.getQueueNum()));
 
             String json = JsonFormat.printer().print(AcceptTypes.newBuilder()
-                    .addTypes(MessageType.NORMAL)
-                    .addTypes(MessageType.TRANSACTION)
+                .addTypes(MessageType.NORMAL)
+                .addTypes(MessageType.TRANSACTION)
                 .build());
             topics.stream().filter(topic -> topic.getName().equals("t1")).forEach(topic -> Assertions.assertEquals(json, topic.getAcceptMessageTypes()));
 
@@ -493,7 +493,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         long streamId;
         try (SqlSession session = getSessionFactory().openSession()) {
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
-            List<com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject> s3StreamObjects = buildS3StreamObjs(1,1, startOffset, interval);
+            List<com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject> s3StreamObjects = buildS3StreamObjs(1, 1, startOffset, interval);
             s3StreamObjects.forEach(s3StreamObjectMapper::create);
             streamId = s3StreamObjects.get(0).getStreamId();
             endOffset = s3StreamObjects.get(0).getEndOffset();
@@ -531,10 +531,9 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             rangeMapper.create(range);
 
             S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
-            buildS3WalObjs(1, 1).stream().map(s3WalObject -> {
+            buildS3WalObjs(1, 1).stream().peek(s3WalObject -> {
                 Map<Long, SubStream> subStreams = buildWalSubStreams(4, 0, 10);
                 s3WalObject.setSubStreams(gson.toJson(subStreams));
-                return s3WalObject;
             }).forEach(s3WALObjectMapper::create);
 
             session.commit();
@@ -570,10 +569,9 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         try (SqlSession session = getSessionFactory().openSession()) {
             S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
 
-            buildS3WalObjs(1, 1).stream().map(s3WalObject1 -> {
+            buildS3WalObjs(1, 1).stream().peek(s3WalObject1 -> {
                 Map<Long, SubStream> subStreams = buildWalSubStreams(4, 0, 10);
                 s3WalObject1.setSubStreams(gson.toJson(subStreams));
-                return s3WalObject1;
             }).forEach(s3WALObjectMapper::create);
 
             session.commit();
@@ -614,17 +612,15 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         try (SqlSession session = getSessionFactory().openSession()) {
             S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
 
-            buildS3WalObjs(1, 1).stream().map(s3WalObject1 -> {
+            buildS3WalObjs(1, 1).stream().peek(s3WalObject1 -> {
                 Map<Long, SubStream> subStreams = buildWalSubStreams(4, 10, 10);
                 s3WalObject1.setSubStreams(gson.toJson(subStreams));
-                return s3WalObject1;
             }).forEach(s3WALObjectMapper::create);
 
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
-            buildS3StreamObjs(5,1, 0, 10).forEach(s3StreamObjectMapper::create);
+            buildS3StreamObjs(5, 1, 0, 10).forEach(s3StreamObjectMapper::create);
             session.commit();
         }
-
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertNull(metadataStore.getLease());
@@ -660,14 +656,13 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
         try (SqlSession session = getSessionFactory().openSession()) {
             S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
-            buildS3WalObjs(1, 1).stream().map(s3WalObject1 -> {
+            buildS3WalObjs(1, 1).stream().peek(s3WalObject1 -> {
                 Map<Long, SubStream> subStreams = buildWalSubStreams(4, 10, 10);
                 s3WalObject1.setSubStreams(gson.toJson(subStreams));
-                return s3WalObject1;
             }).forEach(s3WALObjectMapper::create);
 
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
-            buildS3StreamObjs(5,1, 0, 10).forEach(s3StreamObjectMapper::create);
+            buildS3StreamObjs(5, 1, 0, 10).forEach(s3StreamObjectMapper::create);
             session.commit();
         }
 
@@ -708,14 +703,13 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
         try (SqlSession session = getSessionFactory().openSession()) {
             S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
-            buildS3WalObjs(1, 1).stream().map(s3WalObject1 -> {
+            buildS3WalObjs(1, 1).stream().peek(s3WalObject1 -> {
                 Map<Long, SubStream> subStreams = buildWalSubStreams(4, 10, 10);
                 s3WalObject1.setSubStreams(gson.toJson(subStreams));
-                return s3WalObject1;
             }).forEach(s3WALObjectMapper::create);
 
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
-            buildS3StreamObjs(5,1, 0, 10).forEach(s3StreamObjectMapper::create);
+            buildS3StreamObjs(5, 1, 0, 10).forEach(s3StreamObjectMapper::create);
 
             session.commit();
         }
@@ -766,21 +760,19 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
         try (SqlSession session = getSessionFactory().openSession()) {
             S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
-            buildS3WalObjs(1, 1).stream().map(s3WalObject -> {
+            buildS3WalObjs(1, 1).stream().peek(s3WalObject -> {
                 Map<Long, SubStream> subStreams = buildWalSubStreams(1, 0, 10);
                 s3WalObject.setSubStreams(gson.toJson(subStreams));
-                return s3WalObject;
             }).forEach(s3WALObjectMapper::create);
 
-            buildS3WalObjs(2, 1).stream().map(s3WalObject -> {
+            buildS3WalObjs(2, 1).stream().peek(s3WalObject -> {
                 Map<Long, SubStream> subStreams = buildWalSubStreams(1, 20, 20);
                 s3WalObject.setSubStreams(gson.toJson(subStreams));
-                return s3WalObject;
             }).forEach(s3WALObjectMapper::create);
 
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
-            buildS3StreamObjs(5,1, 10, 10).forEach(s3StreamObjectMapper::create);
-            buildS3StreamObjs(6,1, 40, 10).forEach(s3StreamObjectMapper::create);
+            buildS3StreamObjs(5, 1, 10, 10).forEach(s3StreamObjectMapper::create);
+            buildS3StreamObjs(6, 1, 40, 10).forEach(s3StreamObjectMapper::create);
 
             session.commit();
         }
@@ -837,7 +829,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         }
     }
 
-
     @Test
     public void testOpenStream_WithCloseStream_AtStart() throws IOException, ExecutionException,
         InterruptedException {
@@ -848,6 +839,8 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             stream.setRangeId(-1);
             stream.setSrcNodeId(1);
             stream.setDstNodeId(1);
+            stream.setTopicId(1L);
+            stream.setQueueId(2);
             stream.setState(StreamState.UNINITIALIZED);
             stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
             streamMapper.create(stream);
@@ -916,7 +909,9 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             stream.setEpoch(streamEpoch);
             stream.setSrcNodeId(1);
             stream.setDstNodeId(1);
-            stream.setStartOffset(1234);
+            stream.setTopicId(1L);
+            stream.setQueueId(2);
+            stream.setStartOffset(1234L);
             streamMapper.create(stream);
             streamId = stream.getId();
 
@@ -988,7 +983,9 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             stream.setEpoch(streamEpoch);
             stream.setSrcNodeId(1);
             stream.setDstNodeId(1);
-            stream.setStartOffset(1234);
+            stream.setStartOffset(1234L);
+            stream.setTopicId(1L);
+            stream.setQueueId(2);
             streamMapper.create(stream);
             streamId = stream.getId();
 
@@ -1080,7 +1077,9 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             stream.setEpoch(streamEpoch);
             stream.setSrcNodeId(nodeId);
             stream.setDstNodeId(nodeId);
-            stream.setStartOffset(1234);
+            stream.setStartOffset(1234L);
+            stream.setTopicId(1L);
+            stream.setQueueId(2);
             streamMapper.create(stream);
             streamId = stream.getId();
 
@@ -1171,7 +1170,9 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             stream.setEpoch(streamEpoch);
             stream.setSrcNodeId(1);
             stream.setDstNodeId(1);
-            stream.setStartOffset(1234);
+            stream.setStartOffset(1234L);
+            stream.setTopicId(1L);
+            stream.setQueueId(2);
             streamMapper.create(stream);
             streamId = stream.getId();
 
@@ -1264,18 +1265,18 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             stream.setRangeId(0);
             stream.setState(StreamState.UNINITIALIZED);
             stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
-            stream.setStartOffset(1234);
+            stream.setStartOffset(1234L);
             streamMapper.create(stream);
             dataStreamId = stream.getId();
 
             stream.setStreamRole(StreamRole.STREAM_ROLE_OPS);
-            stream.setStartOffset(1234);
+            stream.setStartOffset(1234L);
             streamMapper.create(stream);
             opsStreamId = stream.getId();
 
             stream.setStreamRole(StreamRole.STREAM_ROLE_RETRY);
             stream.setGroupId(3L);
-            stream.setStartOffset(1234);
+            stream.setStartOffset(1234L);
             streamMapper.create(stream);
             retryStreamId = stream.getId();
             session.commit();
@@ -1324,13 +1325,13 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
 
             Stream stream = new Stream();
-            stream.setEpoch(1);
+            stream.setEpoch(1L);
             stream.setTopicId(2L);
             stream.setQueueId(3);
             stream.setDstNodeId(4);
             stream.setSrcNodeId(5);
             stream.setState(StreamState.OPEN);
-            stream.setStartOffset(6);
+            stream.setStartOffset(6L);
             stream.setRangeId(7);
             stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
             streamMapper.create(stream);
@@ -1357,9 +1358,11 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             com.automq.rocketmq.controller.metadata.database.dao.Stream stream = new com.automq.rocketmq.controller.metadata.database.dao.Stream();
             stream.setSrcNodeId(nodeId);
             stream.setDstNodeId(nodeId);
-            stream.setStartOffset(1234);
-            stream.setEpoch(0);
+            stream.setStartOffset(1234L);
+            stream.setEpoch(0L);
             stream.setRangeId(rangId);
+            stream.setTopicId(1L);
+            stream.setQueueId(2);
             stream.setState(StreamState.OPEN);
             stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
             streamMapper.create(stream);
@@ -1414,9 +1417,11 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             com.automq.rocketmq.controller.metadata.database.dao.Stream stream = new com.automq.rocketmq.controller.metadata.database.dao.Stream();
             stream.setSrcNodeId(nodeId);
             stream.setDstNodeId(nodeId);
-            stream.setStartOffset(1234);
-            stream.setEpoch(0);
+            stream.setStartOffset(1234L);
+            stream.setEpoch(0L);
             stream.setRangeId(rangId);
+            stream.setTopicId(1L);
+            stream.setQueueId(2);
             stream.setState(StreamState.OPEN);
             stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
             streamMapper.create(stream);
@@ -1469,9 +1474,11 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             com.automq.rocketmq.controller.metadata.database.dao.Stream stream = new com.automq.rocketmq.controller.metadata.database.dao.Stream();
             stream.setSrcNodeId(nodeId);
             stream.setDstNodeId(nodeId);
-            stream.setStartOffset(1234);
-            stream.setEpoch(0);
+            stream.setStartOffset(1234L);
+            stream.setEpoch(0L);
             stream.setRangeId(rangId);
+            stream.setTopicId(1L);
+            stream.setQueueId(2);
             stream.setState(StreamState.CLOSED);
             stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
             streamMapper.create(stream);
@@ -1557,8 +1564,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             buildS3StreamObjs(objectId, 2, 3, 100L).forEach(s3StreamObjectMapper::create);
             session.commit();
         }
-
-        long time = System.currentTimeMillis();
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertNull(metadataStore.getLease());
@@ -1719,20 +1724,17 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             .setBrokerId(nodeId)
             .build();
 
-
         try (SqlSession session = this.getSessionFactory().openSession()) {
             S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
 
-            buildS3WalObjs(objectId + 2, 1).stream().map(s3WalObject -> {
+            buildS3WalObjs(objectId + 2, 1).stream().peek(s3WalObject -> {
                 Map<Long, SubStream> subStreams = buildWalSubStreams(1, 20L, 10L);
                 s3WalObject.setSubStreams(gson.toJson(subStreams));
-                return s3WalObject;
             }).forEach(s3WALObjectMapper::create);
 
-            buildS3WalObjs(objectId + 3, 1).stream().map(s3WalObject -> {
+            buildS3WalObjs(objectId + 3, 1).stream().peek(s3WalObject -> {
                 Map<Long, SubStream> subStreams = buildWalSubStreams(1, 30L, 10L);
                 s3WalObject.setSubStreams(gson.toJson(subStreams));
-                return s3WalObject;
             }).forEach(s3WALObjectMapper::create);
 
             session.commit();
@@ -1751,7 +1753,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
                 .setStartOffset(s3StreamObject2.getStartOffset())
                 .setEndOffset(s3StreamObject2.getEndOffset())
                 .build()).toList();
-
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             Assertions.assertNull(metadataStore.getLease());
@@ -1795,7 +1796,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
     @Test
     public void testCommitWalObject_ObjectNotPrepare() throws IOException, ExecutionException, InterruptedException {
-        long streamId = 1, startOffset = 0, endOffset = 10;
+        long streamId, startOffset = 0, endOffset = 10;
         Integer nodeId = 1;
 
         S3WALObject walObject = S3WALObject.newBuilder()
@@ -1810,9 +1811,11 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Stream stream = new Stream();
             stream.setState(StreamState.OPEN);
             stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
-            stream.setTopicId(2);
+            stream.setTopicId(2L);
             stream.setRangeId(1);
-            stream.setEpoch(3);
+            stream.setEpoch(3L);
+            stream.setTopicId(1L);
+            stream.setQueueId(2);
             streamMapper.create(stream);
             streamId = stream.getId();
             Range range = new Range();
@@ -1861,9 +1864,11 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Stream stream = new Stream();
             stream.setState(StreamState.OPEN);
             stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
-            stream.setTopicId(2);
+            stream.setTopicId(2L);
             stream.setRangeId(1);
-            stream.setEpoch(3);
+            stream.setEpoch(3L);
+            stream.setTopicId(1L);
+            stream.setQueueId(2);
             streamMapper.create(stream);
             streamId = stream.getId();
             Range range = new Range();
@@ -1892,8 +1897,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         }
 
         List<Long> compactedObjects = new ArrayList<>();
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config);
-             SqlSession session = getSessionFactory().openSession()) {
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await().with()
                 .pollInterval(100, TimeUnit.MILLISECONDS)
@@ -1965,8 +1969,10 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
                 stream.setSrcNodeId(nodeId);
                 stream.setDstNodeId(nodeId);
                 stream.setStartOffset(startOffset);
-                stream.setEpoch(i);
+                stream.setEpoch((long) i);
                 stream.setRangeId(i + 1);
+                stream.setTopicId(1L);
+                stream.setQueueId(2);
                 stream.setState(StreamState.OPEN);
                 stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
                 streamMapper.create(stream);
@@ -2007,7 +2013,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         }
 
     }
-
 
     @Test
     public void testGetStreams_IsEmpty() throws IOException, ExecutionException, InterruptedException {

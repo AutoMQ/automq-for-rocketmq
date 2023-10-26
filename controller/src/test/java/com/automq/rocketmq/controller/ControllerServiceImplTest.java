@@ -631,7 +631,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             stream.setTopicId(topicId);
             stream.setQueueId(queueId);
             stream.setState(StreamState.CLOSED);
-            stream.setEpoch(1);
+            stream.setEpoch(1L);
             stream.setRangeId(0);
             stream.setSrcNodeId(srcNodeId);
             stream.setDstNodeId(dstNodeId);
@@ -691,7 +691,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             stream.setTopicId(topicId);
             stream.setQueueId(queueId);
             stream.setState(StreamState.CLOSED);
-            stream.setEpoch(1);
+            stream.setEpoch(1L);
             stream.setRangeId(0);
             stream.setSrcNodeId(srcNodeId);
             stream.setDstNodeId(dstNodeId);
@@ -750,9 +750,9 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
             stream.setTopicId(topicId);
             stream.setQueueId(queueId);
-            stream.setEpoch(1);
+            stream.setEpoch(1L);
             stream.setState(StreamState.OPEN);
-            stream.setStartOffset(0);
+            stream.setStartOffset(0L);
             stream.setSrcNodeId(srcNodeId);
             stream.setDstNodeId(dstNodeId);
             streamMapper.create(stream);
@@ -817,9 +817,9 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
             stream.setTopicId(topicId);
             stream.setQueueId(queueId);
-            stream.setEpoch(1);
+            stream.setEpoch(1L);
             stream.setState(StreamState.OPEN);
-            stream.setStartOffset(0);
+            stream.setStartOffset(0L);
             stream.setSrcNodeId(srcNodeId);
             stream.setDstNodeId(dstNodeId);
             streamMapper.create(stream);
@@ -879,9 +879,9 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
             stream.setTopicId(topicId);
             stream.setQueueId(queueId);
-            stream.setEpoch(1);
+            stream.setEpoch(1L);
             stream.setState(StreamState.OPEN);
-            stream.setStartOffset(0);
+            stream.setStartOffset(0L);
             stream.setRangeId(0);
             stream.setSrcNodeId(srcNodeId);
             stream.setDstNodeId(dstNodeId);
@@ -955,9 +955,9 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
             stream.setTopicId(topicId);
             stream.setQueueId(queueId);
-            stream.setEpoch(1);
+            stream.setEpoch(1L);
             stream.setState(StreamState.OPEN);
-            stream.setStartOffset(0);
+            stream.setStartOffset(0L);
             stream.setSrcNodeId(srcNodeId);
             stream.setDstNodeId(dstNodeId);
             streamMapper.create(stream);
@@ -1055,9 +1055,9 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
             stream.setTopicId(topicId);
             stream.setQueueId(queueId);
-            stream.setEpoch(1);
+            stream.setEpoch(1L);
             stream.setState(StreamState.OPEN);
-            stream.setStartOffset(0);
+            stream.setStartOffset(0L);
             stream.setSrcNodeId(srcNodeId);
             stream.setDstNodeId(dstNodeId);
             streamMapper.create(stream);
@@ -1153,9 +1153,9 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
             stream.setTopicId(topicId);
             stream.setQueueId(queueId);
-            stream.setEpoch(1);
+            stream.setEpoch(1L);
             stream.setState(StreamState.OPEN);
-            stream.setStartOffset(0);
+            stream.setStartOffset(0L);
             stream.setSrcNodeId(srcNodeId);
             stream.setDstNodeId(dstNodeId);
             streamMapper.create(stream);
@@ -1243,13 +1243,13 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
 
             Stream stream = new Stream();
-            stream.setEpoch(1);
+            stream.setEpoch(1L);
             stream.setTopicId(2L);
             stream.setQueueId(3);
             stream.setDstNodeId(4);
             stream.setSrcNodeId(5);
             stream.setState(StreamState.OPEN);
-            stream.setStartOffset(6);
+            stream.setStartOffset(6L);
             stream.setRangeId(7);
             stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
             streamMapper.create(stream);
