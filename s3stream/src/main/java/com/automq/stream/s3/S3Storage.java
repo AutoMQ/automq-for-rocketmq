@@ -86,6 +86,7 @@ public class S3Storage implements Storage {
 
     private final Queue<BackoffRecord> backoffRecords = new LinkedBlockingQueue<>();
     private final ScheduledFuture<?> drainBackoffTask;
+    private long lastLogTimestamp = 0L;
 
     private final StreamManager streamManager;
     private final ObjectManager objectManager;
@@ -225,7 +226,10 @@ public class S3Storage implements Storage {
         if (!tryAcquirePermit()) {
             backoffRecords.offer(new BackoffRecord(streamRecord, cf));
             OperationMetricsStats.getOrCreateOperationMetrics(S3Operation.APPEND_STORAGE_LOG_CACHE_FULL).operationCount.inc();
-            LOGGER.warn("[BACKOFF] log cache size {} is larger than {}", logCache.size(), maxWALCacheSize);
+            if (System.currentTimeMillis() - lastLogTimestamp > 1000L) {
+                LOGGER.warn("[BACKOFF] log cache size {} is larger than {}", logCache.size(), maxWALCacheSize);
+                lastLogTimestamp = System.currentTimeMillis();
+            }
             return;
         }
         WriteAheadLog.AppendResult appendResult;
@@ -237,7 +241,10 @@ public class S3Storage implements Storage {
             // the WAL write data align with block, 'WAL is full but LogCacheBlock is not full' may happen.
             forceUpload(LogCache.MATCH_ALL_STREAMS);
             backoffRecords.offer(new BackoffRecord(streamRecord, cf));
-            LOGGER.warn("[BACKOFF] log over capacity", e);
+            if (System.currentTimeMillis() - lastLogTimestamp > 1000L) {
+                LOGGER.warn("[BACKOFF] log over capacity", e);
+                lastLogTimestamp = System.currentTimeMillis();
+            }
             return;
         }
         WalWriteRequest writeRequest = new WalWriteRequest(streamRecord, appendResult.recordOffset(), cf);
