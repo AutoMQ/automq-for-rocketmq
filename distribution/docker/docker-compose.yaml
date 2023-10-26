@@ -9,6 +9,7 @@ services:
       - ROCKETMQ_NODE_ADVERTISE_ADDRESS=192.168.123.147:8081
     ports:
       - "8081:8081"
+      - "8082:8082"
     # https://docs.docker.com/compose/compose-file/05-services/#depends_on
     depends_on:
       mysql-server:
@@ -22,6 +23,7 @@ services:
       - ROCKETMQ_NODE_ADVERTISE_ADDRESS=192.168.123.147:8181
     ports:
       - "8181:8181"
+      - "8182:8182"
     # https://docs.docker.com/compose/compose-file/05-services/#depends_on
     depends_on:
       mysql-server:
