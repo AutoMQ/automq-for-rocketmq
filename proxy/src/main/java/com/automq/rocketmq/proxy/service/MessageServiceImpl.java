@@ -281,7 +281,7 @@ public class MessageServiceImpl implements MessageService {
             if (result.messageList.isEmpty()) {
                 if (result.restMessageCount > 0) {
                     // This means there are messages in the queue but not match the filter. So we should prevent long polling.
-                    return CompletableFuture.completedFuture(new PopResult(PopStatus.POLLING_NOT_FOUND, Collections.emptyList()));
+                    return CompletableFuture.completedFuture(new PopResult(PopStatus.NO_NEW_MSG, Collections.emptyList()));
                 } else {
                     return suspendRequestService.suspendRequest(ctx, requestHeader.getTopic(), virtualQueue.physicalQueueId(), filter, timeoutMillis,
                             // Function to pop message later.
