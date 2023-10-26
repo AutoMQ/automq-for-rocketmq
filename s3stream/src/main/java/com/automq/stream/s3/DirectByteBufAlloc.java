@@ -20,17 +20,55 @@ package com.automq.stream.s3;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.PooledByteBufAllocator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class DirectByteBufAlloc {
-
+    private static final Logger LOGGER = LoggerFactory.getLogger(DirectByteBufAlloc.class);
     private static final PooledByteBufAllocator ALLOC = PooledByteBufAllocator.DEFAULT;
+    private static final List<OOMHandler> OOMHandlers = new ArrayList<>();
 
     public static CompositeByteBuf compositeByteBuffer() {
         return ALLOC.compositeDirectBuffer(Integer.MAX_VALUE);
     }
 
     public static ByteBuf byteBuffer(int initCapacity) {
-        return ALLOC.directBuffer(initCapacity);
+        try {
+            return ALLOC.directBuffer(initCapacity);
+        } catch (OutOfMemoryError e) {
+            for (;;) {
+                int freedBytes = 0;
+                for (OOMHandler handler : OOMHandlers) {
+                    freedBytes += handler.handle(initCapacity);
+                    try {
+                        ByteBuf buf = ALLOC.directBuffer(initCapacity);
+                        LOGGER.warn("OOM recovered, freed {} bytes", freedBytes);
+                        return buf;
+                    } catch (OutOfMemoryError e2) {
+                        // ignore
+                    }
+                }
+                if (freedBytes == 0) {
+                    break;
+                }
+            }
+            throw e;
+        }
     }
 
+    public static void registerOOMHandlers(OOMHandler handler) {
+        OOMHandlers.add(handler);
+    }
+
+    public interface OOMHandler {
+        /**
+         * Try handle OOM exception.
+         * @param memoryRequired the memory required
+         * @return freed memory.
+         */
+        int handle(int memoryRequired);
+    }
 }
