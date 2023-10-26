@@ -57,22 +57,22 @@ class CommonRemotingBehaviorTest {
     void checkVersion() {
         RemotingCommand request = RemotingCommand.createRequestCommand(RequestCode.SEND_MESSAGE_V2, null);
         request.addExtField("PLACE_HOLDER_KEY", "PLACE_HOLDER_VALUE");
-        assertTrue(commonRemotingBehavior.checkVersion(request).isPresent());
-        assertEquals(commonRemotingBehavior.checkVersion(request).get().getCode(), ResponseCode.VERSION_NOT_SUPPORTED);
+        assertTrue(commonRemotingBehavior.checkRequiredField(request).isPresent());
+        assertEquals(commonRemotingBehavior.checkRequiredField(request).get().getCode(), ResponseCode.VERSION_NOT_SUPPORTED);
 
         request.addExtField(BROKER_NAME_FIELD, "bname");
-        assertTrue(commonRemotingBehavior.checkVersion(request).isPresent());
-        assertEquals(commonRemotingBehavior.checkVersion(request).get().getCode(), ResponseCode.VERSION_NOT_SUPPORTED);
+        assertTrue(commonRemotingBehavior.checkRequiredField(request).isPresent());
+        assertEquals(commonRemotingBehavior.checkRequiredField(request).get().getCode(), ResponseCode.VERSION_NOT_SUPPORTED);
 
         request.addExtField(BROKER_NAME_FIELD_FOR_SEND_MESSAGE_V2, "bname");
-        assertTrue(commonRemotingBehavior.checkVersion(request).isEmpty());
+        assertTrue(commonRemotingBehavior.checkRequiredField(request).isEmpty());
 
         request = RemotingCommand.createRequestCommand(RequestCode.PULL_MESSAGE, null);
         request.addExtField(BROKER_NAME_FIELD_FOR_SEND_MESSAGE_V2, "bname");
-        assertTrue(commonRemotingBehavior.checkVersion(request).isPresent());
-        assertEquals(commonRemotingBehavior.checkVersion(request).get().getCode(), ResponseCode.VERSION_NOT_SUPPORTED);
+        assertTrue(commonRemotingBehavior.checkRequiredField(request).isPresent());
+        assertEquals(commonRemotingBehavior.checkRequiredField(request).get().getCode(), ResponseCode.VERSION_NOT_SUPPORTED);
 
         request.addExtField(BROKER_NAME_FIELD, "bname");
-        assertTrue(commonRemotingBehavior.checkVersion(request).isEmpty());
+        assertTrue(commonRemotingBehavior.checkRequiredField(request).isEmpty());
     }
 }

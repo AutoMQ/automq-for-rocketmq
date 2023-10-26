@@ -54,7 +54,7 @@ public class ExtendSendMessageActivity extends SendMessageActivity implements Co
     @Override
     protected RemotingCommand processRequest0(ChannelHandlerContext ctx, RemotingCommand request,
         ProxyContext context) throws Exception {
-        Optional<RemotingCommand> response = checkVersion(request);
+        Optional<RemotingCommand> response = checkRequiredField(request);
         if (response.isPresent()) {
             return response.get();
         }
@@ -114,7 +114,6 @@ public class ExtendSendMessageActivity extends SendMessageActivity implements Co
         }
         message.getProperties().put(MessageConst.PROPERTY_BORN_HOST, bornHost);
 
-        // TODO: Do we need handle more properties here?
         messagingProcessor.sendMessage(context,
                 new SendMessageQueueSelector(dstBrokerName, requestHeader),
                 // For v4 remoting protocol, we honor the producer group in the request header.

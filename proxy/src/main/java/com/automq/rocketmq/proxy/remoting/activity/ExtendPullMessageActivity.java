@@ -66,7 +66,7 @@ public class ExtendPullMessageActivity extends PullMessageActivity implements Co
     @Override
     protected RemotingCommand processRequest0(ChannelHandlerContext ctx, RemotingCommand request,
         ProxyContext context) throws Exception {
-        Optional<RemotingCommand> response = checkVersion(request);
+        Optional<RemotingCommand> response = checkRequiredField(request);
         if (response.isPresent()) {
             return response.get();
         }
@@ -110,7 +110,7 @@ public class ExtendPullMessageActivity extends PullMessageActivity implements Co
             PullMessageResponseHeader.class);
         final PullMessageResponseHeader responseHeader = (PullMessageResponseHeader) response.readCustomHeader();
 
-        // Check the topic existence.
+        // Check the topic type.
         TopicMessageType type = messagingProcessor.getMetadataService().getTopicMessageType(context, requestHeader.getTopic());
         if (type == TopicMessageType.UNSPECIFIED) {
             response.setCode(ResponseCode.TOPIC_NOT_EXIST);

@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.proxy.remoting;
 
+import org.apache.rocketmq.common.MQVersion;
 import org.apache.rocketmq.remoting.CommandCustomHeader;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 import org.apache.rocketmq.remoting.protocol.RemotingSysResponseCode;
@@ -37,8 +38,8 @@ public class RemotingUtil {
     /**
      * Generates a version not supported response command.
      */
-    public static RemotingCommand versionNotSupportedResponse(RemotingCommand request) {
-        String error = "client version " + request.getVersion() + " not supported";
+    public static RemotingCommand clientNotSupportedResponse(RemotingCommand request) {
+        String error = request.getLanguage().name() + " client version " + MQVersion.getVersionDesc(request.getVersion()) + " not supported, please use JAVA client v4.9.5 or later.";
         return RemotingCommand.createResponseCommand(ResponseCode.VERSION_NOT_SUPPORTED, error);
     }
 
