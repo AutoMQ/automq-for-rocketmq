@@ -37,6 +37,7 @@ import com.automq.rocketmq.store.model.message.TagFilter;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -428,15 +429,29 @@ public class MessageServiceImpl implements MessageService {
     @Override
     public CompletableFuture<Set<MessageQueue>> lockBatchMQ(ProxyContext ctx, AddressableMessageQueue messageQueue,
         LockBatchRequestBody requestBody, long timeoutMillis) {
-        // TODO: Support in the next iteration
-        throw new UnsupportedOperationException();
+        HashSet<MessageQueue> successSet = new HashSet<>();
+
+        for (MessageQueue queue : requestBody.getMqSet()) {
+            VirtualQueue virtualQueue = new VirtualQueue(queue.getBrokerName());
+            // Expire time is 60 seconds which is a magic number from apache rocketmq.
+            boolean result = lockService.tryLock(virtualQueue.topicId(), virtualQueue.physicalQueueId(), requestBody.getClientId(), true, 60_000);
+            if (result) {
+                successSet.add(queue);
+            }
+        }
+
+        return CompletableFuture.completedFuture(successSet);
     }
 
     @Override
     public CompletableFuture<Void> unlockBatchMQ(ProxyContext ctx, AddressableMessageQueue messageQueue,
         UnlockBatchRequestBody requestBody, long timeoutMillis) {
-        // TODO: Support in the next iteration
-        throw new UnsupportedOperationException();
+        for (MessageQueue queue : requestBody.getMqSet()) {
+            VirtualQueue virtualQueue = new VirtualQueue(queue.getBrokerName());
+            lockService.tryExpire(virtualQueue.topicId(), virtualQueue.physicalQueueId(), 0);
+        }
+
+        return CompletableFuture.completedFuture(null);
     }
 
     @Override
