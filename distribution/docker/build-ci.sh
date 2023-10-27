@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
@@ -13,25 +15,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-enableStartupScripts: true
 
-service:
-  type: ClusterIP
+ROCKETMQ_VERSION=$1
+ROCKETMQ_REPO=$2
 
-startupScriptContent: |
-    #!/bin/bash
-    set -e
-    export TERM=ansi
-    export AWS_ACCESS_KEY_ID=foot
-    export AWS_SECRET_ACCESS_KEY=bar
-    export AWS_DEFAULT_REGION=eu-west-2
-    export AWS_DEFAULT_BUCKETS=ros
-    export AWS_S3_ENDPOINT=http://localhost:4566
-    export PAGER=
+cp -r ../../rocketmq ./
 
-    echo "S3 Configuration started"
 
-    aws --endpoint-url=$AWS_S3_ENDPOINT s3 mb s3://$AWS_DEFAULT_BUCKETS
-    aws --endpoint-url=$AWS_S3_ENDPOINT s3 cp /tmp/localstack/test-data/ s3://$AWS_DEFAULT_BUCKETS/chart --recursive
-
-    echo "S3 Configured"
+docker build --no-cache -f Dockerfile -t ${ROCKETMQ_REPO}:${ROCKETMQ_VERSION} --build-arg version=${ROCKETMQ_VERSION} . --progress=plain
