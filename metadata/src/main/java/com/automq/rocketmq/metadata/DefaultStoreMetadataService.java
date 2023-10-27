@@ -70,14 +70,8 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
     }
 
     @Override
-    public CompletableFuture<Void> trimStream(long streamId, long streamEpoch,
-        long newStartOffset) {
-        try {
-            return metadataStore.trimStream(streamId, streamEpoch, newStartOffset);
-        } catch (ControllerException e) {
-            LOGGER.error("Exception raised while trim stream for {}, {}, {}", streamId, streamEpoch, newStartOffset, e);
-            return null;
-        }
+    public CompletableFuture<Void> trimStream(long streamId, long streamEpoch, long newStartOffset) {
+        return metadataStore.trimStream(streamId, streamEpoch, newStartOffset);
     }
 
     @Override
