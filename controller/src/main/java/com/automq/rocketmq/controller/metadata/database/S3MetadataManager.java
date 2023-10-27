@@ -49,7 +49,6 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import com.google.protobuf.TextFormat;
 import java.nio.charset.StandardCharsets;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
@@ -445,19 +444,24 @@ public class S3MetadataManager {
         try (SqlSession session = metadataStore.openSession()) {
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
             List<apache.rocketmq.controller.v1.S3StreamObject> streamObjects = s3StreamObjectMapper.list(null, streamId, startOffset, endOffset, limit).stream()
-                .map(streamObject -> apache.rocketmq.controller.v1.S3StreamObject.newBuilder()
-                    .setStreamId(streamObject.getStreamId())
-                    .setObjectSize(streamObject.getObjectSize())
-                    .setObjectId(streamObject.getObjectId())
-                    .setStartOffset(streamObject.getStartOffset())
-                    .setEndOffset(streamObject.getEndOffset())
-                    .setBaseDataTimestamp(streamObject.getBaseDataTimestamp().getTime())
-                    .setCommittedTimestamp(streamObject.getCommittedTimestamp() != null ? streamObject.getCommittedTimestamp().getTime() : S3Constants.NOOP_OBJECT_COMMIT_TIMESTAMP)
-                    .build())
+                .map(this::buildS3StreamObject)
                 .toList();
             future.complete(streamObjects);
         }
         return future;
+    }
+
+    private S3StreamObject buildS3StreamObject(
+        com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject originalObject) {
+        return S3StreamObject.newBuilder()
+            .setStreamId(originalObject.getStreamId())
+            .setObjectSize(originalObject.getObjectSize())
+            .setObjectId(originalObject.getObjectId())
+            .setStartOffset(originalObject.getStartOffset())
+            .setEndOffset(originalObject.getEndOffset())
+            .setBaseDataTimestamp(originalObject.getBaseDataTimestamp().getTime())
+            .setCommittedTimestamp(originalObject.getCommittedTimestamp() != null ? originalObject.getCommittedTimestamp().getTime() : S3Constants.NOOP_OBJECT_COMMIT_TIMESTAMP)
+            .build();
     }
 
     private S3WALObject buildS3WALObject(
@@ -548,15 +552,7 @@ public class S3MetadataManager {
                 S3WalObjectMapper s3WalObjectMapper = session.getMapper(S3WalObjectMapper.class);
                 List<apache.rocketmq.controller.v1.S3StreamObject> s3StreamObjects = s3StreamObjectMapper.list(null, streamId, startOffset, endOffset, limit)
                     .stream()
-                    .map(streamObject -> apache.rocketmq.controller.v1.S3StreamObject.newBuilder()
-                        .setStreamId(streamObject.getStreamId())
-                        .setObjectSize(streamObject.getObjectSize())
-                        .setObjectId(streamObject.getObjectId())
-                        .setStartOffset(streamObject.getStartOffset())
-                        .setEndOffset(streamObject.getEndOffset())
-                        .setBaseDataTimestamp(streamObject.getBaseDataTimestamp().getTime())
-                        .setCommittedTimestamp(streamObject.getCommittedTimestamp() != null ? streamObject.getCommittedTimestamp().getTime() : S3Constants.NOOP_OBJECT_COMMIT_TIMESTAMP)
-                        .build())
+                    .map(this::buildS3StreamObject)
                     .toList();
 
                 List<S3WALObject> walObjects = new ArrayList<>();
