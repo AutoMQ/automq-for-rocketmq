@@ -18,6 +18,7 @@
 package com.automq.rocketmq.cli;
 
 import apache.rocketmq.controller.v1.Cluster;
+import apache.rocketmq.controller.v1.ClusterSummary;
 import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.Node;
 import apache.rocketmq.controller.v1.OngoingMessageQueueReassignment;
@@ -53,9 +54,30 @@ public class ConsoleHelper {
             return;
         }
 
+        CWC_LongestLine cwc = new CWC_LongestLine();
+
+        // Cluster Summary
+        AsciiTable summary = new AsciiTable();
+        summary.addRule();
+        AT_Row row = summary.addRow(null, null, null, null, "CLUSTER SUMMARY");
+        alignCentral(row);
+        summary.addRule();
+        row = summary.addRow("NODE QUANTITY", "TOPIC QUANTITY", "QUEUE QUANTITY", "STREAM QUANTITY",
+            "GROUP QUANTITY");
+        alignCentral(row);
+        ClusterSummary cs = cluster.getSummary();
+        row = summary.addRow(cs.getNodeQuantity(), cs.getTopicQuantity(), cs.getQueueQuantity(),
+            cs.getStreamQuantity(), cs.getGroupQuantity());
+        alignCentral(row);
+        summary.addRule();
+        summary.getRenderer().setCWC(cwc);
+        String render = summary.render();
+        System.out.println(render);
+
+        // Nodes List
         AsciiTable nodeTable = new AsciiTable();
         nodeTable.addRule();
-        AT_Row row = nodeTable.addRow("NODE ID", "NODE NAME", "TOPIC QUANTITY", "QUEUE QUANTITY",
+        row = nodeTable.addRow("NODE ID", "NODE NAME", "TOPIC QUANTITY", "QUEUE QUANTITY",
             "STREAM QUANTITY", "LAST HEARTBEAT", "ROLE", "EPOCH", "EXPIRATION");
 
         alignCentral(row);
@@ -70,9 +92,8 @@ public class ConsoleHelper {
         }
         nodeTable.addRule();
 
-        CWC_LongestLine cwc = new CWC_LongestLine();
         nodeTable.getRenderer().setCWC(cwc);
-        String render = nodeTable.render();
+        render = nodeTable.render();
         System.out.println(render);
     }
 
