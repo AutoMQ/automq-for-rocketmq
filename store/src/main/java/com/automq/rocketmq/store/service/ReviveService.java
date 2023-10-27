@@ -219,8 +219,8 @@ public class ReviveService {
     }
 
     protected void tryRevive(TimerTag timerTag) {
-        this.reviveTimestamp = System.currentTimeMillis();
         backgroundExecutor.execute(new ReviveTask(timerTag.payloadAsByteBuffer()));
+        reviveTimestamp = timerTag.deliveryTimestamp();
     }
 
     public long reviveTimestamp() {

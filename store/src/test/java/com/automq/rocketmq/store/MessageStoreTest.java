@@ -47,6 +47,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -195,7 +196,7 @@ public class MessageStoreTest {
         }
         List<String> receiptHandles = new ArrayList<>();
         // 2. pop 3 message
-        int invisibleDuration = 800;
+        int invisibleDuration = 100;
         PopResult popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, true, false, invisibleDuration).join();
         assertEquals(3, popResult.messageList().size());
         for (FlatMessageExt message : popResult.messageList()) {
@@ -223,6 +224,7 @@ public class MessageStoreTest {
         messageStore.ack(receiptHandles.get(2)).join();
 
         // 9. pop again
+        long reviveTimestamp = System.currentTimeMillis() + invisibleDuration;
         popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, true, false, invisibleDuration).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(2, popResult.messageList().size());
@@ -237,8 +239,8 @@ public class MessageStoreTest {
         assertEquals(PopResult.Status.LOCKED, popResult.status());
 
         // 11. after 1100ms, pop again
-        long reviveTimestamp = System.currentTimeMillis() + invisibleDuration;
-        await().until(() -> reviveService.reviveTimestamp() > reviveTimestamp);
+        await().atMost(2, TimeUnit.SECONDS)
+            .until(() -> reviveService.reviveTimestamp() >= reviveTimestamp && reviveService.inflightReviveCount() == 0);
 
         popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, true, false, invisibleDuration).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
@@ -260,7 +262,7 @@ public class MessageStoreTest {
         }
         List<String> receiptHandles = new ArrayList<>();
         // 2. pop 3 message
-        int invisibleDuration = 800;
+        int invisibleDuration = 100;
         PopResult popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, invisibleDuration).join();
         assertEquals(3, popResult.messageList().size());
         for (FlatMessageExt message : popResult.messageList()) {
@@ -272,6 +274,7 @@ public class MessageStoreTest {
         messageStore.ack(receiptHandles.get(2)).join();
 
         // 4. pop 3 message
+        long reviveTimestamp = System.currentTimeMillis() + invisibleDuration;
         popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, invisibleDuration).join();
         assertEquals(2, popResult.messageList().size());
         for (FlatMessageExt message : popResult.messageList()) {
@@ -282,7 +285,6 @@ public class MessageStoreTest {
         popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, invisibleDuration).join();
         assertEquals(PopResult.Status.END_OF_QUEUE, popResult.status());
 
-        long reviveTimestamp = System.currentTimeMillis() + invisibleDuration;
         popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, true, invisibleDuration).join();
         assertEquals(PopResult.Status.END_OF_QUEUE, popResult.status());
 
@@ -295,7 +297,7 @@ public class MessageStoreTest {
         assertEquals(1, streamStore.nextOffset(snapshotStream.getStreamId()));
 
         // 6. after 1100ms, pop again
-        await().until(() -> reviveService.reviveTimestamp() > reviveTimestamp);
+        await().until(() -> reviveService.reviveTimestamp() >= reviveTimestamp);
 
         popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, invisibleDuration).join();
         assertEquals(PopResult.Status.END_OF_QUEUE, popResult.status());
