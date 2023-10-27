@@ -1,0 +1,16 @@
+image:
+  tag: 8.0.35
+auth:
+  rootPassword: "passward"
+  database: "metadata"
+
+service:
+  type: LoadBalancer
+
+primary:
+  extraVolumeMounts: 
+    - "/docker-entrypoint-initdb.d/ddl.sql": "./ddl.sql"
+initdbScripts:
+  init_script.sh: |
+    #!/bin/sh
+    mysql -u root -p passward  < ./ddl.sql
