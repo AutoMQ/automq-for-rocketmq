@@ -88,6 +88,18 @@ public class TopicManager {
         this.topicNameRequests = new ConcurrentHashMap<>();
     }
 
+    public int topicQuantity() {
+        return topicCache.topicQuantity();
+    }
+
+    public int queueQuantity() {
+        return assignmentCache.queueQuantity();
+    }
+
+    public int streamQuantity() {
+        return streamCache.streamQuantity();
+    }
+
     public int topicNumOfNode(int nodeId) {
         return assignmentCache.topicNumOfNode(nodeId);
     }
@@ -99,7 +111,6 @@ public class TopicManager {
     public int streamNumOfNode(int nodeId) {
         return streamCache.streamNumOfNode(nodeId);
     }
-
 
     public CompletableFuture<Long> createTopic(CreateTopicRequest request) {
         CompletableFuture<Long> future = new CompletableFuture<>();

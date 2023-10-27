@@ -68,4 +68,8 @@ public class TopicCache {
             }
         }
     }
+
+    public int topicQuantity() {
+        return topics.size();
+    }
 }

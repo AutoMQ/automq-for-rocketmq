@@ -92,4 +92,8 @@ public class AssignmentCache {
         }
         return count;
     }
+
+    public int queueQuantity() {
+        return assignments.values().stream().map(Map::size).reduce(0, Integer::sum);
+    }
 }

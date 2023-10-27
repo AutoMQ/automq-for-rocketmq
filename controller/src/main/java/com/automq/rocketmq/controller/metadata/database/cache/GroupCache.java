@@ -79,4 +79,8 @@ public class GroupCache {
         }
     }
 
+    public int groupQuantity() {
+        return groups.size();
+    }
+
 }
