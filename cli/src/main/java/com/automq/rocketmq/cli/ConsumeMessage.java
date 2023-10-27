@@ -169,8 +169,8 @@ public class ConsumeMessage implements Callable<Void> {
         return null;
     }
 
-    private void prepareConsumerGroup(String consumerGroup) throws ControllerException, IOException {
-        GrpcControllerClient client = new GrpcControllerClient();
+    private void prepareConsumerGroup(String consumerGroup) throws IOException {
+        GrpcControllerClient client = new GrpcControllerClient(new CliClientConfig());
         CreateGroupRequest request = CreateGroupRequest.newBuilder()
             .setName(groupName)
             .setMaxRetryAttempt(16)

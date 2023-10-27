@@ -18,6 +18,7 @@
 package com.automq.rocketmq.cli;
 
 import apache.rocketmq.controller.v1.ConsumerGroup;
+import com.automq.rocketmq.controller.metadata.ControllerClient;
 import com.automq.rocketmq.controller.metadata.GrpcControllerClient;
 import de.vandermeer.asciitable.AT_Row;
 import de.vandermeer.asciitable.AsciiTable;
@@ -38,7 +39,7 @@ public class DescribeGroup implements Callable<Void> {
 
     @Override
     public Void call() throws Exception {
-        try (GrpcControllerClient client = new GrpcControllerClient()) {
+        try (ControllerClient client = new GrpcControllerClient(new CliClientConfig())) {
             ConsumerGroup group = client.describeGroup(mqAdmin.endpoint, groupName)
                 .join();
             if (null == group) {

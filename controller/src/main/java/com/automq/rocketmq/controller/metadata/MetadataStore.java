@@ -18,8 +18,10 @@
 package com.automq.rocketmq.controller.metadata;
 
 import apache.rocketmq.controller.v1.AssignmentStatus;
+import apache.rocketmq.controller.v1.Cluster;
 import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
+import apache.rocketmq.controller.v1.DescribeClusterRequest;
 import apache.rocketmq.controller.v1.GroupType;
 import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
@@ -35,6 +37,7 @@ import com.automq.rocketmq.controller.metadata.database.dao.Group;
 import com.automq.rocketmq.controller.metadata.database.dao.Lease;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
+import com.automq.rocketmq.controller.metadata.database.dao.Stream;
 import java.io.Closeable;
 import java.util.List;
 import java.util.Optional;
@@ -73,6 +76,8 @@ public interface MetadataStore extends Closeable {
     void setDataStore(DataStore dataStore);
 
     void start();
+
+    CompletableFuture<Cluster> describeCluster(DescribeClusterRequest request);
 
     /**
      * Register broker into metadata store and return broker epoch
@@ -201,6 +206,8 @@ public interface MetadataStore extends Closeable {
     void applyAssignmentChange(List<QueueAssignment> assignments);
 
     void applyGroupChange(List<Group> groups);
+
+    void applyStreamChange(List<Stream> streams);
 
     ConcurrentMap<Integer, BrokerNode> allNodes();
 

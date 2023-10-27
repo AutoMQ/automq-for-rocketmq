@@ -19,9 +19,11 @@ package com.automq.rocketmq.controller.metadata.database;
 
 import apache.rocketmq.controller.v1.AssignmentStatus;
 import apache.rocketmq.controller.v1.CloseStreamRequest;
+import apache.rocketmq.controller.v1.Cluster;
 import apache.rocketmq.controller.v1.Code;
 import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
+import apache.rocketmq.controller.v1.DescribeClusterRequest;
 import apache.rocketmq.controller.v1.GroupStatus;
 import apache.rocketmq.controller.v1.GroupType;
 import apache.rocketmq.controller.v1.ListOpenStreamsReply;
@@ -69,13 +71,17 @@ import com.automq.rocketmq.controller.tasks.RecycleTopicTask;
 import com.automq.rocketmq.controller.tasks.ScanAssignmentTask;
 import com.automq.rocketmq.controller.tasks.ScanGroupTask;
 import com.automq.rocketmq.controller.tasks.ScanNodeTask;
+import com.automq.rocketmq.controller.tasks.ScanStreamTask;
 import com.automq.rocketmq.controller.tasks.ScanTopicTask;
 import com.automq.rocketmq.controller.tasks.ScanYieldingQueueTask;
 import com.automq.rocketmq.controller.tasks.SchedulerTask;
 import com.google.common.base.Strings;
+import com.google.protobuf.Timestamp;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -191,9 +197,49 @@ public class DefaultMetadataStore implements MetadataStore {
             config.scanIntervalInSecs(), TimeUnit.SECONDS);
         this.scheduledExecutorService.scheduleWithFixedDelay(new ScanAssignmentTask(this), 1,
             config.scanIntervalInSecs(), TimeUnit.SECONDS);
+        this.scheduledExecutorService.scheduleWithFixedDelay(new ScanStreamTask(this), 1,
+            config.scanIntervalInSecs(), TimeUnit.SECONDS);
         this.scheduledExecutorService.scheduleWithFixedDelay(new RecycleS3Task(this),
             config.recycleS3IntervalInSecs(), config.recycleS3IntervalInSecs(), TimeUnit.SECONDS);
         LOGGER.info("MetadataStore tasks scheduled");
+    }
+
+    private static Timestamp toTimestamp(Date time) {
+        return Timestamp.newBuilder()
+            .setSeconds(TimeUnit.MILLISECONDS.toSeconds(time.getTime()))
+            .setNanos((int) TimeUnit.MILLISECONDS.toNanos(time.getTime() % 1000))
+            .build();
+    }
+
+    @Override
+    public CompletableFuture<Cluster> describeCluster(DescribeClusterRequest request) {
+        if (isLeader()) {
+            Cluster.Builder builder = Cluster.newBuilder()
+                .setLease(apache.rocketmq.controller.v1.Lease.newBuilder()
+                    .setEpoch(lease.getEpoch())
+                    .setNodeId(lease.getNodeId())
+                    .setExpirationTimestamp(toTimestamp(lease.getExpirationTime())).build());
+            for (Map.Entry<Integer, BrokerNode> entry : nodes.entrySet()) {
+                BrokerNode brokerNode = entry.getValue();
+                apache.rocketmq.controller.v1.Node node = apache.rocketmq.controller.v1.Node.newBuilder()
+                    .setId(entry.getKey())
+                    .setName(brokerNode.getNode().getName())
+                    .setLastHeartbeat(toTimestamp(brokerNode.lastKeepAliveTime(config)))
+                    .setTopicNum(topicManager.topicNumOfNode(entry.getKey()))
+                    .setQueueNum(topicManager.topicNumOfNode(entry.getKey()))
+                    .setStreamNum(topicManager.streamNumOfNode(entry.getKey()))
+                    .setGoingAway(brokerNode.isGoingAway())
+                    .build();
+                builder.addNodes(node);
+            }
+            return CompletableFuture.completedFuture(builder.build());
+        } else {
+            try {
+                return controllerClient.describeCluster(this.leaderAddress(), request);
+            } catch (ControllerException e) {
+                return CompletableFuture.failedFuture(e);
+            }
+        }
     }
 
     @Override
@@ -1097,6 +1143,11 @@ public class DefaultMetadataStore implements MetadataStore {
     @Override
     public void applyGroupChange(List<Group> groups) {
         this.groupManager.groupCache.apply(groups);
+    }
+
+    @Override
+    public void applyStreamChange(List<Stream> streams) {
+        this.topicManager.streamCache.apply(streams);
     }
 
     @Override

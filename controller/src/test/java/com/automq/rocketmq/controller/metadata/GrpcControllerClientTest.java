@@ -22,6 +22,7 @@ import apache.rocketmq.controller.v1.Code;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.MessageType;
 import apache.rocketmq.controller.v1.Topic;
+import com.automq.rocketmq.common.config.GrpcClientConfig;
 import com.automq.rocketmq.controller.ControllerServiceImpl;
 import com.automq.rocketmq.controller.ControllerTestServer;
 import com.automq.rocketmq.controller.exception.ControllerException;
@@ -36,6 +37,13 @@ import org.mockito.Mockito;
 
 class GrpcControllerClientTest {
 
+    private final GrpcClientConfig config;
+
+    public GrpcControllerClientTest() {
+        config = Mockito.mock(GrpcClientConfig.class);
+        Mockito.when(config.rpcTimeout()).thenCallRealMethod();
+    }
+
     @Test
     public void testRegisterBroker() throws IOException, ExecutionException, InterruptedException {
         String name = "broker-name";
@@ -49,7 +57,7 @@ class GrpcControllerClientTest {
             ArgumentMatchers.anyString())).thenReturn(CompletableFuture.completedFuture(node));
         ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
         try (ControllerTestServer testServer = new ControllerTestServer(0, svc);
-             ControllerClient client = new GrpcControllerClient()
+             ControllerClient client = new GrpcControllerClient(config)
         ) {
             testServer.start();
             int port = testServer.getPort();
@@ -70,7 +78,7 @@ class GrpcControllerClientTest {
         Node node = new Node();
         node.setId(1);
         node.setEpoch(1);
-        try (ControllerClient client = new GrpcControllerClient();
+        try (ControllerClient client = new GrpcControllerClient(config);
              MetadataStore metadataStore = Mockito.mock(MetadataStore.class)) {
             Mockito.when(metadataStore.registerBrokerNode(ArgumentMatchers.anyString(), ArgumentMatchers.anyString(),
                 ArgumentMatchers.anyString())).thenReturn(CompletableFuture.completedFuture(node));
@@ -91,7 +99,7 @@ class GrpcControllerClientTest {
             .thenReturn(CompletableFuture.failedFuture(new ControllerException(Code.MOCK_FAILURE_VALUE, "Mock error message")));
         ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
         try (ControllerTestServer testServer = new ControllerTestServer(0, svc);
-             ControllerClient client = new GrpcControllerClient()
+             ControllerClient client = new GrpcControllerClient(config)
         ) {
             testServer.start();
             int port = testServer.getPort();
@@ -106,7 +114,7 @@ class GrpcControllerClientTest {
         MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
         ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
         try (ControllerTestServer testServer = new ControllerTestServer(0, svc);
-             ControllerClient client = new GrpcControllerClient()
+             ControllerClient client = new GrpcControllerClient(config)
         ) {
             testServer.start();
             int port = testServer.getPort();
@@ -122,7 +130,7 @@ class GrpcControllerClientTest {
         Mockito.when(metadataStore.createTopic(ArgumentMatchers.any())).thenReturn(CompletableFuture.completedFuture(1L));
         ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
         try (ControllerTestServer testServer = new ControllerTestServer(0, svc);
-             ControllerClient client = new GrpcControllerClient()
+             ControllerClient client = new GrpcControllerClient(config)
         ) {
             testServer.start();
             int port = testServer.getPort();
@@ -147,7 +155,7 @@ class GrpcControllerClientTest {
         MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
         ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
         try (ControllerTestServer testServer = new ControllerTestServer(0, svc);
-             ControllerClient client = new GrpcControllerClient()
+             ControllerClient client = new GrpcControllerClient(config)
         ) {
             testServer.start();
             int port = testServer.getPort();
@@ -176,7 +184,7 @@ class GrpcControllerClientTest {
         }).when(metadataStore).deleteTopic(ArgumentMatchers.anyLong());
         ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
         try (ControllerTestServer testServer = new ControllerTestServer(0, svc);
-             ControllerClient client = new GrpcControllerClient()
+             ControllerClient client = new GrpcControllerClient(config)
         ) {
             testServer.start();
             int port = testServer.getPort();
@@ -196,7 +204,7 @@ class GrpcControllerClientTest {
         }).when(metadataStore).deleteTopic(ArgumentMatchers.anyLong());
         ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
         try (ControllerTestServer testServer = new ControllerTestServer(0, svc);
-             ControllerClient client = new GrpcControllerClient()
+             ControllerClient client = new GrpcControllerClient(config)
         ) {
             testServer.start();
             int port = testServer.getPort();
@@ -220,7 +228,7 @@ class GrpcControllerClientTest {
             .thenReturn(future);
         ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
         try (ControllerTestServer testServer = new ControllerTestServer(0, svc);
-             ControllerClient client = new GrpcControllerClient()
+             ControllerClient client = new GrpcControllerClient(config)
         ) {
             testServer.start();
             int port = testServer.getPort();
@@ -241,7 +249,7 @@ class GrpcControllerClientTest {
             .thenReturn(future);
         ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
         try (ControllerTestServer testServer = new ControllerTestServer(0, svc);
-             ControllerClient client = new GrpcControllerClient()
+             ControllerClient client = new GrpcControllerClient(config)
         ) {
             testServer.start();
             int port = testServer.getPort();
@@ -262,7 +270,7 @@ class GrpcControllerClientTest {
         }).when(metadataStore).markMessageQueueAssignable(ArgumentMatchers.anyLong(), ArgumentMatchers.anyInt());
         ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
         try (ControllerTestServer testServer = new ControllerTestServer(0, svc);
-             ControllerClient client = new GrpcControllerClient()
+             ControllerClient client = new GrpcControllerClient(config)
         ) {
             testServer.start();
             int port = testServer.getPort();

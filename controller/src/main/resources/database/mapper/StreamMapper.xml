@@ -90,6 +90,7 @@
             <if test="null != criteria.topicId">AND topic_id = #{criteria.topicId}</if>
             <if test="null != criteria.queueId">AND queue_id = #{criteria.queueId}</if>
             <if test="null != criteria.state">AND state = #{criteria.state}</if>
+            <if test="null != criteria.updateTime">AND update_time >= #{criteria.updateTime}</if>
         </where>
     </update>
 
@@ -135,6 +136,19 @@
             <foreach item="item" index="index" collection="streamIds" open="id IN (" separator="," close=")">
                 #{item}
             </foreach>
+        </where>
+    </select>
+
+    <select id="byCriteria" resultType="Stream">
+        SELECT id, topic_id, queue_id, stream_role, group_id, src_node_id, dst_node_id, epoch, range_id, start_offset,
+        state
+        FROM stream
+        <where>
+            <if test="null != criteria.id">id = #{criteria.id}</if>
+            <if test="null != criteria.topicId">AND topic_id = #{criteria.topicId}</if>
+            <if test="null != criteria.queueId">AND queue_id = #{criteria.queueId}</if>
+            <if test="null != criteria.state">AND state = #{criteria.state}</if>
+            <if test="null != criteria.updateTime">AND update_time >= #{criteria.updateTime}</if>
         </where>
     </select>
 

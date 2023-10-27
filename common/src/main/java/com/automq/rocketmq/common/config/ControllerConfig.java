@@ -17,7 +17,7 @@
 
 package com.automq.rocketmq.common.config;
 
-public interface ControllerConfig {
+public interface ControllerConfig extends GrpcClientConfig {
     int nodeId();
 
     /**

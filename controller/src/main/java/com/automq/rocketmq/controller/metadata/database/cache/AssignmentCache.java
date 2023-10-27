@@ -67,4 +67,29 @@ public class AssignmentCache {
             assignments.remove(assignment.getTopicId());
         }
     }
+
+    public int topicNumOfNode(int nodeId) {
+        int count = 0;
+        for (Map.Entry<Long, Map<Integer, QueueAssignment>> entry : assignments.entrySet()) {
+            for (Map.Entry<Integer, QueueAssignment> e : entry.getValue().entrySet()) {
+                if (e.getValue().getDstNodeId() == nodeId) {
+                    count++;
+                    break;
+                }
+            }
+        }
+        return count;
+    }
+
+    public int queueNumOfNode(int nodeId) {
+        int count = 0;
+        for (Map.Entry<Long, Map<Integer, QueueAssignment>> entry : assignments.entrySet()) {
+            for (Map.Entry<Integer, QueueAssignment> e : entry.getValue().entrySet()) {
+                if (e.getValue().getDstNodeId() == nodeId) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
 }

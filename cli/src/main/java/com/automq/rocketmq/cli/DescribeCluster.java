@@ -17,39 +17,27 @@
 
 package com.automq.rocketmq.cli;
 
-import apache.rocketmq.controller.v1.CreateGroupReply;
-import apache.rocketmq.controller.v1.CreateGroupRequest;
-import apache.rocketmq.controller.v1.GroupType;
+import apache.rocketmq.controller.v1.Cluster;
+import apache.rocketmq.controller.v1.DescribeClusterRequest;
 import com.automq.rocketmq.controller.metadata.ControllerClient;
 import com.automq.rocketmq.controller.metadata.GrpcControllerClient;
+import com.google.protobuf.util.JsonFormat;
 import java.util.concurrent.Callable;
 import picocli.CommandLine;
 
-@CommandLine.Command(name = "createGroup", mixinStandardHelpOptions = true, showDefaultValues = true)
-public class CreateGroup implements Callable<Void> {
+@CommandLine.Command(name = "describeCluster", mixinStandardHelpOptions = true, showDefaultValues = true)
+public class DescribeCluster implements Callable<Void> {
+
     @CommandLine.ParentCommand
     MQAdmin mqAdmin;
-
-    @CommandLine.Option(names = {"-g", "--groupName"}, description = "Group name", required = true)
-    String groupName;
-
-    @CommandLine.Option(names = {"-r", "--maxRetryAttempt"}, description = "Max retry attempt")
-    int maxRetryAttempt = 16;
-
-    @CommandLine.Option(names = {"-t", "--groupType"}, description = "Group type")
-    GroupType groupType = GroupType.GROUP_TYPE_STANDARD;
 
     @Override
     public Void call() throws Exception {
         try (ControllerClient client = new GrpcControllerClient(new CliClientConfig())) {
-            CreateGroupRequest request = CreateGroupRequest.newBuilder()
-                .setName(groupName)
-                .setMaxRetryAttempt(maxRetryAttempt)
-                .setGroupType(groupType)
+            DescribeClusterRequest request = DescribeClusterRequest.newBuilder()
                 .build();
-
-            CreateGroupReply groupReply = client.createGroup(mqAdmin.endpoint, request).join();
-            System.out.println("Group created: " + groupReply.getGroupId());
+            Cluster cluster = client.describeCluster(mqAdmin.endpoint, request).join();
+            System.out.println(JsonFormat.printer().print(cluster));
         }
         return null;
     }
