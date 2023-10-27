@@ -28,6 +28,7 @@ import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
 import org.apache.ibatis.session.SqlSession;
 
@@ -55,7 +56,7 @@ public class RecycleS3Task extends ControllerTask {
             for (Topic topic : topics) {
                 Calendar calendar = Calendar.getInstance();
                 calendar.add(Calendar.HOUR, -topic.getRetentionHours());
-                long threshold = calendar.getTimeInMillis();
+                Date threshold = calendar.getTime();
                 List<Long> streamIds = streamMapper.list(topic.getId(), null, null)
                     .stream()
                     .map(Stream::getId)

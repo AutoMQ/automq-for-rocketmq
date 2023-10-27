@@ -1595,8 +1595,8 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = s3StreamObjectMapper.getByObjectId(objectId + 2);
             Assertions.assertEquals(111L, object.getObjectSize());
             Assertions.assertEquals(streamId, object.getStreamId());
-            Assertions.assertTrue(object.getBaseDataTimestamp() > 0);
-            Assertions.assertTrue(object.getCommittedTimestamp() > 0);
+            Assertions.assertTrue(object.getBaseDataTimestamp().getTime() > 0);
+            Assertions.assertTrue(object.getCommittedTimestamp().getTime() > 0);
         }
     }
 
@@ -1639,8 +1639,8 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Assertions.assertEquals(S3ObjectState.BOS_COMMITTED, s3Object.getState());
 
             com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = s3StreamObjectMapper.getByObjectId(objectId + 2);
-            Assertions.assertTrue(object.getBaseDataTimestamp() > 0);
-            Assertions.assertTrue(object.getCommittedTimestamp() > 0);
+            Assertions.assertTrue(object.getBaseDataTimestamp().getTime() > 0);
+            Assertions.assertTrue(object.getCommittedTimestamp().getTime() > 0);
             Assertions.assertEquals(111L, object.getObjectSize());
             Assertions.assertEquals(streamId, object.getStreamId());
         }
@@ -1749,7 +1749,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
                 .setObjectId(s3StreamObject2.getObjectId())
                 .setStreamId(s3StreamObject2.getStreamId())
                 .setObjectSize(s3StreamObject2.getObjectSize())
-                .setBaseDataTimestamp(s3StreamObject2.getBaseDataTimestamp())
+                .setBaseDataTimestamp(s3StreamObject2.getBaseDataTimestamp().getTime())
                 .setStartOffset(s3StreamObject2.getStartOffset())
                 .setEndOffset(s3StreamObject2.getEndOffset())
                 .build()).toList();
@@ -1779,7 +1779,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
             for (long index = objectId; index < objectId + 2; index++) {
                 com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = s3StreamObjectMapper.getByObjectId(index);
-                Assertions.assertTrue(object.getCommittedTimestamp() > 0);
+                Assertions.assertTrue(object.getCommittedTimestamp().getTime() > 0);
             }
 
             S3Object s3Object = s3ObjectMapper.getById(objectId + 4);
@@ -1789,8 +1789,8 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
             S3WalObject object = s3WALObjectMapper.getByObjectId(objectId + 4);
             Assertions.assertEquals(objectId + 2, object.getSequenceId());
-            Assertions.assertTrue(object.getBaseDataTimestamp() > 0);
-            Assertions.assertTrue(object.getCommittedTimestamp() > 0);
+            Assertions.assertTrue(object.getBaseDataTimestamp().getTime() > 0);
+            Assertions.assertTrue(object.getCommittedTimestamp().getTime() > 0);
         }
     }
 
@@ -1851,6 +1851,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         long streamId;
         int nodeId = 1;
         long objectId;
+        Calendar calendar = Calendar.getInstance();
 
         S3WALObject walObject = S3WALObject.newBuilder()
             .setObjectId(-1)
@@ -1887,7 +1888,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             s3Object.setState(S3ObjectState.BOS_PREPARED);
             s3Object.setStreamId(streamId);
             s3Object.setObjectSize(2139L);
-            Calendar calendar = Calendar.getInstance();
+
             calendar.add(Calendar.HOUR, 1);
             s3Object.setExpiredTimestamp(calendar.getTime());
             objectMapper.prepare(s3Object);
@@ -1904,10 +1905,11 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
                 .atMost(10, TimeUnit.SECONDS)
                 .until(metadataStore::isLeader);
 
+            calendar.add(Calendar.HOUR, 2);
             S3StreamObject streamObject = S3StreamObject.newBuilder()
                 .setObjectId(objectId)
                 .setStreamId(streamId)
-                .setBaseDataTimestamp(1)
+                .setBaseDataTimestamp(calendar.getTimeInMillis())
                 .setStartOffset(0)
                 .setEndOffset(2)
                 .setObjectSize(2139)
@@ -1921,7 +1923,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         try (SqlSession session = getSessionFactory().openSession()) {
             S3StreamObjectMapper mapper = session.getMapper(S3StreamObjectMapper.class);
             com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject s3StreamObject = mapper.getByObjectId(objectId);
-            Assertions.assertTrue(s3StreamObject.getCommittedTimestamp() > 0);
+            Assertions.assertTrue(s3StreamObject.getCommittedTimestamp().getTime() > 0);
 
             S3ObjectMapper objectMapper = session.getMapper(S3ObjectMapper.class);
             S3Object s3Object = objectMapper.getById(objectId);

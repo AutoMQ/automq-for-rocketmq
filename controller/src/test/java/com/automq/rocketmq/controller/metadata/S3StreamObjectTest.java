@@ -28,6 +28,7 @@ import org.junit.jupiter.api.TestMethodOrder;
 
 import java.io.IOException;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -47,7 +48,7 @@ public class S3StreamObjectTest extends DatabaseTestBase {
 
             Calendar calendar = Calendar.getInstance();
             calendar.add(Calendar.SECOND, 30);
-            long time = calendar.getTime().getTime();
+            Date time = calendar.getTime();
 
             s3StreamObject.setBaseDataTimestamp(time);
 
@@ -57,7 +58,13 @@ public class S3StreamObjectTest extends DatabaseTestBase {
 
             // test getById
             S3StreamObject s3StreamObject1 = s3StreamObjectMapper.getById(s3StreamObject.getId());
-            Assertions.assertEquals(s3StreamObject, s3StreamObject1);
+            Assertions.assertEquals(s3StreamObject.getId(), s3StreamObject1.getId());
+            Assertions.assertEquals(s3StreamObject.getObjectId(), s3StreamObject1.getObjectId());
+            Assertions.assertEquals(s3StreamObject.getObjectSize(), s3StreamObject1.getObjectSize());
+            Assertions.assertEquals(s3StreamObject.getStreamId(), s3StreamObject1.getStreamId());
+            Assertions.assertEquals(s3StreamObject.getStartOffset(), s3StreamObject1.getStartOffset());
+            Assertions.assertEquals(s3StreamObject.getEndOffset(), s3StreamObject1.getEndOffset());
+            Assertions.assertEquals(s3StreamObject.getCommittedTimestamp(), s3StreamObject1.getCommittedTimestamp());
 
             // test getByStreamAndObject
             S3StreamObject s3StreamObject2 = s3StreamObjectMapper.getByStreamAndObject(s3StreamObject.getStreamId(), s3StreamObject.getObjectId());
@@ -84,7 +91,14 @@ public class S3StreamObjectTest extends DatabaseTestBase {
             // test list
             s3StreamObjects = s3StreamObjectMapper.list(null, s3StreamObject.getStreamId(), 2000L, 2111L, 1);
             Assertions.assertEquals(1, s3StreamObjects.size());
-            Assertions.assertEquals(s3StreamObject, s3StreamObjects.get(0));
+            Assertions.assertEquals(s3StreamObject.getId(), s3StreamObjects.get(0).getId());
+            Assertions.assertEquals(s3StreamObject.getObjectId(), s3StreamObjects.get(0).getObjectId());
+            Assertions.assertEquals(s3StreamObject.getObjectSize(), s3StreamObjects.get(0).getObjectSize());
+            Assertions.assertEquals(s3StreamObject.getStreamId(), s3StreamObjects.get(0).getStreamId());
+            Assertions.assertEquals(s3StreamObject.getStartOffset(), s3StreamObjects.get(0).getStartOffset());
+            Assertions.assertEquals(s3StreamObject.getEndOffset(), s3StreamObjects.get(0).getEndOffset());
+            Assertions.assertEquals(s3StreamObject.getCommittedTimestamp(), s3StreamObjects.get(0).getCommittedTimestamp());
+
 
             // test delete
             s3StreamObjectMapper.delete(s3StreamObject1.getId(), null, null);
@@ -107,14 +121,20 @@ public class S3StreamObjectTest extends DatabaseTestBase {
 
             Calendar calendar = Calendar.getInstance();
             calendar.add(Calendar.SECOND, 30);
-            long time = calendar.getTime().getTime();
+            Date time = calendar.getTime();
 
             s3StreamObject.setCommittedTimestamp(time);
             int affectedRows = s3StreamObjectMapper.commit(s3StreamObject);
             Assertions.assertEquals(1, affectedRows);
 
             S3StreamObject s3StreamObject2 = s3StreamObjectMapper.getById(s3StreamObject.getId());
-            Assertions.assertEquals(s3StreamObject, s3StreamObject2);
+            Assertions.assertEquals(s3StreamObject.getId(), s3StreamObject2.getId());
+            Assertions.assertEquals(s3StreamObject.getObjectId(), s3StreamObject2.getObjectId());
+            Assertions.assertEquals(s3StreamObject.getObjectSize(), s3StreamObject2.getObjectSize());
+            Assertions.assertEquals(s3StreamObject.getStreamId(), s3StreamObject2.getStreamId());
+            Assertions.assertEquals(s3StreamObject.getStartOffset(), s3StreamObject2.getStartOffset());
+            Assertions.assertEquals(s3StreamObject.getEndOffset(), s3StreamObject2.getEndOffset());
+            Assertions.assertEquals(s3StreamObject.getCommittedTimestamp(), s3StreamObject2.getCommittedTimestamp());
 
             s3StreamObjectMapper.delete(null, s3StreamObject2.getStreamId(), s3StreamObject2.getObjectId());
             List<S3StreamObject> s3StreamObjects = s3StreamObjectMapper.list(s3StreamObject.getObjectId(), null, null, null, null);
@@ -135,7 +155,7 @@ public class S3StreamObjectTest extends DatabaseTestBase {
 
             Calendar calendar = Calendar.getInstance();
             calendar.add(Calendar.SECOND, 30);
-            long time = calendar.getTime().getTime();
+            Date time = calendar.getTime();
 
             s3StreamObject.setCommittedTimestamp(time);
             s3StreamObjectMapper.commit(s3StreamObject);
@@ -157,7 +177,7 @@ public class S3StreamObjectTest extends DatabaseTestBase {
 
             Calendar calendar = Calendar.getInstance();
             calendar.add(Calendar.SECOND, 30);
-            long time = calendar.getTime().getTime();
+            Date time = calendar.getTime();
 
             s3StreamObject.setCommittedTimestamp(time);
             s3StreamObjectMapper.commit(s3StreamObject);
@@ -165,18 +185,18 @@ public class S3StreamObjectTest extends DatabaseTestBase {
 
             Calendar threshold = Calendar.getInstance();
             threshold.add(Calendar.HOUR, 1);
-            Assertions.assertTrue(threshold.getTimeInMillis() > time);
+            Assertions.assertTrue(threshold.getTimeInMillis() > time.getTime());
 
             List<S3StreamObject> objects = s3StreamObjectMapper.list(null, null, null, null, null);
-            Assertions.assertTrue(objects.get(0).getCommittedTimestamp() < threshold.getTimeInMillis());
+            Assertions.assertTrue(objects.get(0).getCommittedTimestamp().getTime() < threshold.getTimeInMillis());
             Assertions.assertEquals(111, objects.get(0).getStreamId());
 
-            List<Long> ids = s3StreamObjectMapper.recyclable(List.of(111L), threshold.getTimeInMillis());
+            List<Long> ids = s3StreamObjectMapper.recyclable(List.of(111L), threshold.getTime());
             Assertions.assertEquals(1, ids.size());
 
             threshold = Calendar.getInstance();
             threshold.add(Calendar.HOUR, -80);
-            ids = s3StreamObjectMapper.recyclable(List.of(111L), threshold.getTimeInMillis());
+            ids = s3StreamObjectMapper.recyclable(List.of(111L), threshold.getTime());
             Assertions.assertTrue(ids.isEmpty());
         }
     }

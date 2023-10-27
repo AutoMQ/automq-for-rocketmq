@@ -41,6 +41,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -144,7 +145,7 @@ public class DatabaseTestBase {
             s3StreamObject.setStreamId(i + 1);
             s3StreamObject.setStartOffset(startOffset + i * interval);
             s3StreamObject.setEndOffset(startOffset + (i + 1) * interval);
-            s3StreamObject.setBaseDataTimestamp(System.currentTimeMillis());
+            s3StreamObject.setBaseDataTimestamp(new Date());
             s3StreamObjects.add(s3StreamObject);
         }
 
@@ -160,7 +161,7 @@ public class DatabaseTestBase {
             s3StreamObject.setObjectSize(100 + i);
             s3StreamObject.setSequenceId(objectId + i);
             s3StreamObject.setNodeId((int) i + 1);
-            s3StreamObject.setBaseDataTimestamp(System.currentTimeMillis());
+            s3StreamObject.setBaseDataTimestamp(new Date());
             s3StreamObjects.add(s3StreamObject);
         }
 

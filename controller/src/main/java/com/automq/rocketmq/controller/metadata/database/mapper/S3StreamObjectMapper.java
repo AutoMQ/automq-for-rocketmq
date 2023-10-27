@@ -20,6 +20,7 @@ package com.automq.rocketmq.controller.metadata.database.mapper;
 import com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.Date;
 import java.util.List;
 
 public interface S3StreamObjectMapper {
@@ -48,5 +49,5 @@ public interface S3StreamObjectMapper {
 
     int batchDelete(@Param("objectIds") List<Long> objectIds);
 
-    List<Long> recyclable(@Param("streamIds") List<Long> streamIds, @Param("threshold") long threshold);
+    List<Long> recyclable(@Param("streamIds") List<Long> streamIds, @Param("threshold") Date threshold);
 }
