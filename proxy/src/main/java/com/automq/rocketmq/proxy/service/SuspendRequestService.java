@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.proxy.service;
 
+import com.automq.rocketmq.common.ServiceThread;
 import com.automq.rocketmq.proxy.model.ProxyContextExt;
 import com.automq.rocketmq.store.model.message.Filter;
 import java.util.Optional;
@@ -31,7 +32,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import javax.annotation.Nonnull;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.rocketmq.common.ServiceThread;
 import org.apache.rocketmq.common.thread.ThreadPoolMonitor;
 import org.apache.rocketmq.common.utils.StartAndShutdown;
 import org.apache.rocketmq.proxy.common.ProxyContext;

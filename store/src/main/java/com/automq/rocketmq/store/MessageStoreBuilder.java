@@ -31,13 +31,13 @@ import com.automq.rocketmq.store.service.ReviveService;
 import com.automq.rocketmq.store.service.RocksDBKVService;
 import com.automq.rocketmq.store.service.SnapshotService;
 import com.automq.rocketmq.store.service.StreamOperationLogService;
+import com.automq.rocketmq.store.service.TimerService;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.service.api.OperationLogService;
 import com.automq.stream.s3.operator.DefaultS3Operator;
 import com.automq.stream.s3.operator.S3Operator;
 
 import static com.automq.rocketmq.store.MessageStoreImpl.KV_NAMESPACE_CHECK_POINT;
-import static com.automq.rocketmq.store.MessageStoreImpl.KV_NAMESPACE_TIMER_TAG;
 
 public class MessageStoreBuilder {
     public static MessageStoreImpl build(StoreConfig storeConfig, S3StreamConfig s3StreamConfig,
@@ -49,12 +49,14 @@ public class MessageStoreBuilder {
         InflightService inflightService = new InflightService();
         SnapshotService snapshotService = new SnapshotService(streamStore, kvService);
         OperationLogService operationLogService = new StreamOperationLogService(streamStore, snapshotService, storeConfig);
-        LogicQueueManager logicQueueManager = new DefaultLogicQueueManager(storeConfig, streamStore, kvService,
+        // TODO: We may have multiple timer service in the future.
+        TimerService timerService = new TimerService("timer_tag_0", kvService);
+        LogicQueueManager logicQueueManager = new DefaultLogicQueueManager(storeConfig, streamStore, kvService, timerService,
             metadataService, operationLogService, inflightService);
-        ReviveService reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, KV_NAMESPACE_TIMER_TAG,
-            kvService, metadataService, inflightService, logicQueueManager, dlqSender);
+        ReviveService reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, kvService, timerService,
+            metadataService, inflightService, logicQueueManager, dlqSender);
         S3ObjectOperator objectOperator = new S3ObjectOperatorImpl(operator);
 
-        return new MessageStoreImpl(storeConfig, streamStore, metadataService, kvService, inflightService, snapshotService, logicQueueManager, reviveService, objectOperator);
+        return new MessageStoreImpl(storeConfig, streamStore, metadataService, kvService, timerService, inflightService, snapshotService, logicQueueManager, reviveService, objectOperator);
     }
 }

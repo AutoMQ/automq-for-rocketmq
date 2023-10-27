@@ -38,6 +38,7 @@ import com.automq.rocketmq.store.service.ReviveService;
 import com.automq.rocketmq.store.service.RocksDBKVService;
 import com.automq.rocketmq.store.service.SnapshotService;
 import com.automq.rocketmq.store.service.StreamOperationLogService;
+import com.automq.rocketmq.store.service.TimerService;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.service.api.OperationLogService;
 import com.automq.stream.s3.operator.MemoryS3Operator;
@@ -58,7 +59,6 @@ import org.mockito.Mockito;
 
 import static com.automq.rocketmq.store.MessageStoreImpl.KV_NAMESPACE_CHECK_POINT;
 import static com.automq.rocketmq.store.MessageStoreImpl.KV_NAMESPACE_FIFO_INDEX;
-import static com.automq.rocketmq.store.MessageStoreImpl.KV_NAMESPACE_TIMER_TAG;
 import static com.automq.rocketmq.store.mock.MockMessageUtil.buildMessage;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -67,6 +67,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class MessageStoreTest {
     private static final String PATH = "/tmp/ros/message_store_test/";
+    public static final String KV_NAMESPACE_TIMER_TAG = "timer_tag";
     private static final long TOPIC_ID = 1313;
     private static final int QUEUE_ID = 13;
     private static final long CONSUMER_GROUP_ID = 131313;
@@ -74,11 +75,9 @@ public class MessageStoreTest {
     private KVService kvService;
     private StoreMetadataService metadataService;
     private StreamStore streamStore;
-    private InflightService inflightService;
     private MessageStore messageStore;
     private StoreConfig config;
     private LogicQueueManager logicQueueManager;
-    private DLQSender dlqSender;
     private ReviveService reviveService;
 
     @BeforeEach
@@ -87,18 +86,19 @@ public class MessageStoreTest {
         kvService = Mockito.spy(new RocksDBKVService(PATH));
         metadataService = new MockStoreMetadataService();
         streamStore = new MockStreamStore();
-        inflightService = new InflightService();
+        InflightService inflightService = new InflightService();
         config = new StoreConfig();
         SnapshotService snapshotService = new SnapshotService(streamStore, kvService);
         OperationLogService operationLogService = new StreamOperationLogService(streamStore, snapshotService, config);
-        logicQueueManager = new DefaultLogicQueueManager(config, streamStore, kvService, metadataService, operationLogService, inflightService);
-        dlqSender = Mockito.mock(DLQSender.class);
+        TimerService timerService = new TimerService(KV_NAMESPACE_TIMER_TAG, kvService);
+        logicQueueManager = new DefaultLogicQueueManager(config, streamStore, kvService, timerService, metadataService, operationLogService, inflightService);
+        DLQSender dlqSender = Mockito.mock(DLQSender.class);
         Mockito.doReturn(CompletableFuture.completedFuture(null))
             .when(dlqSender).send(Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
-        reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, KV_NAMESPACE_TIMER_TAG, kvService, metadataService, inflightService,
+        reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, kvService, timerService, metadataService, inflightService,
             logicQueueManager, dlqSender);
         S3ObjectOperator operator = new S3ObjectOperatorImpl(new MemoryS3Operator());
-        messageStore = new MessageStoreImpl(config, streamStore, metadataService, kvService, inflightService, snapshotService, logicQueueManager, reviveService, operator);
+        messageStore = new MessageStoreImpl(config, streamStore, metadataService, kvService, timerService, inflightService, snapshotService, logicQueueManager, reviveService, operator);
         messageStore.start();
     }
 
@@ -281,6 +281,8 @@ public class MessageStoreTest {
         // 5. pop again
         popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, invisibleDuration).join();
         assertEquals(PopResult.Status.END_OF_QUEUE, popResult.status());
+
+        long reviveTimestamp = System.currentTimeMillis() + invisibleDuration;
         popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, true, invisibleDuration).join();
         assertEquals(PopResult.Status.END_OF_QUEUE, popResult.status());
 
@@ -293,7 +295,6 @@ public class MessageStoreTest {
         assertEquals(1, streamStore.nextOffset(snapshotStream.getStreamId()));
 
         // 6. after 1100ms, pop again
-        long reviveTimestamp = System.currentTimeMillis() + invisibleDuration;
         await().until(() -> reviveService.reviveTimestamp() > reviveTimestamp);
 
         popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, invisibleDuration).join();
@@ -490,7 +491,7 @@ public class MessageStoreTest {
     private boolean verifyStatesExist() {
         AtomicBoolean exist = new AtomicBoolean(false);
         try {
-            kvService.iterate(MessageStoreImpl.KV_NAMESPACE_TIMER_TAG, (key, value) -> {
+            kvService.iterate(KV_NAMESPACE_TIMER_TAG, (key, value) -> {
                 exist.set(true);
             });
             if (exist.get()) {

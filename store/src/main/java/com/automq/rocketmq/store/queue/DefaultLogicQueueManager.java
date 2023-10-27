@@ -29,6 +29,7 @@ import com.automq.rocketmq.store.exception.StoreErrorCode;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.message.TopicQueueId;
 import com.automq.rocketmq.store.service.InflightService;
+import com.automq.rocketmq.store.service.TimerService;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.service.api.OperationLogService;
 import com.automq.stream.utils.FutureUtil;
@@ -46,6 +47,7 @@ public class DefaultLogicQueueManager implements LogicQueueManager {
     private final StoreConfig storeConfig;
     private final StreamStore streamStore;
     private final KVService kvService;
+    private final TimerService timerService;
     private final StoreMetadataService metadataService;
     private final OperationLogService operationLogService;
     private final InflightService inflightService;
@@ -53,11 +55,13 @@ public class DefaultLogicQueueManager implements LogicQueueManager {
     private final String identity = "[DefaultLogicQueueManager]";
 
     public DefaultLogicQueueManager(StoreConfig storeConfig, StreamStore streamStore,
-        KVService kvService, StoreMetadataService metadataService, OperationLogService operationLogService,
+        KVService kvService, TimerService timerService, StoreMetadataService metadataService,
+        OperationLogService operationLogService,
         InflightService inflightService) {
         this.storeConfig = storeConfig;
         this.streamStore = streamStore;
         this.kvService = kvService;
+        this.timerService = timerService;
         this.metadataService = metadataService;
         this.operationLogService = operationLogService;
         this.inflightService = inflightService;
@@ -148,7 +152,7 @@ public class DefaultLogicQueueManager implements LogicQueueManager {
             return CompletableFuture.completedFuture(null);
         }
 
-        MessageStateMachine stateMachine = new DefaultLogicQueueStateMachine(topicId, queueId, kvService);
+        MessageStateMachine stateMachine = new DefaultLogicQueueStateMachine(topicId, queueId, kvService, timerService);
         LogicQueue logicQueue = new StreamLogicQueue(storeConfig, topicId, queueId,
             metadataService, stateMachine, streamStore, operationLogService, inflightService);
 

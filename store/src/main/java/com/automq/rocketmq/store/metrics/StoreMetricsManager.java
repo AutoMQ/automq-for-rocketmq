@@ -18,6 +18,7 @@
 package com.automq.rocketmq.store.metrics;
 
 import com.automq.rocketmq.common.MetricsManager;
+import com.automq.rocketmq.common.ServiceThread;
 import com.automq.rocketmq.common.config.MetricsConfig;
 import com.automq.rocketmq.store.MessageStoreImpl;
 import com.automq.rocketmq.store.api.LogicQueue;
@@ -37,7 +38,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.Supplier;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.rocketmq.common.ServiceThread;
 import org.apache.rocketmq.common.metrics.NopLongCounter;
 import org.apache.rocketmq.common.metrics.NopObservableLongGauge;
 import org.slf4j.Logger;

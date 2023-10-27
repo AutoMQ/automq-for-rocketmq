@@ -40,6 +40,7 @@ import com.automq.rocketmq.store.service.InflightService;
 import com.automq.rocketmq.store.service.RocksDBKVService;
 import com.automq.rocketmq.store.service.SnapshotService;
 import com.automq.rocketmq.store.service.StreamOperationLogService;
+import com.automq.rocketmq.store.service.TimerService;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.service.api.OperationLogService;
 import com.automq.rocketmq.store.util.SerializeUtil;
@@ -76,7 +77,6 @@ public class LogicQueueTest {
     private MessageStateMachine stateMachine;
     private InflightService inflightService;
     private OperationLogService operationLogService;
-    private SnapshotService snapshotService;
     private LogicQueue logicQueue;
 
     @BeforeEach
@@ -84,9 +84,10 @@ public class LogicQueueTest {
         kvService = new RocksDBKVService(PATH);
         metadataService = new MockStoreMetadataService();
         streamStore = new MockStreamStore();
-        stateMachine = Mockito.spy(new DefaultLogicQueueStateMachine(TOPIC_ID, QUEUE_ID, kvService));
+        TimerService timerService = new TimerService(MessageStoreTest.KV_NAMESPACE_TIMER_TAG, kvService);
+        stateMachine = Mockito.spy(new DefaultLogicQueueStateMachine(TOPIC_ID, QUEUE_ID, kvService, timerService));
         inflightService = new InflightService();
-        snapshotService = new SnapshotService(streamStore, kvService);
+        SnapshotService snapshotService = new SnapshotService(streamStore, kvService);
         operationLogService = new StreamOperationLogService(streamStore, snapshotService, new StoreConfig());
         logicQueue = new StreamLogicQueue(new StoreConfig(), TOPIC_ID, QUEUE_ID,
             metadataService, stateMachine, streamStore, operationLogService, inflightService);
@@ -788,7 +789,7 @@ public class LogicQueueTest {
         List<ReceiptHandle> receiptHandleList = new ArrayList<>();
         try {
             // Iterate timer tag until now to find messages need to reconsume.
-            kvService.iterate(MessageStoreImpl.KV_NAMESPACE_TIMER_TAG, (key, value) -> {
+            kvService.iterate(MessageStoreTest.KV_NAMESPACE_TIMER_TAG, (key, value) -> {
                 ReceiptHandle receiptHandle = ReceiptHandle.getRootAsReceiptHandle(ByteBuffer.wrap(value));
                 receiptHandleList.add(receiptHandle);
             });

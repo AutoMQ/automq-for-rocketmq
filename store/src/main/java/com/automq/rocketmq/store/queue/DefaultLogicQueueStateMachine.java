@@ -22,6 +22,7 @@ import com.automq.rocketmq.store.api.MessageStateMachine;
 import com.automq.rocketmq.store.exception.StoreErrorCode;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.generated.CheckPoint;
+import com.automq.rocketmq.store.model.generated.TimerHandlerType;
 import com.automq.rocketmq.store.model.kv.BatchDeleteRequest;
 import com.automq.rocketmq.store.model.kv.BatchRequest;
 import com.automq.rocketmq.store.model.kv.BatchWriteRequest;
@@ -31,6 +32,7 @@ import com.automq.rocketmq.store.model.operation.ChangeInvisibleDurationOperatio
 import com.automq.rocketmq.store.model.operation.OperationSnapshot;
 import com.automq.rocketmq.store.model.operation.PopOperation;
 import com.automq.rocketmq.store.model.operation.ResetConsumeOffsetOperation;
+import com.automq.rocketmq.store.service.TimerService;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.util.SerializeUtil;
 import com.automq.stream.utils.FutureUtil;
@@ -55,13 +57,12 @@ import org.slf4j.LoggerFactory;
 
 import static com.automq.rocketmq.store.MessageStoreImpl.KV_NAMESPACE_CHECK_POINT;
 import static com.automq.rocketmq.store.MessageStoreImpl.KV_NAMESPACE_FIFO_INDEX;
-import static com.automq.rocketmq.store.MessageStoreImpl.KV_NAMESPACE_TIMER_TAG;
 import static com.automq.rocketmq.store.util.SerializeUtil.buildCheckPointKey;
 import static com.automq.rocketmq.store.util.SerializeUtil.buildCheckPointValue;
 import static com.automq.rocketmq.store.util.SerializeUtil.buildOrderIndexKey;
 import static com.automq.rocketmq.store.util.SerializeUtil.buildOrderIndexValue;
 import static com.automq.rocketmq.store.util.SerializeUtil.buildReceiptHandle;
-import static com.automq.rocketmq.store.util.SerializeUtil.buildTimerTagKey;
+import static com.automq.rocketmq.store.util.SerializeUtil.buildReceiptHandleKey;
 
 public class DefaultLogicQueueStateMachine implements MessageStateMachine {
     private static final Logger LOGGER = LoggerFactory.getLogger(DefaultLogicQueueStateMachine.class);
@@ -75,11 +76,13 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
     private final Lock reentrantLock = lock.readLock();
     private final Lock exclusiveLock = lock.writeLock();
     private final KVService kvService;
+    private final TimerService timerService;
     private final String identity;
 
-    public DefaultLogicQueueStateMachine(long topicId, int queueId, KVService kvService) {
+    public DefaultLogicQueueStateMachine(long topicId, int queueId, KVService kvService, TimerService timerService) {
         this.consumerGroupMetadataMap = new ConcurrentHashMap<>();
         this.kvService = kvService;
+        this.timerService = timerService;
         this.topicId = topicId;
         this.queueId = queueId;
         this.identity = "[DefaultStateMachine-" + topicId + "-" + queueId + "]";
@@ -148,10 +151,10 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
                 consumerGroupId, operationId, operation.popOperationType(), operationTimestamp, nextVisibleTimestamp));
         requestList.add(writeCheckPointRequest);
 
-        BatchWriteRequest writeTimerTagRequest = new BatchWriteRequest(KV_NAMESPACE_TIMER_TAG,
-            buildTimerTagKey(nextVisibleTimestamp, topicId, queueId, operationId),
-            buildReceiptHandle(consumerGroupId, topicId, queueId, operationId));
-        requestList.add(writeTimerTagRequest);
+        BatchWriteRequest timerEnqueueRequest = timerService.enqueueRequest(
+            nextVisibleTimestamp, buildReceiptHandleKey(topicId, queueId, operationId),
+            TimerHandlerType.POP_REVIVE, buildReceiptHandle(consumerGroupId, topicId, queueId, operationId));
+        requestList.add(timerEnqueueRequest);
 
         Integer currentConsumeTimes = metadata.getConsumeTimes().getOrDefault(offset, 0);
         Integer newConsumeTimes = currentConsumeTimes + 1;
@@ -199,10 +202,10 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
                 consumerGroupId, operationId, operation.popOperationType(), operationTimestamp, nextVisibleTimestamp));
         requestList.add(writeCheckPointRequest);
 
-        BatchWriteRequest writeTimerTagRequest = new BatchWriteRequest(KV_NAMESPACE_TIMER_TAG,
-            buildTimerTagKey(nextVisibleTimestamp, topicId, queueId, operationId),
-            buildReceiptHandle(consumerGroupId, topicId, queueId, operationId));
-        requestList.add(writeTimerTagRequest);
+        BatchWriteRequest timerEnqueueRequest = timerService.enqueueRequest(
+            nextVisibleTimestamp, buildReceiptHandleKey(topicId, queueId, operationId),
+            TimerHandlerType.POP_REVIVE, buildReceiptHandle(consumerGroupId, topicId, queueId, operationId));
+        requestList.add(timerEnqueueRequest);
 
         kvService.batch(requestList.toArray(new BatchRequest[0]));
         return ReplayPopResult.empty();
@@ -247,10 +250,10 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
                 consumerGroupId, operationId, operation.popOperationType(), operationTimestamp, nextVisibleTimestamp));
         requestList.add(writeCheckPointRequest);
 
-        BatchWriteRequest writeTimerTagRequest = new BatchWriteRequest(KV_NAMESPACE_TIMER_TAG,
-            buildTimerTagKey(nextVisibleTimestamp, topicId, queueId, operationId),
-            buildReceiptHandle(consumerGroupId, topicId, queueId, operationId));
-        requestList.add(writeTimerTagRequest);
+        BatchWriteRequest timerEnqueueRequest = timerService.enqueueRequest(
+            nextVisibleTimestamp, buildReceiptHandleKey(topicId, queueId, operationId),
+            TimerHandlerType.POP_REVIVE, buildReceiptHandle(consumerGroupId, topicId, queueId, operationId));
+        requestList.add(timerEnqueueRequest);
 
         // if this message is orderly, write order index for each offset in this operation to KV service
         long baseOffset = offset - count + 1;
@@ -342,10 +345,10 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
         int queue = operation.queueId();
         long operationId = operation.operationId();
         long consumerGroupId = operation.consumerGroupId();
-        long nextInvisibleTimestamp = operationTimestamp + invisibleDuration;
+        long nextVisibleTimestamp = operationTimestamp + invisibleDuration;
 
-        LOGGER.trace("Replay change invisible duration operation: topicId={}, queueId={}, operationId={}, invisibleDuration={}, operationTimestamp={}, nextInvisibleTimestamp={} at offset: {}",
-            topic, queue, operationId, invisibleDuration, operationTimestamp, nextInvisibleTimestamp, operationOffset);
+        LOGGER.trace("Replay change invisible duration operation: topicId={}, queueId={}, operationId={}, invisibleDuration={}, operationTimestamp={}, nextVisibleTimestamp={} at offset: {}",
+            topic, queue, operationId, invisibleDuration, operationTimestamp, nextVisibleTimestamp, operationOffset);
 
         reentrantLock.lock();
         try {
@@ -358,20 +361,20 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
             }
             // Delete last timer tag.
             CheckPoint checkPoint = CheckPoint.getRootAsCheckPoint(ByteBuffer.wrap(buffer));
-            BatchDeleteRequest deleteLastTimerTagRequest = new BatchDeleteRequest(KV_NAMESPACE_TIMER_TAG,
-                buildTimerTagKey(checkPoint.nextVisibleTimestamp(), checkPoint.topicId(), checkPoint.queueId(), checkPoint.operationId()));
+            BatchDeleteRequest timerCancelRequest = timerService.cancelRequest(checkPoint.nextVisibleTimestamp(),
+                buildReceiptHandleKey(checkPoint.topicId(), checkPoint.queueId(), checkPoint.operationId()));
 
             // Write new check point and timer tag.
             BatchWriteRequest writeCheckPointRequest = new BatchWriteRequest(KV_NAMESPACE_CHECK_POINT,
                 buildCheckPointKey(checkPoint.topicId(), checkPoint.queueId(), checkPoint.consumerGroupId(), checkPoint.operationId()),
                 buildCheckPointValue(checkPoint.topicId(), checkPoint.queueId(), checkPoint.messageOffset(), checkPoint.count(),
                     checkPoint.consumerGroupId(), checkPoint.operationId(), PopOperation.PopOperationType.valueOf(checkPoint.popOperationType()),
-                    checkPoint.deliveryTimestamp(), nextInvisibleTimestamp));
+                    checkPoint.deliveryTimestamp(), nextVisibleTimestamp));
 
-            BatchWriteRequest writeTimerTagRequest = new BatchWriteRequest(KV_NAMESPACE_TIMER_TAG,
-                buildTimerTagKey(nextInvisibleTimestamp, checkPoint.topicId(), checkPoint.queueId(), checkPoint.operationId()),
-                buildReceiptHandle(checkPoint.consumerGroupId(), checkPoint.topicId(), checkPoint.queueId(), checkPoint.operationId()));
-            kvService.batch(deleteLastTimerTagRequest, writeCheckPointRequest, writeTimerTagRequest);
+            BatchWriteRequest timerEnqueueRequest = timerService.enqueueRequest(
+                nextVisibleTimestamp, buildReceiptHandleKey(checkPoint.topicId(), checkPoint.queueId(), checkPoint.operationId()),
+                TimerHandlerType.POP_REVIVE, buildReceiptHandle(checkPoint.consumerGroupId(), checkPoint.topicId(), checkPoint.queueId(), checkPoint.operationId()));
+            kvService.batch(timerCancelRequest, writeCheckPointRequest, timerEnqueueRequest);
         } catch (StoreException e) {
             LOGGER.error("{}: Replay change invisible duration operation failed", identity, e);
             CompletableFuture.failedFuture(e);
@@ -420,7 +423,7 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
     }
 
     private void deleteCheckPointsAndRelatedStates(List<CheckPoint> checkPointList) throws StoreException {
-        List<BatchRequest> batchRequests = checkPointList.stream().map(this::deleteCheckPointAndRelatedStatesReqs).flatMap(List::stream).collect(Collectors.toList());
+        List<BatchRequest> batchRequests = checkPointList.stream().map(this::deleteCheckPointAndRelatedStatesReqs).flatMap(List::stream).toList();
         if (!batchRequests.isEmpty()) {
             kvService.batch(batchRequests.toArray(new BatchRequest[0]));
         }
@@ -440,9 +443,9 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
             buildCheckPointKey(checkPoint.topicId(), checkPoint.queueId(), checkPoint.consumerGroupId(), checkPoint.operationId()));
         requestList.add(deleteCheckPointRequest);
 
-        BatchDeleteRequest deleteTimerTagRequest = new BatchDeleteRequest(KV_NAMESPACE_TIMER_TAG,
-            buildTimerTagKey(checkPoint.nextVisibleTimestamp(), checkPoint.topicId(), checkPoint.queueId(), checkPoint.operationId()));
-        requestList.add(deleteTimerTagRequest);
+        BatchDeleteRequest timerCancelRequest = timerService.cancelRequest(checkPoint.nextVisibleTimestamp(),
+            buildReceiptHandleKey(checkPoint.topicId(), checkPoint.queueId(), checkPoint.operationId()));
+        requestList.add(timerCancelRequest);
 
         if (checkPoint.popOperationType() == PopOperation.PopOperationType.POP_ORDER.value()) {
             long baseOffset = checkPoint.messageOffset() - checkPoint.count() + 1;
@@ -457,7 +460,10 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
     }
 
     private void writeCheckPointsAndRelatedStates(List<CheckPoint> checkPointList) throws StoreException {
-        List<BatchRequest> batchRequests = checkPointList.stream().map(this::writeCheckPointAndRelatedStatesReqs).flatMap(List::stream).collect(Collectors.toList());
+        List<BatchRequest> batchRequests = checkPointList.stream()
+            .map(this::writeCheckPointAndRelatedStatesReqs)
+            .flatMap(List::stream)
+            .toList();
         if (!batchRequests.isEmpty()) {
             kvService.batch(batchRequests.toArray(new BatchRequest[0]));
         }
@@ -480,10 +486,11 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
                 checkPoint.deliveryTimestamp(), checkPoint.nextVisibleTimestamp()));
         requestList.add(writeCheckPointRequest);
         // write timer tag
-        BatchWriteRequest writeTimerTagRequest = new BatchWriteRequest(KV_NAMESPACE_TIMER_TAG,
-            buildTimerTagKey(checkPoint.nextVisibleTimestamp(), checkPoint.topicId(), checkPoint.queueId(), checkPoint.operationId()),
-            buildReceiptHandle(checkPoint.consumerGroupId(), checkPoint.topicId(), checkPoint.queueId(), checkPoint.operationId()));
-        requestList.add(writeTimerTagRequest);
+
+        BatchWriteRequest timerEnqueueRequest = timerService.enqueueRequest(
+            checkPoint.nextVisibleTimestamp(), buildReceiptHandleKey(checkPoint.topicId(), checkPoint.queueId(), checkPoint.operationId()),
+            TimerHandlerType.POP_REVIVE, buildReceiptHandle(checkPoint.consumerGroupId(), checkPoint.topicId(), checkPoint.queueId(), checkPoint.operationId()));
+        requestList.add(timerEnqueueRequest);
         // write order index
         if (checkPoint.popOperationType() == PopOperation.PopOperationType.POP_ORDER.ordinal()) {
             long baseOffset = checkPoint.messageOffset() - checkPoint.count() + 1;
@@ -496,7 +503,6 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
         }
         return requestList;
     }
-
 
     @Override
     public OperationSnapshot takeSnapshot() throws StoreException {
