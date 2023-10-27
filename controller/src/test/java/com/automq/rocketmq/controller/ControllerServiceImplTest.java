@@ -73,6 +73,7 @@ import com.automq.rocketmq.controller.metadata.database.dao.S3Object;
 import com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject;
 import com.automq.rocketmq.controller.metadata.database.dao.S3WalObject;
 import com.automq.rocketmq.controller.metadata.database.dao.Stream;
+import com.automq.rocketmq.controller.metadata.database.dao.StreamCriteria;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
 import com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.GroupProgressMapper;
@@ -607,7 +608,11 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
         try (SqlSession session = getSessionFactory().openSession()) {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
-            List<Stream> streams = streamMapper.list(topicId, queueId, null);
+            StreamCriteria criteria = StreamCriteria.newBuilder()
+                .withTopicId(topicId)
+                .withQueueId(queueId)
+                .build();
+            List<Stream> streams = streamMapper.byCriteria(criteria);
             Assertions.assertEquals(1, streams.size());
             Assertions.assertEquals(StreamState.OPEN, streams.get(0).getState());
         }
@@ -794,7 +799,11 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
         try (SqlSession session = getSessionFactory().openSession()) {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
-            List<Stream> streams = streamMapper.list(topicId, queueId, null);
+            StreamCriteria criteria = StreamCriteria.newBuilder()
+                .withTopicId(topicId)
+                .withQueueId(queueId)
+                .build();
+            List<Stream> streams = streamMapper.byCriteria(criteria);
             Assertions.assertEquals(1, streams.size());
             Assertions.assertEquals(StreamState.CLOSED, streams.get(0).getState());
         }
@@ -923,7 +932,11 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
         try (SqlSession session = getSessionFactory().openSession()) {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
-            List<Stream> streams = streamMapper.list(topicId, queueId, null);
+            StreamCriteria criteria = StreamCriteria.newBuilder()
+                .withTopicId(topicId)
+                .withQueueId(queueId)
+                .build();
+            List<Stream> streams = streamMapper.byCriteria(criteria);
             Assertions.assertEquals(1, streams.size());
             Assertions.assertEquals(newStartOffset, streams.get(0).getStartOffset());
 
@@ -1020,7 +1033,11 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
         try (SqlSession session = getSessionFactory().openSession()) {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
-            List<Stream> streams = streamMapper.list(topicId, queueId, null);
+            StreamCriteria criteria = StreamCriteria.newBuilder()
+                .withTopicId(topicId)
+                .withQueueId(queueId)
+                .build();
+            List<Stream> streams = streamMapper.byCriteria(criteria);
             Assertions.assertEquals(1, streams.size());
             Assertions.assertEquals(newStartOffset, streams.get(0).getStartOffset());
 
@@ -1087,10 +1104,9 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
             S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
             buildS3WalObjs(objectId, 1).stream()
-                .map(s3WalObject -> {
+                .peek(s3WalObject -> {
                     Map<Long, SubStream> subStreams = buildWalSubStreams(1, 0, 10);
                     s3WalObject.setSubStreams(gson.toJson(subStreams));
-                    return s3WalObject;
                 }).forEach(s3WALObjectMapper::create);
             session.commit();
         }
@@ -1117,7 +1133,11 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
         try (SqlSession session = getSessionFactory().openSession()) {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
-            List<Stream> streams = streamMapper.list(topicId, queueId, null);
+            StreamCriteria criteria = StreamCriteria.newBuilder()
+                .withTopicId(topicId)
+                .withQueueId(queueId)
+                .build();
+            List<Stream> streams = streamMapper.byCriteria(criteria);
             Assertions.assertEquals(1, streams.size());
             Assertions.assertEquals(newStartOffset, streams.get(0).getStartOffset());
 
@@ -1219,7 +1239,11 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
         try (SqlSession session = getSessionFactory().openSession()) {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
-            List<Stream> streams = streamMapper.list(topicId, queueId, null);
+            StreamCriteria criteria = StreamCriteria.newBuilder()
+                .withTopicId(topicId)
+                .withQueueId(queueId)
+                .build();
+            List<Stream> streams = streamMapper.byCriteria(criteria);
             Assertions.assertEquals(1, streams.size());
             Assertions.assertEquals(newStartOffset, streams.get(0).getStartOffset());
 
@@ -1304,7 +1328,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
             try (SqlSession session = this.getSessionFactory().openSession()) {
                 S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
-                buildS3StreamObjs(objectId,2 ,1234, 1234).forEach(s3StreamObjectMapper::create);
+                buildS3StreamObjs(objectId, 2, 1234, 1234).forEach(s3StreamObjectMapper::create);
                 session.commit();
             }
 
@@ -1384,7 +1408,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 s3ObjectMapper.prepare(s3Object1);
 
                 S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
-                buildS3StreamObjs(objectId,1 ,1234, 1234).forEach(s3StreamObjectMapper::create);
+                buildS3StreamObjs(objectId, 1, 1234, 1234).forEach(s3StreamObjectMapper::create);
                 session.commit();
             }
 
@@ -1749,7 +1773,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                     .build())
                 .toList();
 
-
             apache.rocketmq.controller.v1.S3WALObject walObject = apache.rocketmq.controller.v1.S3WALObject.newBuilder()
                 .setObjectId(objectId + 4)
                 .setSequenceId(11)
@@ -1805,7 +1828,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 PrepareS3ObjectsReply reply = client.prepareS3Objects(String.format("localhost:%d", port), request).get();
                 objectId = reply.getFirstObjectId();
             }
-
 
             try (SqlSession session = this.getSessionFactory().openSession()) {
                 S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
@@ -1924,7 +1946,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 PrepareS3ObjectsReply reply = client.prepareS3Objects(String.format("localhost:%d", port), request).get();
                 objectId = reply.getFirstObjectId();
             }
-
 
             try (SqlSession session = this.getSessionFactory().openSession()) {
                 S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);

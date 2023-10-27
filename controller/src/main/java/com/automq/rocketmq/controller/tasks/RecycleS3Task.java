@@ -21,6 +21,7 @@ import apache.rocketmq.controller.v1.TopicStatus;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.dao.Stream;
+import com.automq.rocketmq.controller.metadata.database.dao.StreamCriteria;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
 import com.automq.rocketmq.controller.metadata.database.mapper.S3ObjectMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.S3StreamObjectMapper;
@@ -57,7 +58,10 @@ public class RecycleS3Task extends ControllerTask {
                 Calendar calendar = Calendar.getInstance();
                 calendar.add(Calendar.HOUR, -topic.getRetentionHours());
                 Date threshold = calendar.getTime();
-                List<Long> streamIds = streamMapper.list(topic.getId(), null, null)
+                StreamCriteria criteria = StreamCriteria.newBuilder()
+                    .withTopicId(topic.getId())
+                    .build();
+                List<Long> streamIds = streamMapper.byCriteria(criteria)
                     .stream()
                     .map(Stream::getId)
                     .toList();

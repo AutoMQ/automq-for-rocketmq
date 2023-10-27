@@ -47,6 +47,7 @@ import com.automq.rocketmq.controller.metadata.database.dao.S3Object;
 import com.automq.rocketmq.controller.metadata.database.dao.S3WalObject;
 import com.automq.rocketmq.controller.metadata.database.dao.Stream;
 import com.automq.rocketmq.controller.metadata.database.dao.Range;
+import com.automq.rocketmq.controller.metadata.database.dao.StreamCriteria;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
 import com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
@@ -250,7 +251,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Assertions.assertEquals(4, assignments.size());
 
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
-            List<Stream> streams = streamMapper.list(topicId, null, null);
+            List<Stream> streams = streamMapper.byCriteria(StreamCriteria.newBuilder().withTopicId(topicId).build());
             // By default, we create 3 streams for each message queue: data, ops, snapshot
             Assertions.assertEquals(queueNum * 3, streams.size());
         }
@@ -324,7 +325,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Assertions.assertEquals(4, assignments.size());
 
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
-            List<Stream> streams = streamMapper.list(topicId, null, null);
+            List<Stream> streams = streamMapper.byCriteria(StreamCriteria.newBuilder().withTopicId(topicId).build());
             // By default, we create 3 streams for each message queue: data, ops, snapshot
             Assertions.assertEquals(queueNum * 3, streams.size());
         }

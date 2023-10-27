@@ -154,6 +154,9 @@ class GrpcControllerClientTest {
         int queueNum = 4;
         MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
         ControllerServiceImpl svc = new ControllerServiceImpl(metadataStore);
+        ControllerException e = new ControllerException(Code.DUPLICATED_VALUE, "Topic is not available");
+        Mockito.when(metadataStore.createTopic(ArgumentMatchers.any()))
+            .thenReturn(CompletableFuture.failedFuture(e));
         try (ControllerTestServer testServer = new ControllerTestServer(0, svc);
              ControllerClient client = new GrpcControllerClient(config)
         ) {
