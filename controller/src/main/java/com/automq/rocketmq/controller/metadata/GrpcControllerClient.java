@@ -420,8 +420,7 @@ public class GrpcControllerClient implements ControllerClient {
     }
 
     @Override
-    public CompletableFuture<Void> notifyQueueClose(String target, long topicId,
-        int queueId) throws ControllerException {
+    public CompletableFuture<Void> notifyQueueClose(String target, long topicId, int queueId) {
 
         ControllerServiceGrpc.ControllerServiceFutureStub stub;
         try {

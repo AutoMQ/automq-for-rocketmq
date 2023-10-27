@@ -618,8 +618,7 @@ public class S3MetadataManager {
     }
 
 
-    public CompletableFuture<Void> trimStream(long streamId, long streamEpoch,
-        long newStartOffset) throws ControllerException {
+    public CompletableFuture<Void> trimStream(long streamId, long streamEpoch, long newStartOffset) {
         CompletableFuture<Void> future = new CompletableFuture<>();
         for (; ; ) {
             if (metadataStore.isLeader()) {

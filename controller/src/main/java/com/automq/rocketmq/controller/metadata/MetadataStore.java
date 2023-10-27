@@ -141,7 +141,7 @@ public interface MetadataStore extends Closeable {
     CompletableFuture<List<QueueAssignment>> listAssignments(Long topicId, Integer srcNodeId, Integer dstNodeId,
         AssignmentStatus status);
 
-    CompletableFuture<Void> reassignMessageQueue(long topicId, int queueId, int dstNodeId) throws ControllerException;
+    CompletableFuture<Void> reassignMessageQueue(long topicId, int queueId, int dstNodeId);
 
     CompletableFuture<Void> markMessageQueueAssignable(long topicId, int queueId);
 
@@ -169,7 +169,7 @@ public interface MetadataStore extends Closeable {
      */
     CompletableFuture<Void> onQueueClosed(long topicId, int queueId);
 
-    CompletableFuture<Void> trimStream(long streamId, long streamEpoch, long newStartOffset) throws ControllerException;
+    CompletableFuture<Void> trimStream(long streamId, long streamEpoch, long newStartOffset);
 
     CompletableFuture<StreamMetadata> openStream(long streamId, long streamEpoch, int nodeId);
 
