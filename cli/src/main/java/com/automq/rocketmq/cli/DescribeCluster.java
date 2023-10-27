@@ -21,7 +21,6 @@ import apache.rocketmq.controller.v1.Cluster;
 import apache.rocketmq.controller.v1.DescribeClusterRequest;
 import com.automq.rocketmq.controller.metadata.ControllerClient;
 import com.automq.rocketmq.controller.metadata.GrpcControllerClient;
-import com.google.protobuf.util.JsonFormat;
 import java.util.concurrent.Callable;
 import picocli.CommandLine;
 
@@ -37,7 +36,7 @@ public class DescribeCluster implements Callable<Void> {
             DescribeClusterRequest request = DescribeClusterRequest.newBuilder()
                 .build();
             Cluster cluster = client.describeCluster(mqAdmin.endpoint, request).join();
-            System.out.println(JsonFormat.printer().print(cluster));
+            ConsoleHelper.printCluster(cluster);
         }
         return null;
     }
