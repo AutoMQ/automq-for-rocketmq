@@ -21,7 +21,6 @@ import apache.rocketmq.controller.v1.Cluster;
 import apache.rocketmq.controller.v1.DescribeClusterRequest;
 import com.automq.rocketmq.controller.metadata.ControllerClient;
 import com.automq.rocketmq.controller.metadata.GrpcControllerClient;
-import com.google.protobuf.util.JsonFormat;
 import java.util.concurrent.Callable;
 import picocli.CommandLine;
 
