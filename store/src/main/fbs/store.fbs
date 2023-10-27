@@ -91,3 +91,16 @@ table ConsumeTimes {
   offset:long;
   consume_times:int;
 }
+
+enum TimerHandlerType:short {
+    POP_REVIVE,
+    PULL_RETRY,
+    TIMER_MESSAGE,
+    TRANSACTION_MESSAGE,
+}
+
+table TimerTag {
+   delivery_timestamp:long;
+   handler_type:TimerHandlerType;
+   payload: [byte];
+}

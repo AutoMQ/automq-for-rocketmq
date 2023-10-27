@@ -28,6 +28,7 @@ import com.automq.rocketmq.store.mock.MockStreamStore;
 import com.automq.rocketmq.store.queue.DefaultLogicQueueManager;
 import com.automq.rocketmq.store.service.InflightService;
 import com.automq.rocketmq.store.service.RocksDBKVService;
+import com.automq.rocketmq.store.service.TimerService;
 import com.automq.rocketmq.store.service.api.KVService;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.AfterEach;
@@ -43,20 +44,18 @@ class DefaultLogicQueueManagerTest {
     private static final int QUEUE_ID = 1;
 
     private static KVService kvService;
-    private static StoreMetadataService metadataService;
-    private static StreamStore streamStore;
-    private static InflightService inflightService;
     private static MockOperationLogService operationLogService;
     private DefaultLogicQueueManager topicQueueManager;
 
     @BeforeEach
     void setUp() throws StoreException {
         kvService = new RocksDBKVService(PATH);
-        metadataService = new MockStoreMetadataService();
-        streamStore = new MockStreamStore();
-        inflightService = new InflightService();
+        StoreMetadataService metadataService = new MockStoreMetadataService();
+        StreamStore streamStore = new MockStreamStore();
+        InflightService inflightService = new InflightService();
         operationLogService = new MockOperationLogService();
-        topicQueueManager = new DefaultLogicQueueManager(new StoreConfig(), streamStore, kvService, metadataService, operationLogService, inflightService);
+        TimerService timerService = new TimerService(MessageStoreTest.KV_NAMESPACE_TIMER_TAG, kvService);
+        topicQueueManager = new DefaultLogicQueueManager(new StoreConfig(), streamStore, kvService, timerService, metadataService, operationLogService, inflightService);
     }
 
     @AfterEach

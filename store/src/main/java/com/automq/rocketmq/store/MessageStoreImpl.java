@@ -38,6 +38,7 @@ import com.automq.rocketmq.store.model.message.ResetConsumeOffsetResult;
 import com.automq.rocketmq.store.service.InflightService;
 import com.automq.rocketmq.store.service.ReviveService;
 import com.automq.rocketmq.store.service.SnapshotService;
+import com.automq.rocketmq.store.service.TimerService;
 import com.automq.rocketmq.store.service.api.KVService;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -46,7 +47,6 @@ import static com.automq.rocketmq.store.util.SerializeUtil.decodeReceiptHandle;
 
 public class MessageStoreImpl implements MessageStore {
     public static final String KV_NAMESPACE_CHECK_POINT = "check_point";
-    public static final String KV_NAMESPACE_TIMER_TAG = "timer_tag";
     public static final String KV_NAMESPACE_FIFO_INDEX = "fifo_index";
 
     private final AtomicBoolean started = new AtomicBoolean(false);
@@ -56,6 +56,7 @@ public class MessageStoreImpl implements MessageStore {
     private final StreamStore streamStore;
     private final StoreMetadataService metadataService;
     private final KVService kvService;
+    private final TimerService timerService;
     private final ReviveService reviveService;
     private final InflightService inflightService;
     private final SnapshotService snapshotService;
@@ -63,13 +64,14 @@ public class MessageStoreImpl implements MessageStore {
     private final S3ObjectOperator s3ObjectOperator;
 
     public MessageStoreImpl(StoreConfig config, StreamStore streamStore,
-        StoreMetadataService metadataService, KVService kvService, InflightService inflightService,
-        SnapshotService snapshotService, LogicQueueManager logicQueueManager, ReviveService reviveService,
-        S3ObjectOperator s3ObjectOperator) {
+        StoreMetadataService metadataService, KVService kvService, TimerService timerService,
+        InflightService inflightService, SnapshotService snapshotService, LogicQueueManager logicQueueManager,
+        ReviveService reviveService, S3ObjectOperator s3ObjectOperator) {
         this.config = config;
         this.streamStore = streamStore;
         this.metadataService = metadataService;
         this.kvService = kvService;
+        this.timerService = timerService;
         this.inflightService = inflightService;
         this.snapshotService = snapshotService;
         this.logicQueueManager = logicQueueManager;
@@ -101,7 +103,7 @@ public class MessageStoreImpl implements MessageStore {
         }
         clearStateMachineData();
         streamStore.start();
-        reviveService.start();
+        timerService.start();
         snapshotService.start();
         logicQueueManager.start();
     }
@@ -113,7 +115,7 @@ public class MessageStoreImpl implements MessageStore {
         }
         logicQueueManager.shutdown();
         snapshotService.shutdown();
-        reviveService.shutdown();
+        timerService.start();
         streamStore.shutdown();
         clearStateMachineData();
     }
@@ -121,8 +123,8 @@ public class MessageStoreImpl implements MessageStore {
     private void clearStateMachineData() throws StoreException {
         // clear all statemachine related data in rocksdb
         kvService.clear(KV_NAMESPACE_CHECK_POINT);
-        kvService.clear(KV_NAMESPACE_TIMER_TAG);
         kvService.clear(KV_NAMESPACE_FIFO_INDEX);
+        timerService.clear();
     }
 
     @Override

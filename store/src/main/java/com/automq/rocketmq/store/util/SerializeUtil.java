@@ -72,10 +72,9 @@ public class SerializeUtil {
         return builder.sizedByteArray();
     }
 
-    // <deliveryTimestamp + invisibleDuration><topicId><queueId><operationId>
-    public static byte[] buildTimerTagKey(long nextVisibleTimestamp, long topicId, int queueId, long operationId) {
-        ByteBuffer buffer = ByteBuffer.allocate(28);
-        buffer.putLong(nextVisibleTimestamp);
+    // <topicId><queueId><operationId>
+    public static byte[] buildReceiptHandleKey(long topicId, int queueId, long operationId) {
+        ByteBuffer buffer = ByteBuffer.allocate(20);
         buffer.putLong(topicId);
         buffer.putInt(queueId);
         buffer.putLong(operationId);
