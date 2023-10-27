@@ -37,7 +37,7 @@ public class DescribeCluster implements Callable<Void> {
             DescribeClusterRequest request = DescribeClusterRequest.newBuilder()
                 .build();
             Cluster cluster = client.describeCluster(mqAdmin.endpoint, request).join();
-            System.out.println(JsonFormat.printer().print(cluster));
+            ConsoleHelper.printCluster(cluster);
         }
         return null;
     }
