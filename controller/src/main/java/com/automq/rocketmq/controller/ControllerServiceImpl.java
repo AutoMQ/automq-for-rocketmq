@@ -319,26 +319,16 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     @Override
     public void reassignMessageQueue(ReassignMessageQueueRequest request,
         StreamObserver<ReassignMessageQueueReply> responseObserver) {
-        try {
-            metadataStore.reassignMessageQueue(request.getQueue().getTopicId(), request.getQueue().getQueueId(), request.getDstNodeId()).whenComplete((res, e) -> {
-                if (null != e) {
-                    responseObserver.onError(e);
-                } else {
-                    ReassignMessageQueueReply reply = ReassignMessageQueueReply.newBuilder()
-                        .setStatus(Status.newBuilder().setCode(Code.OK).build()).build();
-                    responseObserver.onNext(reply);
-                    responseObserver.onCompleted();
-                }
-            });
-        } catch (ControllerException e) {
-            ReassignMessageQueueReply reply = ReassignMessageQueueReply.newBuilder()
-                .setStatus(Status.newBuilder()
-                    .setCode(Code.forNumber(e.getErrorCode()))
-                    .setMessage(e.getMessage()).build())
-                .build();
-            responseObserver.onNext(reply);
-            responseObserver.onCompleted();
-        }
+        metadataStore.reassignMessageQueue(request.getQueue().getTopicId(), request.getQueue().getQueueId(), request.getDstNodeId()).whenComplete((res, e) -> {
+            if (null != e) {
+                responseObserver.onError(e);
+            } else {
+                ReassignMessageQueueReply reply = ReassignMessageQueueReply.newBuilder()
+                    .setStatus(Status.newBuilder().setCode(Code.OK).build()).build();
+                responseObserver.onNext(reply);
+                responseObserver.onCompleted();
+            }
+        });
     }
 
     @Override
@@ -545,8 +535,8 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
 
     @Override
     public void trimStream(TrimStreamRequest request, StreamObserver<TrimStreamReply> responseObserver) {
-        try {
-            metadataStore.trimStream(request.getStreamId(), request.getStreamEpoch(), request.getNewStartOffset()).whenComplete((res, e) -> {
+        metadataStore.trimStream(request.getStreamId(), request.getStreamEpoch(), request.getNewStartOffset())
+            .whenComplete((res, e) -> {
                 if (null != e) {
                     responseObserver.onError(e);
                 } else {
@@ -557,15 +547,6 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
                     responseObserver.onCompleted();
                 }
             });
-        } catch (ControllerException e) {
-            TrimStreamReply reply = TrimStreamReply.newBuilder()
-                .setStatus(Status.newBuilder()
-                    .setCode(Code.forNumber(e.getErrorCode()))
-                    .setMessage(e.getMessage()).build())
-                .build();
-            responseObserver.onNext(reply);
-            responseObserver.onCompleted();
-        }
     }
 
     @Override

@@ -222,11 +222,11 @@ public class DefaultMetadataStore implements MetadataStore {
                     .setExpirationTimestamp(toTimestamp(lease.getExpirationTime())).build());
 
             builder.setSummary(ClusterSummary.newBuilder()
-                    .setNodeQuantity(nodes.size())
-                    .setTopicQuantity(topicManager.topicQuantity())
-                    .setQueueQuantity(topicManager.queueQuantity())
-                    .setStreamQuantity(topicManager.streamQuantity())
-                    .setGroupQuantity(groupManager.groupCache.groupQuantity())
+                .setNodeQuantity(nodes.size())
+                .setTopicQuantity(topicManager.topicQuantity())
+                .setQueueQuantity(topicManager.queueQuantity())
+                .setStreamQuantity(topicManager.streamQuantity())
+                .setGroupQuantity(groupManager.groupCache.groupQuantity())
                 .build());
 
             for (Map.Entry<Integer, BrokerNode> entry : nodes.entrySet()) {
@@ -475,8 +475,7 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public CompletableFuture<Void> reassignMessageQueue(long topicId, int queueId,
-        int dstNodeId) {
+    public CompletableFuture<Void> reassignMessageQueue(long topicId, int queueId, int dstNodeId) {
         CompletableFuture<Void> future = new CompletableFuture<>();
         for (; ; ) {
             if (isLeader()) {
@@ -1161,8 +1160,7 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public CompletableFuture<Void> trimStream(long streamId, long streamEpoch,
-        long newStartOffset) throws ControllerException {
+    public CompletableFuture<Void> trimStream(long streamId, long streamEpoch, long newStartOffset) {
         return s3MetadataManager.trimStream(streamId, streamEpoch, newStartOffset);
     }
 
