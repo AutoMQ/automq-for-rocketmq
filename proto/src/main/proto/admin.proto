@@ -39,7 +39,30 @@ message Node {
   google.protobuf.Timestamp last_heartbeat = 7;
 }
 
+message ClusterSummary {
+  // Total quantity of topics
+  int32 topic_quantity = 1;
+
+  // Total quantity of queues
+  int32 queue_quantity = 2;
+
+  // Total quantity of streams
+  int32 stream_quantity = 3;
+
+  // Total quantity of nodes
+  int32 node_quantity = 4;
+
+  // Total quantity of groups
+  int32 group_quantity = 5;
+}
+
 message Cluster {
-  Lease lease = 1;
-  repeated Node nodes = 2;
+  // Overall cluster summary
+  ClusterSummary summary = 1;
+
+  // Cluster leadership lease
+  Lease lease = 2;
+
+  // List of cluster nodes
+  repeated Node nodes = 3;
 }

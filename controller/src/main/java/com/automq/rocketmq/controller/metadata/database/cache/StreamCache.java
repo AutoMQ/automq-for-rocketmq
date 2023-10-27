@@ -55,4 +55,8 @@ public class StreamCache {
             streams.put(stream.getId(), stream);
         }
     }
+
+    public int streamQuantity() {
+        return streams.size();
+    }
 }

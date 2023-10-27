@@ -20,6 +20,7 @@ package com.automq.rocketmq.controller.metadata.database;
 import apache.rocketmq.controller.v1.AssignmentStatus;
 import apache.rocketmq.controller.v1.CloseStreamRequest;
 import apache.rocketmq.controller.v1.Cluster;
+import apache.rocketmq.controller.v1.ClusterSummary;
 import apache.rocketmq.controller.v1.Code;
 import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
@@ -219,6 +220,15 @@ public class DefaultMetadataStore implements MetadataStore {
                     .setEpoch(lease.getEpoch())
                     .setNodeId(lease.getNodeId())
                     .setExpirationTimestamp(toTimestamp(lease.getExpirationTime())).build());
+
+            builder.setSummary(ClusterSummary.newBuilder()
+                    .setNodeQuantity(nodes.size())
+                    .setTopicQuantity(topicManager.topicQuantity())
+                    .setQueueQuantity(topicManager.queueQuantity())
+                    .setStreamQuantity(topicManager.streamQuantity())
+                    .setGroupQuantity(groupManager.groupCache.groupQuantity())
+                .build());
+
             for (Map.Entry<Integer, BrokerNode> entry : nodes.entrySet()) {
                 BrokerNode brokerNode = entry.getValue();
                 apache.rocketmq.controller.v1.Node node = apache.rocketmq.controller.v1.Node.newBuilder()
@@ -226,7 +236,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     .setName(brokerNode.getNode().getName())
                     .setLastHeartbeat(toTimestamp(brokerNode.lastKeepAliveTime(config)))
                     .setTopicNum(topicManager.topicNumOfNode(entry.getKey()))
-                    .setQueueNum(topicManager.topicNumOfNode(entry.getKey()))
+                    .setQueueNum(topicManager.queueNumOfNode(entry.getKey()))
                     .setStreamNum(topicManager.streamNumOfNode(entry.getKey()))
                     .setGoingAway(brokerNode.isGoingAway())
                     .build();
