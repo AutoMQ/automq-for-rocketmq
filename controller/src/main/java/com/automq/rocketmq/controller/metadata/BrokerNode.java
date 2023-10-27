@@ -19,6 +19,8 @@ package com.automq.rocketmq.controller.metadata;
 
 import com.automq.rocketmq.common.config.ControllerConfig;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,9 +38,26 @@ public class BrokerNode {
 
     private boolean goingAway;
 
+    private final long baseNano;
+    private final Date baseTime;
+
     public BrokerNode(Node node) {
         this.node = node;
         this.lastKeepAlive = System.nanoTime();
+        this.baseNano = this.lastKeepAlive;
+        this.baseTime = new Date();
+    }
+
+    public Date lastKeepAliveTime(ControllerConfig config) {
+        if (node.getId() == config.nodeId()) {
+            return new Date();
+        }
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTime(baseTime);
+        long deltaMillis = TimeUnit.NANOSECONDS.toMillis(lastKeepAlive - baseNano);
+        calendar.add(Calendar.SECOND, (int) TimeUnit.MILLISECONDS.toSeconds(deltaMillis));
+        calendar.add(Calendar.MILLISECOND, (int) (deltaMillis % 1000));
+        return calendar.getTime();
     }
 
     public void keepAlive(long epoch, boolean goingAway) {

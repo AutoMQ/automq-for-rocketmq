@@ -41,6 +41,8 @@ public interface StreamMapper {
 
     List<Stream> list(@Param("topicId") Long topicId, @Param("queueId") Integer queueId, @Param("groupId") Long groupId);
 
+    List<Stream> byCriteria(@Param("criteria") StreamCriteria criteria);
+
     List<Stream> listByNode(@Param("nodeId") int nodeId, @Param("state") StreamState state);
 
     void update(Stream stream);

@@ -25,6 +25,7 @@ import picocli.CommandLine;
     description = "Command line tools for S3RocketMQ",
     showDefaultValues = true,
     subcommands = {
+        DescribeCluster.class,
         CreateTopic.class,
         DescribeTopic.class,
         UpdateTopic.class,

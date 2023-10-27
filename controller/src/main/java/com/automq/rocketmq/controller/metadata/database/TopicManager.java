@@ -24,7 +24,6 @@ import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.GroupStatus;
 import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.StreamState;
-import apache.rocketmq.controller.v1.SubStream;
 import apache.rocketmq.controller.v1.TopicStatus;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.controller.exception.ControllerException;
@@ -32,6 +31,7 @@ import com.automq.rocketmq.controller.metadata.BrokerNode;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.cache.AssignmentCache;
 import com.automq.rocketmq.controller.metadata.database.cache.Inflight;
+import com.automq.rocketmq.controller.metadata.database.cache.StreamCache;
 import com.automq.rocketmq.controller.metadata.database.cache.TopicCache;
 import com.automq.rocketmq.controller.metadata.database.dao.Group;
 import com.automq.rocketmq.controller.metadata.database.dao.GroupCriteria;
@@ -44,11 +44,7 @@ import com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
-import com.automq.rocketmq.controller.metadata.database.serde.SubStreamDeserializer;
-import com.automq.rocketmq.controller.metadata.database.serde.SubStreamSerializer;
 import com.google.common.base.Strings;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 import java.util.ArrayList;
@@ -73,27 +69,37 @@ public class TopicManager {
 
     private final MetadataStore metadataStore;
 
-    private final Gson gson;
-
     final TopicCache topicCache;
 
     final AssignmentCache assignmentCache;
+
+    final StreamCache streamCache;
 
     final ConcurrentMap<Long, Inflight<apache.rocketmq.controller.v1.Topic>> topicIdRequests;
     final ConcurrentMap<String, Inflight<apache.rocketmq.controller.v1.Topic>> topicNameRequests;
 
     public TopicManager(MetadataStore metadataStore) {
         this.metadataStore = metadataStore;
-        this.gson = new GsonBuilder()
-            .registerTypeAdapter(SubStream.class, new SubStreamSerializer())
-            .registerTypeAdapter(SubStream.class, new SubStreamDeserializer())
-            .create();
 
         this.topicCache = new TopicCache();
         this.assignmentCache = new AssignmentCache();
+        this.streamCache = new StreamCache();
         this.topicIdRequests = new ConcurrentHashMap<>();
         this.topicNameRequests = new ConcurrentHashMap<>();
     }
+
+    public int topicNumOfNode(int nodeId) {
+        return assignmentCache.topicNumOfNode(nodeId);
+    }
+
+    public int queueNumOfNode(int nodeId) {
+        return assignmentCache.queueNumOfNode(nodeId);
+    }
+
+    public int streamNumOfNode(int nodeId) {
+        return streamCache.streamNumOfNode(nodeId);
+    }
+
 
     public CompletableFuture<Long> createTopic(CreateTopicRequest request) {
         CompletableFuture<Long> future = new CompletableFuture<>();

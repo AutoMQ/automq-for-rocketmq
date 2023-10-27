@@ -18,12 +18,15 @@
 package com.automq.rocketmq.controller.metadata.database.dao;
 
 import apache.rocketmq.controller.v1.StreamState;
+import java.util.Date;
 
 public class StreamCriteria {
     Long id;
     Long topicId;
     Integer queueId;
     StreamState state;
+
+    Date updateTime;
 
     public static class StreamCriteriaBuilder {
         private final StreamCriteria criteria = new StreamCriteria();
@@ -51,6 +54,11 @@ public class StreamCriteria {
             return this;
         }
 
+        public StreamCriteriaBuilder withUpdateTime(Date updateTime) {
+            criteria.updateTime = updateTime;
+            return this;
+        }
+
         public StreamCriteria build() {
             return criteria;
         }
@@ -74,5 +82,9 @@ public class StreamCriteria {
 
     public StreamState getState() {
         return state;
+    }
+
+    public Date getUpdateTime() {
+        return updateTime;
     }
 }

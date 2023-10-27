@@ -35,6 +35,8 @@ import apache.rocketmq.controller.v1.DeleteGroupReply;
 import apache.rocketmq.controller.v1.DeleteGroupRequest;
 import apache.rocketmq.controller.v1.DeleteTopicReply;
 import apache.rocketmq.controller.v1.DeleteTopicRequest;
+import apache.rocketmq.controller.v1.DescribeClusterReply;
+import apache.rocketmq.controller.v1.DescribeClusterRequest;
 import apache.rocketmq.controller.v1.DescribeGroupReply;
 import apache.rocketmq.controller.v1.DescribeGroupRequest;
 import apache.rocketmq.controller.v1.DescribeTopicReply;
@@ -96,6 +98,23 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     public ControllerServiceImpl(MetadataStore metadataStore) {
         this.metadataStore = metadataStore;
         executorService = Executors.newSingleThreadScheduledExecutor(new PrefixThreadFactory("ControllerService_"));
+    }
+
+    @Override
+    public void describeCluster(DescribeClusterRequest request, StreamObserver<DescribeClusterReply> responseObserver) {
+        metadataStore.describeCluster(request)
+            .whenComplete((c, e) -> {
+                if (null == e) {
+                    responseObserver.onError(e);
+                    return;
+                }
+                DescribeClusterReply reply = DescribeClusterReply.newBuilder()
+                    .setCluster(c)
+                    .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                    .build();
+                responseObserver.onNext(reply);
+                responseObserver.onCompleted();
+            });
     }
 
     @Override

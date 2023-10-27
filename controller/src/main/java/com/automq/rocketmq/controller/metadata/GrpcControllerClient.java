@@ -19,6 +19,7 @@ package com.automq.rocketmq.controller.metadata;
 
 import apache.rocketmq.controller.v1.CloseStreamReply;
 import apache.rocketmq.controller.v1.CloseStreamRequest;
+import apache.rocketmq.controller.v1.Cluster;
 import apache.rocketmq.controller.v1.CommitOffsetReply;
 import apache.rocketmq.controller.v1.CommitOffsetRequest;
 import apache.rocketmq.controller.v1.CommitStreamObjectReply;
@@ -34,6 +35,8 @@ import apache.rocketmq.controller.v1.DeleteGroupReply;
 import apache.rocketmq.controller.v1.DeleteGroupRequest;
 import apache.rocketmq.controller.v1.DeleteTopicReply;
 import apache.rocketmq.controller.v1.DeleteTopicRequest;
+import apache.rocketmq.controller.v1.DescribeClusterReply;
+import apache.rocketmq.controller.v1.DescribeClusterRequest;
 import apache.rocketmq.controller.v1.DescribeGroupReply;
 import apache.rocketmq.controller.v1.DescribeGroupRequest;
 import apache.rocketmq.controller.v1.DescribeTopicReply;
@@ -109,6 +112,35 @@ public class GrpcControllerClient implements ControllerClient {
             stubs.putIfAbsent(target, stub);
         }
         return stubs.get(target);
+    }
+
+    @Override
+    public CompletableFuture<Cluster> describeCluster(String target, DescribeClusterRequest request) {
+        ControllerServiceGrpc.ControllerServiceFutureStub stub;
+        try {
+            stub = buildStubForTarget(target);
+        } catch (ControllerException e) {
+            return CompletableFuture.failedFuture(e);
+        }
+
+        CompletableFuture<Cluster> future = new CompletableFuture<>();
+        Futures.addCallback(stub.describeCluster(request), new FutureCallback<>() {
+            @Override
+            public void onSuccess(DescribeClusterReply result) {
+                if (result.getStatus().getCode() == Code.OK) {
+                    future.complete(result.getCluster());
+                } else {
+                    future.completeExceptionally(new ControllerException(result.getStatus().getCodeValue(),
+                        result.getStatus().getMessage()));
+                }
+            }
+
+            @Override
+            public void onFailure(@Nonnull Throwable t) {
+                future.completeExceptionally(t);
+            }
+        }, MoreExecutors.directExecutor());
+        return future;
     }
 
     public CompletableFuture<Node> registerBroker(String target, String name, String address,

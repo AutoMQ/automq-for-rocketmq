@@ -19,6 +19,7 @@ package com.automq.rocketmq.controller.metadata;
 
 import apache.rocketmq.controller.v1.CloseStreamReply;
 import apache.rocketmq.controller.v1.CloseStreamRequest;
+import apache.rocketmq.controller.v1.Cluster;
 import apache.rocketmq.controller.v1.CommitStreamObjectReply;
 import apache.rocketmq.controller.v1.CommitStreamObjectRequest;
 import apache.rocketmq.controller.v1.CommitWALObjectReply;
@@ -26,6 +27,7 @@ import apache.rocketmq.controller.v1.CommitWALObjectRequest;
 import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
+import apache.rocketmq.controller.v1.DescribeClusterRequest;
 import apache.rocketmq.controller.v1.ListOpenStreamsReply;
 import apache.rocketmq.controller.v1.ListOpenStreamsRequest;
 import apache.rocketmq.controller.v1.OpenStreamReply;
@@ -47,6 +49,8 @@ import java.io.Closeable;
 import java.util.concurrent.CompletableFuture;
 
 public interface ControllerClient extends Closeable {
+
+    CompletableFuture<Cluster> describeCluster(String target, DescribeClusterRequest request);
 
     CompletableFuture<Node> registerBroker(String target, String name, String address, String instanceId);
 

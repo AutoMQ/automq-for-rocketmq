@@ -18,6 +18,7 @@
 package com.automq.rocketmq.cli;
 
 import apache.rocketmq.controller.v1.Topic;
+import com.automq.rocketmq.controller.metadata.ControllerClient;
 import com.automq.rocketmq.controller.metadata.GrpcControllerClient;
 import java.util.concurrent.Callable;
 import picocli.CommandLine;
@@ -33,7 +34,7 @@ public class DescribeTopic implements Callable<Void> {
 
     @Override
     public Void call() throws Exception {
-        try (GrpcControllerClient client = new GrpcControllerClient()) {
+        try (ControllerClient client = new GrpcControllerClient()) {
             Topic topic = client.describeTopic(mqAdmin.endpoint, null, topicName)
                 .join();
             if (null == topic) {

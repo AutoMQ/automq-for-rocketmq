@@ -19,6 +19,7 @@ package com.automq.rocketmq.cli;
 
 import apache.rocketmq.controller.v1.Topic;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
+import com.automq.rocketmq.controller.metadata.ControllerClient;
 import com.automq.rocketmq.controller.metadata.GrpcControllerClient;
 import com.google.common.base.Strings;
 import java.util.concurrent.Callable;
@@ -41,7 +42,7 @@ public class UpdateTopic implements Callable<Void> {
 
     @Override
     public Void call() throws Exception {
-        try (GrpcControllerClient client = new GrpcControllerClient()) {
+        try (ControllerClient client = new GrpcControllerClient()) {
             Topic topic = client.describeTopic(mqAdmin.endpoint, topicId, null)
                 .join();
             if (null == topic) {

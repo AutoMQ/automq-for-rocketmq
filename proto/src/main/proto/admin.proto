@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+package apache.rocketmq.controller.v1;
+
+option java_multiple_files = true;
+option java_package = "apache.rocketmq.controller.v1";
+option java_generate_equals_and_hash = true;
+option java_string_check_utf8 = true;
+option java_outer_classname = "ControllerAdmin";
+
+message Lease {
+  int32 node_id = 1;
+  int32 epoch = 2;
+  google.protobuf.Timestamp expiration_timestamp = 3;
+}
+
+message Node {
+  // Node ID
+  int32 id = 1;
+
+  // Node name
+  string name = 2;
+
+  // Number of topics served by this node
+  int32 topic_num = 3;
+
+  // Number of queues served by this node
+  int32 queue_num = 4;
+
+  // Number of streams served by this node
+  int32 stream_num = 5;
+
+  // Flag if this node is going offline shortly
+  bool going_away = 6;
+
+  // Timestamp that the leader receives heartbeat from this node
+  google.protobuf.Timestamp last_heartbeat = 7;
+}
+
+message Cluster {
+  Lease lease = 1;
+  repeated Node nodes = 2;
+}

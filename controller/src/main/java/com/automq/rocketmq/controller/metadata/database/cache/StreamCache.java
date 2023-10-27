@@ -17,5 +17,42 @@
 
 package com.automq.rocketmq.controller.metadata.database.cache;
 
+import apache.rocketmq.controller.v1.StreamState;
+import com.automq.rocketmq.controller.metadata.database.dao.Stream;
+import java.util.Collection;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
 public class StreamCache {
+
+    private final ConcurrentMap<Long, Stream> streams;
+
+    public StreamCache() {
+        streams = new ConcurrentHashMap<>();
+    }
+
+    public int streamNumOfNode(int nodeId) {
+        int count = 0;
+        for (Map.Entry<Long, Stream> entry : streams.entrySet()) {
+            if (entry.getValue().getDstNodeId() == nodeId) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    public void apply(Collection<Stream> streams) {
+        for (Stream stream : streams) {
+            cacheItem(stream);
+        }
+    }
+
+    private void cacheItem(Stream stream) {
+        if (stream.getState() == StreamState.DELETED) {
+            streams.remove(stream.getId());
+        } else {
+            streams.put(stream.getId(), stream);
+        }
+    }
 }

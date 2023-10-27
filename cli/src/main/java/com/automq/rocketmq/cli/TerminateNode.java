@@ -19,6 +19,7 @@ package com.automq.rocketmq.cli;
 
 import apache.rocketmq.controller.v1.TerminateNodeReply;
 import apache.rocketmq.controller.v1.TerminateNodeRequest;
+import com.automq.rocketmq.controller.metadata.ControllerClient;
 import com.automq.rocketmq.controller.metadata.GrpcControllerClient;
 import io.grpc.stub.StreamObserver;
 import java.util.concurrent.Callable;
@@ -38,7 +39,7 @@ public class TerminateNode implements Callable<Void> {
     @Override
     public Void call() throws Exception {
         final CountDownLatch latch = new CountDownLatch(1);
-        try (GrpcControllerClient client = new GrpcControllerClient()) {
+        try (ControllerClient client = new GrpcControllerClient()) {
             TerminateNodeRequest request = TerminateNodeRequest.newBuilder().setNodeId(nodeId).build();
             client.terminateNode(mqAdmin.endpoint, request, new StreamObserver<>() {
                 @Override
