@@ -29,6 +29,7 @@ import org.junit.jupiter.api.TestMethodOrder;
 
 import java.io.IOException;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -47,7 +48,7 @@ public class S3WalObjectTest extends DatabaseTestBase {
 
             Calendar calendar = Calendar.getInstance();
             calendar.add(Calendar.SECOND, 30);
-            long time = calendar.getTime().getTime();
+            Date time = calendar.getTime();
 
             s3WALObject.setBaseDataTimestamp(time);
 
@@ -55,7 +56,12 @@ public class S3WalObjectTest extends DatabaseTestBase {
             Assertions.assertEquals(1, affectedRows);
 
             S3WalObject s3WalObject1 = s3WalObjectMapper.getByObjectId(s3WALObject.getObjectId());
-            Assertions.assertEquals(s3WALObject, s3WalObject1);
+            Assertions.assertEquals(s3WALObject.getObjectId(), s3WalObject1.getObjectId());
+            Assertions.assertEquals(s3WALObject.getObjectSize(), s3WalObject1.getObjectSize());
+            Assertions.assertEquals(s3WALObject.getNodeId(), s3WalObject1.getNodeId());
+            Assertions.assertEquals(s3WALObject.getSequenceId(), s3WalObject1.getSequenceId());
+            Assertions.assertEquals(s3WALObject.getSubStreams(), s3WalObject1.getSubStreams());
+            Assertions.assertEquals(s3WALObject.getBaseDataTimestamp(), s3WalObject1.getBaseDataTimestamp());
 
             List<S3WalObject> s3WalObjects = s3WalObjectMapper.list(s3WalObject1.getNodeId(), s3WalObject1.getSequenceId());
             Assertions.assertNotNull(s3WalObjects);
@@ -90,7 +96,7 @@ public class S3WalObjectTest extends DatabaseTestBase {
 
             Calendar calendar = Calendar.getInstance();
             calendar.add(Calendar.SECOND, 30);
-            long time = calendar.getTime().getTime();
+            Date time = calendar.getTime();
 
             s3WALObject.setBaseDataTimestamp(time);
 
@@ -98,12 +104,18 @@ public class S3WalObjectTest extends DatabaseTestBase {
             Assertions.assertEquals(1, affectedRows);
 
             S3WalObject s3WalObject1 = s3WalObjectMapper.getByObjectId(s3WALObject.getObjectId());
-            s3WalObject1.setCommittedTimestamp(time + 10 * 1000);
+            s3WalObject1.setCommittedTimestamp(new Date(time.getTime() + 10 * 1000));
 
             affectedRows = s3WalObjectMapper.commit(s3WalObject1);
             S3WalObject s3WalObject2 = s3WalObjectMapper.getByObjectId(s3WalObject1.getObjectId());
             Assertions.assertEquals(1, affectedRows);
-            Assertions.assertEquals(s3WalObject1, s3WalObject2);
+            Assertions.assertEquals(s3WalObject1.getObjectId(), s3WalObject2.getObjectId());
+            Assertions.assertEquals(s3WalObject1.getObjectSize(), s3WalObject2.getObjectSize());
+            Assertions.assertEquals(s3WalObject1.getNodeId(), s3WalObject2.getNodeId());
+            Assertions.assertEquals(s3WalObject1.getSequenceId(), s3WalObject2.getSequenceId());
+            Assertions.assertEquals(s3WalObject1.getSubStreams(), s3WalObject2.getSubStreams());
+            Assertions.assertEquals(s3WalObject1.getBaseDataTimestamp(), s3WalObject2.getBaseDataTimestamp());
+            Assertions.assertEquals(s3WalObject1.getCommittedTimestamp(), s3WalObject2.getCommittedTimestamp());
 
             s3WalObjectMapper.delete(null, s3WalObject1.getNodeId(), null);
             List<S3WalObject> s3WalObjects = s3WalObjectMapper.list(null, s3WalObject1.getSequenceId());

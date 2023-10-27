@@ -18,6 +18,7 @@
 
 package com.automq.rocketmq.controller.metadata.database.dao;
 
+import java.util.Date;
 import java.util.Objects;
 
 public class S3WalObject {
@@ -32,11 +33,11 @@ public class S3WalObject {
 
     String subStreams;
 
-    long baseDataTimestamp;
+    Date baseDataTimestamp;
 
-    long committedTimestamp;
+    Date committedTimestamp;
 
-    long createdTimestamp = System.currentTimeMillis();
+    Date createdTimestamp = new Date();
 
     public Long getObjectId() {
         return objectId;
@@ -78,45 +79,40 @@ public class S3WalObject {
         this.subStreams = subStreams;
     }
 
-    public long getBaseDataTimestamp() {
+    public Date getBaseDataTimestamp() {
         return baseDataTimestamp;
     }
 
-    public void setBaseDataTimestamp(long baseDataTimestamp) {
+    public void setBaseDataTimestamp(Date baseDataTimestamp) {
         this.baseDataTimestamp = baseDataTimestamp;
     }
 
-    public long getCommittedTimestamp() {
+    public Date getCommittedTimestamp() {
         return committedTimestamp;
     }
 
-    public void setCommittedTimestamp(long committedTimestamp) {
+    public void setCommittedTimestamp(Date committedTimestamp) {
         this.committedTimestamp = committedTimestamp;
     }
 
-    public long getCreatedTimestamp() {
+    public Date getCreatedTimestamp() {
         return createdTimestamp;
     }
 
-    public void setCreatedTimestamp(long createdTimestamp) {
+    public void setCreatedTimestamp(Date createdTimestamp) {
         this.createdTimestamp = createdTimestamp;
     }
 
     @Override
     public boolean equals(Object o) {
-        if (this == o)
-            return true;
-        if (o == null || getClass() != o.getClass())
-            return false;
-        S3WalObject object = (S3WalObject) o;
-        return baseDataTimestamp == object.baseDataTimestamp && committedTimestamp == object.committedTimestamp
-            && objectId.equals(object.objectId) && nodeId.equals(object.nodeId)
-            && objectSize.equals(object.objectSize) && sequenceId.equals(object.sequenceId)
-            && Objects.equals(subStreams, object.subStreams);
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        S3WalObject that = (S3WalObject) o;
+        return Objects.equals(objectId, that.objectId) && Objects.equals(nodeId, that.nodeId) && Objects.equals(objectSize, that.objectSize) && Objects.equals(sequenceId, that.sequenceId) && Objects.equals(subStreams, that.subStreams) && Objects.equals(baseDataTimestamp, that.baseDataTimestamp) && Objects.equals(committedTimestamp, that.committedTimestamp) && Objects.equals(createdTimestamp, that.createdTimestamp);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(objectId, nodeId, objectSize, sequenceId, subStreams, baseDataTimestamp, committedTimestamp);
+        return Objects.hash(objectId, nodeId, objectSize, sequenceId, subStreams, baseDataTimestamp, committedTimestamp, createdTimestamp);
     }
 }

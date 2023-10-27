@@ -49,6 +49,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import com.google.protobuf.TextFormat;
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
@@ -199,7 +200,10 @@ public class S3MetadataManager {
 
                         if (!s3WalObjects.isEmpty()) {
                             // update dataTs to the min compacted object's dataTs
-                            dataTs = s3WalObjects.stream().mapToLong(S3WalObject::getBaseDataTimestamp).min().getAsLong();
+                            dataTs = s3WalObjects.stream()
+                                .map(S3WalObject::getBaseDataTimestamp)
+                                .map(Date::getTime)
+                                .min(Long::compareTo).get();
                             // update sequenceId to the min compacted object's sequenceId
                             sequenceId = s3WalObjects.stream().mapToLong(S3WalObject::getSequenceId).min().getAsLong();
                         }
@@ -222,9 +226,9 @@ public class S3MetadataManager {
                             com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
                             object.setStreamId(s3StreamObject.getStreamId());
                             object.setObjectId(s3StreamObject.getObjectId());
-                            object.setCommittedTimestamp(System.currentTimeMillis());
+                            object.setCommittedTimestamp(new Date());
                             object.setStartOffset(s3StreamObject.getStartOffset());
-                            object.setBaseDataTimestamp(s3StreamObject.getBaseDataTimestamp());
+                            object.setBaseDataTimestamp(new Date(s3StreamObject.getBaseDataTimestamp()));
                             object.setEndOffset(s3StreamObject.getEndOffset());
                             object.setObjectSize(s3StreamObject.getObjectSize());
                             s3StreamObjectMapper.commit(object);
@@ -242,8 +246,8 @@ public class S3MetadataManager {
                         S3WalObject s3WALObject = new S3WalObject();
                         s3WALObject.setObjectId(objectId);
                         s3WALObject.setObjectSize(walObject.getObjectSize());
-                        s3WALObject.setBaseDataTimestamp(dataTs);
-                        s3WALObject.setCommittedTimestamp(System.currentTimeMillis());
+                        s3WALObject.setBaseDataTimestamp(new Date(dataTs));
+                        s3WALObject.setCommittedTimestamp(new Date());
                         s3WALObject.setNodeId(brokerId);
                         s3WALObject.setSequenceId(sequenceId);
                         s3WALObject.setSubStreams(gson.toJson(walObject.getSubStreamsMap()));
@@ -320,7 +324,7 @@ public class S3MetadataManager {
 
                                 // update dataTs to the min compacted object's dataTs
                                 com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject s3StreamObject = s3StreamObjectMapper.getByObjectId(id);
-                                return s3StreamObject.getBaseDataTimestamp();
+                                return s3StreamObject.getBaseDataTimestamp().getTime();
                             })
                             .min(Long::compareTo).get();
                     }
@@ -332,8 +336,8 @@ public class S3MetadataManager {
                         newS3StreamObj.setObjectSize(streamObject.getObjectSize());
                         newS3StreamObj.setStartOffset(streamObject.getStartOffset());
                         newS3StreamObj.setEndOffset(streamObject.getEndOffset());
-                        newS3StreamObj.setBaseDataTimestamp(dataTs);
-                        newS3StreamObj.setCommittedTimestamp(committedTs);
+                        newS3StreamObj.setBaseDataTimestamp(new Date(dataTs));
+                        newS3StreamObj.setCommittedTimestamp(new Date(committedTs));
                         s3StreamObjectMapper.create(newS3StreamObj);
                     }
 
@@ -447,8 +451,8 @@ public class S3MetadataManager {
                     .setObjectId(streamObject.getObjectId())
                     .setStartOffset(streamObject.getStartOffset())
                     .setEndOffset(streamObject.getEndOffset())
-                    .setBaseDataTimestamp(streamObject.getBaseDataTimestamp())
-                    .setCommittedTimestamp(streamObject.getCommittedTimestamp())
+                    .setBaseDataTimestamp(streamObject.getBaseDataTimestamp().getTime())
+                    .setCommittedTimestamp(streamObject.getCommittedTimestamp() != null ? streamObject.getCommittedTimestamp().getTime() : S3Constants.NOOP_OBJECT_COMMIT_TIMESTAMP)
                     .build())
                 .toList();
             future.complete(streamObjects);
@@ -464,8 +468,8 @@ public class S3MetadataManager {
             .setObjectSize(originalObject.getObjectSize())
             .setBrokerId(originalObject.getNodeId())
             .setSequenceId(originalObject.getSequenceId())
-            .setBaseDataTimestamp(originalObject.getBaseDataTimestamp())
-            .setCommittedTimestamp(originalObject.getCommittedTimestamp())
+            .setBaseDataTimestamp(originalObject.getBaseDataTimestamp().getTime())
+            .setCommittedTimestamp(originalObject.getCommittedTimestamp() != null ? originalObject.getCommittedTimestamp().getTime() : S3Constants.NOOP_OBJECT_COMMIT_TIMESTAMP)
             .putAllSubStreams(subStreams)
             .build();
     }
@@ -550,8 +554,8 @@ public class S3MetadataManager {
                         .setObjectId(streamObject.getObjectId())
                         .setStartOffset(streamObject.getStartOffset())
                         .setEndOffset(streamObject.getEndOffset())
-                        .setBaseDataTimestamp(streamObject.getBaseDataTimestamp())
-                        .setCommittedTimestamp(streamObject.getCommittedTimestamp())
+                        .setBaseDataTimestamp(streamObject.getBaseDataTimestamp().getTime())
+                        .setCommittedTimestamp(streamObject.getCommittedTimestamp() != null ? streamObject.getCommittedTimestamp().getTime() : S3Constants.NOOP_OBJECT_COMMIT_TIMESTAMP)
                         .build())
                     .toList();
 

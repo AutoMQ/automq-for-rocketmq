@@ -18,6 +18,7 @@
 
 package com.automq.rocketmq.controller.metadata.database.dao;
 
+import java.util.Date;
 import java.util.Objects;
 
 public class S3StreamObject {
@@ -34,11 +35,11 @@ public class S3StreamObject {
 
     private Long objectSize;
 
-    private long baseDataTimestamp;
+    private Date baseDataTimestamp;
 
-    private long committedTimestamp;
+    private Date committedTimestamp;
 
-    private long createdTimestamp = System.currentTimeMillis();
+    private Date createdTimestamp = new Date();
 
     public Long getId() {
         return id;
@@ -88,45 +89,40 @@ public class S3StreamObject {
         this.objectSize = objectSize;
     }
 
-    public long getBaseDataTimestamp() {
+    public Date getBaseDataTimestamp() {
         return baseDataTimestamp;
     }
 
-    public void setBaseDataTimestamp(long baseDataTimestamp) {
+    public void setBaseDataTimestamp(Date baseDataTimestamp) {
         this.baseDataTimestamp = baseDataTimestamp;
     }
 
-    public long getCommittedTimestamp() {
+    public Date getCommittedTimestamp() {
         return committedTimestamp;
     }
 
-    public void setCommittedTimestamp(long committedTimestamp) {
+    public void setCommittedTimestamp(Date committedTimestamp) {
         this.committedTimestamp = committedTimestamp;
     }
 
-    public long getCreatedTimestamp() {
+    public Date getCreatedTimestamp() {
         return createdTimestamp;
     }
 
-    public void setCreatedTimestamp(long createdTimestamp) {
+    public void setCreatedTimestamp(Date createdTimestamp) {
         this.createdTimestamp = createdTimestamp;
     }
 
     @Override
     public boolean equals(Object o) {
-        if (this == o)
-            return true;
-        if (o == null || getClass() != o.getClass())
-            return false;
-        S3StreamObject object = (S3StreamObject) o;
-        return baseDataTimestamp == object.baseDataTimestamp && committedTimestamp == object.committedTimestamp
-            && Objects.equals(id, object.id) && Objects.equals(objectId, object.objectId)
-            && Objects.equals(streamId, object.streamId) && Objects.equals(startOffset, object.startOffset)
-            && Objects.equals(endOffset, object.endOffset) && Objects.equals(objectSize, object.objectSize);
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        S3StreamObject that = (S3StreamObject) o;
+        return Objects.equals(id, that.id) && Objects.equals(objectId, that.objectId) && Objects.equals(streamId, that.streamId) && Objects.equals(startOffset, that.startOffset) && Objects.equals(endOffset, that.endOffset) && Objects.equals(objectSize, that.objectSize) && Objects.equals(baseDataTimestamp, that.baseDataTimestamp) && Objects.equals(committedTimestamp, that.committedTimestamp) && Objects.equals(createdTimestamp, that.createdTimestamp);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, objectId, streamId, startOffset, endOffset, objectSize, baseDataTimestamp, committedTimestamp);
+        return Objects.hash(id, objectId, streamId, startOffset, endOffset, objectSize, baseDataTimestamp, committedTimestamp, createdTimestamp);
     }
 }

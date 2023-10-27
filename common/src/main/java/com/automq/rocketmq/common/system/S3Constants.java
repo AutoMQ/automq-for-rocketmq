@@ -21,4 +21,6 @@ package com.automq.rocketmq.common.system;
 public class S3Constants {
 
     public static final int NOOP_OBJECT_ID = -1;
+
+    public static final int NOOP_OBJECT_COMMIT_TIMESTAMP = 0;
 }
