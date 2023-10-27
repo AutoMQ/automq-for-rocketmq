@@ -20,6 +20,7 @@ package com.automq.rocketmq.proxy.remoting.activity;
 import apache.rocketmq.controller.v1.AcceptTypes;
 import apache.rocketmq.controller.v1.Code;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
+import apache.rocketmq.controller.v1.GroupType;
 import apache.rocketmq.controller.v1.MessageType;
 import apache.rocketmq.controller.v1.Topic;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
@@ -31,8 +32,6 @@ import io.netty.channel.ChannelHandlerContext;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.ThreadPoolExecutor;
-import org.apache.rocketmq.client.exception.MQBrokerException;
 import org.apache.rocketmq.common.attribute.AttributeParser;
 import org.apache.rocketmq.common.attribute.TopicMessageType;
 import org.apache.rocketmq.common.topic.TopicValidator;
@@ -43,8 +42,10 @@ import org.apache.rocketmq.proxy.remoting.activity.AbstractRemotingActivity;
 import org.apache.rocketmq.proxy.remoting.pipeline.RequestPipeline;
 import org.apache.rocketmq.remoting.exception.RemotingCommandException;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
+import org.apache.rocketmq.remoting.protocol.RemotingSerializable;
 import org.apache.rocketmq.remoting.protocol.ResponseCode;
 import org.apache.rocketmq.remoting.protocol.header.CreateTopicRequestHeader;
+import org.apache.rocketmq.remoting.protocol.subscription.SubscriptionGroupConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,6 +56,7 @@ import static org.apache.rocketmq.remoting.protocol.RequestCode.UPDATE_AND_CREAT
 public class AdminActivity extends AbstractRemotingActivity implements CommonRemotingBehavior {
     public static final Logger LOGGER = LoggerFactory.getLogger(AdminActivity.class);
     private final MetadataStore metadataStore;
+
     public AdminActivity(RequestPipeline requestPipeline,
         MessagingProcessor messagingProcessor, MetadataStore metadataStore) {
         super(requestPipeline, messagingProcessor);
@@ -73,6 +75,28 @@ public class AdminActivity extends AbstractRemotingActivity implements CommonRem
 
     private RemotingCommand updateAndCreateSubscriptionGroup(ChannelHandlerContext ctx, RemotingCommand request,
         ProxyContext context) {
+        RemotingCommand response = RemotingUtil.buildResponseCommand(request, ResponseCode.SUCCESS);
+
+        SubscriptionGroupConfig groupConfig = RemotingSerializable.decode(request.getBody(), SubscriptionGroupConfig.class);
+        LOGGER.info("Create or update subscription group {} by {} with {}", groupConfig.getGroupName(),
+            context.getRemoteAddress(), groupConfig);
+
+        // Default to standard group type.
+        GroupType groupType = groupConfig.isConsumeMessageOrderly() ? GroupType.GROUP_TYPE_FIFO : GroupType.GROUP_TYPE_STANDARD;
+
+        // Set DLQ to zero here to disable DLQ.
+        CompletableFuture<Long> groupCf = metadataStore.createGroup(groupConfig.getGroupName(), groupConfig.getRetryMaxTimes(), groupType, 0);
+        // TODO: Support update if the group already exists.
+        groupCf.whenComplete((id, ex) -> {
+            if (ex != null) {
+                LOGGER.error("Failed to create consumer group {}.", groupConfig.getGroupName(), ex);
+                response.setCode(ResponseCode.SYSTEM_ERROR);
+                response.setRemark(ex.getMessage());
+                return;
+            }
+            LOGGER.info("Consumer group {}/{} created or updated by {}", groupConfig.getGroupName(), id, groupConfig);
+            writeResponse(ctx, context, request, response);
+        });
         return null;
     }
 

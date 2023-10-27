@@ -23,7 +23,6 @@ import com.automq.rocketmq.proxy.remoting.activity.ExtendConsumerManagerActivity
 import com.automq.rocketmq.proxy.remoting.activity.ExtendPullMessageActivity;
 import com.automq.rocketmq.proxy.remoting.activity.ExtendSendMessageActivity;
 import io.netty.channel.ChannelHandlerContext;
-import java.util.concurrent.ThreadPoolExecutor;
 import org.apache.rocketmq.proxy.processor.MessagingProcessor;
 import org.apache.rocketmq.proxy.remoting.pipeline.RequestPipeline;
 import org.apache.rocketmq.remoting.RemotingServer;
