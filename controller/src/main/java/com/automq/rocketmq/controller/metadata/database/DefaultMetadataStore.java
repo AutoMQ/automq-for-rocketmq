@@ -619,7 +619,13 @@ public class DefaultMetadataStore implements MetadataStore {
         return CompletableFuture.supplyAsync(() -> {
             try (SqlSession session = openSession()) {
                 StreamMapper streamMapper = session.getMapper(StreamMapper.class);
-                List<Stream> streams = streamMapper.list(topicId, queueId, groupId).stream()
+                StreamCriteria criteria = StreamCriteria.newBuilder()
+                    .withTopicId(topicId)
+                    .withQueueId(queueId)
+                    .withGroupId(groupId)
+                    .build();
+                List<Stream> streams = streamMapper.byCriteria(criteria)
+                    .stream()
                     .filter(stream -> stream.getStreamRole() == streamRole).toList();
                 if (streams.isEmpty()) {
                     if (streamRole == StreamRole.STREAM_ROLE_RETRY) {
@@ -1022,7 +1028,11 @@ public class DefaultMetadataStore implements MetadataStore {
                         continue;
                     }
                     StreamMapper streamMapper = session.getMapper(StreamMapper.class);
-                    List<StreamMetadata> streams = buildStreamMetadata(streamMapper.listByNode(nodeId, StreamState.OPEN), session);
+                    StreamCriteria criteria = StreamCriteria.newBuilder()
+                        .withDstNodeId(nodeId)
+                        .withState(StreamState.OPEN)
+                        .build();
+                    List<StreamMetadata> streams = buildStreamMetadata(streamMapper.byCriteria(criteria), session);
                     future.complete(streams);
                     break;
                 }
@@ -1069,7 +1079,8 @@ public class DefaultMetadataStore implements MetadataStore {
         return CompletableFuture.supplyAsync(() -> {
             try (SqlSession session = openSession()) {
                 StreamMapper streamMapper = session.getMapper(StreamMapper.class);
-                List<Stream> streams = streamMapper.listByStreamIds(streamIds);
+                StreamCriteria criteria = StreamCriteria.newBuilder().addBatchStreamIds(streamIds).build();
+                List<Stream> streams = streamMapper.byCriteria(criteria);
                 return buildStreamMetadata(streams, session);
             }
         }, asyncExecutorService);

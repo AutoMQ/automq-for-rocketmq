@@ -73,7 +73,11 @@
         UPDATE stream
         SET state = #{state}
         <where>
-            <if test="null != criteria.id">id = #{criteria.id}</if>
+            <if test="null != criteria.ids">
+                <foreach item="item" collection="criteria.ids" open="id IN (" separator="," close=")">
+                    #{item}
+                </foreach>
+            </if>
             <if test="null != criteria.topicId">AND topic_id = #{criteria.topicId}</if>
             <if test="null != criteria.queueId">AND queue_id = #{criteria.queueId}</if>
             <if test="null != criteria.state">AND state = #{criteria.state}</if>
@@ -86,7 +90,11 @@
             dst_node_id = #{dstNodeId},
             state = #{state}
         <where>
-            <if test="null != criteria.id">id = #{criteria.id}</if>
+            <if test="null != criteria.ids">
+                <foreach item="item" collection="criteria.ids" open="id IN (" separator="," close=")">
+                    #{item}
+                </foreach>
+            </if>
             <if test="null != criteria.topicId">AND topic_id = #{criteria.topicId}</if>
             <if test="null != criteria.queueId">AND queue_id = #{criteria.queueId}</if>
             <if test="null != criteria.state">AND state = #{criteria.state}</if>
@@ -101,42 +109,10 @@
         </where>
     </delete>
 
-    <select id="list" resultType="Stream">
-        SELECT id, topic_id, queue_id, stream_role, group_id, src_node_id, dst_node_id, epoch, range_id, start_offset,
-               state
-        FROM stream
-        <where>
-            <if test="null != topicId">topic_id = #{topicId}</if>
-            <if test="null != queueId">AND queue_id = #{queueId}</if>
-            <if test="null != groupId">AND group_id = #{groupId}</if>
-        </where>
-    </select>
-
-    <select id="listByNode" resultType="Stream">
-        SELECT id, topic_id, queue_id, stream_role, group_id, src_node_id, dst_node_id, epoch, range_id, start_offset,
-        state
-        FROM stream
-        <where>
-            <if test="null != nodeId">dst_node_id = #{nodeId}</if>
-            <if test="null != state">AND state = #{state}</if>
-        </where>
-    </select>
-
     <select id="queueEpoch" resultType="long">
         SELECT MAX(epoch)
         FROM stream
         WHERE topic_id = #{topicId} AND queue_id = #{queueId}
-    </select>
-
-    <select id="listByStreamIds" resultType="Stream">
-        SELECT id, topic_id, queue_id, stream_role, group_id, src_node_id, dst_node_id, epoch, range_id, start_offset,
-        state
-        FROM stream
-        <where>
-            <foreach item="item" index="index" collection="streamIds" open="id IN (" separator="," close=")">
-                #{item}
-            </foreach>
-        </where>
     </select>
 
     <select id="byCriteria" resultType="Stream">
@@ -144,11 +120,18 @@
         state
         FROM stream
         <where>
-            <if test="null != criteria.id">id = #{criteria.id}</if>
+            <if test="null != criteria.ids">
+                <foreach item="item" collection="criteria.ids" open="id IN (" separator="," close=")">
+                    #{item}
+                </foreach>
+            </if>
             <if test="null != criteria.topicId">AND topic_id = #{criteria.topicId}</if>
             <if test="null != criteria.queueId">AND queue_id = #{criteria.queueId}</if>
             <if test="null != criteria.state">AND state = #{criteria.state}</if>
             <if test="null != criteria.updateTime">AND update_time >= #{criteria.updateTime}</if>
+            <if test="null != criteria.srcNodeId">AND src_node_id = #{criteria.srcNodeId}</if>
+            <if test="null != criteria.dstNodeId">AND dst_node_id = #{criteria.dstNodeId}</if>
+            <if test="null != criteria.groupId">AND group_id = #{criteria.groupId}</if>
         </where>
     </select>
 

@@ -39,11 +39,7 @@ public interface StreamMapper {
 
     int delete(@Param("id") Long id);
 
-    List<Stream> list(@Param("topicId") Long topicId, @Param("queueId") Integer queueId, @Param("groupId") Long groupId);
-
     List<Stream> byCriteria(@Param("criteria") StreamCriteria criteria);
-
-    List<Stream> listByNode(@Param("nodeId") int nodeId, @Param("state") StreamState state);
 
     void update(Stream stream);
 
@@ -55,6 +51,4 @@ public interface StreamMapper {
         @Param("srcNodeId") int src,
         @Param("dstNodeId") int dst,
         @Param("state") StreamState state);
-
-    List<Stream> listByStreamIds(@Param("streamIds") List<Long> streamIds);
 }

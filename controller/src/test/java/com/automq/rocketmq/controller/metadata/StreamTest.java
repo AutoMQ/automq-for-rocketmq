@@ -64,7 +64,7 @@ public class StreamTest extends DatabaseTestBase {
 
             streamMapper.delete(createdStream.getId());
 
-            List<Stream> streams = streamMapper.list(null, null, null);
+            List<Stream> streams = streamMapper.byCriteria(StreamCriteria.newBuilder().build());
             Assertions.assertTrue(streams.isEmpty());
         }
     }
@@ -147,7 +147,7 @@ public class StreamTest extends DatabaseTestBase {
             Assertions.assertEquals(StreamState.OPEN, stream1.getState());
 
             StreamCriteria criteria = StreamCriteria.newBuilder()
-                .withStreamId(stream1.getId())
+                .addStreamId(stream1.getId())
                 .withState(StreamState.OPEN)
                 .build();
             affectedRows = streamMapper.updateStreamState(criteria, StreamState.CLOSED);

@@ -18,12 +18,24 @@
 package com.automq.rocketmq.controller.metadata.database.dao;
 
 import apache.rocketmq.controller.v1.StreamState;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
+import java.util.List;
 
 public class StreamCriteria {
-    Long id;
+    List<Long> ids;
+
+    Integer dstNodeId;
+
+    Integer srcNodeId;
+
+    Long groupId;
+
     Long topicId;
+
     Integer queueId;
+
     StreamState state;
 
     Date updateTime;
@@ -34,10 +46,37 @@ public class StreamCriteria {
         StreamCriteriaBuilder() {
         }
 
-        public StreamCriteriaBuilder withStreamId(long streamId) {
-            criteria.id = streamId;
+        public StreamCriteriaBuilder addStreamId(long streamId) {
+            if (null == criteria.ids) {
+                criteria.ids = new ArrayList<>();
+            }
+            criteria.ids.add(streamId);
             return this;
         }
+
+        public StreamCriteriaBuilder addBatchStreamIds(Collection<Long> ids) {
+            if (null == criteria.ids) {
+                criteria.ids = new ArrayList<>();
+            }
+            criteria.ids.addAll(ids);
+            return this;
+        }
+
+        public StreamCriteriaBuilder withDstNodeId(int dstNodeId) {
+            criteria.dstNodeId = dstNodeId;
+            return this;
+        }
+
+        public StreamCriteriaBuilder withSrcNodeId(int srcNodeId) {
+            criteria.srcNodeId = srcNodeId;
+            return this;
+        }
+
+        public StreamCriteriaBuilder withGroupId(Long groupId) {
+            criteria.groupId = groupId;
+            return this;
+        }
+
 
         public StreamCriteriaBuilder withTopicId(long topicId) {
             criteria.topicId = topicId;
@@ -68,8 +107,20 @@ public class StreamCriteria {
         return new StreamCriteriaBuilder();
     }
 
-    public Long getId() {
-        return id;
+    public List<Long> getIds() {
+        return ids;
+    }
+
+    public Integer getDstNodeId() {
+        return dstNodeId;
+    }
+
+    public Integer getSrcNodeId() {
+        return srcNodeId;
+    }
+
+    public Long getGroupId() {
+        return groupId;
     }
 
     public Long getTopicId() {
