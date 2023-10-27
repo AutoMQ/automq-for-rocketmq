@@ -1851,6 +1851,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         long streamId;
         int nodeId = 1;
         long objectId;
+        Calendar calendar = Calendar.getInstance();
 
         S3WALObject walObject = S3WALObject.newBuilder()
             .setObjectId(-1)
@@ -1887,7 +1888,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             s3Object.setState(S3ObjectState.BOS_PREPARED);
             s3Object.setStreamId(streamId);
             s3Object.setObjectSize(2139L);
-            Calendar calendar = Calendar.getInstance();
+
             calendar.add(Calendar.HOUR, 1);
             s3Object.setExpiredTimestamp(calendar.getTime());
             objectMapper.prepare(s3Object);
@@ -1904,10 +1905,11 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
                 .atMost(10, TimeUnit.SECONDS)
                 .until(metadataStore::isLeader);
 
+            calendar.add(Calendar.HOUR, 2);
             S3StreamObject streamObject = S3StreamObject.newBuilder()
                 .setObjectId(objectId)
                 .setStreamId(streamId)
-                .setBaseDataTimestamp(1)
+                .setBaseDataTimestamp(calendar.getTimeInMillis())
                 .setStartOffset(0)
                 .setEndOffset(2)
                 .setObjectSize(2139)
