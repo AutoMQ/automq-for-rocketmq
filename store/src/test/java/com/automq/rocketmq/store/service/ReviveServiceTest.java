@@ -107,7 +107,8 @@ class ReviveServiceTest {
         FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
         logicQueue.put(message).join();
         // pop message
-        int invisibleDuration = 1000;
+        int invisibleDuration = 100;
+        long reviveTimestamp = System.currentTimeMillis() + invisibleDuration;
         PopResult popResult = logicQueue.popNormal(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
         assertEquals(1, popResult.messageList().size());
         // check ck exist
@@ -118,32 +119,28 @@ class ReviveServiceTest {
         timerService.dequeue();
         ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.consumerGroupId(), handle.operationId()));
         assertNotNull(ckValue);
-        // after 1s revive can clear ck
-        long reviveTimestamp = System.currentTimeMillis() + invisibleDuration;
+        // Wait clearing ck.
         await().until(() -> {
             timerService.dequeue();
-            return reviveService.reviveTimestamp() >= reviveTimestamp && reviveService.inflightReviveCount() == 0;
+            byte[] ck = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.consumerGroupId(), handle.operationId()));
+            return ck == null;
         });
-
-        ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.consumerGroupId(), handle.operationId()));
-        assertNull(ckValue);
 
         // check if this message has been appended to retry stream
         PullResult retryPullResult = logicQueue.pullRetry(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 0, invisibleDuration).join();
         assertEquals(1, retryPullResult.messageList().size());
 
         // pop retry
+        long reviveTimestamp1 = System.currentTimeMillis() + invisibleDuration;
         PopResult retryPopResult = logicQueue.popRetry(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
         assertEquals(1, retryPopResult.messageList().size());
         FlatMessageExt msg = retryPopResult.messageList().get(0);
         assertEquals(2, msg.deliveryAttempts());
 
-        long reviveTimestamp1 = System.currentTimeMillis() + invisibleDuration;
         // after 1s
         await().until(() -> {
             timerService.dequeue();
-            long ts0 = reviveService.reviveTimestamp();
-            return ts0 >= reviveTimestamp1;
+            return reviveService.reviveTimestamp() >= reviveTimestamp1;
         });
         // wait inflight all complete
         await().until(() -> reviveService.inflightReviveCount() == 0);
@@ -173,7 +170,8 @@ class ReviveServiceTest {
             logicQueue.put(message).join();
         }
         // pop message
-        int invisibleDuration = 1000;
+        int invisibleDuration = 100;
+        long reviveTimestamp = System.currentTimeMillis() + invisibleDuration;
         PopResult popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
         assertEquals(1, popResult.messageList().size());
         // check ck exist
@@ -185,33 +183,27 @@ class ReviveServiceTest {
         ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.consumerGroupId(), handle.operationId()));
         assertNotNull(ckValue);
         // after 1s revive can clear ck
-        long reviveTimestamp = System.currentTimeMillis() + invisibleDuration;
         await().until(() -> {
             timerService.dequeue();
-            return reviveService.reviveTimestamp() >= reviveTimestamp && reviveService.inflightReviveCount() == 0;
+            byte[] ck = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.consumerGroupId(), handle.operationId()));
+            return ck == null;
         });
 
-        ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.consumerGroupId(), handle.operationId()));
-        assertNull(ckValue);
-
         // pop again
+        long reviveTimestamp1 = System.currentTimeMillis() + invisibleDuration;
         PopResult retryPopResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
         assertEquals(1, retryPopResult.messageList().size());
         FlatMessageExt msg = retryPopResult.messageList().get(0);
         assertEquals(2, msg.deliveryAttempts());
         assertEquals(0, msg.offset());
 
-        long reviveTimestamp1 = System.currentTimeMillis() + invisibleDuration;
         // after 1s
         await().until(() -> {
             timerService.dequeue();
-            long ts0 = reviveService.reviveTimestamp();
-            return ts0 >= reviveTimestamp1;
+            return reviveService.reviveTimestamp() >= reviveTimestamp1;
         });
         // wait inflight all complete
-        await().until(() -> {
-            return reviveService.inflightReviveCount() == 0;
-        });
+        await().until(() -> reviveService.inflightReviveCount() == 0);
 
         // check if this message has been sent to DLQ
         Mockito.verify(dlqSender, Mockito.times(1))
@@ -243,7 +235,7 @@ class ReviveServiceTest {
         FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
         logicQueue.put(message).join();
         // pop message
-        int invisibleDuration = 1000;
+        int invisibleDuration = 100;
         long reviveTimestamp = System.currentTimeMillis() + invisibleDuration;
         PopResult popResult = logicQueue.popNormal(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
         assertEquals(1, popResult.messageList().size());
@@ -255,14 +247,14 @@ class ReviveServiceTest {
         timerService.dequeue();
         ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.consumerGroupId(), handle.operationId()));
         assertNotNull(ckValue);
-        // after 1s revive can clear ck
+
+        // Wait clearing ck.
+        ReceiptHandle finalHandle = handle;
         await().until(() -> {
             timerService.dequeue();
-            return reviveService.reviveTimestamp() >= reviveTimestamp && reviveService.inflightReviveCount() == 0;
+            byte[] ck = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, finalHandle.consumerGroupId(), finalHandle.operationId()));
+            return ck == null;
         });
-
-        ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.consumerGroupId(), handle.operationId()));
-        assertNull(ckValue);
 
         // check if this message has been appended to retry stream
         PullResult retryPullResult = logicQueue.pullRetry(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 0, 32).join();
