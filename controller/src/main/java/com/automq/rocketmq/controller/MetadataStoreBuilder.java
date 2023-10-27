@@ -34,7 +34,7 @@ public class MetadataStoreBuilder {
     }
     public static MetadataStore build(ControllerConfig config) throws IOException {
         SqlSessionFactory sessionFactory = getSessionFactory(config.dbUrl(), config.dbUserName(), config.dbPassword());
-        return new DefaultMetadataStore(new GrpcControllerClient(), sessionFactory, config);
+        return new DefaultMetadataStore(new GrpcControllerClient(config), sessionFactory, config);
     }
 
     private static SqlSessionFactory getSessionFactory(String dbUrl, String dbUser, String dbPassword) throws IOException {

@@ -358,7 +358,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .until(metadataStore::isLeader);
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-                 ControllerClient client = new GrpcControllerClient()
+                 ControllerClient client = new GrpcControllerClient(config)
             ) {
                 testServer.start();
                 int port = testServer.getPort();
@@ -405,7 +405,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .until(metadataStore::isLeader);
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-                 ControllerClient client = new GrpcControllerClient()
+                 ControllerClient client = new GrpcControllerClient(config)
             ) {
                 testServer.start();
                 int port = testServer.getPort();
@@ -456,7 +456,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .until(metadataStore::isLeader);
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-                 ControllerClient client = new GrpcControllerClient()
+                 ControllerClient client = new GrpcControllerClient(config)
             ) {
                 testServer.start();
                 int port = testServer.getPort();
@@ -497,7 +497,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .until(metadataStore::isLeader);
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-                 ControllerClient client = new GrpcControllerClient()
+                 ControllerClient client = new GrpcControllerClient(config)
             ) {
                 testServer.start();
                 int port = testServer.getPort();
@@ -543,7 +543,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .until(metadataStore::isLeader);
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-                 ControllerClient client = new GrpcControllerClient()
+                 ControllerClient client = new GrpcControllerClient(config)
             ) {
                 testServer.start();
                 int port = testServer.getPort();
@@ -592,7 +592,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .until(metadataStore::isLeader);
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-                 ControllerClient client = new GrpcControllerClient()
+                 ControllerClient client = new GrpcControllerClient(config)
             ) {
                 testServer.start();
                 int port = testServer.getPort();
@@ -658,7 +658,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .until(metadataStore::isLeader);
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-                 ControllerClient client = new GrpcControllerClient()
+                 ControllerClient client = new GrpcControllerClient(config)
             ) {
                 testServer.start();
                 int port = testServer.getPort();
@@ -718,7 +718,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .until(metadataStore::isLeader);
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-                 ControllerClient client = new GrpcControllerClient()
+                 ControllerClient client = new GrpcControllerClient(config)
             ) {
                 testServer.start();
                 int port = testServer.getPort();
@@ -778,7 +778,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .until(metadataStore::isLeader);
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-                 ControllerClient client = new GrpcControllerClient()
+                 ControllerClient client = new GrpcControllerClient(config)
             ) {
                 testServer.start();
                 int port = testServer.getPort();
@@ -845,7 +845,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .until(metadataStore::isLeader);
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-                 ControllerClient client = new GrpcControllerClient()
+                 ControllerClient client = new GrpcControllerClient(config)
             ) {
                 testServer.start();
                 int port = testServer.getPort();
@@ -908,7 +908,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .until(metadataStore::isLeader);
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-                 ControllerClient client = new GrpcControllerClient()
+                 ControllerClient client = new GrpcControllerClient(config)
             ) {
                 testServer.start();
                 int port = testServer.getPort();
@@ -1005,7 +1005,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .until(metadataStore::isLeader);
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-                 ControllerClient client = new GrpcControllerClient()
+                 ControllerClient client = new GrpcControllerClient(config)
             ) {
                 testServer.start();
                 int port = testServer.getPort();
@@ -1102,7 +1102,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .until(metadataStore::isLeader);
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-                 ControllerClient client = new GrpcControllerClient()
+                 ControllerClient client = new GrpcControllerClient(config)
             ) {
                 testServer.start();
                 int port = testServer.getPort();
@@ -1204,7 +1204,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .until(metadataStore::isLeader);
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-                 ControllerClient client = new GrpcControllerClient()
+                 ControllerClient client = new GrpcControllerClient(config)
             ) {
                 testServer.start();
                 int port = testServer.getPort();
@@ -1263,7 +1263,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .until(metadataStore::isLeader);
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-                 ControllerClient client = new GrpcControllerClient()
+                 ControllerClient client = new GrpcControllerClient(config)
             ) {
                 testServer.start();
                 int port = testServer.getPort();
@@ -1289,7 +1289,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .until(metadataStore::isLeader);
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-                 ControllerClient client = new GrpcControllerClient()
+                 ControllerClient client = new GrpcControllerClient(config)
             ) {
                 testServer.start();
                 int port = testServer.getPort();
@@ -1319,7 +1319,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             compactedObjects.add(objectId + 1);
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-                 ControllerClient client = new GrpcControllerClient()
+                 ControllerClient client = new GrpcControllerClient(config)
             ) {
                 testServer.start();
                 int port = testServer.getPort();
@@ -1398,7 +1398,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             compactedObjects.add(objectId);
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-                 ControllerClient client = new GrpcControllerClient()
+                 ControllerClient client = new GrpcControllerClient(config)
             ) {
                 testServer.start();
                 int port = testServer.getPort();
@@ -1426,7 +1426,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .until(metadataStore::isLeader);
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-                 ControllerClient client = new GrpcControllerClient()
+                 ControllerClient client = new GrpcControllerClient(config)
             ) {
                 testServer.start();
                 int port = testServer.getPort();
@@ -1446,7 +1446,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .build();
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-                 ControllerClient client = new GrpcControllerClient()
+                 ControllerClient client = new GrpcControllerClient(config)
             ) {
                 testServer.start();
                 int port = testServer.getPort();
@@ -1491,7 +1491,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .until(metadataStore::isLeader);
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-                 ControllerClient client = new GrpcControllerClient()
+                 ControllerClient client = new GrpcControllerClient(config)
             ) {
                 testServer.start();
                 int port = testServer.getPort();
@@ -1511,7 +1511,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .build();
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-                 ControllerClient client = new GrpcControllerClient()
+                 ControllerClient client = new GrpcControllerClient(config)
             ) {
                 testServer.start();
                 int port = testServer.getPort();
@@ -1554,7 +1554,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .until(metadataStore::isLeader);
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-                 ControllerClient client = new GrpcControllerClient()
+                 ControllerClient client = new GrpcControllerClient(config)
             ) {
                 testServer.start();
                 int port = testServer.getPort();
@@ -1596,7 +1596,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             compactedObjects.add(objectId + 3);
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-                 ControllerClient client = new GrpcControllerClient()
+                 ControllerClient client = new GrpcControllerClient(config)
             ) {
                 testServer.start();
                 int port = testServer.getPort();
@@ -1641,7 +1641,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .until(metadataStore::isLeader);
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-                 ControllerClient client = new GrpcControllerClient()
+                 ControllerClient client = new GrpcControllerClient(config)
             ) {
                 testServer.start();
                 int port = testServer.getPort();
@@ -1662,7 +1662,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .build();
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-                 ControllerClient client = new GrpcControllerClient()
+                 ControllerClient client = new GrpcControllerClient(config)
             ) {
                 testServer.start();
                 int port = testServer.getPort();
@@ -1706,7 +1706,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .until(metadataStore::isLeader);
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-                 ControllerClient client = new GrpcControllerClient()
+                 ControllerClient client = new GrpcControllerClient(config)
             ) {
                 testServer.start();
                 int port = testServer.getPort();
@@ -1762,7 +1762,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             compactedObjects.add(objectId + 3);
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-                 ControllerClient client = new GrpcControllerClient()
+                 ControllerClient client = new GrpcControllerClient(config)
             ) {
                 testServer.start();
                 int port = testServer.getPort();
@@ -1793,7 +1793,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .until(metadataStore::isLeader);
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-                 ControllerClient client = new GrpcControllerClient()
+                 ControllerClient client = new GrpcControllerClient(config)
             ) {
                 testServer.start();
                 int port = testServer.getPort();
@@ -1849,7 +1849,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             compactedObjects.add(objectId + 3);
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-                 ControllerClient client = new GrpcControllerClient()
+                 ControllerClient client = new GrpcControllerClient(config)
             ) {
                 testServer.start();
                 int port = testServer.getPort();
@@ -1912,7 +1912,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .until(metadataStore::isLeader);
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-                 ControllerClient client = new GrpcControllerClient()
+                 ControllerClient client = new GrpcControllerClient(config)
             ) {
                 testServer.start();
                 int port = testServer.getPort();
@@ -1968,7 +1968,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             compactedObjects.add(objectId + 3);
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-                 ControllerClient client = new GrpcControllerClient()
+                 ControllerClient client = new GrpcControllerClient(config)
             ) {
                 testServer.start();
                 int port = testServer.getPort();
@@ -2042,7 +2042,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 .until(metadataStore::isLeader);
 
             try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
-                 ControllerClient client = new GrpcControllerClient();
+                 ControllerClient client = new GrpcControllerClient(config);
                  SqlSession session = getSessionFactory().openSession()
             ) {
                 testServer.start();

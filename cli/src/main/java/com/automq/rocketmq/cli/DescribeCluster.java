@@ -25,7 +25,7 @@ import com.google.protobuf.util.JsonFormat;
 import java.util.concurrent.Callable;
 import picocli.CommandLine;
 
-@CommandLine.Command(name = "describeTopic", mixinStandardHelpOptions = true, showDefaultValues = true)
+@CommandLine.Command(name = "describeCluster", mixinStandardHelpOptions = true, showDefaultValues = true)
 public class DescribeCluster implements Callable<Void> {
 
     @CommandLine.ParentCommand
@@ -33,7 +33,7 @@ public class DescribeCluster implements Callable<Void> {
 
     @Override
     public Void call() throws Exception {
-        try (ControllerClient client = new GrpcControllerClient()) {
+        try (ControllerClient client = new GrpcControllerClient(new CliClientConfig())) {
             DescribeClusterRequest request = DescribeClusterRequest.newBuilder()
                 .build();
             Cluster cluster = client.describeCluster(mqAdmin.endpoint, request).join();

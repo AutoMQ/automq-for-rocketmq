@@ -34,7 +34,7 @@ public class DescribeTopic implements Callable<Void> {
 
     @Override
     public Void call() throws Exception {
-        try (ControllerClient client = new GrpcControllerClient()) {
+        try (ControllerClient client = new GrpcControllerClient(new CliClientConfig())) {
             Topic topic = client.describeTopic(mqAdmin.endpoint, null, topicName)
                 .join();
             if (null == topic) {

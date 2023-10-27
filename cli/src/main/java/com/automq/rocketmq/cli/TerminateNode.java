@@ -39,7 +39,7 @@ public class TerminateNode implements Callable<Void> {
     @Override
     public Void call() throws Exception {
         final CountDownLatch latch = new CountDownLatch(1);
-        try (ControllerClient client = new GrpcControllerClient()) {
+        try (ControllerClient client = new GrpcControllerClient(new CliClientConfig())) {
             TerminateNodeRequest request = TerminateNodeRequest.newBuilder().setNodeId(nodeId).build();
             client.terminateNode(mqAdmin.endpoint, request, new StreamObserver<>() {
                 @Override

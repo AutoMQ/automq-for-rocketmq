@@ -60,7 +60,7 @@ public class CreateTopic implements Callable<Void> {
             System.exit(1);
         }
 
-        GrpcControllerClient client = new GrpcControllerClient();
+        GrpcControllerClient client = new GrpcControllerClient(new CliClientConfig());
         CreateTopicRequest request = CreateTopicRequest.newBuilder()
             .setTopic(topicName)
             .setCount(queueNums)

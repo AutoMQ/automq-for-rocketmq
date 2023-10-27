@@ -102,9 +102,10 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
 
     @Override
     public void describeCluster(DescribeClusterRequest request, StreamObserver<DescribeClusterReply> responseObserver) {
+        LOGGER.debug("Received {}", TextFormat.shortDebugString(request));
         metadataStore.describeCluster(request)
             .whenComplete((c, e) -> {
-                if (null == e) {
+                if (null != e) {
                     responseObserver.onError(e);
                     return;
                 }

@@ -39,7 +39,7 @@ public class DescribeGroup implements Callable<Void> {
 
     @Override
     public Void call() throws Exception {
-        try (ControllerClient client = new GrpcControllerClient()) {
+        try (ControllerClient client = new GrpcControllerClient(new CliClientConfig())) {
             ConsumerGroup group = client.describeGroup(mqAdmin.endpoint, groupName)
                 .join();
             if (null == group) {

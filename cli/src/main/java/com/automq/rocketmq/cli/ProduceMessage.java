@@ -131,7 +131,7 @@ public class ProduceMessage implements Callable<Void> {
     }
 
     private void prepareTopics() throws IOException, ControllerException {
-        GrpcControllerClient client = new GrpcControllerClient();
+        GrpcControllerClient client = new GrpcControllerClient(new CliClientConfig());
 
         for (int i = 0; i < topicNums; i++) {
             String topicName = topicPrefix + i;

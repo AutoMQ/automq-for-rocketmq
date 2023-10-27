@@ -76,6 +76,7 @@ public class DatabaseTestBase {
         Mockito.when(config.balanceWorkloadIntervalInSecs()).thenCallRealMethod();
         Mockito.when(config.recycleS3IntervalInSecs()).thenCallRealMethod();
         Mockito.when(config.goingAway()).thenReturn(false);
+        Mockito.when(config.rpcTimeout()).thenCallRealMethod();
         gson = new GsonBuilder()
             .registerTypeAdapter(SubStream.class, new SubStreamSerializer())
             .registerTypeAdapter(SubStream.class, new SubStreamDeserializer())

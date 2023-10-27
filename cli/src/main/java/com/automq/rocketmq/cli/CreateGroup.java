@@ -41,7 +41,7 @@ public class CreateGroup implements Callable<Void> {
 
     @Override
     public Void call() throws Exception {
-        try (ControllerClient client = new GrpcControllerClient()) {
+        try (ControllerClient client = new GrpcControllerClient(new CliClientConfig())) {
             CreateGroupRequest request = CreateGroupRequest.newBuilder()
                 .setName(groupName)
                 .setMaxRetryAttempt(maxRetryAttempt)
