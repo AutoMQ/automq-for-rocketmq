@@ -35,17 +35,21 @@ jobs:
       matrix:
         java-version: ["17"]
     steps:
-#      - name: 'Download artifact'
-#        uses: actions/download-artifact@v2
-#        with:
-#          name: rocketmq
-#          path: ${{github.workspace}}/
-#      - run: |
-#          unzip rocketmq*.zip
-#          mv rocketmq-on-s3/ rocketmq/
-#          ls
-#          ls rocketmq/bin
-#          pwd
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: 'Download artifact'
+        uses: actions/download-artifact@v2
+        with:
+          name: rocketmq
+          path: ${{github.workspace}}/rocketmq-on-s3/distribution/target
+      - run: |
+          cd rocketmq-on-s3/distribution/target
+          unzip rocketmq*.zip
+          mv rocketmq-on-s3/ rocketmq/
+          ls
+          ls rocketmq/bin
+          pwd
       - uses: actions/checkout@v3
         with:
           repository: AutoMQ/rocketmq-e2e
