@@ -50,6 +50,8 @@ jobs:
           ls
           ls rocketmq/bin
           pwd
+          cd ${{github.workspace}}
+          ls
       - uses: actions/checkout@v3
         with:
           repository: AutoMQ/rocketmq-e2e
@@ -65,7 +67,7 @@ jobs:
       - name: Build and save docker images
         id: build-images
         run: |
-          cd rocketmq-on-s3/distribution/docker
+          cd ${{github.workspace}}/rocketmq-on-s3/distribution/docker
           sh build-ci.sh ${DOCKER_REPO}
           mkdir versionlist
           full_node_version=$(git ls-remote --tags | awk -F '/' 'END{print $3}')
