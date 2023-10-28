@@ -89,6 +89,11 @@ public class MultiPartWriter implements Writer {
     }
 
     @Override
+    public void copyOnWrite() {
+        //TODO: implement this
+    }
+
+    @Override
     public boolean hasBatchingPart() {
         return objectPart != null;
     }

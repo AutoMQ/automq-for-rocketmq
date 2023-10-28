@@ -63,6 +63,11 @@ class ProxyWriter implements Writer {
     }
 
     @Override
+    public void copyOnWrite() {
+        //TODO: implement this
+    }
+
+    @Override
     public void copyWrite(String sourcePath, long start, long end) {
         if (multiPartWriter == null) {
             newMultiPartWriter();
@@ -108,6 +113,11 @@ class ProxyWriter implements Writer {
         public CompletableFuture<Void> write(ByteBuf part) {
             data.addComponent(true, part);
             return cf;
+        }
+
+        @Override
+        public void copyOnWrite() {
+            //TODO: implement this
         }
 
         @Override
