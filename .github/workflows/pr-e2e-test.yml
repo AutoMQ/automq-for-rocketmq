@@ -67,7 +67,7 @@ jobs:
       - name: Build and save docker images
         id: build-images
         run: |
-          cd ${{github.workspace}}/rocketmq-on-s3/distribution/docker
+          cd distribution/docker
           sh build-ci.sh ${DOCKER_REPO}
           mkdir versionlist
           full_node_version=$(git ls-remote --tags | awk -F '/' 'END{print $3}')
