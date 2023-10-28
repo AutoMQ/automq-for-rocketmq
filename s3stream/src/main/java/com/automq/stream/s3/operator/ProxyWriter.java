@@ -64,7 +64,11 @@ class ProxyWriter implements Writer {
 
     @Override
     public void copyOnWrite() {
-        //TODO: implement this
+        if (multiPartWriter != null) {
+            multiPartWriter.copyOnWrite();
+        } else {
+            objectWriter.copyOnWrite();
+        }
     }
 
     @Override
@@ -117,7 +121,14 @@ class ProxyWriter implements Writer {
 
         @Override
         public void copyOnWrite() {
-            //TODO: implement this
+            int size = data.readableBytes();
+            if (size > 0) {
+                ByteBuf buf = DirectByteBufAlloc.byteBuffer(size);
+                buf.writeBytes(data.duplicate());
+                CompositeByteBuf copy = DirectByteBufAlloc.compositeByteBuffer().addComponent(true, buf);
+                this.data.release();
+                this.data = copy;
+            }
         }
 
         @Override
