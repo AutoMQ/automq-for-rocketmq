@@ -140,6 +140,12 @@ jobs:
 #        version: ${{ fromJSON(needs.list-version.outputs.version-json) }}
         version: ["5.1.3-alpine"]
     steps:
+      - name: Get kubeconfig
+        env:
+          KUBECONFIG_FILE: '${{ secrets.KUBE_CONFIG }}'
+        run: |
+          mkdir -p ~/.kube
+          echo $KUBECONFIG_FILE | base64 -d > ~/.kube/config
       - uses: apache/rocketmq-test-tool@7d84d276ad7755b1dc5cf9657a7a9bff6ae6d288
         name: e2e test
         with:
@@ -150,7 +156,7 @@ jobs:
           test-code-branch: "master"
           test-code-path: java/e2e
           test-cmd: "mvn -B test"
-          job-id: 0
+          job-id: 1
       - name: Publish Test Report
         uses: mikepenz/action-junit-report@v3
         if: always() # always run even if the previous step fails
@@ -177,6 +183,12 @@ jobs:
 #        version: ${{ fromJSON(needs.list-version.outputs.version-json) }}
         version: ["5.1.3-alpine"]
     steps:
+      - name: Get kubeconfig
+        env:
+          KUBECONFIG_FILE: '${{ secrets.KUBE_CONFIG }}'
+        run: |
+          mkdir -p ~/.kube
+          echo $KUBECONFIG_FILE | base64 -d > ~/.kube/config
       - uses: apache/rocketmq-test-tool@7d84d276ad7755b1dc5cf9657a7a9bff6ae6d288
         name: e2e test
         with:
@@ -190,7 +202,7 @@ jobs:
             cd ../common &&  mvn -Prelease -DskipTests clean package -U
             cd ../rocketmq-admintools && source bin/env.sh
             cd ../golang && go get -u github.com/apache/rocketmq-clients/golang && gotestsum --junitfile ./target/surefire-reports/TEST-report.xml ./mqgotest/... -timeout 2m  -v
-          job-id: 0
+          job-id: 1
       - name: Publish Test Report
         uses: mikepenz/action-junit-report@v3
         if: always() # always run even if the previous step fails
@@ -217,6 +229,12 @@ jobs:
 #        version: ${{ fromJSON(needs.list-version.outputs.version-json) }}
         version: ["5.1.3-alpine"]
     steps:
+      - name: Get kubeconfig
+        env:
+          KUBECONFIG_FILE: '${{ secrets.KUBE_CONFIG }}'
+        run: |
+          mkdir -p ~/.kube
+          echo $KUBECONFIG_FILE | base64 -d > ~/.kube/config
       - uses: apache/rocketmq-test-tool@7d84d276ad7755b1dc5cf9657a7a9bff6ae6d288
         name: e2e test
         with:
@@ -227,7 +245,7 @@ jobs:
           test-code-branch: "master"
           test-code-path: java/e2e-v4
           test-cmd: "mvn -B test"
-          job-id: 0
+          job-id: 1
       - name: Publish Test Report
         uses: mikepenz/action-junit-report@v3
         if: always() # always run even if the previous step fails
