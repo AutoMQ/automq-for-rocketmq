@@ -120,6 +120,7 @@ jobs:
         env:
           KUBECONFIG_FILE: '${{ secrets.KUBE_CONFIG }}'
         run: |
+          mkdir -p ~/.kube
           echo $KUBECONFIG_FILE | base64 -d > ~/.kube/config
       - name: Deploy RocketMQ
         working-directory: distribution/helm
@@ -259,4 +260,9 @@ jobs:
           ask-config: "${{ secrets.ASK_CONFIG_VIRGINA }}"
           test-version: "${{ matrix.version }}"
           job-id: ${{ strategy.job-index }}
-          
+      - name: clean Rocketmq
+        working-directory: distribution/helm
+        env:
+          DOCKER_REPO: ${{ env.DOCKER_REPO }}
+        run: |
+          sh clean-ci.sh
