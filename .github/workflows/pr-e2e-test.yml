@@ -47,8 +47,6 @@ jobs:
           cd rocketmq-on-s3/distribution/target
           ls
           pwd
-          cd ../../../../
-          ls
       - uses: actions/checkout@v3
         with:
           repository: AutoMQ/rocketmq-e2e
@@ -63,13 +61,14 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build and save docker images
         id: build-images
+        working-directory: ./distribution/docker
         run: |
-          cd rocketmq-on-s3/distribution/docker
+          pwd
+          ls
           mkdir versionlist
           full_node_version=$(git ls-remote --tags | awk -F '/' 'END{print $3}')
           commit_version=$(git rev-parse --short HEAD)
           version=${full_node_version}-${commit_version}
-          mkdir versionlist
           touch versionlist/"${version}-`echo ${{ matrix.base-image }} | sed -e "s/:/-/g"`"
           echo "version=${version}"
           sh build-ci.sh ${DOCKER_REPO} ${version}
