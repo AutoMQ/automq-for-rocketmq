@@ -78,7 +78,7 @@ jobs:
         name: Upload distribution versionlist
         with:
           name: versionlist
-          path: rocketmq-on-s3/distribution/docker/versionlist/*
+          path: ./distribution/docker/versionlist/*
   
   list-version:
     if: always()
