@@ -134,12 +134,11 @@ jobs:
 #        run: |
 #          echo $KUBECONFIG_FILE | base64 -d > ~/.kube/config
       - name: Deploy RocketMQ
-        working-directory: rocketmq-on-s3/distribution/docker
+        working-directory: distribution/helm
         env:
           DOCKER_REPO: ${{ env.DOCKER_REPO }}
         run: |
-          cd distribution/
-          sh helm/deploy-ci.sh ${DOCKER_REPO}  ${{ matrix.version }}
+          sh deploy-ci.sh ${DOCKER_REPO}  ${{ matrix.version }}
 
   test-e2e-grpc-java:
     if: ${{ success() }}
