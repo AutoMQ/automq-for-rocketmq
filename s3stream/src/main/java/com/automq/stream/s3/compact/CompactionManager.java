@@ -355,7 +355,9 @@ public class CompactionManager {
                             streamObject.setEndOffset(streamDataBlocks.get(streamDataBlocks.size() - 1).getEndOffset());
                             streamObject.setObjectSize(writer.size());
                             pair.getValue().complete(streamObject);
-                            forceSplitLimit.release(dataSize);
+                            if (dataSize < Writer.MIN_PART_SIZE) {
+                                forceSplitLimit.release(dataSize);
+                            }
                         });
                         objectId++;
                     }
