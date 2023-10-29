@@ -104,8 +104,8 @@ jobs:
     if: ${{ success() }}
     name: Deploy RocketMQ
     needs: [list-version,docker]
-    runs-on: ubuntu-latest
-    #    runs-on: private-k3s
+#    runs-on: ubuntu-latest
+    runs-on: private-k3s
     timeout-minutes: 60
     strategy:
       matrix:
@@ -116,23 +116,11 @@ jobs:
         uses: actions/checkout@v3
         with:
           submodules: true
-      - name: install k8s
+      - name: Get kubeconfig
+        env:
+          KUBECONFIG_FILE: '${{ secrets.KUBE_CONFIG }}'
         run: |
-          curl -sfL https://get.k3s.io | K3S_KUBECONFIG_MODE=777 sh -
-          cat /etc/rancher/k3s/k3s.yaml
-          mkdir -p ~/.kube
-          cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
-      - name: install helm
-        run: |
-          curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
-          helm version
-          ls
-          pwd
-#      - name: Get kubeconfig
-#        env:
-#          KUBECONFIG_FILE: '${{ secrets.KUBE_CONFIG }}'
-#        run: |
-#          echo $KUBECONFIG_FILE | base64 -d > ~/.kube/config
+          echo $KUBECONFIG_FILE | base64 -d > ~/.kube/config
       - name: Deploy RocketMQ
         working-directory: distribution/helm
         env:
