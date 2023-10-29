@@ -45,11 +45,7 @@ jobs:
           path: ${{github.workspace}}/rocketmq-on-s3/distribution/target
       - run: |
           cd rocketmq-on-s3/distribution/target
-          unzip rocketmq*.zip
           ls
-#          mv rocketmq-on-s3/ rocketmq/
-#          ls
-#          ls rocketmq/bin
           pwd
           cd ../../../
           ls
