@@ -126,6 +126,7 @@ jobs:
         env:
           JOB_INDEX: ${{ strategy.job-index }}
         run: |
+          REPO_NAME=$(basename ${{ env.GITHUB_REPOSITORY }})
           $NAMESPACE=${REPO_NAME}-${GITHUB_RUN_ID}-${JOB_INDEX}
           kubectl create namespace $NAMESPACE
           echo $NAMESPACE >> $GITHUB_OUTPUT
