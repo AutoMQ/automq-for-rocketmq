@@ -46,11 +46,12 @@ jobs:
       - run: |
           cd rocketmq-on-s3/distribution/target
           unzip rocketmq*.zip
-          mv rocketmq-on-s3/ rocketmq/
           ls
-          ls rocketmq/bin
+#          mv rocketmq-on-s3/ rocketmq/
+#          ls
+#          ls rocketmq/bin
           pwd
-          cd ${{github.workspace}}
+          cd ../../../
           ls
       - uses: actions/checkout@v3
         with:
@@ -67,14 +68,14 @@ jobs:
       - name: Build and save docker images
         id: build-images
         run: |
-          cd distribution/docker
-          sh build-ci.sh ${DOCKER_REPO}
+          cd rocketmq-on-s3/distribution/docker
           mkdir versionlist
           full_node_version=$(git ls-remote --tags | awk -F '/' 'END{print $3}')
           commit_version=$(git rev-parse --short HEAD)
           version=${full_node_version}-${commit_version}
           mkdir versionlist
           touch versionlist/"${version}-`echo ${{ matrix.base-image }} | sed -e "s/:/-/g"`"
+          echo "version=${version}"
           sh build-ci.sh ${DOCKER_REPO} ${version}
           docker push ${DOCKER_REPO}:${version}
           ls versionlist/
