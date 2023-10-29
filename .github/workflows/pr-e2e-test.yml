@@ -144,7 +144,7 @@ jobs:
         name: e2e test
         with:
           action: "test"
-          ask-config: "${{ secrets.ASK_CONFIG_VIRGINA }}"
+          ask-config: "${{ secrets.KUBE_CONFIG }}"
           test-version: "${{ matrix.version }}"
           test-code-git: "https://github.com/AutoMQ/rocketmq-e2e.git"
           test-code-branch: "master"
@@ -181,7 +181,7 @@ jobs:
         name: e2e test
         with:
           action: "test"
-          ask-config: "${{ secrets.ASK_CONFIG_VIRGINA }}"
+          ask-config: "${{ secrets.KUBE_CONFIG }}"
           test-version: "${{ matrix.version }}"
           test-code-git: "https://github.com/AutoMQ/rocketmq-e2e.git"
           test-code-branch: "master"
@@ -221,7 +221,7 @@ jobs:
         name: e2e test
         with:
           action: "test"
-          ask-config: "${{ secrets.ASK_CONFIG_VIRGINA }}"
+          ask-config: "${{ secrets.KUBE_CONFIG }}"
           test-version: "${{ matrix.version }}"
           test-code-git: "https://github.com/AutoMQ/rocketmq-e2e.git"
           test-code-branch: "master"
@@ -257,7 +257,7 @@ jobs:
         name: clean
         with:
           action: "clean"
-          ask-config: "${{ secrets.ASK_CONFIG_VIRGINA }}"
+          ask-config: "${{ secrets.KUBE_CONFIG }}"
           test-version: "${{ matrix.version }}"
           job-id: ${{ strategy.job-index }}
       - name: clean Rocketmq
