@@ -68,7 +68,8 @@ jobs:
           mkdir versionlist
           full_node_version=$(git ls-remote --tags | awk -F '/' 'END{print $3}')
           commit_version=$(git rev-parse --short HEAD)
-          touch versionlist/"${version} | sed -e "s/:/-/g"`"
+          version=${full_node_version}-${commit_version}
+          touch versionlist/"${version}"
           echo "version=${version}"
           sh build-ci.sh ${DOCKER_REPO} ${version}
           docker push ${DOCKER_REPO}:${version}
