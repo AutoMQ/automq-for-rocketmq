@@ -465,7 +465,17 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
 
     @Override
     public void updateGroup(UpdateGroupRequest request, StreamObserver<UpdateGroupReply> responseObserver) {
-
+        metadataStore.updateGroup(request).whenComplete((res, e) -> {
+            if (null != e) {
+                responseObserver.onError(e);
+                return;
+            }
+            UpdateGroupReply reply = UpdateGroupReply.newBuilder()
+                .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                .build();
+            responseObserver.onNext(reply);
+            responseObserver.onCompleted();
+        });
     }
 
     @Override
