@@ -54,6 +54,7 @@ import apache.rocketmq.controller.v1.StreamState;
 import apache.rocketmq.controller.v1.SubStream;
 import apache.rocketmq.controller.v1.TopicStatus;
 import apache.rocketmq.controller.v1.TrimStreamRequest;
+import apache.rocketmq.controller.v1.UpdateGroupRequest;
 import apache.rocketmq.controller.v1.UpdateTopicReply;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.common.system.StreamConstants;
@@ -513,6 +514,60 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                     Assertions.assertEquals(GroupStatus.GROUP_STATUS_DELETED, g.getStatus());
                 }
             }
+        }
+    }
+
+    @Test
+    public void testUpdateGroup() throws IOException {
+        ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
+
+        long groupId;
+
+        try (SqlSession session = getSessionFactory().openSession()) {
+            GroupMapper mapper = session.getMapper(GroupMapper.class);
+            Group group = new Group();
+            group.setStatus(GroupStatus.GROUP_STATUS_ACTIVE);
+            group.setName("G1");
+            group.setMaxDeliveryAttempt(1);
+            group.setGroupType(GroupType.GROUP_TYPE_FIFO);
+            group.setDeadLetterTopicId(2L);
+            mapper.create(group);
+            groupId = group.getId();
+            session.commit();
+        }
+
+        try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), config)) {
+            metadataStore.start();
+            Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
+                .atMost(10, TimeUnit.SECONDS)
+                .until(metadataStore::isLeader);
+
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore));
+                 ControllerClient client = new GrpcControllerClient(config)
+            ) {
+                testServer.start();
+                int port = testServer.getPort();
+                String target = String.format("localhost:%d", port);
+                UpdateGroupRequest request = UpdateGroupRequest.newBuilder()
+                    .setGroupId(groupId)
+                    .setGroupType(GroupType.GROUP_TYPE_STANDARD)
+                    .setName("G2")
+                    .setMaxRetryAttempt(2)
+                    .setDeadLetterTopicId(4L)
+                    .build();
+                client.updateGroup(target, request).join();
+            }
+        }
+
+        try (SqlSession session = getSessionFactory().openSession()) {
+            GroupMapper mapper = session.getMapper(GroupMapper.class);
+            List<Group> groups = mapper.byCriteria(GroupCriteria.newBuilder().setGroupId(groupId).build());
+            Assertions.assertEquals(1, groups.size());
+            Group group = groups.get(0);
+            Assertions.assertEquals("G2", group.getName());
+            Assertions.assertEquals(GroupType.GROUP_TYPE_STANDARD, group.getGroupType());
+            Assertions.assertEquals(2, group.getMaxDeliveryAttempt());
+            Assertions.assertEquals(4, group.getDeadLetterTopicId());
         }
     }
 
@@ -1357,7 +1412,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
             }
 
-            long time = System.currentTimeMillis();
             try (SqlSession session = getSessionFactory().openSession()) {
                 S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
                 for (long index = objectId; index < objectId + 2; index++) {
@@ -1484,7 +1538,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
             }
 
-            long time = System.currentTimeMillis();
             try (SqlSession session = getSessionFactory().openSession()) {
                 S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
                 S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
@@ -1550,7 +1603,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 client.commitStreamObject(String.format("localhost:%d", port), request1).get();
             }
 
-            long time = System.currentTimeMillis();
             try (SqlSession session = getSessionFactory().openSession()) {
                 S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
                 S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
@@ -1594,17 +1646,15 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             try (SqlSession session = this.getSessionFactory().openSession()) {
                 S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
                 buildS3WalObjs(objectId + 2, 1).stream()
-                    .map(s3WalObject -> {
+                    .peek(s3WalObject -> {
                         Map<Long, SubStream> subStreams = buildWalSubStreams(1, 0, 10);
                         s3WalObject.setSubStreams(gson.toJson(subStreams));
-                        return s3WalObject;
                     }).forEach(s3WALObjectMapper::create);
 
                 buildS3WalObjs(objectId + 3, 1).stream()
-                    .map(s3WalObject -> {
+                    .peek(s3WalObject -> {
                         Map<Long, SubStream> subStreams = buildWalSubStreams(1, 10, 10);
                         s3WalObject.setSubStreams(gson.toJson(subStreams));
-                        return s3WalObject;
                     }).forEach(s3WALObjectMapper::create);
                 session.commit();
             }
@@ -1678,7 +1728,6 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 objectId = reply.getFirstObjectId();
             }
 
-            long time = System.currentTimeMillis();
             apache.rocketmq.controller.v1.S3WALObject walObject = apache.rocketmq.controller.v1.S3WALObject.newBuilder()
                 .setObjectId(objectId + 4)
                 .setObjectSize(222L)
@@ -1720,7 +1769,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     @Test
     public void test3WALObjects_2PC_Expired() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
-        long objectId, streamId = 1;
+        long objectId;
         int nodeId = 2;
 
         try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), config)) {
@@ -1746,17 +1795,15 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             try (SqlSession session = this.getSessionFactory().openSession()) {
                 S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
                 buildS3WalObjs(objectId + 2, 1).stream()
-                    .map(s3WalObject -> {
+                    .peek(s3WalObject -> {
                         Map<Long, SubStream> subStreams = buildWalSubStreams(1, 0, 10);
                         s3WalObject.setSubStreams(gson.toJson(subStreams));
-                        return s3WalObject;
                     }).forEach(s3WALObjectMapper::create);
 
                 buildS3WalObjs(objectId + 3, 1).stream()
-                    .map(s3WalObject -> {
+                    .peek(s3WalObject -> {
                         Map<Long, SubStream> subStreams = buildWalSubStreams(1, 10, 10);
                         s3WalObject.setSubStreams(gson.toJson(subStreams));
-                        return s3WalObject;
                     }).forEach(s3WALObjectMapper::create);
 
                 session.commit();
@@ -1806,7 +1853,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     @Test
     public void test3WALObjects_2PC() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
-        long objectId, streamId = 1;
+        long objectId;
         int nodeId = 2;
 
         try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), config)) {
@@ -1832,17 +1879,15 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             try (SqlSession session = this.getSessionFactory().openSession()) {
                 S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
                 buildS3WalObjs(objectId + 2, 1).stream()
-                    .map(s3WalObject -> {
+                    .peek(s3WalObject -> {
                         Map<Long, SubStream> subStreams = buildWalSubStreams(1, 0, 10);
                         s3WalObject.setSubStreams(gson.toJson(subStreams));
-                        return s3WalObject;
                     }).forEach(s3WALObjectMapper::create);
 
                 buildS3WalObjs(objectId + 3, 1).stream()
-                    .map(s3WalObject -> {
+                    .peek(s3WalObject -> {
                         Map<Long, SubStream> subStreams = buildWalSubStreams(1, 10, 10);
                         s3WalObject.setSubStreams(gson.toJson(subStreams));
-                        return s3WalObject;
                     }).forEach(s3WALObjectMapper::create);
 
                 session.commit();
@@ -1924,7 +1969,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     @Test
     public void test3WALObjects_2PC_duplicate() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
-        long objectId, streamId = 1;
+        long objectId;
         int nodeId = 2;
 
         try (MetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), config)) {
@@ -1950,17 +1995,15 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             try (SqlSession session = this.getSessionFactory().openSession()) {
                 S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
                 buildS3WalObjs(objectId + 2, 1).stream()
-                    .map(s3WalObject -> {
+                    .peek(s3WalObject -> {
                         Map<Long, SubStream> subStreams = buildWalSubStreams(1, 0, 10);
                         s3WalObject.setSubStreams(gson.toJson(subStreams));
-                        return s3WalObject;
                     }).forEach(s3WALObjectMapper::create);
 
                 buildS3WalObjs(objectId + 3, 1).stream()
-                    .map(s3WalObject -> {
+                    .peek(s3WalObject -> {
                         Map<Long, SubStream> subStreams = buildWalSubStreams(1, 10, 10);
                         s3WalObject.setSubStreams(gson.toJson(subStreams));
-                        return s3WalObject;
                     }).forEach(s3WALObjectMapper::create);
 
                 session.commit();
