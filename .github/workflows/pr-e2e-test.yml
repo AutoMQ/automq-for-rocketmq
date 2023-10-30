@@ -179,6 +179,7 @@ jobs:
           name: test-e2e-grpc-java-log.txt
           path: testlog.txt
       - name: Delete Test Report in K3s
+        if: always()
         run: |
           rm -rf **/test_report/TEST-*.xml
 
@@ -221,6 +222,7 @@ jobs:
           name: test-e2e-golang-log.txt
           path: testlog.txt
       - name: Delete Test Report in K3s
+        if: always()
         run: |
           rm -rf **/test_report/TEST-*.xml
 
@@ -260,6 +262,7 @@ jobs:
           name: test-e2e-remoting-java-log.txt
           path: testlog.txt
       - name: Delete Test Report in K3s
+        if: always()
         run: |
           rm -rf **/test_report/TEST-*.xml
 
