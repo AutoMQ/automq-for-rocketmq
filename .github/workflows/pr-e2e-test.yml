@@ -123,6 +123,7 @@ jobs:
           mkdir -p ~/.kube
           echo $KUBECONFIG_FILE | base64 -d > ~/.kube/config
       - name: Create Namespace
+        id: create_namespace
         env:
           JOB_INDEX: ${{ strategy.job-index }}
         run: |
@@ -153,18 +154,25 @@ jobs:
         uses: actions/checkout@v3
         with:
           submodules: true
+      - uses: actions/checkout@v3
+        with:
+          repository: AutoMQ/rocketmq-e2e
+          ref: master
+          path: rocketmq-e2es
+          token: ${{ secrets.PAT_E2E }}
+        run: | 
+          pwd
+          ls
       - name: e2e test
         working-directory: distribution/helm
         env:
           ASK_CONFIG: "${{ secrets.KUBE_CONFIG }}"
           VERSION: "${{ matrix.version }}"
-          TEST_CODE_GIT: "https://github.com/AutoMQ/rocketmq-e2e.git"
-          TEST_CODE_BRANCH: "master"
-          TEST_CODE_PATH: java/e2e
+          TEST_CODE_PATH: rocketmq-e2e/java/e2e
           TEST_CMD_BASE: "mvn -B test"
           JOB_INDEX: 0
         run: |
-          sh test-ci.sh ${VERSION} ${TEST_CODE_GIT} ${TEST_CODE_BRANCH} ${TEST_CODE_PATH} ${TEST_CMD_BASE} ${ASK_CONFIG} ${JOB_INDEX}
+          sh test-ci.sh ${VERSION} ${TEST_CODE_PATH} ${TEST_CMD_BASE} ${ASK_CONFIG} ${JOB_INDEX}
           
 #  test-e2e-golang:
 #    if: ${{ success() }}

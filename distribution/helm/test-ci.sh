@@ -56,12 +56,9 @@ echo $TEST_CMD_BASE
 
 TEST_CMD=`echo "${TEST_CMD_BASE}" | sed -s 's/^/        /g'`
 
-git clone $TEST_CODE_GIT -b $TEST_CODE_BRANCH code
-
 cd code
 cd $TEST_CODE_PATH
 ${TEST_CMD}
 exit_code=$?
 
-killall kubectl
 exit ${exit_code}
