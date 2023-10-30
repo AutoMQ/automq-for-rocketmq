@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.store;
 
+import apache.rocketmq.controller.v1.StreamMetadata;
 import com.automq.rocketmq.common.config.StoreConfig;
 import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.model.generated.FlatMessage;
@@ -40,6 +41,7 @@ import com.automq.rocketmq.store.service.InflightService;
 import com.automq.rocketmq.store.service.RocksDBKVService;
 import com.automq.rocketmq.store.service.SnapshotService;
 import com.automq.rocketmq.store.service.StreamOperationLogService;
+import com.automq.rocketmq.store.service.StreamReclaimService;
 import com.automq.rocketmq.store.service.TimerService;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.service.api.OperationLogService;
@@ -55,6 +57,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import static com.automq.rocketmq.store.mock.MockMessageUtil.buildMessage;
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -77,10 +80,11 @@ public class LogicQueueTest {
     private MessageStateMachine stateMachine;
     private InflightService inflightService;
     private OperationLogService operationLogService;
+    private StreamReclaimService streamReclaimService;
     private LogicQueue logicQueue;
 
     @BeforeEach
-    public void setUp() throws StoreException {
+    public void setUp() throws Exception {
         kvService = new RocksDBKVService(PATH);
         metadataService = new MockStoreMetadataService();
         streamStore = new MockStreamStore();
@@ -89,13 +93,16 @@ public class LogicQueueTest {
         inflightService = new InflightService();
         SnapshotService snapshotService = new SnapshotService(streamStore, kvService);
         operationLogService = new StreamOperationLogService(streamStore, snapshotService, new StoreConfig());
+        streamReclaimService = new StreamReclaimService(streamStore);
         logicQueue = new StreamLogicQueue(new StoreConfig(), TOPIC_ID, QUEUE_ID,
-            metadataService, stateMachine, streamStore, operationLogService, inflightService);
+            metadataService, stateMachine, streamStore, operationLogService, inflightService, streamReclaimService);
+        streamReclaimService.start();
         logicQueue.open().join();
     }
 
     @AfterEach
-    public void tearDown() throws StoreException {
+    public void tearDown() throws Exception {
+        streamReclaimService.shutdown();
         kvService.destroy();
     }
 
@@ -569,11 +576,14 @@ public class LogicQueueTest {
 
     @Test
     void pop_retry() throws StoreException {
+        StreamMetadata retryStream = metadataService.retryStreamOf(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID).join();
         // 1. append 5 messages to retry queue
         for (int i = 0; i < 5; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
             logicQueue.putRetry(CONSUMER_GROUP_ID, message);
         }
+        assertEquals(0, streamStore.startOffset(retryStream.getStreamId()));
+        assertEquals(5, streamStore.nextOffset(retryStream.getStreamId()));
 
         // 2. pop 2 messages
         PopResult popResult = logicQueue.popRetry(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 2, 100).join();
@@ -598,6 +608,8 @@ public class LogicQueueTest {
         assertEquals(0, stateMachine.retryAckOffset(CONSUMER_GROUP_ID));
         String receiptHandle2 = popResult.messageList().get(0).receiptHandle().get();
 
+        assertEquals(0, streamStore.startOffset(retryStream.getStreamId()));
+
         // 3. ack msg_0
         AckResult ackResult = logicQueue.ack(receiptHandle0).join();
         assertEquals(AckResult.Status.SUCCESS, ackResult.status());
@@ -607,9 +619,10 @@ public class LogicQueueTest {
         assertEquals(3, stateMachine.retryConsumeOffset(CONSUMER_GROUP_ID));
         assertEquals(1, stateMachine.retryAckOffset(CONSUMER_GROUP_ID));
 
-        // 4. check ck
+        await().until(() -> streamReclaimService.inflightTaskNum() == 0);
+        assertEquals(1, streamStore.startOffset(retryStream.getStreamId()));
 
-        // 5. ack msg_2 timeout
+        // 4. ack msg_2 timeout
         ackResult = logicQueue.ackTimeout(receiptHandle2).join();
         assertEquals(AckResult.Status.SUCCESS, ackResult.status());
         assertEquals(1, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
@@ -618,7 +631,10 @@ public class LogicQueueTest {
         assertEquals(3, stateMachine.retryConsumeOffset(CONSUMER_GROUP_ID));
         assertEquals(1, stateMachine.retryAckOffset(CONSUMER_GROUP_ID));
 
-        // 6. ack msg_1
+        await().until(() -> streamReclaimService.inflightTaskNum() == 0);
+        assertEquals(1, streamStore.startOffset(retryStream.getStreamId()));
+
+        // 5. ack msg_1
         ackResult = logicQueue.ack(receiptHandle1).join();
         assertEquals(AckResult.Status.SUCCESS, ackResult.status());
         assertEquals(0, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
@@ -626,6 +642,9 @@ public class LogicQueueTest {
         assertEquals(0, stateMachine.ackOffset(CONSUMER_GROUP_ID));
         assertEquals(3, stateMachine.retryConsumeOffset(CONSUMER_GROUP_ID));
         assertEquals(3, stateMachine.retryAckOffset(CONSUMER_GROUP_ID));
+
+        await().until(() -> streamReclaimService.inflightTaskNum() == 0);
+        assertEquals(3, streamStore.startOffset(retryStream.getStreamId()));
     }
 
     @Test
@@ -660,7 +679,7 @@ public class LogicQueueTest {
 
         // 6. open again
         logicQueue = new StreamLogicQueue(new StoreConfig(), TOPIC_ID, QUEUE_ID,
-            metadataService, stateMachine, streamStore, operationLogService, inflightService);
+            metadataService, stateMachine, streamStore, operationLogService, inflightService, streamReclaimService);
         logicQueue.open().join();
 
         // 7. check ck exist
@@ -713,7 +732,7 @@ public class LogicQueueTest {
             return CompletableFuture.completedFuture(null);
         }).when(stateMachine).clear();
         logicQueue = new StreamLogicQueue(new StoreConfig(), TOPIC_ID, QUEUE_ID,
-            metadataService, stateMachine, streamStore, operationLogService, inflightService);
+            metadataService, stateMachine, streamStore, operationLogService, inflightService, streamReclaimService);
         logicQueue.open().join();
 
         // 5. check ck exist

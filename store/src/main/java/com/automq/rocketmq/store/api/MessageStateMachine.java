@@ -55,8 +55,13 @@ public interface MessageStateMachine {
 
     int consumeTimes(long consumerGroupId, long offset);
 
+    void registerAckOffsetListener(OffsetListener listener);
+
+    void registerRetryAckOffsetListener(OffsetListener listener);
+
     class ReplayPopResult {
         private final int popTimes;
+
         private ReplayPopResult(int popTimes) {
             this.popTimes = popTimes;
         }
@@ -72,6 +77,10 @@ public interface MessageStateMachine {
         public int getPopTimes() {
             return popTimes;
         }
+    }
+
+    interface OffsetListener {
+        void onOffset(long consumerGroupId, long offset);
     }
 
 }

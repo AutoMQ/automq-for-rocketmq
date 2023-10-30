@@ -29,6 +29,7 @@ import com.automq.rocketmq.store.exception.StoreErrorCode;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.message.TopicQueueId;
 import com.automq.rocketmq.store.service.InflightService;
+import com.automq.rocketmq.store.service.StreamReclaimService;
 import com.automq.rocketmq.store.service.TimerService;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.service.api.OperationLogService;
@@ -51,13 +52,14 @@ public class DefaultLogicQueueManager implements LogicQueueManager {
     private final StoreMetadataService metadataService;
     private final OperationLogService operationLogService;
     private final InflightService inflightService;
+    private final StreamReclaimService streamReclaimService;
     private final ConcurrentMap<TopicQueueId, CompletableFuture<LogicQueue>> logicQueueMap;
     private final String identity = "[DefaultLogicQueueManager]";
 
     public DefaultLogicQueueManager(StoreConfig storeConfig, StreamStore streamStore,
         KVService kvService, TimerService timerService, StoreMetadataService metadataService,
         OperationLogService operationLogService,
-        InflightService inflightService) {
+        InflightService inflightService, StreamReclaimService streamReclaimService) {
         this.storeConfig = storeConfig;
         this.streamStore = streamStore;
         this.kvService = kvService;
@@ -65,6 +67,7 @@ public class DefaultLogicQueueManager implements LogicQueueManager {
         this.metadataService = metadataService;
         this.operationLogService = operationLogService;
         this.inflightService = inflightService;
+        this.streamReclaimService = streamReclaimService;
         this.logicQueueMap = new ConcurrentHashMap<>();
     }
 
@@ -154,7 +157,7 @@ public class DefaultLogicQueueManager implements LogicQueueManager {
 
         MessageStateMachine stateMachine = new DefaultLogicQueueStateMachine(topicId, queueId, kvService, timerService);
         LogicQueue logicQueue = new StreamLogicQueue(storeConfig, topicId, queueId,
-            metadataService, stateMachine, streamStore, operationLogService, inflightService);
+            metadataService, stateMachine, streamStore, operationLogService, inflightService, streamReclaimService);
 
         LOGGER.info("{}: Create and open logic queue success: topic: {} queue: {}", identity, topicId, queueId);
         return logicQueue.open()

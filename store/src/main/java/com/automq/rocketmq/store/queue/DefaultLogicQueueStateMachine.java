@@ -78,6 +78,8 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
     private final KVService kvService;
     private final TimerService timerService;
     private final String identity;
+    private final List<OffsetListener> ackOffsetListeners = new ArrayList<>();
+    private final List<OffsetListener> retryAckOffsetListeners = new ArrayList<>();
 
     public DefaultLogicQueueStateMachine(long topicId, int queueId, KVService kvService, TimerService timerService) {
         this.consumerGroupMetadataMap = new ConcurrentHashMap<>();
@@ -96,6 +98,16 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
     @Override
     public int queueId() {
         return queueId;
+    }
+
+    @Override
+    public void registerAckOffsetListener(OffsetListener listener) {
+        this.ackOffsetListeners.add(listener);
+    }
+
+    @Override
+    public void registerRetryAckOffsetListener(OffsetListener listener) {
+        this.retryAckOffsetListeners.add(listener);
     }
 
     @Override
@@ -278,7 +290,10 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
 
     private AckCommitter getAckCommitter(long consumerGroupId, RoaringBitmap bitmap) {
         ConsumerGroupMetadata metadata = this.consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId));
-        return this.ackCommitterMap.computeIfAbsent(consumerGroupId, k -> new AckCommitter(metadata.getAckOffset(), metadata::setAckOffset, bitmap));
+        return this.ackCommitterMap.computeIfAbsent(consumerGroupId, k -> new AckCommitter(metadata.getAckOffset(), offset -> {
+            metadata.setAckOffset(offset);
+            this.ackOffsetListeners.forEach(listener -> listener.onOffset(consumerGroupId, offset));
+        }, bitmap));
     }
 
     private AckCommitter getRetryAckCommitter(long consumerGroupId) {
@@ -287,7 +302,10 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
 
     private AckCommitter getRetryAckCommitter(long consumerGroupId, RoaringBitmap bitmap) {
         ConsumerGroupMetadata metadata = this.consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId));
-        return this.retryAckCommitterMap.computeIfAbsent(consumerGroupId, k -> new AckCommitter(metadata.getRetryAckOffset(), metadata::setRetryAckOffset, bitmap));
+        return this.retryAckCommitterMap.computeIfAbsent(consumerGroupId, k -> new AckCommitter(metadata.getRetryAckOffset(), offset -> {
+            metadata.setRetryAckOffset(offset);
+            this.retryAckOffsetListeners.forEach(listener -> listener.onOffset(consumerGroupId, offset));
+        }, bitmap));
     }
 
     @Override

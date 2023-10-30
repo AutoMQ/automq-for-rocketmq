@@ -29,6 +29,7 @@ import com.automq.rocketmq.store.model.stream.SingleRecord;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.util.SerializeUtil;
 import com.automq.stream.utils.FutureUtil;
+import com.automq.stream.utils.ThreadUtils;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,6 +38,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -46,7 +49,6 @@ import org.slf4j.LoggerFactory;
 
 public class SnapshotService implements Lifecycle, Runnable {
     public static final Logger LOGGER = LoggerFactory.getLogger(SnapshotService.class);
-
     private final StreamStore streamStore;
     private final BlockingQueue<SnapshotTask> snapshotTaskQueue;
     private Thread snapshotTaker;
@@ -54,11 +56,15 @@ public class SnapshotService implements Lifecycle, Runnable {
     private volatile boolean stopped = false;
     private final ConcurrentMap<TopicQueueId, SnapshotStatus> snapshotStatusMap = new ConcurrentHashMap<>();
     private CompletableFuture<Void> runningCf;
+    private ExecutorService backgroundExecutor;
 
     public SnapshotService(StreamStore streamStore, KVService kvService) {
         this.streamStore = streamStore;
         this.snapshotTaskQueue = new LinkedBlockingQueue<>(1024);
         this.kvService = kvService;
+        this.backgroundExecutor = Executors.newSingleThreadExecutor(
+            ThreadUtils.createThreadFactory("snapshot-background-executor", false)
+        );
     }
 
     public static class SnapshotStatus {
@@ -87,6 +93,11 @@ public class SnapshotService implements Lifecycle, Runnable {
     public void start() throws Exception {
         this.stopped = false;
         this.runningCf = new CompletableFuture<>();
+        if (this.backgroundExecutor == null || this.backgroundExecutor.isShutdown()) {
+            this.backgroundExecutor = Executors.newSingleThreadExecutor(
+                ThreadUtils.createThreadFactory("snapshot-background-executor", false)
+            );
+        }
         this.snapshotTaker = new Thread(this, "snapshot-taker");
         this.snapshotTaker.setDaemon(true);
         this.snapshotTaker.start();
@@ -103,6 +114,11 @@ public class SnapshotService implements Lifecycle, Runnable {
         List<SnapshotTask> snapshotTasks = new ArrayList<>();
         snapshotTaskQueue.drainTo(snapshotTasks);
         snapshotTasks.forEach(SnapshotTask::abort);
+        // 3. shutdown background executor
+        if (this.backgroundExecutor != null) {
+            this.backgroundExecutor.shutdown();
+            this.backgroundExecutor = null;
+        }
     }
 
     @Override
@@ -173,14 +189,13 @@ public class SnapshotService implements Lifecycle, Runnable {
 
         // append snapshot to snapshot stream
         return streamStore.append(snapshotStreamId, new SingleRecord(ByteBuffer.wrap(snapshotData)))
-            .thenCompose(appendResult -> {
+            .thenComposeAsync(appendResult -> {
                 // trim operation stream
-                return streamStore.trim(operationStreamId, snapshot.getSnapshotEndOffset() + 1)
-                    .thenAccept(nil -> {
-                        // complete snapshot task
-                        task.completeSuccess(snapshot.getSnapshotEndOffset() + 1);
-                    });
-            });
+                return streamStore.trim(operationStreamId, snapshot.getSnapshotEndOffset() + 1);
+            }, backgroundExecutor).thenAcceptAsync(nil -> {
+                // complete snapshot task
+                task.completeSuccess(snapshot.getSnapshotEndOffset() + 1);
+            }, backgroundExecutor);
     }
 
     CompletableFuture<TakeSnapshotResult> addSnapshotTask(SnapshotTask task) {

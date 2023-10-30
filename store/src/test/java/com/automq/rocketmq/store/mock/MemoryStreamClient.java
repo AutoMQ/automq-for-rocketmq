@@ -113,7 +113,9 @@ public class MemoryStreamClient implements StreamClient {
         @Override
         public CompletableFuture<Void> trim(long newStartOffset) {
             recordMap = new ConcurrentSkipListMap<>(recordMap.tailMap(newStartOffset));
-            startOffset.set(newStartOffset);
+            if (newStartOffset > startOffset.get()) {
+                startOffset.set(newStartOffset);
+            }
             return CompletableFuture.completedFuture(null);
         }
 

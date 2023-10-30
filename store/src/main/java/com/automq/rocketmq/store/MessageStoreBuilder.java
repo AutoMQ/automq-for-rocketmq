@@ -31,6 +31,7 @@ import com.automq.rocketmq.store.service.ReviveService;
 import com.automq.rocketmq.store.service.RocksDBKVService;
 import com.automq.rocketmq.store.service.SnapshotService;
 import com.automq.rocketmq.store.service.StreamOperationLogService;
+import com.automq.rocketmq.store.service.StreamReclaimService;
 import com.automq.rocketmq.store.service.TimerService;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.service.api.OperationLogService;
@@ -49,10 +50,11 @@ public class MessageStoreBuilder {
         InflightService inflightService = new InflightService();
         SnapshotService snapshotService = new SnapshotService(streamStore, kvService);
         OperationLogService operationLogService = new StreamOperationLogService(streamStore, snapshotService, storeConfig);
+        StreamReclaimService streamReclaimService = new StreamReclaimService(streamStore);
         // TODO: We may have multiple timer service in the future.
         TimerService timerService = new TimerService("timer_tag_0", kvService);
         LogicQueueManager logicQueueManager = new DefaultLogicQueueManager(storeConfig, streamStore, kvService, timerService,
-            metadataService, operationLogService, inflightService);
+            metadataService, operationLogService, inflightService, streamReclaimService);
         ReviveService reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, kvService, timerService,
             metadataService, inflightService, logicQueueManager, deadLetterSender);
         S3ObjectOperator objectOperator = new S3ObjectOperatorImpl(operator);
