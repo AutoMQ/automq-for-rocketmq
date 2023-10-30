@@ -17,11 +17,11 @@
 
 package com.automq.rocketmq.proxy.remoting;
 
+import com.automq.rocketmq.proxy.processor.ExtendMessagingProcessor;
 import com.automq.rocketmq.proxy.remoting.activity.ExtendConsumerManagerActivity;
 import com.automq.rocketmq.proxy.remoting.activity.ExtendPullMessageActivity;
 import com.automq.rocketmq.proxy.remoting.activity.ExtendSendMessageActivity;
 import io.netty.channel.ChannelHandlerContext;
-import org.apache.rocketmq.proxy.processor.MessagingProcessor;
 import org.apache.rocketmq.proxy.remoting.pipeline.RequestPipeline;
 import org.apache.rocketmq.remoting.RemotingServer;
 import org.apache.rocketmq.remoting.netty.NettyRequestProcessor;
@@ -30,8 +30,11 @@ import org.apache.rocketmq.remoting.protocol.RequestCode;
 
 public class RemotingProtocolServer extends org.apache.rocketmq.proxy.remoting.RemotingProtocolServer {
     private RequestPipeline requestPipeline;
-    public RemotingProtocolServer(MessagingProcessor messagingProcessor) {
+    private final ExtendMessagingProcessor messagingProcessor;
+
+    public RemotingProtocolServer(ExtendMessagingProcessor messagingProcessor) {
         super(messagingProcessor);
+        this.messagingProcessor = messagingProcessor;
 
         // Extend some request code to support more features.
         extendRequestCode();

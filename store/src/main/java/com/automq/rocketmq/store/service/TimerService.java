@@ -63,9 +63,6 @@ public class TimerService extends ServiceThread {
             throw new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "Invalid timer tag type: " + handlerType);
         }
 
-        if (timerHandlerMap.containsKey(handlerType)) {
-            throw new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "Handler for timer tag type: " + TimerHandlerType.name(handlerType) + " already exists");
-        }
         timerHandlerMap.put(handlerType, handler);
     }
 
@@ -106,6 +103,7 @@ public class TimerService extends ServiceThread {
         byte[] payload) throws StoreException {
         checkHandler(handlerType);
 
+        // TODO: Append operation to op_log for recovering.
         byte[] key = buildTimerTagKey(deliveryTimestamp, identity);
         byte[] value = buildTimerTagValue(deliveryTimestamp, handlerType, payload);
 

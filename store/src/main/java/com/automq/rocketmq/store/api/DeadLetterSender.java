@@ -20,9 +20,9 @@ package com.automq.rocketmq.store.api;
 import com.automq.rocketmq.common.model.FlatMessageExt;
 import java.util.concurrent.CompletableFuture;
 
-public interface DLQSender {
+public interface DeadLetterSender {
     /**
-     * Send message to DLQ
+     * Send message to dead letter topic.
      *
      * @param consumerGroupId consumer group id
      * @param originalFlatMessage original message

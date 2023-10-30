@@ -40,6 +40,8 @@ table SystemProperties {
     born_host: string;
     // The count of the message delivery attempt
     delivery_attempts: int = -1;
+    // Time-point at when the message is visible to clients, which is optional.
+    delivery_timestamp: long = -1;
     // The trace context of the message
     trace_context: string;
     // The queue offset in the original queue

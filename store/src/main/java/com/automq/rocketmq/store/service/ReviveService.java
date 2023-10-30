@@ -19,7 +19,7 @@ package com.automq.rocketmq.store.service;
 
 import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
-import com.automq.rocketmq.store.api.DLQSender;
+import com.automq.rocketmq.store.api.DeadLetterSender;
 import com.automq.rocketmq.store.api.LogicQueue;
 import com.automq.rocketmq.store.api.LogicQueueManager;
 import com.automq.rocketmq.store.exception.StoreErrorCode;
@@ -63,11 +63,11 @@ public class ReviveService {
     private final String identity = "[ReviveService]";
     private final ConcurrentMap<Long/*operationId*/, CompletableFuture<Void>> inflightRevive;
     private final ExecutorService backgroundExecutor;
-    private final DLQSender dlqSender;
+    private final DeadLetterSender deadLetterSender;
 
     public ReviveService(String checkPointNamespace, KVService kvService, TimerService timerService,
         StoreMetadataService metadataService, InflightService inflightService,
-        LogicQueueManager logicQueueManager, DLQSender dlqSender) throws StoreException {
+        LogicQueueManager logicQueueManager, DeadLetterSender deadLetterSender) throws StoreException {
         this.checkPointNamespace = checkPointNamespace;
         this.kvService = kvService;
         this.timerService = timerService;
@@ -75,7 +75,7 @@ public class ReviveService {
         this.inflightService = inflightService;
         this.logicQueueManager = logicQueueManager;
         this.inflightRevive = new ConcurrentHashMap<>();
-        this.dlqSender = dlqSender;
+        this.deadLetterSender = deadLetterSender;
         this.backgroundExecutor = Executors.newSingleThreadExecutor(
             ThreadUtils.createThreadFactory("revive-service-background", false));
 
@@ -167,14 +167,14 @@ public class ReviveService {
                     if (consumeTimes >= maxDeliveryAttempts) {
                         messageExt.setDeliveryAttempts(consumeTimes);
                         // Send to dead letter topic specified in consumer group config.
-                        return dlqSender.send(consumerGroupId, messageExt)
+                        return deadLetterSender.send(consumerGroupId, messageExt)
                             .thenApply(nil -> Pair.of(true, logicQueue));
                     }
                     return CompletableFuture.completedFuture(Pair.of(false, logicQueue));
                 }
                 if (messageExt.deliveryAttempts() >= maxDeliveryAttempts) {
                     // Send to dead letter topic specified in consumer group config.
-                    return dlqSender.send(consumerGroupId, messageExt)
+                    return deadLetterSender.send(consumerGroupId, messageExt)
                         .thenApply(nil -> Pair.of(true, logicQueue));
                 }
                 messageExt.setOriginalQueueOffset(messageExt.originalOffset());
@@ -184,9 +184,9 @@ public class ReviveService {
             });
 
             CompletableFuture<AckResult> ackFuture = resendFuture.thenComposeAsync(pair -> {
-                boolean sendDLQ = pair.getLeft();
+                boolean sendDeadLetter = pair.getLeft();
                 LogicQueue queue = pair.getRight();
-                if (sendDLQ) {
+                if (sendDeadLetter) {
                     // regard sending to DLQ as ack
                     return queue.ack(SerializeUtil.encodeReceiptHandle(receiptHandle));
                 }

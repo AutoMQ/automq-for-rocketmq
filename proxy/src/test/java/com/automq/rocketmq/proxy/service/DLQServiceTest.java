@@ -44,7 +44,7 @@ public class DLQServiceTest {
     private BrokerConfig config;
     private ProxyMetadataService metadataService;
     private Producer producer;
-    private DLQService dlqService;
+    private DeadLetterService dlqService;
 
 
     private static final long TOPIC_ID = 6;
@@ -63,7 +63,7 @@ public class DLQServiceTest {
         config.setAdvertiseAddress("localhost:8081");
         metadataService = Mockito.mock(DefaultProxyMetadataService.class);
         producer = Mockito.mock(Producer.class);
-        dlqService = Mockito.spy(new DLQService(config, metadataService));
+        dlqService = Mockito.spy(new DeadLetterService(config, metadataService));
         Mockito.doReturn(producer)
             .when(dlqService).getProducer();
     }

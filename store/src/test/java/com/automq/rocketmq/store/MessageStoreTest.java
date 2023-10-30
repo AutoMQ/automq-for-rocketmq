@@ -22,7 +22,7 @@ import com.automq.rocketmq.common.config.StoreConfig;
 import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
-import com.automq.rocketmq.store.api.DLQSender;
+import com.automq.rocketmq.store.api.DeadLetterSender;
 import com.automq.rocketmq.store.api.LogicQueue;
 import com.automq.rocketmq.store.api.LogicQueueManager;
 import com.automq.rocketmq.store.api.MessageStore;
@@ -93,11 +93,11 @@ public class MessageStoreTest {
         OperationLogService operationLogService = new StreamOperationLogService(streamStore, snapshotService, config);
         TimerService timerService = new TimerService(KV_NAMESPACE_TIMER_TAG, kvService);
         logicQueueManager = new DefaultLogicQueueManager(config, streamStore, kvService, timerService, metadataService, operationLogService, inflightService);
-        DLQSender dlqSender = Mockito.mock(DLQSender.class);
+        DeadLetterSender deadLetterSender = Mockito.mock(DeadLetterSender.class);
         Mockito.doReturn(CompletableFuture.completedFuture(null))
-            .when(dlqSender).send(Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
+            .when(deadLetterSender).send(Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
         reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, kvService, timerService, metadataService, inflightService,
-            logicQueueManager, dlqSender);
+            logicQueueManager, deadLetterSender);
         S3ObjectOperator operator = new S3ObjectOperatorImpl(new MemoryS3Operator());
         messageStore = new MessageStoreImpl(config, streamStore, metadataService, kvService, timerService, inflightService, snapshotService, logicQueueManager, reviveService, operator);
         messageStore.start();

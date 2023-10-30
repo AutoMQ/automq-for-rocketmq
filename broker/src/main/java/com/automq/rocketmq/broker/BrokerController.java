@@ -17,8 +17,6 @@
 
 package com.automq.rocketmq.broker;
 
-import com.automq.rocketmq.proxy.grpc.GrpcProtocolServer;
-import com.automq.rocketmq.proxy.remoting.RemotingProtocolServer;
 import com.automq.rocketmq.common.api.DataStore;
 import com.automq.rocketmq.common.config.BrokerConfig;
 import com.automq.rocketmq.common.util.Lifecycle;
@@ -30,8 +28,10 @@ import com.automq.rocketmq.metadata.DefaultStoreMetadataService;
 import com.automq.rocketmq.metadata.api.ProxyMetadataService;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.proxy.config.ProxyConfiguration;
+import com.automq.rocketmq.proxy.grpc.GrpcProtocolServer;
 import com.automq.rocketmq.proxy.processor.ExtendMessagingProcessor;
-import com.automq.rocketmq.proxy.service.DLQService;
+import com.automq.rocketmq.proxy.remoting.RemotingProtocolServer;
+import com.automq.rocketmq.proxy.service.DeadLetterService;
 import com.automq.rocketmq.proxy.service.DefaultServiceManager;
 import com.automq.rocketmq.store.DataStoreFacade;
 import com.automq.rocketmq.store.MessageStoreBuilder;
@@ -40,7 +40,6 @@ import com.automq.rocketmq.store.api.MessageStore;
 import org.apache.rocketmq.common.constant.LoggerName;
 import org.apache.rocketmq.common.thread.ThreadPoolMonitor;
 import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
-import org.apache.rocketmq.proxy.processor.MessagingProcessor;
 import org.apache.rocketmq.proxy.service.ServiceManager;
 
 public class BrokerController implements Lifecycle {
@@ -52,9 +51,9 @@ public class BrokerController implements Lifecycle {
     private final MessageStore messageStore;
     private final StoreMetadataService storeMetadataService;
     private final ProxyMetadataService proxyMetadataService;
-    private final MessagingProcessor messagingProcessor;
+    private final ExtendMessagingProcessor messagingProcessor;
     private final MetricsExporter metricsExporter;
-    private final DLQService dlqService;
+    private final DeadLetterService dlqService;
 
     public BrokerController(BrokerConfig brokerConfig) throws Exception {
         this.brokerConfig = brokerConfig;
@@ -67,7 +66,7 @@ public class BrokerController implements Lifecycle {
         proxyMetadataService = new DefaultProxyMetadataService(metadataStore);
         storeMetadataService = new DefaultStoreMetadataService(metadataStore);
 
-        dlqService = new DLQService(brokerConfig, proxyMetadataService);
+        dlqService = new DeadLetterService(brokerConfig, proxyMetadataService);
 
         MessageStoreImpl messageStore = MessageStoreBuilder.build(brokerConfig.store(), brokerConfig.s3Stream(), storeMetadataService, dlqService);
         this.messageStore = messageStore;
@@ -84,7 +83,7 @@ public class BrokerController implements Lifecycle {
         grpcServer = new GrpcProtocolServer(brokerConfig.proxy(), messagingProcessor, controllerService);
         remotingServer = new RemotingProtocolServer(messagingProcessor);
 
-        metricsExporter = new MetricsExporter(brokerConfig, messageStore, (ExtendMessagingProcessor) messagingProcessor);
+        metricsExporter = new MetricsExporter(brokerConfig, messageStore, messagingProcessor);
     }
 
     @Override

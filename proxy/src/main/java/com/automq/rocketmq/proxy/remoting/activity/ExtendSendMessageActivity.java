@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.proxy.remoting.activity;
 
+import com.automq.rocketmq.proxy.processor.ExtendMessagingProcessor;
 import com.automq.rocketmq.proxy.remoting.RemotingUtil;
 import io.netty.channel.ChannelHandlerContext;
 import java.net.InetSocketAddress;
@@ -31,7 +32,6 @@ import org.apache.rocketmq.common.message.MessageDecoder;
 import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.common.topic.TopicValidator;
 import org.apache.rocketmq.proxy.common.ProxyContext;
-import org.apache.rocketmq.proxy.processor.MessagingProcessor;
 import org.apache.rocketmq.proxy.processor.QueueSelector;
 import org.apache.rocketmq.proxy.remoting.activity.SendMessageActivity;
 import org.apache.rocketmq.proxy.remoting.pipeline.RequestPipeline;
@@ -40,15 +40,19 @@ import org.apache.rocketmq.proxy.service.route.MessageQueueView;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 import org.apache.rocketmq.remoting.protocol.RequestCode;
 import org.apache.rocketmq.remoting.protocol.ResponseCode;
+import org.apache.rocketmq.remoting.protocol.header.ConsumerSendMsgBackRequestHeader;
 import org.apache.rocketmq.remoting.protocol.header.SendMessageRequestHeader;
 import org.apache.rocketmq.remoting.protocol.header.SendMessageResponseHeader;
 
 import static com.automq.rocketmq.proxy.remoting.RemotingUtil.REQUEST_NOT_FINISHED;
 
 public class ExtendSendMessageActivity extends SendMessageActivity implements CommonRemotingBehavior {
+    ExtendMessagingProcessor messagingProcessor;
+
     public ExtendSendMessageActivity(RequestPipeline requestPipeline,
-        MessagingProcessor messagingProcessor) {
+        ExtendMessagingProcessor messagingProcessor) {
         super(requestPipeline, messagingProcessor);
+        this.messagingProcessor = messagingProcessor;
     }
 
     @Override
@@ -141,8 +145,19 @@ public class ExtendSendMessageActivity extends SendMessageActivity implements Co
     @Override
     protected RemotingCommand consumerSendMessage(ChannelHandlerContext ctx, RemotingCommand request,
         ProxyContext context) throws Exception {
-        // TODO: Support RETRY message that through the CONSUMER_SEND_MSG_BACK RPC.
-        return super.consumerSendMessage(ctx, request, context);
+        ConsumerSendMsgBackRequestHeader requestHeader = (ConsumerSendMsgBackRequestHeader) request.decodeCommandCustomHeader(ConsumerSendMsgBackRequestHeader.class);
+        messagingProcessor.getServiceManager()
+            .getMessageService()
+            .sendMessageBack(context, null, requestHeader.getOriginMsgId(), requestHeader, context.getRemainingMs())
+            .whenComplete((finalResponse, error) -> {
+                if (error != null) {
+                    writeErrResponse(ctx, context, request, error);
+                    return;
+                }
+                writeResponse(ctx, context, request, finalResponse);
+            });
+
+        return null;
     }
 
     @Override

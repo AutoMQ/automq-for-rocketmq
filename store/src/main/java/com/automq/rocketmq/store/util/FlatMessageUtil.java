@@ -20,11 +20,20 @@ package com.automq.rocketmq.store.util;
 import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.stream.api.RecordBatchWithContext;
+import com.google.flatbuffers.Table;
+import java.nio.ByteBuffer;
 
 /**
  * An utility class to convert S3Stream Record to FlatMessage, and vice versa.
  */
 public class FlatMessageUtil {
+    public static <T extends Table> byte[] flatBufferToByteArray(T table) {
+        ByteBuffer buffer = table.getByteBuffer();
+        byte[] bytes = new byte[buffer.remaining()];
+        buffer.get(buffer.position(), bytes);
+        return bytes;
+    }
+
     public static FlatMessageExt transferToMessageExt(RecordBatchWithContext recordBatch) {
         FlatMessage message = FlatMessage.getRootAsFlatMessage(recordBatch.rawPayload());
         return FlatMessageExt.Builder.builder()
