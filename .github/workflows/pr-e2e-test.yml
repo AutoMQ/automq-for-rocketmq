@@ -158,12 +158,12 @@ jobs:
         with:
           repository: AutoMQ/rocketmq-e2e
           ref: master
-          path: rocketmq-e2es
+          path: rocketmq-e2e
           token: ${{ secrets.PAT_E2E }}
       - name: Check e2e repo
         run: |
           pwd
-          ls
+          ls rocketmq-e2e/
       - name: e2e test
         working-directory: distribution/helm
         env:
@@ -273,6 +273,7 @@ jobs:
       - name: clean Rocketmq
         working-directory: distribution/helm
         env:
+          NAMESPACE: ${{ steps.create_namespace.outputs.namespace }}
           DOCKER_REPO: ${{ env.DOCKER_REPO }}
         run: |
-          sh clean-ci.sh
+          sh clean-ci.sh ${NAMESPACE}
