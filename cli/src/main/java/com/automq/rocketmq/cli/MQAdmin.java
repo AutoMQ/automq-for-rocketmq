@@ -32,6 +32,7 @@ import picocli.CommandLine;
         ListTopic.class,
         CreateGroup.class,
         DescribeGroup.class,
+        UpdateGroup.class,
         ListGroup.class,
         ProduceMessage.class,
         ConsumeMessage.class,

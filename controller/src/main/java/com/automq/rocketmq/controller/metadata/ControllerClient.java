@@ -44,6 +44,7 @@ import apache.rocketmq.controller.v1.Topic;
 import apache.rocketmq.controller.v1.TrimStreamReply;
 import apache.rocketmq.controller.v1.TrimStreamRequest;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
+import apache.rocketmq.controller.v1.UpdateGroupRequest;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
@@ -75,6 +76,8 @@ public interface ControllerClient extends Closeable {
     CompletableFuture<CreateGroupReply> createGroup(String target, CreateGroupRequest request);
 
     CompletableFuture<ConsumerGroup> describeGroup(String target, String groupName);
+
+    CompletableFuture<Void> updateGroup(String target, UpdateGroupRequest request);
 
     CompletableFuture<Void> deleteGroup(String target, long groupId);
 

@@ -72,6 +72,8 @@ import apache.rocketmq.controller.v1.TerminationStage;
 import apache.rocketmq.controller.v1.Topic;
 import apache.rocketmq.controller.v1.TrimStreamReply;
 import apache.rocketmq.controller.v1.TrimStreamRequest;
+import apache.rocketmq.controller.v1.UpdateGroupReply;
+import apache.rocketmq.controller.v1.UpdateGroupRequest;
 import apache.rocketmq.controller.v1.UpdateTopicReply;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.common.PrefixThreadFactory;
@@ -459,6 +461,11 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
             responseObserver.onNext(reply);
             responseObserver.onCompleted();
         }));
+    }
+
+    @Override
+    public void updateGroup(UpdateGroupRequest request, StreamObserver<UpdateGroupReply> responseObserver) {
+
     }
 
     @Override

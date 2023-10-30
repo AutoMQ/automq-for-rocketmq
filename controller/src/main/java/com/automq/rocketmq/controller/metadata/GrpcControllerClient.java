@@ -67,6 +67,8 @@ import apache.rocketmq.controller.v1.TerminateNodeRequest;
 import apache.rocketmq.controller.v1.Topic;
 import apache.rocketmq.controller.v1.TrimStreamReply;
 import apache.rocketmq.controller.v1.TrimStreamRequest;
+import apache.rocketmq.controller.v1.UpdateGroupReply;
+import apache.rocketmq.controller.v1.UpdateGroupRequest;
 import apache.rocketmq.controller.v1.UpdateTopicReply;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.common.config.GrpcClientConfig;
@@ -537,6 +539,34 @@ public class GrpcControllerClient implements ControllerClient {
                         LOGGER.error("Unexpected describe group response: {}", TextFormat.shortDebugString(result));
                         future.completeExceptionally(new ControllerException(result.getStatus().getCodeValue(), result.getStatus().getMessage()));
                     }
+                }
+            }
+
+            @Override
+            public void onFailure(@Nonnull Throwable t) {
+                future.completeExceptionally(t);
+            }
+        }, MoreExecutors.directExecutor());
+        return future;
+    }
+
+    @Override
+    public CompletableFuture<Void> updateGroup(String target, UpdateGroupRequest request) {
+        ControllerServiceGrpc.ControllerServiceFutureStub stub;
+        try {
+            stub = getOrCreateStubForTarget(target);
+        } catch (ControllerException e) {
+            return CompletableFuture.failedFuture(e);
+        }
+
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        Futures.addCallback(stub.updateGroup(request), new FutureCallback<>() {
+            @Override
+            public void onSuccess(UpdateGroupReply result) {
+                if (result.getStatus().getCode() == Code.OK) {
+                    future.complete(null);
+                } else {
+                    future.completeExceptionally(new ControllerException(result.getStatus().getCodeValue(), result.getStatus().getMessage()));
                 }
             }
 
