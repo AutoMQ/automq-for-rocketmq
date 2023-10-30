@@ -165,7 +165,6 @@ jobs:
           pwd
           ls rocketmq-e2e/
       - name: e2e test
-        working-directory: distribution/helm
         env:
           ASK_CONFIG: "${{ secrets.KUBE_CONFIG }}"
           VERSION: "${{ matrix.version }}"
@@ -173,6 +172,7 @@ jobs:
           TEST_CMD_BASE: "mvn -B test"
           JOB_INDEX: 0
         run: |
+          cd distribution/helm
           sh test-ci.sh ${VERSION} ${TEST_CODE_PATH} ${TEST_CMD_BASE} ${ASK_CONFIG} ${JOB_INDEX}
           
 #  test-e2e-golang:

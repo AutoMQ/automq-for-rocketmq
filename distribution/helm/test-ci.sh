@@ -56,7 +56,6 @@ echo $TEST_CMD_BASE
 
 TEST_CMD=`echo "${TEST_CMD_BASE}" | sed -s 's/^/        /g'`
 
-cd code
 cd $TEST_CODE_PATH
 ${TEST_CMD}
 exit_code=$?
