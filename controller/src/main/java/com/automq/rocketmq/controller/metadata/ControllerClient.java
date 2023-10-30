@@ -28,6 +28,8 @@ import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.DescribeClusterRequest;
+import apache.rocketmq.controller.v1.ListGroupReply;
+import apache.rocketmq.controller.v1.ListGroupRequest;
 import apache.rocketmq.controller.v1.ListOpenStreamsReply;
 import apache.rocketmq.controller.v1.ListOpenStreamsRequest;
 import apache.rocketmq.controller.v1.ListTopicsReply;
@@ -75,6 +77,8 @@ public interface ControllerClient extends Closeable {
     CompletableFuture<ConsumerGroup> describeGroup(String target, String groupName);
 
     CompletableFuture<Void> deleteGroup(String target, long groupId);
+
+    void listGroups(String target, ListGroupRequest request, StreamObserver<ListGroupReply> observer);
 
     CompletableFuture<Void> commitOffset(String target, long groupId, long topicId, int queueId, long offset);
 

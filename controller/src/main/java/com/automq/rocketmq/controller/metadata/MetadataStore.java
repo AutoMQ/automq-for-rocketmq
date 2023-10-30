@@ -39,6 +39,7 @@ import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import com.automq.rocketmq.controller.metadata.database.dao.Stream;
 import java.io.Closeable;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -158,6 +159,8 @@ public interface MetadataStore extends Closeable {
      * @return Deleted consumer group
      */
     CompletableFuture<ConsumerGroup> deleteGroup(long groupId);
+
+    CompletableFuture<Collection<ConsumerGroup>> listGroups();
 
     CompletableFuture<StreamMetadata> getStream(long topicId, int queueId, Long groupId, StreamRole streamRole);
 

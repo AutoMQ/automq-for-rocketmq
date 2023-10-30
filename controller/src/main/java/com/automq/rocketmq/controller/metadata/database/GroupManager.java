@@ -33,6 +33,8 @@ import com.automq.rocketmq.controller.metadata.database.dao.Topic;
 import com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 import com.google.common.base.Strings;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -218,7 +220,6 @@ public class GroupManager {
     }
 
     public CompletableFuture<ConsumerGroup> deleteGroup(long groupId) {
-
         return CompletableFuture.supplyAsync(() -> {
             try (SqlSession session = metadataStore.openSession()) {
                 GroupMapper mapper = session.getMapper(GroupMapper.class);
@@ -255,4 +256,21 @@ public class GroupManager {
             .build();
     }
 
+    public CompletableFuture<Collection<ConsumerGroup>> listGroups() {
+        return CompletableFuture.supplyAsync(() -> {
+            List<ConsumerGroup> groups = new ArrayList<>();
+
+            try (SqlSession session = metadataStore.openSession()) {
+                GroupMapper mapper = session.getMapper(GroupMapper.class);
+                List<Group> list = mapper.byCriteria(GroupCriteria.newBuilder()
+                    .setStatus(GroupStatus.GROUP_STATUS_ACTIVE)
+                    .build());
+                for (Group item : list) {
+                    groups.add(fromGroup(item));
+                }
+            }
+
+            return groups;
+        });
+    }
 }
