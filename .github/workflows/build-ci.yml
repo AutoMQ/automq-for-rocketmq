@@ -13,25 +13,25 @@ jobs:
       - uses: actions/checkout@v3
         with:
           submodules: true
-      - name: Install flatc
-        run: sudo bash install_flatc.sh
-      - uses: actions/setup-java@v3
-        with:
-          distribution: "temurin"
-          java-version: "17"
-          cache: "maven"
-      - name: Cache Docker images.
-        uses: ScribeMD/docker-cache@0.3.6
-        with:
-          key: docker-${{ runner.os }}
-      - name: Build distribution tar
-        run: |
-          mvn -Prelease-all clean install -U
-      - uses: actions/upload-artifact@v3
-        name: Upload distribution tar
-        with:
-          name: rocketmq
-          path: distribution/target/rocketmq*.zip
+#      - name: Install flatc
+#        run: sudo bash install_flatc.sh
+#      - uses: actions/setup-java@v3
+#        with:
+#          distribution: "temurin"
+#          java-version: "17"
+#          cache: "maven"
+#      - name: Cache Docker images.
+#        uses: ScribeMD/docker-cache@0.3.6
+#        with:
+#          key: docker-${{ runner.os }}
+#      - name: Build distribution tar
+#        run: |
+#          mvn -Prelease-all clean install -U
+#      - uses: actions/upload-artifact@v3
+#        name: Upload distribution tar
+#        with:
+#          name: rocketmq
+#          path: distribution/target/rocketmq*.zip
 
   pr-e2e:
     name: PR e2e test

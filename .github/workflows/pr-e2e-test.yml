@@ -129,14 +129,14 @@ jobs:
           REPO_NAME=`echo ${GITHUB_REPOSITORY#*/} | sed -e "s/\//-/g" | cut -c1-36 | tr '[A-Z]' '[a-z]'`
           NAMESPACE=${REPO_NAME}-${GITHUB_RUN_ID}-${JOB_INDEX}
           kubectl create namespace $NAMESPACE
-          echo "namespace=NAMESPACE" >> $GITHUB_OUTPUT
+          echo "namespace=$NAMESPACE" >> $GITHUB_OUTPUT
       - name: Deploy RocketMQ
         working-directory: distribution/helm
         env:
           NAMESPACE: ${{ steps.create_namespace.outputs.namespace }}
           DOCKER_REPO: ${{ env.DOCKER_REPO }}
         run: |
-          sh deploy-ci.sh ${DOCKER_REPO}  ${{ matrix.version }} ${NAMESPACE}
+          sh deploy-ci.sh ${DOCKER_REPO} ${{ matrix.version }} ${NAMESPACE}
 
   test-e2e-grpc-java:
     if: ${{ success() }}
@@ -162,9 +162,9 @@ jobs:
           TEST_CODE_BRANCH: "master"
           TEST_CODE_PATH: java/e2e
           TEST_CMD_BASE: "mvn -B test"
-          job-id: 0
+          JOB_INDEX: 0
         run: |
-          sh test-ci.sh
+          sh test-ci.sh ${VERSION} ${TEST_CODE_GIT} ${TEST_CODE_BRANCH} ${TEST_CODE_PATH} ${TEST_CMD_BASE} ${ASK_CONFIG} ${JOB_INDEX}
           
 #  test-e2e-golang:
 #    if: ${{ success() }}

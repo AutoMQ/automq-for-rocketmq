@@ -31,6 +31,7 @@ export TEST_CODE_GIT
 export TEST_CODE_BRANCH
 export TEST_CODE_PATH
 
+
 echo "Start test version: ${GITHUB_REPOSITORY}@${VERSION}"
 
 echo "************************************"
@@ -46,10 +47,6 @@ env_uuid=${REPO_NAME}-${GITHUB_RUN_ID}-${JOB_INDEX}
 echo "************************************"
 echo "*        E2E Test local...         *"
 echo "************************************"
-
-wget https://dlcdn.apache.org/maven/maven-3/3.8.7/binaries/apache-maven-3.8.7-bin.tar.gz
-tar -zxvf apache-maven-3.8.7-bin.tar.gz -C /opt/
-export PATH=$PATH:/opt/apache-maven-3.8.7/bin
 
 ns=${env_uuid}
 
