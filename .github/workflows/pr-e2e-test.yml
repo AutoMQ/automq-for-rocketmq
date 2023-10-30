@@ -113,6 +113,9 @@ jobs:
       matrix:
         version: ${{ fromJSON(needs.list-version.outputs.version-json) }}
     steps:
+      - name: Change file permissions
+        run: |
+          sudo chown -R $USER:$USER /runner/_work/rocketmq-on-s3/rocketmq-on-s3
       - name: Checkout code
         uses: actions/checkout@v3
         with:
