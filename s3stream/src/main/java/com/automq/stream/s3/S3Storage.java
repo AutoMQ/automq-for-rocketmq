@@ -82,7 +82,7 @@ public class S3Storage implements Storage {
     private final ScheduledExecutorService backgroundExecutor = Threads.newSingleThreadScheduledExecutor(
             ThreadUtils.createThreadFactory("s3-storage-background", true), LOGGER);
     private final ExecutorService uploadWALExecutor = Threads.newFixedThreadPool(
-            4, ThreadUtils.createThreadFactory("s3-storage-upload-wal", true), LOGGER);
+            4, ThreadUtils.createThreadFactory("s3-storage-upload-wal-%d", true), LOGGER);
 
     private final Queue<WalWriteRequest> backoffRecords = new LinkedBlockingQueue<>();
     private final ScheduledFuture<?> drainBackoffTask;
@@ -179,6 +179,9 @@ public class S3Storage implements Storage {
             if (expectNextOffset == null || expectNextOffset == streamRecordBatch.getBaseOffset()) {
                 cacheBlock.put(streamRecordBatch);
                 streamNextOffsets.put(streamRecordBatch.getStreamId(), streamRecordBatch.getLastOffset());
+            } else {
+                LOGGER.error("unexpected WAL record, streamId={}, expectNextOffset={}, record={}", streamId, expectNextOffset, streamRecordBatch);
+                streamRecordBatch.release();
             }
         }
         if (logEndOffset >= 0L) {

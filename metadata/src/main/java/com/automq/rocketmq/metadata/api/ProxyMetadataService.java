@@ -18,12 +18,16 @@
 package com.automq.rocketmq.metadata.api;
 
 import apache.rocketmq.controller.v1.ConsumerGroup;
+import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.Topic;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 public interface ProxyMetadataService {
+
+    CompletableFuture<Topic> createTopic(CreateTopicRequest request);
+
     /**
      * Query the topic metadata of a given topic name.
      *

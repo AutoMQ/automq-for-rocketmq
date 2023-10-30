@@ -29,8 +29,13 @@ import picocli.CommandLine;
         CreateTopic.class,
         DescribeTopic.class,
         UpdateTopic.class,
+        DeleteTopic.class,
+        ListTopic.class,
         CreateGroup.class,
         DescribeGroup.class,
+        UpdateGroup.class,
+        DeleteGroup.class,
+        ListGroup.class,
         ProduceMessage.class,
         ConsumeMessage.class,
         TerminateNode.class

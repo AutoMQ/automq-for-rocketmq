@@ -26,6 +26,7 @@ import apache.rocketmq.controller.v1.CommitStreamObjectReply;
 import apache.rocketmq.controller.v1.CommitStreamObjectRequest;
 import apache.rocketmq.controller.v1.CommitWALObjectReply;
 import apache.rocketmq.controller.v1.CommitWALObjectRequest;
+import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.ControllerServiceGrpc;
 import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
@@ -43,6 +44,8 @@ import apache.rocketmq.controller.v1.DescribeTopicReply;
 import apache.rocketmq.controller.v1.DescribeTopicRequest;
 import apache.rocketmq.controller.v1.HeartbeatReply;
 import apache.rocketmq.controller.v1.HeartbeatRequest;
+import apache.rocketmq.controller.v1.ListGroupReply;
+import apache.rocketmq.controller.v1.ListGroupRequest;
 import apache.rocketmq.controller.v1.ListMessageQueueReassignmentsReply;
 import apache.rocketmq.controller.v1.ListMessageQueueReassignmentsRequest;
 import apache.rocketmq.controller.v1.ListOpenStreamsRequest;
@@ -69,6 +72,8 @@ import apache.rocketmq.controller.v1.TerminationStage;
 import apache.rocketmq.controller.v1.Topic;
 import apache.rocketmq.controller.v1.TrimStreamReply;
 import apache.rocketmq.controller.v1.TrimStreamRequest;
+import apache.rocketmq.controller.v1.UpdateGroupReply;
+import apache.rocketmq.controller.v1.UpdateGroupRequest;
 import apache.rocketmq.controller.v1.UpdateTopicReply;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.common.PrefixThreadFactory;
@@ -246,7 +251,7 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     }
 
     @Override
-    public void listAllTopics(ListTopicsRequest request, StreamObserver<ListTopicsReply> responseObserver) {
+    public void listTopics(ListTopicsRequest request, StreamObserver<ListTopicsReply> responseObserver) {
         metadataStore.listTopics().whenComplete(((topics, e) -> {
             if (null != e) {
                 if (e instanceof ControllerException ex) {
@@ -459,6 +464,21 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     }
 
     @Override
+    public void updateGroup(UpdateGroupRequest request, StreamObserver<UpdateGroupReply> responseObserver) {
+        metadataStore.updateGroup(request).whenComplete((res, e) -> {
+            if (null != e) {
+                responseObserver.onError(e);
+                return;
+            }
+            UpdateGroupReply reply = UpdateGroupReply.newBuilder()
+                .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                .build();
+            responseObserver.onNext(reply);
+            responseObserver.onCompleted();
+        });
+    }
+
+    @Override
     public void deleteGroup(DeleteGroupRequest request, StreamObserver<DeleteGroupReply> responseObserver) {
         metadataStore.deleteGroup(request.getId()).whenComplete((res, e) -> {
             if (null != e) {
@@ -481,6 +501,25 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
                 .setStatus(Status.newBuilder().setCode(Code.OK).build()).build());
             responseObserver.onCompleted();
         });
+    }
+
+    @Override
+    public void listGroups(ListGroupRequest request, StreamObserver<ListGroupReply> responseObserver) {
+        metadataStore.listGroups().whenComplete(((groups, e) -> {
+            if (null != e) {
+                responseObserver.onError(e);
+                return;
+            }
+
+            for (ConsumerGroup group : groups) {
+                ListGroupReply reply = ListGroupReply.newBuilder()
+                    .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                    .setGroup(group)
+                    .build();
+                responseObserver.onNext(reply);
+            }
+            responseObserver.onCompleted();
+        }));
     }
 
     @Override

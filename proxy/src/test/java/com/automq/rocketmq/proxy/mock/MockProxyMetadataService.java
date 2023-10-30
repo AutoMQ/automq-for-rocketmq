@@ -19,6 +19,7 @@ package com.automq.rocketmq.proxy.mock;
 
 import apache.rocketmq.controller.v1.AcceptTypes;
 import apache.rocketmq.controller.v1.ConsumerGroup;
+import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.MessageQueue;
 import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.MessageType;
@@ -31,6 +32,11 @@ import java.util.concurrent.CompletableFuture;
 
 public class MockProxyMetadataService implements ProxyMetadataService {
     Map<Long, Long> offsetMap = new HashMap<>();
+
+    @Override
+    public CompletableFuture<Topic> createTopic(CreateTopicRequest request) {
+        return topicOf(request.getTopic());
+    }
 
     @Override
     public CompletableFuture<Topic> topicOf(String topicName) {

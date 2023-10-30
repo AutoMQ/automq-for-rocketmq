@@ -83,16 +83,19 @@ public class DefaultS3Operator implements S3Operator {
     private final S3AsyncClient readS3Client;
     private final Semaphore inflightWriteLimiter;
     private final Semaphore inflightReadLimiter;
-
     private final List<ReadTask> waitingReadTasks = new LinkedList<>();
     private final AsyncNetworkBandwidthLimiter networkInboundBandwidthLimiter;
     private final AsyncNetworkBandwidthLimiter networkOutboundBandwidthLimiter;
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(
             ThreadUtils.createThreadFactory("s3operator", true));
-    private final ExecutorService s3ReadCallbackExecutor = Executors.newSingleThreadExecutor(
-            ThreadUtils.createThreadFactory("s3-read-cb-executor", true));
-    private final ExecutorService s3WriteCallbackExecutor = Executors.newSingleThreadExecutor(
-            ThreadUtils.createThreadFactory("s3-write-cb-executor", true));
+    private final ExecutorService readLimiterCallbackExecutor = Executors.newSingleThreadExecutor(
+            ThreadUtils.createThreadFactory("s3-read-limiter-cb-executor", true));
+    private final ExecutorService writeLimiterCallbackExecutor = Executors.newSingleThreadExecutor(
+            ThreadUtils.createThreadFactory("s3-write-limiter-cb-executor", true));
+    private final ExecutorService readCallbackExecutor = Executors.newSingleThreadExecutor(
+            ThreadUtils.createThreadFactory("s3-read-cb-executor-%d", true));
+    private final ExecutorService writeCallbackExecutor = Executors.newSingleThreadExecutor(
+            ThreadUtils.createThreadFactory("s3-write-cb-executor-%d", true));
 
     public DefaultS3Operator(String endpoint, String region, String bucket, boolean forcePathStyle, String accessKey, String secretKey) {
         this(endpoint, region, bucket, forcePathStyle, accessKey, secretKey, null, null, false);
@@ -162,7 +165,7 @@ public class DefaultS3Operator implements S3Operator {
                 } else {
                     rangeRead0(path, start, end, cf);
                 }
-            }, s3ReadCallbackExecutor);
+            }, readLimiterCallbackExecutor);
         } else {
             rangeRead0(path, start, end, cf);
         }
@@ -230,11 +233,12 @@ public class DefaultS3Operator implements S3Operator {
     CompletableFuture<ByteBuf> mergedRangeRead(String path, long start, long end) {
         end = end - 1;
         CompletableFuture<ByteBuf> cf = new CompletableFuture<>();
-        if (!acquireReadPermit(cf)) {
-            return cf;
+        CompletableFuture<ByteBuf> retCf = acquireReadPermit(cf);
+        if (retCf.isDone()) {
+            return retCf;
         }
         mergedRangeRead0(path, start, end, cf);
-        return cf.whenComplete((rst, ex) -> inflightReadLimiter.release());
+        return retCf;
     }
 
     void mergedRangeRead0(String path, long start, long end, CompletableFuture<ByteBuf> cf) {
@@ -264,8 +268,9 @@ public class DefaultS3Operator implements S3Operator {
     @Override
     public CompletableFuture<Void> write(String path, ByteBuf data, ThrottleStrategy throttleStrategy) {
         CompletableFuture<Void> cf = new CompletableFuture<>();
-        if (!acquireWritePermit(cf)) {
-            return cf;
+        CompletableFuture<Void> retCf = acquireWritePermit(cf);
+        if (retCf.isDone()) {
+            return retCf;
         }
         if (networkOutboundBandwidthLimiter != null) {
             networkOutboundBandwidthLimiter.consume(throttleStrategy, data.readableBytes()).whenCompleteAsync((v, ex) -> {
@@ -274,11 +279,11 @@ public class DefaultS3Operator implements S3Operator {
                 } else {
                     write0(path, data, cf);
                 }
-            }, s3WriteCallbackExecutor);
+            }, writeLimiterCallbackExecutor);
         } else {
             write0(path, data, cf);
         }
-        return cf.whenComplete((rst, ex) -> inflightWriteLimiter.release());
+        return retCf;
     }
 
     private void write0(String path, ByteBuf data, CompletableFuture<Void> cf) {
@@ -357,11 +362,12 @@ public class DefaultS3Operator implements S3Operator {
     @Override
     public CompletableFuture<String> createMultipartUpload(String path) {
         CompletableFuture<String> cf = new CompletableFuture<>();
-        if (!acquireWritePermit(cf)) {
-            return cf;
+        CompletableFuture<String> retCf = acquireWritePermit(cf);
+        if (retCf.isDone()) {
+            return retCf;
         }
         createMultipartUpload0(path, cf);
-        return cf.whenComplete((rst, ex) -> inflightWriteLimiter.release());
+        return retCf;
     }
 
     void createMultipartUpload0(String path, CompletableFuture<String> cf) {
@@ -388,8 +394,9 @@ public class DefaultS3Operator implements S3Operator {
     @Override
     public CompletableFuture<CompletedPart> uploadPart(String path, String uploadId, int partNumber, ByteBuf data, ThrottleStrategy throttleStrategy) {
         CompletableFuture<CompletedPart> cf = new CompletableFuture<>();
-        if (!acquireWritePermit(cf)) {
-            return cf;
+        CompletableFuture<CompletedPart> refCf = acquireWritePermit(cf);
+        if (refCf.isDone()) {
+            return refCf;
         }
         if (networkOutboundBandwidthLimiter != null) {
             networkOutboundBandwidthLimiter.consume(throttleStrategy, data.readableBytes()).whenCompleteAsync((v, ex) -> {
@@ -398,12 +405,12 @@ public class DefaultS3Operator implements S3Operator {
                 } else {
                     uploadPart0(path, uploadId, partNumber, data, cf);
                 }
-            }, s3WriteCallbackExecutor);
+            }, writeLimiterCallbackExecutor);
         } else {
             uploadPart0(path, uploadId, partNumber, data, cf);
         }
         cf.whenComplete((rst, ex) -> data.release());
-        return cf.whenComplete((rst, ex) -> inflightWriteLimiter.release());
+        return refCf;
     }
 
     private void uploadPart0(String path, String uploadId, int partNumber, ByteBuf part, CompletableFuture<CompletedPart> cf) {
@@ -434,11 +441,12 @@ public class DefaultS3Operator implements S3Operator {
     @Override
     public CompletableFuture<CompletedPart> uploadPartCopy(String sourcePath, String path, long start, long end, String uploadId, int partNumber) {
         CompletableFuture<CompletedPart> cf = new CompletableFuture<>();
-        if (!acquireWritePermit(cf)) {
-            return cf;
+        CompletableFuture<CompletedPart> retCf = acquireWritePermit(cf);
+        if (retCf.isDone()) {
+            return retCf;
         }
         uploadPartCopy0(sourcePath, path, start, end, uploadId, partNumber, cf);
-        return cf.whenComplete((rst, ex) -> inflightWriteLimiter.release());
+        return retCf;
     }
 
     private void uploadPartCopy0(String sourcePath, String path, long start, long end, String uploadId, int partNumber, CompletableFuture<CompletedPart> cf) {
@@ -469,11 +477,12 @@ public class DefaultS3Operator implements S3Operator {
     @Override
     public CompletableFuture<Void> completeMultipartUpload(String path, String uploadId, List<CompletedPart> parts) {
         CompletableFuture<Void> cf = new CompletableFuture<>();
-        if (!acquireWritePermit(cf)) {
-            return cf;
+        CompletableFuture<Void> retCf = acquireWritePermit(cf);
+        if (retCf.isDone()) {
+            return retCf;
         }
         completeMultipartUpload0(path, uploadId, parts, cf);
-        return cf.whenComplete((rst, ex) -> inflightWriteLimiter.release());
+        return retCf;
     }
 
     public void completeMultipartUpload0(String path, String uploadId, List<CompletedPart> parts, CompletableFuture<Void> cf) {
@@ -578,24 +587,56 @@ public class DefaultS3Operator implements S3Operator {
         return builder.build();
     }
 
-    boolean acquireReadPermit(CompletableFuture<?> cf) {
+    /**
+     * Acquire read permit, permit will auto release when cf complete.
+     *
+     * @return retCf the retCf should be used as method return value to ensure release before following operations.
+     */
+    <T> CompletableFuture<T> acquireReadPermit(CompletableFuture<T> cf) {
         // TODO: async acquire?
         try {
             inflightReadLimiter.acquire();
-            return true;
+            CompletableFuture<T> newCf = new CompletableFuture<>();
+            cf.whenComplete((rst, ex) -> {
+                inflightReadLimiter.release();
+                readCallbackExecutor.execute(() -> {
+                    if (ex != null) {
+                        newCf.completeExceptionally(ex);
+                    } else {
+                        newCf.complete(rst);
+                    }
+                });
+            });
+            return newCf;
         } catch (InterruptedException e) {
             cf.completeExceptionally(e);
-            return false;
+            return cf;
         }
     }
 
-    boolean acquireWritePermit(CompletableFuture<?> cf) {
+    /**
+     * Acquire write permit, permit will auto release when cf complete.
+     *
+     * @return retCf the retCf should be used as method return value to ensure release before following operations.
+     */
+    <T> CompletableFuture<T> acquireWritePermit(CompletableFuture<T> cf) {
         try {
             inflightWriteLimiter.acquire();
-            return true;
+            CompletableFuture<T> newCf = new CompletableFuture<>();
+            cf.whenComplete((rst, ex) -> {
+                inflightWriteLimiter.release();
+                writeCallbackExecutor.execute(() -> {
+                    if (ex != null) {
+                        newCf.completeExceptionally(ex);
+                    } else {
+                        newCf.complete(rst);
+                    }
+                });
+            });
+            return newCf;
         } catch (InterruptedException e) {
             cf.completeExceptionally(e);
-            return false;
+            return cf;
         }
     }
 

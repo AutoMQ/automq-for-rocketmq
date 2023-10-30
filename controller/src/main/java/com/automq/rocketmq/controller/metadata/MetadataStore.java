@@ -29,6 +29,7 @@ import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.TerminationStage;
 import apache.rocketmq.controller.v1.Topic;
+import apache.rocketmq.controller.v1.UpdateGroupRequest;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.common.api.DataStore;
 import com.automq.rocketmq.common.config.ControllerConfig;
@@ -39,6 +40,7 @@ import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
 import com.automq.rocketmq.controller.metadata.database.dao.Stream;
 import java.io.Closeable;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -151,6 +153,8 @@ public interface MetadataStore extends Closeable {
 
     CompletableFuture<ConsumerGroup> describeGroup(Long groupId, String groupName);
 
+    CompletableFuture<Void> updateGroup(UpdateGroupRequest request);
+
     /**
      * Delete group with the given group id logically.
      *
@@ -158,6 +162,8 @@ public interface MetadataStore extends Closeable {
      * @return Deleted consumer group
      */
     CompletableFuture<ConsumerGroup> deleteGroup(long groupId);
+
+    CompletableFuture<Collection<ConsumerGroup>> listGroups();
 
     CompletableFuture<StreamMetadata> getStream(long topicId, int queueId, Long groupId, StreamRole streamRole);
 

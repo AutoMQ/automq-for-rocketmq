@@ -379,6 +379,31 @@ message DescribeGroupReply {
   ConsumerGroup group = 2;
 }
 
+message UpdateGroupRequest {
+  ControllerRequestContext context = 1;
+
+  int64 groupId = 2;
+
+  // Consumer group name
+  string name = 3;
+
+  // Maximum retry attempts before forwarding messages to dead-letter-queue
+  int32 max_retry_attempt = 4;
+
+  // Type of the group, standard for max concurrency and FIFO for message-group scope ordering
+  GroupType group_type = 5;
+
+  // Associated topic for dead letters.
+  int64 dead_letter_topic_id = 6;
+
+  // How transactional messages are consumed.
+  IsolationLevel isolation = 7;
+}
+
+message UpdateGroupReply {
+  Status status = 1;
+}
+
 message DeleteGroupRequest {
   ControllerRequestContext context = 1;
   int64 id = 2;
@@ -386,6 +411,15 @@ message DeleteGroupRequest {
 
 message DeleteGroupReply {
   Status status = 1;
+}
+
+message ListGroupRequest {
+  ControllerRequestContext context = 1;
+}
+
+message ListGroupReply {
+  Status status = 1;
+  ConsumerGroup group = 2;
 }
 
 enum TerminationStage {
@@ -430,7 +464,7 @@ service ControllerService {
 
   rpc describeTopic(DescribeTopicRequest) returns (DescribeTopicReply) {}
 
-  rpc listAllTopics(ListTopicsRequest) returns (stream ListTopicsReply) {}
+  rpc listTopics(ListTopicsRequest) returns (stream ListTopicsReply) {}
 
   rpc updateTopic(UpdateTopicRequest) returns (UpdateTopicReply) {}
 
@@ -450,7 +484,11 @@ service ControllerService {
 
   rpc describeGroup(DescribeGroupRequest) returns (DescribeGroupReply) {}
 
+  rpc updateGroup(UpdateGroupRequest) returns (UpdateGroupReply) {}
+
   rpc deleteGroup(DeleteGroupRequest) returns (DeleteGroupReply) {}
+
+  rpc listGroups(ListGroupRequest) returns (stream ListGroupReply) {}
 
   rpc commitOffset(CommitOffsetRequest) returns (CommitOffsetReply) {}
 

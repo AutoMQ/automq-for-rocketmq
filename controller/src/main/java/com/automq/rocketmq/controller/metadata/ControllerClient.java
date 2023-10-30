@@ -28,8 +28,12 @@ import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.DescribeClusterRequest;
+import apache.rocketmq.controller.v1.ListGroupReply;
+import apache.rocketmq.controller.v1.ListGroupRequest;
 import apache.rocketmq.controller.v1.ListOpenStreamsReply;
 import apache.rocketmq.controller.v1.ListOpenStreamsRequest;
+import apache.rocketmq.controller.v1.ListTopicsReply;
+import apache.rocketmq.controller.v1.ListTopicsRequest;
 import apache.rocketmq.controller.v1.OpenStreamReply;
 import apache.rocketmq.controller.v1.OpenStreamRequest;
 import apache.rocketmq.controller.v1.PrepareS3ObjectsReply;
@@ -40,6 +44,7 @@ import apache.rocketmq.controller.v1.Topic;
 import apache.rocketmq.controller.v1.TrimStreamReply;
 import apache.rocketmq.controller.v1.TrimStreamRequest;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
+import apache.rocketmq.controller.v1.UpdateGroupRequest;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
@@ -60,6 +65,8 @@ public interface ControllerClient extends Closeable {
 
     CompletableFuture<Topic> describeTopic(String target, Long topicId, String topicName);
 
+    void listTopics(String target, ListTopicsRequest request, StreamObserver<ListTopicsReply> observer);
+
     CompletableFuture<Void> heartbeat(String target, int nodeId, long epoch, boolean goingAway);
 
     CompletableFuture<Void> reassignMessageQueue(String target, long topicId, int queueId, int dstNodeId);
@@ -70,7 +77,11 @@ public interface ControllerClient extends Closeable {
 
     CompletableFuture<ConsumerGroup> describeGroup(String target, String groupName);
 
+    CompletableFuture<Void> updateGroup(String target, UpdateGroupRequest request);
+
     CompletableFuture<Void> deleteGroup(String target, long groupId);
+
+    void listGroups(String target, ListGroupRequest request, StreamObserver<ListGroupReply> observer);
 
     CompletableFuture<Void> commitOffset(String target, long groupId, long topicId, int queueId, long offset);
 
