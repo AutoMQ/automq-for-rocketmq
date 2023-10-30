@@ -430,7 +430,7 @@ service ControllerService {
 
   rpc describeTopic(DescribeTopicRequest) returns (DescribeTopicReply) {}
 
-  rpc listAllTopics(ListTopicsRequest) returns (stream ListTopicsReply) {}
+  rpc listTopics(ListTopicsRequest) returns (stream ListTopicsReply) {}
 
   rpc updateTopic(UpdateTopicRequest) returns (UpdateTopicReply) {}
 

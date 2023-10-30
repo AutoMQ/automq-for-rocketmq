@@ -246,7 +246,7 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     }
 
     @Override
-    public void listAllTopics(ListTopicsRequest request, StreamObserver<ListTopicsReply> responseObserver) {
+    public void listTopics(ListTopicsRequest request, StreamObserver<ListTopicsReply> responseObserver) {
         metadataStore.listTopics().whenComplete(((topics, e) -> {
             if (null != e) {
                 if (e instanceof ControllerException ex) {

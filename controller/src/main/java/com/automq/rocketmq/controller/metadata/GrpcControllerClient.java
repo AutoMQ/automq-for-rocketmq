@@ -45,6 +45,8 @@ import apache.rocketmq.controller.v1.HeartbeatReply;
 import apache.rocketmq.controller.v1.HeartbeatRequest;
 import apache.rocketmq.controller.v1.ListOpenStreamsReply;
 import apache.rocketmq.controller.v1.ListOpenStreamsRequest;
+import apache.rocketmq.controller.v1.ListTopicsReply;
+import apache.rocketmq.controller.v1.ListTopicsRequest;
 import apache.rocketmq.controller.v1.MessageQueue;
 import apache.rocketmq.controller.v1.NodeRegistrationReply;
 import apache.rocketmq.controller.v1.NodeRegistrationRequest;
@@ -344,6 +346,15 @@ public class GrpcControllerClient implements ControllerClient {
             }
         }, MoreExecutors.directExecutor());
         return future;
+    }
+
+    @Override
+    public void listTopics(String target, ListTopicsRequest request, StreamObserver<ListTopicsReply> observer) {
+        ManagedChannel channel = Grpc.newChannelBuilder(target, InsecureChannelCredentials.create())
+            .build();
+        ControllerServiceGrpc.ControllerServiceStub stub = ControllerServiceGrpc.newStub(channel);
+        stub.withDeadlineAfter(60, TimeUnit.SECONDS)
+            .listTopics(request, observer);
     }
 
     @Override

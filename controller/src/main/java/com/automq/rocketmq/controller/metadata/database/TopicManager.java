@@ -422,11 +422,8 @@ public class TopicManager {
         List<apache.rocketmq.controller.v1.Topic> result = new ArrayList<>();
         try (SqlSession session = metadataStore.openSession()) {
             TopicMapper topicMapper = session.getMapper(TopicMapper.class);
-            List<Topic> topics = topicMapper.list(null, null);
+            List<Topic> topics = topicMapper.list(TopicStatus.TOPIC_STATUS_ACTIVE, null);
             for (Topic topic : topics) {
-                if (TopicStatus.TOPIC_STATUS_DELETED == topic.getStatus()) {
-                    continue;
-                }
                 AcceptTypes.Builder builder = AcceptTypes.newBuilder();
                 JsonFormat.parser().ignoringUnknownFields().merge(topic.getAcceptMessageTypes(), builder);
                 apache.rocketmq.controller.v1.Topic t = apache.rocketmq.controller.v1.Topic.newBuilder()
