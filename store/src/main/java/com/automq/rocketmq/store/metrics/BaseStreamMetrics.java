@@ -52,6 +52,9 @@ public class BaseStreamMetrics {
     }
 
     protected String metricsName(String type, String name) {
+        name = name.replace(type, "");
+        name = name.toLowerCase();
+        type = type.toLowerCase();
         return STREAM_METRICS_PREFIX + type + "_" + name;
     }
 }
