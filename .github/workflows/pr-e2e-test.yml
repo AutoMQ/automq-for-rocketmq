@@ -178,6 +178,9 @@ jobs:
         with:
           name: test-e2e-grpc-java-log.txt
           path: testlog.txt
+      - name: Delete Test Report in K3s
+        run: |
+          rm -rf **/test_report/TEST-*.xml
 
   test-e2e-golang:
     if: ${{ success() }}
@@ -217,6 +220,9 @@ jobs:
         with:
           name: test-e2e-golang-log.txt
           path: testlog.txt
+      - name: Delete Test Report in K3s
+        run: |
+          rm -rf **/test_report/TEST-*.xml
 
   test-e2e-remoting-java:
     if: ${{ success() }}
@@ -253,7 +259,9 @@ jobs:
         with:
           name: test-e2e-remoting-java-log.txt
           path: testlog.txt
-
+      - name: Delete Test Report in K3s
+        run: |
+          rm -rf **/test_report/TEST-*.xml
 
   clean:
     if: always()
