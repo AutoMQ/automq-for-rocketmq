@@ -388,6 +388,15 @@ message DeleteGroupReply {
   Status status = 1;
 }
 
+message ListGroupRequest {
+  ControllerRequestContext context = 1;
+}
+
+message ListGroupReply {
+  Status status = 1;
+  ConsumerGroup group = 2;
+}
+
 enum TerminationStage {
   TS_UNSPECIFIED = 0;
   TS_TRANSFERRING_LEADERSHIP = 1;
@@ -451,6 +460,8 @@ service ControllerService {
   rpc describeGroup(DescribeGroupRequest) returns (DescribeGroupReply) {}
 
   rpc deleteGroup(DeleteGroupRequest) returns (DeleteGroupReply) {}
+
+  rpc listGroups(ListGroupRequest) returns (stream ListGroupReply) {}
 
   rpc commitOffset(CommitOffsetRequest) returns (CommitOffsetReply) {}
 

@@ -43,6 +43,8 @@ import apache.rocketmq.controller.v1.DescribeTopicReply;
 import apache.rocketmq.controller.v1.DescribeTopicRequest;
 import apache.rocketmq.controller.v1.HeartbeatReply;
 import apache.rocketmq.controller.v1.HeartbeatRequest;
+import apache.rocketmq.controller.v1.ListGroupReply;
+import apache.rocketmq.controller.v1.ListGroupRequest;
 import apache.rocketmq.controller.v1.ListOpenStreamsReply;
 import apache.rocketmq.controller.v1.ListOpenStreamsRequest;
 import apache.rocketmq.controller.v1.ListTopicsReply;
@@ -581,6 +583,15 @@ public class GrpcControllerClient implements ControllerClient {
             }
         }, MoreExecutors.directExecutor());
         return future;
+    }
+
+    @Override
+    public void listGroups(String target, ListGroupRequest request, StreamObserver<ListGroupReply> observer) {
+        ManagedChannel channel = Grpc.newChannelBuilder(target, InsecureChannelCredentials.create())
+            .build();
+        ControllerServiceGrpc.ControllerServiceStub stub = ControllerServiceGrpc.newStub(channel);
+        stub.withDeadlineAfter(60, TimeUnit.SECONDS)
+            .listGroups(request, observer);
     }
 
     @Override

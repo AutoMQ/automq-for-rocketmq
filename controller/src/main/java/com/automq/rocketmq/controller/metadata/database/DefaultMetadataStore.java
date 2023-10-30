@@ -80,6 +80,7 @@ import com.google.common.base.Strings;
 import com.google.protobuf.Timestamp;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -450,6 +451,11 @@ public class DefaultMetadataStore implements MetadataStore {
     @Override
     public CompletableFuture<ConsumerGroup> deleteGroup(long groupId) {
         return groupManager.deleteGroup(groupId);
+    }
+
+    @Override
+    public CompletableFuture<Collection<ConsumerGroup>> listGroups() {
+        return groupManager.listGroups();
     }
 
     @Override

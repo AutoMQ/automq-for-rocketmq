@@ -26,6 +26,7 @@ import apache.rocketmq.controller.v1.CommitStreamObjectReply;
 import apache.rocketmq.controller.v1.CommitStreamObjectRequest;
 import apache.rocketmq.controller.v1.CommitWALObjectReply;
 import apache.rocketmq.controller.v1.CommitWALObjectRequest;
+import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.ControllerServiceGrpc;
 import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
@@ -43,6 +44,8 @@ import apache.rocketmq.controller.v1.DescribeTopicReply;
 import apache.rocketmq.controller.v1.DescribeTopicRequest;
 import apache.rocketmq.controller.v1.HeartbeatReply;
 import apache.rocketmq.controller.v1.HeartbeatRequest;
+import apache.rocketmq.controller.v1.ListGroupReply;
+import apache.rocketmq.controller.v1.ListGroupRequest;
 import apache.rocketmq.controller.v1.ListMessageQueueReassignmentsReply;
 import apache.rocketmq.controller.v1.ListMessageQueueReassignmentsRequest;
 import apache.rocketmq.controller.v1.ListOpenStreamsRequest;
@@ -481,6 +484,25 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
                 .setStatus(Status.newBuilder().setCode(Code.OK).build()).build());
             responseObserver.onCompleted();
         });
+    }
+
+    @Override
+    public void listGroups(ListGroupRequest request, StreamObserver<ListGroupReply> responseObserver) {
+        metadataStore.listGroups().whenComplete(((groups, e) -> {
+            if (null != e) {
+                responseObserver.onError(e);
+                return;
+            }
+
+            for (ConsumerGroup group : groups) {
+                ListGroupReply reply = ListGroupReply.newBuilder()
+                    .setStatus(Status.newBuilder().setCode(Code.OK).build())
+                    .setGroup(group)
+                    .build();
+                responseObserver.onNext(reply);
+            }
+            responseObserver.onCompleted();
+        }));
     }
 
     @Override
