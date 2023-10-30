@@ -312,6 +312,7 @@ public class GroupManager {
                         }
                         mapper.update(group);
                         session.commit();
+                        break;
                     }
                 } else {
                     try {

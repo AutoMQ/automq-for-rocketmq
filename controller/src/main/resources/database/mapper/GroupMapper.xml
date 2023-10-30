@@ -27,7 +27,8 @@
 
     <update id="update" parameterType="Group">
         UPDATE consumer_group
-        SET name = #{name}, status = #{status}, dead_letter_topic_id = #{deadLetterTopicId}
+        SET name = #{name}, status = #{status}, dead_letter_topic_id = #{deadLetterTopicId}, group_type = #{groupType},
+            max_delivery_attempt = #{maxDeliveryAttempt}
         WHERE id = #{id}
     </update>
 
