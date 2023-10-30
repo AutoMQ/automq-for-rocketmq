@@ -37,6 +37,7 @@ import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.StreamState;
 import apache.rocketmq.controller.v1.TerminationStage;
+import apache.rocketmq.controller.v1.UpdateGroupRequest;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.common.PrefixThreadFactory;
 import com.automq.rocketmq.common.api.DataStore;
@@ -446,6 +447,11 @@ public class DefaultMetadataStore implements MetadataStore {
     @Override
     public CompletableFuture<ConsumerGroup> describeGroup(Long groupId, String groupName) {
         return groupManager.describeGroup(groupId, groupName);
+    }
+
+    @Override
+    public CompletableFuture<Void> updateGroup(UpdateGroupRequest request) {
+        return groupManager.updateGroup(request);
     }
 
     @Override

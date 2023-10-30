@@ -29,6 +29,7 @@ import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.TerminationStage;
 import apache.rocketmq.controller.v1.Topic;
+import apache.rocketmq.controller.v1.UpdateGroupRequest;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.common.api.DataStore;
 import com.automq.rocketmq.common.config.ControllerConfig;
@@ -151,6 +152,8 @@ public interface MetadataStore extends Closeable {
     CompletableFuture<Long> createGroup(String groupName, int maxRetry, GroupType type, long dlq);
 
     CompletableFuture<ConsumerGroup> describeGroup(Long groupId, String groupName);
+
+    CompletableFuture<Void> updateGroup(UpdateGroupRequest request);
 
     /**
      * Delete group with the given group id logically.

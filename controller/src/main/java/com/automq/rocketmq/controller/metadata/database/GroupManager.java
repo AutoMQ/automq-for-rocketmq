@@ -23,6 +23,7 @@ import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.GroupStatus;
 import apache.rocketmq.controller.v1.GroupType;
 import apache.rocketmq.controller.v1.TopicStatus;
+import apache.rocketmq.controller.v1.UpdateGroupRequest;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.cache.GroupCache;
@@ -271,6 +272,58 @@ public class GroupManager {
             }
 
             return groups;
+        });
+    }
+
+    public CompletableFuture<Void> updateGroup(UpdateGroupRequest request) {
+        return CompletableFuture.supplyAsync(() -> {
+            for (; ; ) {
+                if (metadataStore.isLeader()) {
+                    try (SqlSession session = metadataStore.openSession()) {
+                        if (!metadataStore.maintainLeadershipWithSharedLock(session)) {
+                            continue;
+                        }
+
+                        GroupMapper mapper = session.getMapper(GroupMapper.class);
+                        List<Group> groups = mapper.byCriteria(GroupCriteria.newBuilder()
+                            .setGroupId(request.getGroupId())
+                            .setStatus(GroupStatus.GROUP_STATUS_ACTIVE)
+                            .build());
+                        if (groups.isEmpty()) {
+                            String msg = String.format("Group[group-id=%d] is not found", request.getGroupId());
+                            throw new CompletionException(new ControllerException(Code.NOT_FOUND_VALUE, msg));
+                        }
+
+                        Group group = groups.get(0);
+                        if (request.getGroupType() != GroupType.GROUP_TYPE_UNSPECIFIED) {
+                            group.setGroupType(request.getGroupType());
+                        }
+
+                        if (!Strings.isNullOrEmpty(request.getName())) {
+                            group.setName(request.getName());
+                        }
+
+                        if (request.getDeadLetterTopicId() > 0) {
+                            group.setDeadLetterTopicId(request.getDeadLetterTopicId());
+                        }
+
+                        if (request.getMaxRetryAttempt() > 0) {
+                            group.setMaxDeliveryAttempt(request.getMaxRetryAttempt());
+                        }
+                        mapper.update(group);
+                        session.commit();
+                    }
+                } else {
+                    try {
+                        metadataStore.controllerClient().updateGroup(metadataStore.leaderAddress(), request).join();
+                        break;
+                    } catch (ControllerException e) {
+                        throw new CompletionException(e);
+                    }
+                }
+            }
+
+            return null;
         });
     }
 }
