@@ -92,9 +92,9 @@ public class DefaultS3Operator implements S3Operator {
             ThreadUtils.createThreadFactory("s3-read-limiter-cb-executor", true));
     private final ExecutorService writeLimiterCallbackExecutor = Executors.newSingleThreadExecutor(
             ThreadUtils.createThreadFactory("s3-write-limiter-cb-executor", true));
-    private final ExecutorService readCallbackExecutor = Executors.newFixedThreadPool(2,
+    private final ExecutorService readCallbackExecutor = Executors.newSingleThreadExecutor(
             ThreadUtils.createThreadFactory("s3-read-cb-executor-%d", true));
-    private final ExecutorService writeCallbackExecutor = Executors.newFixedThreadPool(2,
+    private final ExecutorService writeCallbackExecutor = Executors.newSingleThreadExecutor(
             ThreadUtils.createThreadFactory("s3-write-cb-executor-%d", true));
 
     public DefaultS3Operator(String endpoint, String region, String bucket, boolean forcePathStyle, String accessKey, String secretKey) {
