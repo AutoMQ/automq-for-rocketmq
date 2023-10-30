@@ -24,11 +24,9 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import org.apache.rocketmq.broker.client.ConsumerGroupInfo;
 import org.apache.rocketmq.broker.pagecache.ManyMessageTransfer;
-import org.apache.rocketmq.client.consumer.PullResult;
 import org.apache.rocketmq.client.consumer.PullStatus;
 import org.apache.rocketmq.common.attribute.TopicMessageType;
 import org.apache.rocketmq.common.help.FAQUrl;
@@ -140,7 +138,7 @@ public class ExtendPullMessageActivity extends PullMessageActivity implements Co
         assert brokerName != null;
         MessageQueue messageQueue = new MessageQueue(requestHeader.getTopic(), brokerName, requestHeader.getQueueId());
 
-        SubscriptionData subscriptionData = null;
+        SubscriptionData subscriptionData;
         final boolean hasSubscriptionFlag = PullSysFlag.hasSubscriptionFlag(requestHeader.getSysFlag());
 
         if (hasSubscriptionFlag) {
@@ -181,71 +179,68 @@ public class ExtendPullMessageActivity extends PullMessageActivity implements Co
             }
         }
 
-        // TODO: handle pulling retry message
-        CompletableFuture<PullResult> pullCf = messagingProcessor.pullMessage(
-            context,
-            messageQueue,
-            requestHeader.getConsumerGroup(),
-            requestHeader.getQueueOffset(),
-            requestHeader.getMaxMsgNums(),
-            requestHeader.getSysFlag(),
-            requestHeader.getCommitOffset(),
-            requestHeader.getSuspendTimeoutMillis(),
-            subscriptionData,
-            context.getRemainingMs());
-
-        pullCf.whenComplete((pullResult, throwable) -> {
-            if (throwable != null) {
-                writeErrResponse(ctx, context, request, throwable);
-                return;
-            }
-
-            responseHeader.setNextBeginOffset(pullResult.getNextBeginOffset());
-            responseHeader.setMinOffset(pullResult.getMinOffset());
-            responseHeader.setMaxOffset(pullResult.getMaxOffset());
-            responseHeader.setSuggestWhichBrokerId(0L);
-            responseHeader.setTopicSysFlag(0);
-            responseHeader.setGroupSysFlag(0);
-
-            switch (pullResult.getPullStatus()) {
-                case FOUND -> response.setCode(ResponseCode.SUCCESS);
-                case NO_MATCHED_MSG -> response.setCode(ResponseCode.PULL_RETRY_IMMEDIATELY);
-                // TODO: For this code, we need suspend the request for long polling.
-                case NO_NEW_MSG -> response.setCode(ResponseCode.PULL_NOT_FOUND);
-                case OFFSET_ILLEGAL -> {
-                    LOGGER.warn("the pull request offset illegal, commitOffset: {}, requestOffset: {}, messageQueue: {}",
-                        requestHeader.getCommitOffset(), requestHeader.getQueueOffset(), messageQueue);
-                    response.setCode(ResponseCode.PULL_OFFSET_MOVED);
+        messagingProcessor.pullMessage(
+                context,
+                messageQueue,
+                requestHeader.getConsumerGroup(),
+                requestHeader.getQueueOffset(),
+                requestHeader.getMaxMsgNums(),
+                requestHeader.getSysFlag(),
+                requestHeader.getCommitOffset(),
+                requestHeader.getSuspendTimeoutMillis(),
+                subscriptionData,
+                context.getRemainingMs())
+            .whenComplete((pullResult, throwable) -> {
+                if (throwable != null) {
+                    writeErrResponse(ctx, context, request, throwable);
+                    return;
                 }
-            }
 
-            if (pullResult.getPullStatus() == PullStatus.FOUND) {
-                List<MessageExt> msgList = pullResult.getMsgFoundList();
+                responseHeader.setNextBeginOffset(pullResult.getNextBeginOffset());
+                responseHeader.setMinOffset(pullResult.getMinOffset());
+                responseHeader.setMaxOffset(pullResult.getMaxOffset());
+                responseHeader.setSuggestWhichBrokerId(0L);
+                responseHeader.setTopicSysFlag(0);
+                responseHeader.setGroupSysFlag(0);
 
-                GetMessageResult getMessageResult = new GetMessageResult();
-                for (MessageExt messageExt : msgList) {
-                    byte[] payload;
-                    try {
-                        payload = MessageDecoder.encode(messageExt, false);
-                    } catch (Exception e) {
-                        // TODO: Rewrite the response for this case.
-                        throw new CompletionException(e);
+                switch (pullResult.getPullStatus()) {
+                    case FOUND -> response.setCode(ResponseCode.SUCCESS);
+                    case NO_MATCHED_MSG -> response.setCode(ResponseCode.PULL_RETRY_IMMEDIATELY);
+                    case NO_NEW_MSG -> response.setCode(ResponseCode.PULL_NOT_FOUND);
+                    case OFFSET_ILLEGAL -> {
+                        LOGGER.warn("the pull request offset illegal, commitOffset: {}, requestOffset: {}, messageQueue: {}",
+                            requestHeader.getCommitOffset(), requestHeader.getQueueOffset(), messageQueue);
+                        response.setCode(ResponseCode.PULL_OFFSET_MOVED);
                     }
-                    getMessageResult.addMessage(new SelectMappedBufferResult(0, ByteBuffer.wrap(payload), payload.length, null));
                 }
-                FileRegion fileRegion =
-                    new ManyMessageTransfer(response.encodeHeader(getMessageResult.getBufferTotalSize()), getMessageResult);
-                ctx.writeAndFlush(fileRegion)
-                    .addListener(future -> {
-                        recordRpcLatency(context, response);
-                        if (!future.isSuccess()) {
-                            LOGGER.error("Write pull message response failed", future.cause());
+
+                if (pullResult.getPullStatus() == PullStatus.FOUND) {
+                    List<MessageExt> msgList = pullResult.getMsgFoundList();
+
+                    GetMessageResult getMessageResult = new GetMessageResult();
+                    for (MessageExt messageExt : msgList) {
+                        byte[] payload;
+                        try {
+                            payload = MessageDecoder.encode(messageExt, false);
+                        } catch (Exception e) {
+                            // TODO: Rewrite the response for this case.
+                            throw new CompletionException(e);
                         }
-                    });
-                return;
-            }
-            writeResponse(ctx, context, request, response);
-        });
+                        getMessageResult.addMessage(new SelectMappedBufferResult(0, ByteBuffer.wrap(payload), payload.length, null));
+                    }
+                    FileRegion fileRegion =
+                        new ManyMessageTransfer(response.encodeHeader(getMessageResult.getBufferTotalSize()), getMessageResult);
+                    ctx.writeAndFlush(fileRegion)
+                        .addListener(future -> {
+                            recordRpcLatency(context, response);
+                            if (!future.isSuccess()) {
+                                LOGGER.error("Write pull message response failed", future.cause());
+                            }
+                        });
+                    return;
+                }
+                writeResponse(ctx, context, request, response);
+            });
 
         return null;
     }

@@ -27,6 +27,7 @@ import com.automq.rocketmq.store.api.S3ObjectOperator;
 import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.generated.ReceiptHandle;
+import com.automq.rocketmq.store.model.generated.TimerHandlerType;
 import com.automq.rocketmq.store.model.message.AckResult;
 import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
 import com.automq.rocketmq.store.model.message.ClearRetryMessagesResult;
@@ -40,6 +41,7 @@ import com.automq.rocketmq.store.service.ReviveService;
 import com.automq.rocketmq.store.service.SnapshotService;
 import com.automq.rocketmq.store.service.TimerService;
 import com.automq.rocketmq.store.service.api.KVService;
+import com.automq.rocketmq.store.util.FlatMessageUtil;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -103,6 +105,7 @@ public class MessageStoreImpl implements MessageStore {
         }
         clearStateMachineData();
         streamStore.start();
+        timerService.registerHandler(TimerHandlerType.TIMER_MESSAGE, timerTag -> put(FlatMessage.getRootAsFlatMessage(timerTag.payloadAsByteBuffer())));
         timerService.start();
         snapshotService.start();
         logicQueueManager.start();
@@ -159,6 +162,16 @@ public class MessageStoreImpl implements MessageStore {
 
     @Override
     public CompletableFuture<PutResult> put(FlatMessage message) {
+        long deliveryTimestamp = message.systemProperties().deliveryTimestamp();
+        if (deliveryTimestamp > 0 && deliveryTimestamp - System.currentTimeMillis() > 1000) {
+            try {
+                timerService.enqueue(deliveryTimestamp, TimerHandlerType.TIMER_MESSAGE, FlatMessageUtil.flatBufferToByteArray(message));
+                return CompletableFuture.completedFuture(new PutResult(PutResult.Status.PUT_DELAYED, -1));
+            } catch (Exception e) {
+                return CompletableFuture.failedFuture(e);
+            }
+        }
+
         return logicQueueManager.getOrCreate(message.topicId(), message.queueId())
             .thenCompose(topicQueue -> topicQueue.put(message));
     }

@@ -32,10 +32,13 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.rocketmq.common.message.Message;
 import org.apache.rocketmq.common.message.MessageAccessor;
 import org.apache.rocketmq.common.message.MessageConst;
 import org.apache.rocketmq.common.message.MessageExt;
+import org.apache.rocketmq.remoting.protocol.subscription.ExponentialRetryPolicy;
+import org.apache.rocketmq.remoting.protocol.subscription.GroupRetryPolicy;
 
 import static com.automq.rocketmq.proxy.util.ReceiptHandleUtil.encodeReceiptHandle;
 
@@ -43,6 +46,68 @@ import static com.automq.rocketmq.proxy.util.ReceiptHandleUtil.encodeReceiptHand
  * An utility class to convert RocketMQ message models to {@link FlatMessage}, and vice versa.
  */
 public class FlatMessageUtil {
+    private static final long[] DELAY_LEVEL_ARRAY = new long[] {
+        TimeUnit.SECONDS.toMillis(1),
+        TimeUnit.SECONDS.toMillis(5),
+        TimeUnit.SECONDS.toMillis(10),
+        TimeUnit.SECONDS.toMillis(30),
+        TimeUnit.MINUTES.toMillis(1),
+        TimeUnit.MINUTES.toMillis(2),
+        TimeUnit.MINUTES.toMillis(3),
+        TimeUnit.MINUTES.toMillis(4),
+        TimeUnit.MINUTES.toMillis(5),
+        TimeUnit.MINUTES.toMillis(6),
+        TimeUnit.MINUTES.toMillis(7),
+        TimeUnit.MINUTES.toMillis(8),
+        TimeUnit.MINUTES.toMillis(9),
+        TimeUnit.MINUTES.toMillis(10),
+        TimeUnit.MINUTES.toMillis(20),
+        TimeUnit.MINUTES.toMillis(30),
+        TimeUnit.HOURS.toMillis(1),
+        TimeUnit.HOURS.toMillis(2)
+    };
+
+    public static long calculateDeliveryTimestamp(GroupRetryPolicy retryPolicy, int delayLevel) {
+        switch (retryPolicy.getType()) {
+            case CUSTOMIZED -> {
+                // The parameter of nextDelayDuration is the last consume times.
+                return retryPolicy.getCustomizedRetryPolicy().nextDelayDuration(delayLevel - 2);
+            }
+            case EXPONENTIAL -> {
+                ExponentialRetryPolicy policy = retryPolicy.getExponentialRetryPolicy();
+                double result = policy.getInitial() + Math.pow(policy.getMultiplier(), delayLevel);
+                return Math.min((long) result, policy.getMax());
+            }
+            default -> throw new IllegalArgumentException("Unsupported retry policy type: " + retryPolicy.getType());
+        }
+    }
+
+    public static long calculateDeliveryTimestamp(int delayLevel) {
+        delayLevel = Math.min(Math.max(0, delayLevel), DELAY_LEVEL_ARRAY.length - 1);
+        return DELAY_LEVEL_ARRAY[delayLevel];
+    }
+
+    public static long calculateDeliveryTimestamp(Message message) {
+        int delayLevel = message.getDelayTimeLevel();
+        if (delayLevel > 0) {
+            return calculateDeliveryTimestamp(delayLevel);
+        }
+
+        long deliveryTimestamp = 0;
+        try {
+            if (message.getProperty(MessageConst.PROPERTY_TIMER_DELAY_SEC) != null) {
+                deliveryTimestamp = System.currentTimeMillis() + Long.parseLong(message.getProperty(MessageConst.PROPERTY_TIMER_DELAY_SEC)) * 1000;
+            } else if (message.getProperty(MessageConst.PROPERTY_TIMER_DELAY_MS) != null) {
+                deliveryTimestamp = System.currentTimeMillis() + Long.parseLong(message.getProperty(MessageConst.PROPERTY_TIMER_DELAY_MS));
+            } else {
+                deliveryTimestamp = Long.parseLong(message.getProperty(MessageConst.PROPERTY_TIMER_DELIVER_MS));
+            }
+        } catch (Exception e) {
+            return deliveryTimestamp;
+        }
+        return deliveryTimestamp;
+    }
+
     public static FlatMessage convertTo(long topicId, int queueId, String storeHost, Message rmqMessage) {
         FlatMessageT flatMessageT = new FlatMessageT();
         flatMessageT.setTopicId(topicId);
@@ -52,11 +117,13 @@ public class FlatMessageUtil {
         // The properties of RocketMQ message contains user properties and system properties.
         // We should split them into two parts.
         Map<String, String> properties = rmqMessage.getProperties();
+        long deliveryTimestamp = calculateDeliveryTimestamp(rmqMessage);
 
         SystemPropertiesT systemPropertiesT = splitSystemProperties(flatMessageT, properties);
         systemPropertiesT.setStoreTimestamp(System.currentTimeMillis());
         systemPropertiesT.setStoreHost(storeHost);
         systemPropertiesT.setDeliveryAttempts(1);
+        systemPropertiesT.setDeliveryTimestamp(deliveryTimestamp);
         flatMessageT.setSystemProperties(systemPropertiesT);
 
         // The rest of the properties are user properties.

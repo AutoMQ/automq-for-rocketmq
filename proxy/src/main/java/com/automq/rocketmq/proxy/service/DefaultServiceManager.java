@@ -42,16 +42,17 @@ public class DefaultServiceManager implements ServiceManager {
     private final ProxyRelayService proxyRelayService;
     private final TransactionService transactionService;
     private final AdminService adminService;
-    private final DLQService dlqService;
+    private final DeadLetterService deadLetterService;
 
-    public DefaultServiceManager(BrokerConfig config, ProxyMetadataService metadataService, DLQService dlqService,
+    public DefaultServiceManager(BrokerConfig config, ProxyMetadataService proxyMetadataService,
+        DeadLetterService deadLetterService,
         MessageStore messageStore) {
-        this.metadataService = metadataService;
-        this.dlqService = dlqService;
+        this.metadataService = proxyMetadataService;
+        this.deadLetterService = deadLetterService;
+        this.resourceMetadataService = new ResourceMetadataService(proxyMetadataService);
         LockService lockService = new LockService(config.proxy());
-        this.messageService = new MessageServiceImpl(config.proxy(), messageStore, metadataService, lockService);
-        this.resourceMetadataService = new ResourceMetadataService(metadataService);
-        this.topicRouteService = new TopicRouteServiceImpl(config, metadataService);
+        this.messageService = new MessageServiceImpl(config.proxy(), messageStore, proxyMetadataService, lockService, deadLetterService);
+        this.topicRouteService = new TopicRouteServiceImpl(config, proxyMetadataService);
         this.producerManager = new ProducerManager();
         this.consumerManager = new ConsumerManager(new ConsumerIdsChangeListenerImpl(), config.proxy().channelExpiredTimeout());
         this.proxyRelayService = new ProxyRelayServiceImpl();

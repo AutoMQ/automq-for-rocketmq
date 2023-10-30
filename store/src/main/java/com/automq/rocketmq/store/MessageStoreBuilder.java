@@ -20,7 +20,7 @@ package com.automq.rocketmq.store;
 import com.automq.rocketmq.common.config.S3StreamConfig;
 import com.automq.rocketmq.common.config.StoreConfig;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
-import com.automq.rocketmq.store.api.DLQSender;
+import com.automq.rocketmq.store.api.DeadLetterSender;
 import com.automq.rocketmq.store.api.LogicQueueManager;
 import com.automq.rocketmq.store.api.S3ObjectOperator;
 import com.automq.rocketmq.store.api.StreamStore;
@@ -41,7 +41,7 @@ import static com.automq.rocketmq.store.MessageStoreImpl.KV_NAMESPACE_CHECK_POIN
 
 public class MessageStoreBuilder {
     public static MessageStoreImpl build(StoreConfig storeConfig, S3StreamConfig s3StreamConfig,
-        StoreMetadataService metadataService, DLQSender dlqSender) throws StoreException {
+        StoreMetadataService metadataService, DeadLetterSender deadLetterSender) throws StoreException {
         S3Operator operator = new DefaultS3Operator(s3StreamConfig.s3Endpoint(), s3StreamConfig.s3Region(), s3StreamConfig.s3Bucket(),
             s3StreamConfig.s3ForcePathStyle(), s3StreamConfig.s3AccessKey(), s3StreamConfig.s3SecretKey());
         StreamStore streamStore = new S3StreamStore(storeConfig, s3StreamConfig, metadataService, operator);
@@ -54,7 +54,7 @@ public class MessageStoreBuilder {
         LogicQueueManager logicQueueManager = new DefaultLogicQueueManager(storeConfig, streamStore, kvService, timerService,
             metadataService, operationLogService, inflightService);
         ReviveService reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, kvService, timerService,
-            metadataService, inflightService, logicQueueManager, dlqSender);
+            metadataService, inflightService, logicQueueManager, deadLetterSender);
         S3ObjectOperator objectOperator = new S3ObjectOperatorImpl(operator);
 
         return new MessageStoreImpl(storeConfig, streamStore, metadataService, kvService, timerService, inflightService, snapshotService, logicQueueManager, reviveService, objectOperator);

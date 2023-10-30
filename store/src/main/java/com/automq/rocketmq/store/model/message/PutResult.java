@@ -20,5 +20,6 @@ package com.automq.rocketmq.store.model.message;
 public record PutResult(Status status, long offset) {
     public enum Status {
         PUT_OK,
+        PUT_DELAYED,
     }
 }

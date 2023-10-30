@@ -41,6 +41,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -93,13 +94,15 @@ public class MessageServiceImpl implements MessageService {
     private final ProxyMetadataService metadataService;
     private final MessageStore store;
     private final LockService lockService;
+    private final DeadLetterService deadLetterService;
     private final SuspendRequestService suspendRequestService;
 
     public MessageServiceImpl(ProxyConfig config, MessageStore store, ProxyMetadataService metadataService,
-        LockService lockService) {
+        LockService lockService, DeadLetterService deadLetterService) {
         this.config = config;
         this.store = store;
         this.metadataService = metadataService;
+        this.deadLetterService = deadLetterService;
         this.lockService = lockService;
         this.suspendRequestService = SuspendRequestService.getInstance();
     }
@@ -161,7 +164,82 @@ public class MessageServiceImpl implements MessageService {
     @Override
     public CompletableFuture<RemotingCommand> sendMessageBack(ProxyContext ctx, ReceiptHandle handle, String messageId,
         ConsumerSendMsgBackRequestHeader requestHeader, long timeoutMillis) {
-        throw new UnsupportedOperationException();
+        // Build the response.
+        final RemotingCommand response = RemotingCommand.createResponseCommand(null);
+        Integer delayLevel = requestHeader.getDelayLevel();
+        if (Objects.isNull(delayLevel)) {
+            response.setCode(ResponseCode.ILLEGAL_OPERATION);
+            response.setRemark("argument delay level is null");
+            return CompletableFuture.completedFuture(response);
+        }
+
+        Long offset = requestHeader.getOffset();
+        if (Objects.isNull(offset)) {
+            response.setCode(ResponseCode.ILLEGAL_OPERATION);
+            response.setRemark("argument offset is null");
+            return CompletableFuture.completedFuture(response);
+        }
+
+        VirtualQueue virtualQueue = new VirtualQueue(requestHeader.getBname());
+
+        CompletableFuture<Topic> topicFuture = topicOf(requestHeader.getOriginTopic());
+        CompletableFuture<ConsumerGroup> groupFuture = consumerGroupOf(requestHeader.getGroup());
+        return topicFuture.thenCombine(groupFuture, (topic, group) -> {
+            if (topic.getTopicId() != virtualQueue.topicId()) {
+                LOGGER.error("Topic id in request header {} does not match topic id in message queue {}, maybe the topic is recreated.",
+                    topic.getTopicId(), virtualQueue.topicId());
+                throw new CompletionException(new MQBrokerException(ResponseCode.TOPIC_NOT_EXIST, "Topic not exist"));
+            }
+            return Pair.of(topic, group);
+        }).thenCompose(pair -> {
+            Topic topic = pair.getLeft();
+            ConsumerGroup group = pair.getRight();
+
+            CompletableFuture<FlatMessageExt> pullFuture =
+                store.pull(group.getGroupId(), topic.getTopicId(), virtualQueue.physicalQueueId(),
+                        Filter.DEFAULT_FILTER, requestHeader.getOffset(), 1, false)
+                    .thenApply(pullResult -> {
+                        if (pullResult.status() == com.automq.rocketmq.store.model.message.PullResult.Status.FOUND) {
+                            return pullResult.messageList().get(0);
+                        }
+                        throw new IllegalArgumentException("Message not found");
+                    });
+
+            // Message consume retry strategy
+            // <0: no retry,put into DLQ directly
+            // =0: broker control retry frequency
+            // >0: client control retry frequency
+            return switch (Integer.compare(delayLevel, 0)) {
+                case -1 -> pullFuture.thenCompose(message -> deadLetterService.send(group.getGroupId(), message));
+                case 0 -> pullFuture.thenCompose(message -> {
+                    // TODO: send delay message.
+                    // Keep the same logic as apache RocketMQ.
+                    int serverDelayLevel = 2 + message.deliveryAttempts();
+                    message.message().systemProperties().mutateDeliveryTimestamp(FlatMessageUtil.calculateDeliveryTimestamp(serverDelayLevel));
+                    return store.put(message.message())
+                        .exceptionally(ex -> {
+                            LOGGER.error("Put message to retry topic failed", ex);
+                            return null;
+                        })
+                        .thenApply(ignore -> null);
+                });
+                case 1 -> pullFuture.thenCompose(message -> {
+                    message.message().systemProperties().mutateDeliveryTimestamp(FlatMessageUtil.calculateDeliveryTimestamp(delayLevel));
+                    return store.put(message.message())
+                        .exceptionally(ex -> {
+                            LOGGER.error("Put message to retry topic failed", ex);
+                            return null;
+                        })
+                        .thenApply(ignore -> null);
+                });
+                default -> throw new IllegalStateException("Never reach here");
+            };
+        }).whenComplete((nil, throwable) -> {
+            if (throwable != null) {
+                response.setCode(ResponseCode.SYSTEM_ERROR);
+                response.setRemark(throwable.getMessage());
+            }
+        }).thenApply(nil -> response);
     }
 
     @Override

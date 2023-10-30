@@ -24,7 +24,7 @@ import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.model.generated.KeyValue;
 import com.automq.rocketmq.common.system.MessageConstants;
 import com.automq.rocketmq.metadata.api.ProxyMetadataService;
-import com.automq.rocketmq.store.api.DLQSender;
+import com.automq.rocketmq.store.api.DeadLetterSender;
 import com.automq.stream.utils.ThreadUtils;
 import java.nio.ByteBuffer;
 import java.time.Duration;
@@ -41,8 +41,8 @@ import org.apache.rocketmq.common.message.MessageConst;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class DLQService implements DLQSender {
-    private static final Logger LOGGER = LoggerFactory.getLogger(DLQService.class);
+public class DeadLetterService implements DeadLetterSender {
+    private static final Logger LOGGER = LoggerFactory.getLogger(DeadLetterService.class);
     private final Producer producer;
     private final ClientServiceProvider provider;
     private final BrokerConfig brokerConfig;
@@ -50,7 +50,7 @@ public class DLQService implements DLQSender {
     private final ExecutorService senderExecutor;
 
     // TODO: optimize producer related parameters
-    public DLQService(BrokerConfig brokerConfig, ProxyMetadataService metadataService) {
+    public DeadLetterService(BrokerConfig brokerConfig, ProxyMetadataService metadataService) {
         this.brokerConfig = brokerConfig;
         this.metadataService = metadataService;
         this.provider = ClientServiceProvider.loadService();
