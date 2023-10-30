@@ -160,7 +160,8 @@ jobs:
           ref: master
           path: rocketmq-e2es
           token: ${{ secrets.PAT_E2E }}
-        run: | 
+      - name: Check e2e repo
+        run: |
           pwd
           ls
       - name: e2e test
