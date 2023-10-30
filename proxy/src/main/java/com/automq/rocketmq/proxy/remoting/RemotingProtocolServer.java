@@ -17,6 +17,8 @@
 
 package com.automq.rocketmq.proxy.remoting;
 
+import com.automq.rocketmq.controller.metadata.MetadataStore;
+import com.automq.rocketmq.proxy.remoting.activity.AdminActivity;
 import com.automq.rocketmq.proxy.remoting.activity.ExtendConsumerManagerActivity;
 import com.automq.rocketmq.proxy.remoting.activity.ExtendPullMessageActivity;
 import com.automq.rocketmq.proxy.remoting.activity.ExtendSendMessageActivity;
@@ -30,8 +32,10 @@ import org.apache.rocketmq.remoting.protocol.RequestCode;
 
 public class RemotingProtocolServer extends org.apache.rocketmq.proxy.remoting.RemotingProtocolServer {
     private RequestPipeline requestPipeline;
-    public RemotingProtocolServer(MessagingProcessor messagingProcessor) {
+    private final MetadataStore metadataStore;
+    public RemotingProtocolServer(MessagingProcessor messagingProcessor, MetadataStore metadataStore) {
         super(messagingProcessor);
+        this.metadataStore = metadataStore;
 
         // Extend some request code to support more features.
         extendRequestCode();
@@ -89,7 +93,11 @@ public class RemotingProtocolServer extends org.apache.rocketmq.proxy.remoting.R
      * Extend the request code to support more features, like CreateTopicRequest.
      */
     private void extendRequestCode() {
+        RemotingServer remotingServer = this.defaultRemotingServer;
 
+        AdminActivity adminActivity = new AdminActivity(requestPipeline, messagingProcessor, metadataStore);
+        remotingServer.registerProcessor(RequestCode.UPDATE_AND_CREATE_TOPIC, adminActivity, this.defaultExecutor);
+        remotingServer.registerProcessor(RequestCode.UPDATE_AND_CREATE_SUBSCRIPTIONGROUP, adminActivity, this.defaultExecutor);
     }
 
     @Override

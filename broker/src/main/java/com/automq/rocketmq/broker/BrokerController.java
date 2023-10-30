@@ -82,7 +82,7 @@ public class BrokerController implements Lifecycle {
         // TODO: Split controller to a separate port
         ControllerServiceImpl controllerService = MetadataStoreBuilder.build(metadataStore);
         grpcServer = new GrpcProtocolServer(brokerConfig.proxy(), messagingProcessor, controllerService);
-        remotingServer = new RemotingProtocolServer(messagingProcessor);
+        remotingServer = new RemotingProtocolServer(messagingProcessor, metadataStore);
 
         metricsExporter = new MetricsExporter(brokerConfig, messageStore, (ExtendMessagingProcessor) messagingProcessor);
     }
