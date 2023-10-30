@@ -18,10 +18,7 @@
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 REPO_DIR=$(dirname "$(dirname "$SCRIPT_DIR")")
 cd "$SCRIPT_DIR" || exit 1
-if [ ! -f "ddl.sql" ]
-then
-  cp "$REPO_DIR/controller/src/main/resources/ddl.sql" .
-fi
+cp "$REPO_DIR/controller/src/main/resources/ddl.sql" .
 
 OS_NAME=$(uname)
 if [ "$OS_NAME" == "Linux" ]
