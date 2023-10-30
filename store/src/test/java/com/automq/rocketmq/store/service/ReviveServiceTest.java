@@ -76,8 +76,9 @@ class ReviveServiceTest {
         MessageStateMachine stateMachine = new DefaultLogicQueueStateMachine(TOPIC_ID, QUEUE_ID, kvService, timerService);
         SnapshotService snapshotService = new SnapshotService(streamStore, kvService);
         OperationLogService operationLogService = new StreamOperationLogService(streamStore, snapshotService, new StoreConfig());
+        StreamReclaimService streamReclaimService = new StreamReclaimService(streamStore);
         logicQueue = new StreamLogicQueue(new StoreConfig(), TOPIC_ID, QUEUE_ID,
-            metadataService, stateMachine, streamStore, operationLogService, inflightService);
+            metadataService, stateMachine, streamStore, operationLogService, inflightService, streamReclaimService);
         LogicQueueManager manager = Mockito.mock(LogicQueueManager.class);
         Mockito.doAnswer(ink -> CompletableFuture.completedFuture(logicQueue)).when(manager).getOrCreate(TOPIC_ID, QUEUE_ID);
         deadLetterSender = Mockito.mock(DeadLetterSender.class);

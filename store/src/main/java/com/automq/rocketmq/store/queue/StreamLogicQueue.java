@@ -40,8 +40,10 @@ import com.automq.rocketmq.store.model.operation.PopOperation;
 import com.automq.rocketmq.store.model.operation.ResetConsumeOffsetOperation;
 import com.automq.rocketmq.store.model.stream.SingleRecord;
 import com.automq.rocketmq.store.service.InflightService;
+import com.automq.rocketmq.store.service.StreamReclaimService;
 import com.automq.rocketmq.store.service.api.OperationLogService;
 import com.automq.rocketmq.store.util.SerializeUtil;
+import com.automq.stream.utils.FutureUtil;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -68,11 +70,13 @@ public class StreamLogicQueue extends LogicQueue {
     private final StoreConfig config;
     private final OperationLogService operationLogService;
     private final InflightService inflightService;
+    private final StreamReclaimService streamReclaimService;
     private final AtomicReference<State> state;
 
     public StreamLogicQueue(StoreConfig config, long topicId, int queueId,
         StoreMetadataService metadataService, MessageStateMachine stateMachine, StreamStore streamStore,
-        OperationLogService operationLogService, InflightService inflightService) {
+        OperationLogService operationLogService, InflightService inflightService,
+        StreamReclaimService streamReclaimService) {
         super(topicId, queueId);
         this.config = config;
         this.metadataService = metadataService;
@@ -81,6 +85,7 @@ public class StreamLogicQueue extends LogicQueue {
         this.retryStreamIdMap = new ConcurrentHashMap<>();
         this.operationLogService = operationLogService;
         this.inflightService = inflightService;
+        this.streamReclaimService = streamReclaimService;
         this.state = new AtomicReference<>(State.INIT);
     }
 
@@ -124,9 +129,36 @@ public class StreamLogicQueue extends LogicQueue {
                 })
                 // recover from operation log
                 .thenCompose(nil -> operationLogService.recover(stateMachine, operationStreamId, snapshotStreamId))
+                .thenAccept(nil -> {
+                    // register retry ack advance listener
+                    this.stateMachine.registerRetryAckOffsetListener(this::onRetryAckOffsetAdvance);
+                    state.set(State.OPENED);
+                })
                 .thenAccept(nil -> state.set(State.OPENED));
         }
         return CompletableFuture.completedFuture(null);
+    }
+
+    private void onRetryAckOffsetAdvance(long consumerGroupId, long ackOffset) {
+        // TODO: add reclaim policy
+        CompletableFuture<Long> retryStreamIdCf = retryStreamIdMap.get(consumerGroupId);
+        if (retryStreamIdCf == null) {
+            LOGGER.warn("Retry stream id not found for consumer group: {}", consumerGroupId);
+            return;
+        }
+        CompletableFuture<StreamReclaimService.StreamReclaimResult> taskCf =
+            streamReclaimService.addReclaimTask(new StreamReclaimService.StreamReclaimTask(retryStreamIdCf, ackOffset));
+        taskCf.thenAccept(result -> {
+            if (result.success()) {
+                LOGGER.trace("Reclaim consumerGroup: {} 's retry stream to new start offset: {}", consumerGroupId, result.startOffset());
+            } else {
+                LOGGER.warn("Aborted to reclaim consumerGroup: {} 's retry stream to new start offset: {}", consumerGroupId, ackOffset);
+            }
+        }).exceptionally(e -> {
+            Throwable cause = FutureUtil.cause(e);
+            LOGGER.error("Failed to reclaim consumerGroup: {} 's retry stream to new start offset: {}", consumerGroupId, ackOffset, cause);
+            return null;
+        });
     }
 
     @Override

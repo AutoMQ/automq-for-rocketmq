@@ -38,6 +38,7 @@ import com.automq.rocketmq.store.service.ReviveService;
 import com.automq.rocketmq.store.service.RocksDBKVService;
 import com.automq.rocketmq.store.service.SnapshotService;
 import com.automq.rocketmq.store.service.StreamOperationLogService;
+import com.automq.rocketmq.store.service.StreamReclaimService;
 import com.automq.rocketmq.store.service.TimerService;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.service.api.OperationLogService;
@@ -91,8 +92,9 @@ public class MessageStoreTest {
         config = new StoreConfig();
         SnapshotService snapshotService = new SnapshotService(streamStore, kvService);
         OperationLogService operationLogService = new StreamOperationLogService(streamStore, snapshotService, config);
+        StreamReclaimService streamReclaimService = new StreamReclaimService(streamStore);
         TimerService timerService = new TimerService(KV_NAMESPACE_TIMER_TAG, kvService);
-        logicQueueManager = new DefaultLogicQueueManager(config, streamStore, kvService, timerService, metadataService, operationLogService, inflightService);
+        logicQueueManager = new DefaultLogicQueueManager(config, streamStore, kvService, timerService, metadataService, operationLogService, inflightService, streamReclaimService);
         DeadLetterSender deadLetterSender = Mockito.mock(DeadLetterSender.class);
         Mockito.doReturn(CompletableFuture.completedFuture(null))
             .when(deadLetterSender).send(Mockito.anyLong(), Mockito.any(FlatMessageExt.class));

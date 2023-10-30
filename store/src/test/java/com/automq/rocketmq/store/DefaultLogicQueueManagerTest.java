@@ -28,6 +28,7 @@ import com.automq.rocketmq.store.mock.MockStreamStore;
 import com.automq.rocketmq.store.queue.DefaultLogicQueueManager;
 import com.automq.rocketmq.store.service.InflightService;
 import com.automq.rocketmq.store.service.RocksDBKVService;
+import com.automq.rocketmq.store.service.StreamReclaimService;
 import com.automq.rocketmq.store.service.TimerService;
 import com.automq.rocketmq.store.service.api.KVService;
 import java.util.Optional;
@@ -44,19 +45,23 @@ class DefaultLogicQueueManagerTest {
     private static final long TOPIC_ID = 0;
     private static final int QUEUE_ID = 1;
 
-    private static KVService kvService;
-    private static MockOperationLogService operationLogService;
+    private KVService kvService;
+    private StoreMetadataService metadataService;
+    private StreamStore streamStore;
+    private MockOperationLogService operationLogService;
     private DefaultLogicQueueManager topicQueueManager;
+    private StreamReclaimService streamReclaimService;
 
     @BeforeEach
     void setUp() throws StoreException {
         kvService = new RocksDBKVService(PATH);
-        StoreMetadataService metadataService = new MockStoreMetadataService();
-        StreamStore streamStore = new MockStreamStore();
+        metadataService = new MockStoreMetadataService();
+        streamStore = new MockStreamStore();
         InflightService inflightService = new InflightService();
         operationLogService = new MockOperationLogService();
+        streamReclaimService = new StreamReclaimService(streamStore);
         TimerService timerService = new TimerService(MessageStoreTest.KV_NAMESPACE_TIMER_TAG, kvService);
-        topicQueueManager = new DefaultLogicQueueManager(new StoreConfig(), streamStore, kvService, timerService, metadataService, operationLogService, inflightService);
+        topicQueueManager = new DefaultLogicQueueManager(new StoreConfig(), streamStore, kvService, timerService, metadataService, operationLogService, inflightService, streamReclaimService);
     }
 
     @AfterEach
