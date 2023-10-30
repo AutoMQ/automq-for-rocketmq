@@ -30,6 +30,8 @@ import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.DescribeClusterRequest;
 import apache.rocketmq.controller.v1.ListOpenStreamsReply;
 import apache.rocketmq.controller.v1.ListOpenStreamsRequest;
+import apache.rocketmq.controller.v1.ListTopicsReply;
+import apache.rocketmq.controller.v1.ListTopicsRequest;
 import apache.rocketmq.controller.v1.OpenStreamReply;
 import apache.rocketmq.controller.v1.OpenStreamRequest;
 import apache.rocketmq.controller.v1.PrepareS3ObjectsReply;
@@ -59,6 +61,8 @@ public interface ControllerClient extends Closeable {
     CompletableFuture<Void> deleteTopic(String target, long topicId) throws ControllerException;
 
     CompletableFuture<Topic> describeTopic(String target, Long topicId, String topicName);
+
+    void listTopics(String target, ListTopicsRequest request, StreamObserver<ListTopicsReply> observer);
 
     CompletableFuture<Void> heartbeat(String target, int nodeId, long epoch, boolean goingAway);
 

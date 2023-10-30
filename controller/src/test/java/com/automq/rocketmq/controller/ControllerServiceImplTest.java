@@ -266,7 +266,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 int port = testServer.getPort();
                 ManagedChannel channel = Grpc.newChannelBuilderForAddress("localhost", port, InsecureChannelCredentials.create()).build();
                 ControllerServiceGrpc.ControllerServiceBlockingStub blockingStub = ControllerServiceGrpc.newBlockingStub(channel);
-                Iterator<ListTopicsReply> replies = blockingStub.listAllTopics(ListTopicsRequest.newBuilder().build());
+                Iterator<ListTopicsReply> replies = blockingStub.listTopics(ListTopicsRequest.newBuilder().build());
                 while (replies.hasNext()) {
                     ListTopicsReply reply = replies.next();
                     Assertions.assertTrue(reply.getTopic().getName().startsWith("T"));
