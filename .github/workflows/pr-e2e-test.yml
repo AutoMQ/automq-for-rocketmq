@@ -107,6 +107,8 @@ jobs:
 #    runs-on: ubuntu-latest
     runs-on: private-k3s
     timeout-minutes: 60
+    outputs:
+      namespace: ${{ steps.create_namespace.outputs.namespace }}
     strategy:
       matrix:
 #        version: ${{ fromJSON(needs.list-version.outputs.version-json) }}
@@ -192,7 +194,7 @@ jobs:
           action: "test"
           ask-config: "${{ secrets.KUBE_CONFIG }}"
           test-version: "${{ matrix.version }}"
-          test-code-git: "https://github.com/AutoMQ/rocketmq-e2e.git"
+          test-code-git: "https://${{ secrets.PAT_E2E }}:@github.com/AutoMQ/rocketmq-e2e.git"
           test-code-branch: "master"
           test-code-path: golang
           test-cmd: |
@@ -251,12 +253,12 @@ jobs:
 #        with:
 #          name: test-e2e-remoting-java-log.txt
 #          path: testlog.txt
-# , test-e2e-golang, test-e2e-remoting-java
+# , test-e2e-remoting-java
 
   clean:
     if: always()
     name: Clean
-    needs: [list-version, test-e2e-grpc-java]
+    needs: [deploy, list-version, test-e2e-grpc-java, test-e2e-golang]
     runs-on: private-k3s
     timeout-minutes: 60
     strategy:
@@ -273,7 +275,7 @@ jobs:
       - name: clean Rocketmq
         working-directory: distribution/helm
         env:
-          NAMESPACE: ${{ steps.create_namespace.outputs.namespace }}
+          NAMESPACE: ${{ needs.deploy.outputs.namespace }}
           DOCKER_REPO: ${{ env.DOCKER_REPO }}
         run: |
           sh clean-ci.sh ${NAMESPACE}

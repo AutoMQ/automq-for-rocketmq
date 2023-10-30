@@ -54,9 +54,8 @@ echo namespace: $ns
 echo $TEST_CODE_GIT
 echo $TEST_CMD_BASE
 
-TEST_CMD=`echo "${TEST_CMD_BASE}" | sed -s 's/^/        /g'`
 
-cd "$TEST_CODE_PATH"
+cd ${TEST_CODE_PATH}
 ${TEST_CMD}
 exit_code=$?
 
