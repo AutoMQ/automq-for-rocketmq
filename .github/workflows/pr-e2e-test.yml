@@ -129,7 +129,7 @@ jobs:
           REPO_NAME=`echo ${GITHUB_REPOSITORY#*/} | sed -e "s/\//-/g" | cut -c1-36 | tr '[A-Z]' '[a-z]'`
           NAMESPACE=${REPO_NAME}-${GITHUB_RUN_ID}-${JOB_INDEX}
           kubectl create namespace $NAMESPACE
-          echo "::set-output name=namespace::$NAMESPACE"
+          echo "namespace=NAMESPACE" >> $GITHUB_OUTPUT
       - name: Deploy RocketMQ
         working-directory: distribution/helm
         env:
