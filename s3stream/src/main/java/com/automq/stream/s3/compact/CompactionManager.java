@@ -328,7 +328,7 @@ public class CompactionManager {
             return new ArrayList<>();
         }
         // prepare N stream objects at one time
-        objectManager.prepareObject(groupedDataBlocks.size(), TimeUnit.MINUTES.toMillis(60))
+        objectManager.prepareObject(groupedDataBlocks.size(), TimeUnit.MINUTES.toMillis(CompactionConstants.S3_OBJECT_TTL_MINUTES))
                 .thenAcceptAsync(objectId -> {
                     for (Pair<List<StreamDataBlock>, CompletableFuture<StreamObject>> pair : groupedDataBlocks) {
                         List<StreamDataBlock> streamDataBlocks = pair.getKey();
@@ -362,7 +362,7 @@ public class CompactionManager {
                         objectId++;
                     }
                 }, forceSplitThreadPool).exceptionally(ex -> {
-                    logger.error("Prepare object failed", ex);
+                    logger.error("Force split object failed", ex);
                     for (Pair<List<StreamDataBlock>, CompletableFuture<StreamObject>> pair : groupedDataBlocks) {
                         pair.getValue().completeExceptionally(ex);
                     }
@@ -383,25 +383,9 @@ public class CompactionManager {
 
         CommitWALObjectRequest request = new CommitWALObjectRequest();
         request.setObjectId(-1L);
+        Set<Long> compactedObjectIds = new HashSet<>();
 
-        List<CompactionPlan> compactionPlans = new ArrayList<>();
-        if (excludedObjectIds.isEmpty()) {
-            // compact WAL objects only when compaction limitations are not violated after force split
-            try {
-                logger.info("{} WAL objects as compact candidates, total compaction size: {}",
-                        objectsToCompact.size(), objectsToCompact.stream().mapToLong(S3ObjectMetadata::objectSize).sum());
-                Map<Long, List<StreamDataBlock>> streamDataBlockMap = CompactionUtils.blockWaitObjectIndices(streamMetadataList, objectsToCompact, s3Operator);
-                long now = System.currentTimeMillis();
-                compactionPlans = this.compactionAnalyzer.analyze(streamDataBlockMap, excludedObjectIds);
-                logger.info("Analyze compaction plans complete, cost {}ms", System.currentTimeMillis() - now);
-                logCompactionPlans(compactionPlans, excludedObjectIds);
-                objectsToCompact = objectsToCompact.stream().filter(e -> !excludedObjectIds.contains(e.objectId())).collect(Collectors.toList());
-                compactWALObjects(request, compactionPlans, objectsToCompact);
-            } catch (Exception e) {
-                logger.error("Error while compacting objects ", e);
-            }
-        }
-
+        // wait for all force split objects to complete
         forceSplitCfs.stream().map(e -> {
             try {
                 return e.join();
@@ -411,16 +395,36 @@ public class CompactionManager {
             }
         }).filter(Objects::nonNull).forEach(request::addStreamObject);
 
-        Set<Long> compactedObjectIds = new HashSet<>();
+        // add split objects
         objectMetadataFilterMap.get(true).forEach(e -> {
             if (!excludedObjectIds.contains(e.objectId())) {
                 compactedObjectIds.add(e.objectId());
             }
         });
-        compactionPlans.forEach(c -> c.streamDataBlocksMap().values().forEach(v -> v.forEach(b -> compactedObjectIds.add(b.getObjectId()))));
+
+        if (excludedObjectIds.isEmpty()) {
+            // compact WAL objects only when compaction limitations are not violated after force split
+            try {
+                logger.info("{} WAL objects as compact candidates, total compaction size: {}",
+                        objectsToCompact.size(), objectsToCompact.stream().mapToLong(S3ObjectMetadata::objectSize).sum());
+                Map<Long, List<StreamDataBlock>> streamDataBlockMap = CompactionUtils.blockWaitObjectIndices(streamMetadataList, objectsToCompact, s3Operator);
+                long now = System.currentTimeMillis();
+                List<CompactionPlan> compactionPlans = this.compactionAnalyzer.analyze(streamDataBlockMap, excludedObjectIds);
+                logger.info("Analyze compaction plans complete, cost {}ms", System.currentTimeMillis() - now);
+                logCompactionPlans(compactionPlans, excludedObjectIds);
+                objectsToCompact = objectsToCompact.stream().filter(e -> !excludedObjectIds.contains(e.objectId())).collect(Collectors.toList());
+                compactWALObjects(request, compactionPlans, objectsToCompact);
+                compactionPlans.forEach(c -> c.streamDataBlocksMap().values().forEach(v -> v.forEach(b -> compactedObjectIds.add(b.getObjectId()))));
+            } catch (Exception e) {
+                logger.error("Error while compacting objects ", e);
+            }
+        }
+
         request.setCompactedObjectIds(new ArrayList<>(compactedObjectIds));
 
-        if (!sanityCheckCompactionResult(streamMetadataList, objectsToSplit, objectsToCompact, request)) {
+        List<S3ObjectMetadata> compactedObjectMetadata = s3ObjectMetadata.stream()
+                .filter(e -> compactedObjectIds.contains(e.objectId())).toList();
+        if (!sanityCheckCompactionResult(streamMetadataList, compactedObjectMetadata, request)) {
             logger.error("Sanity check failed, compaction result is illegal");
             return null;
         }
@@ -428,14 +432,12 @@ public class CompactionManager {
         return request;
     }
 
-    boolean sanityCheckCompactionResult(List<StreamMetadata> streamMetadataList, List<S3ObjectMetadata> objectsToSplit,
-                                        List<S3ObjectMetadata> objectsToCompact, CommitWALObjectRequest request) {
+    boolean sanityCheckCompactionResult(List<StreamMetadata> streamMetadataList, List<S3ObjectMetadata> compactedObjects,
+                                        CommitWALObjectRequest request) {
         Map<Long, StreamMetadata> streamMetadataMap = streamMetadataList.stream()
                 .collect(Collectors.toMap(StreamMetadata::getStreamId, e -> e));
-        Map<Long, S3ObjectMetadata> objectMetadataMap = objectsToCompact.stream()
+        Map<Long, S3ObjectMetadata> objectMetadataMap = compactedObjects.stream()
                 .collect(Collectors.toMap(S3ObjectMetadata::objectId, e -> e));
-        objectMetadataMap.putAll(objectsToSplit.stream()
-                .collect(Collectors.toMap(S3ObjectMetadata::objectId, e -> e)));
 
         List<StreamOffsetRange> compactedStreamOffsetRanges = new ArrayList<>();
         request.getStreamRanges().forEach(o -> compactedStreamOffsetRanges.add(new StreamOffsetRange(o.getStreamId(), o.getStartOffset(), o.getEndOffset())));
