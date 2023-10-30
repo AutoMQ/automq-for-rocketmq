@@ -126,8 +126,8 @@ jobs:
         env:
           JOB_INDEX: ${{ strategy.job-index }}
         run: |
-          REPO_NAME=$(basename ${{ env.GITHUB_REPOSITORY }})
-          $NAMESPACE=${REPO_NAME}-${GITHUB_RUN_ID}-${JOB_INDEX}
+          REPO_NAME=`echo ${GITHUB_REPOSITORY#*/} | sed -e "s/\//-/g" | cut -c1-36 | tr '[A-Z]' '[a-z]'`
+          NAMESPACE=${REPO_NAME}-${GITHUB_RUN_ID}-${JOB_INDEX}
           kubectl create namespace $NAMESPACE
           echo $NAMESPACE >> $GITHUB_OUTPUT
       - name: Deploy RocketMQ
