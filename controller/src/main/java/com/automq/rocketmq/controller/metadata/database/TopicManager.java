@@ -430,6 +430,7 @@ public class TopicManager {
                     .setTopicId(topic.getId())
                     .setName(topic.getName())
                     .setCount(topic.getQueueNum())
+                    .setRetentionHours(topic.getRetentionHours())
                     .setAcceptTypes(builder.build())
                     .build();
                 result.add(t);
