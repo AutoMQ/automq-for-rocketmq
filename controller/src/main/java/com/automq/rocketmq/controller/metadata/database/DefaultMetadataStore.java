@@ -1146,20 +1146,22 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public String addressOfNode(int nodeId) {
+    public CompletableFuture<String> addressOfNode(int nodeId) {
         BrokerNode node = this.nodes.get(nodeId);
         if (null != node) {
-            return node.getNode().getAddress();
+            return CompletableFuture.completedFuture(node.getNode().getAddress());
         }
 
-        try (SqlSession session = openSession()) {
-            NodeMapper mapper = session.getMapper(NodeMapper.class);
-            Node n = mapper.get(nodeId, null, null, null);
-            if (null != n) {
-                return n.getAddress();
+        return CompletableFuture.supplyAsync(() -> {
+            try (SqlSession session = openSession()) {
+                NodeMapper mapper = session.getMapper(NodeMapper.class);
+                Node n = mapper.get(nodeId, null, null, null);
+                if (null != n) {
+                    return n.getAddress();
+                }
             }
-        }
-        return null;
+            return null;
+        }, asyncExecutorService);
     }
 
     @Override
