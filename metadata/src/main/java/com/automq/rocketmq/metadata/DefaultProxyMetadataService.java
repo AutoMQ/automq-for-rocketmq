@@ -18,6 +18,7 @@
 package com.automq.rocketmq.metadata;
 
 import apache.rocketmq.controller.v1.ConsumerGroup;
+import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
@@ -36,6 +37,12 @@ public class DefaultProxyMetadataService implements ProxyMetadataService {
 
     public DefaultProxyMetadataService(MetadataStore metadataStore) {
         this.metadataStore = metadataStore;
+    }
+
+    @Override
+    public CompletableFuture<Topic> createTopic(CreateTopicRequest request) {
+        return metadataStore.createTopic(request)
+            .thenComposeAsync(this::topicOf);
     }
 
     @Override
