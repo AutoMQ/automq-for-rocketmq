@@ -157,9 +157,9 @@ jobs:
           distribution: "temurin"
           java-version: "17"
           cache: "maven"
-      - name: Build distribution tar
+      - name: Build rocketmq dependency
         run: |
-          mvn -Prelease-all clean install -U
+          mvn clean install -U -DskipTests
       - uses: actions/checkout@v3
         if: always()
         with:
@@ -212,9 +212,9 @@ jobs:
           distribution: "temurin"
           java-version: "17"
           cache: "maven"
-      - name: Build distribution tar
+      - name: Build rocketmq dependency
         run: |
-          mvn -Prelease-all clean install -U
+          mvn clean install -U -DskipTests
       - uses: actions/checkout@v3
         if: always()
         with:
@@ -273,9 +273,9 @@ jobs:
           distribution: "temurin"
           java-version: "17"
           cache: "maven"
-      - name: Build distribution tar
+      - name: Build rocketmq dependency
         run: |
-          mvn -Prelease-all clean install -U
+          mvn clean install -U -DskipTests
       - uses: actions/checkout@v3
         if: always()
         with:
