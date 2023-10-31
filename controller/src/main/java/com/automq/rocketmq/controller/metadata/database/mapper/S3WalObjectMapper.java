@@ -35,4 +35,6 @@ public interface S3WalObjectMapper {
     List<S3WalObject> list(@Param("nodeId") Integer nodeId, @Param("sequenceId") Long sequenceId);
 
     int commit(S3WalObject s3WALObject);
+
+    boolean streamExclusive(@Param("nodeId") int nodeId, @Param("streamId") long streamId);
 }

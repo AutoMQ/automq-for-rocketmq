@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS topic
     status               TINYINT               DEFAULT 0,
     create_time          DATETIME              DEFAULT current_timestamp,
     update_time          DATETIME              DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    accept_message_types TEXT         NOT NULL,
+    accept_message_types JSON         NOT NULL,
     UNIQUE INDEX idx_topic_name (name)
 );
 
@@ -159,11 +159,11 @@ CREATE TABLE IF NOT EXISTS s3streamobject
 
 CREATE TABLE IF NOT EXISTS s3walobject
 (
-    object_id           BIGINT   NOT NULL,
-    object_size         BIGINT   NOT NULL,
-    node_id             INT      NOT NULL,
-    sequence_id         BIGINT   NOT NULL,
-    sub_streams         LONGTEXT NOT NULL, -- immutable
+    object_id           BIGINT NOT NULL,
+    object_size         BIGINT NOT NULL,
+    node_id             INT    NOT NULL,
+    sequence_id         BIGINT NOT NULL,
+    sub_streams         JSON   NOT NULL, -- immutable
     base_data_timestamp TIMESTAMP(3),
     committed_timestamp TIMESTAMP(3),
     created_timestamp   TIMESTAMP(3),

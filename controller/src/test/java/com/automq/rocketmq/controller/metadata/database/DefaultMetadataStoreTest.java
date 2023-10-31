@@ -59,6 +59,7 @@ import com.automq.rocketmq.controller.metadata.database.mapper.S3WalObjectMapper
 import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 
+import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -257,6 +258,12 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         }
     }
 
+    private static AcceptTypes decodeAcceptTypes(String json) throws InvalidProtocolBufferException {
+        AcceptTypes.Builder builder = AcceptTypes.newBuilder();
+        JsonFormat.parser().ignoringUnknownFields().merge(json, builder);
+        return builder.build();
+    }
+
     @Test
     void testUpdateTopic() throws IOException, ExecutionException, InterruptedException {
         String address = "localhost:1234";
@@ -276,6 +283,11 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         long topicId;
         int queueNum = 4;
         String topicName = "t1";
+
+        AcceptTypes acceptTypes = AcceptTypes.newBuilder()
+            .addTypes(MessageType.NORMAL)
+            .addTypes(MessageType.TRANSACTION)
+            .build();
 
         try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
@@ -301,10 +313,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             UpdateTopicRequest updateTopicRequest = UpdateTopicRequest.newBuilder()
                 .setTopicId(topicId)
                 .setName(topicName)
-                .setAcceptTypes(AcceptTypes.newBuilder()
-                    .addTypes(MessageType.NORMAL)
-                    .addTypes(MessageType.TRANSACTION)
-                    .build())
+                .setAcceptTypes(acceptTypes)
                 .build();
             metadataStore.updateTopic(updateTopicRequest).get();
         }
@@ -314,11 +323,14 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             List<Topic> topics = topicMapper.list(null, null);
             topics.stream().filter(topic -> topic.getName().equals("t1")).forEach(topic -> Assertions.assertEquals(4, topic.getQueueNum()));
 
-            String json = JsonFormat.printer().print(AcceptTypes.newBuilder()
-                .addTypes(MessageType.NORMAL)
-                .addTypes(MessageType.TRANSACTION)
-                .build());
-            topics.stream().filter(topic -> topic.getName().equals("t1")).forEach(topic -> Assertions.assertEquals(json, topic.getAcceptMessageTypes()));
+            topics.stream().filter(topic -> topic.getName().equals("t1"))
+                .forEach(topic -> {
+                    try {
+                        Assertions.assertEquals(acceptTypes, decodeAcceptTypes(topic.getAcceptMessageTypes()));
+                    } catch (InvalidProtocolBufferException e) {
+                        Assertions.fail(e);
+                    }
+                });
 
             QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
             List<QueueAssignment> assignments = assignmentMapper.list(topicId, null, null, null, null);

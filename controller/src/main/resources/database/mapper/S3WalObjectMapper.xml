@@ -72,4 +72,13 @@
         </where>
     </select>
 
+    <select id="streamExclusive" resultType="boolean">
+        SELECT COUNT(node_id) = 0 AS exclusive
+        FROM
+            (SELECT node_id, JSON_EXTRACT(sub_streams, '$.subStreams.*.streamId') AS ids
+            FROM s3walobject
+            WHERE node_id != #{nodeId}) t
+        WHERE CONVERT(#{streamId}, CHAR)  MEMBER OF(t.ids)
+    </select>
+
 </mapper>
