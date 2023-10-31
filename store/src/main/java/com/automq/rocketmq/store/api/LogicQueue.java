@@ -100,21 +100,6 @@ public abstract class LogicQueue {
         CLOSED
     }
 
-    public static class QueueOffsetRange {
-        private final long startOffset;
-        private final long endOffset;
-
-        public QueueOffsetRange(long startOffset, long endOffset) {
-            this.startOffset = startOffset;
-            this.endOffset = endOffset;
-        }
-
-        public long getStartOffset() {
-            return startOffset;
-        }
-
-        public long getEndOffset() {
-            return endOffset;
-        }
+    public record QueueOffsetRange(long startOffset, long endOffset) {
     }
 }
