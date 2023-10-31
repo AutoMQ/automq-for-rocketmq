@@ -23,6 +23,7 @@ import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.MessageQueue;
 import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.MessageType;
+import apache.rocketmq.controller.v1.SubscriptionMode;
 import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.metadata.api.ProxyMetadataService;
 import java.util.HashMap;
@@ -77,7 +78,13 @@ public class MockProxyMetadataService implements ProxyMetadataService {
     @Override
     public CompletableFuture<ConsumerGroup> consumerGroupOf(String groupName) {
         long groupId = 8;
-        return CompletableFuture.completedFuture(ConsumerGroup.newBuilder().setName(groupName).setGroupId(groupId).build());
+        return CompletableFuture.completedFuture(
+            ConsumerGroup.newBuilder()
+                .setName(groupName)
+                .setGroupId(groupId)
+                .setMaxDeliveryAttempt(16)
+                .setSubMode(SubscriptionMode.SUB_MODE_POP)
+                .build());
     }
 
     @Override

@@ -220,9 +220,8 @@ public class SuspendRequestService extends ServiceThread implements StartAndShut
 
     @Override
     public void run() {
-        waitForRunning(100);
-
         while (!stopped) {
+            waitForRunning(100);
             try {
                 cleanExpiredRequest();
             } catch (Exception e) {

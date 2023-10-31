@@ -18,6 +18,8 @@
 package com.automq.rocketmq.proxy.remoting;
 
 import org.apache.rocketmq.common.MQVersion;
+import org.apache.rocketmq.proxy.common.ProxyContext;
+import org.apache.rocketmq.proxy.processor.channel.ChannelProtocolType;
 import org.apache.rocketmq.remoting.CommandCustomHeader;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 import org.apache.rocketmq.remoting.protocol.RemotingSysResponseCode;
@@ -45,9 +47,10 @@ public class RemotingUtil {
 
     /**
      * Build a response command with the given response code, the opaque of the request, and the given custom header.
-     * @param request The request command.
+     *
+     * @param request      The request command.
      * @param responseCode The response code.
-     * @param classHeader The class of the custom header.
+     * @param classHeader  The class of the custom header.
      * @return The response command.
      */
     public static RemotingCommand buildResponseCommand(RemotingCommand request, int responseCode,
@@ -60,7 +63,7 @@ public class RemotingUtil {
     /**
      * Build a response command with the given response code, and the opaque of the request.
      *
-     * @param request The request command.
+     * @param request      The request command.
      * @param responseCode The response code.
      * @return The response command.
      */
@@ -68,5 +71,9 @@ public class RemotingUtil {
         RemotingCommand response = RemotingCommand.createResponseCommand(responseCode, null, null);
         response.setOpaque(request.getOpaque());
         return response;
+    }
+
+    public static boolean isRemotingProtocol(ProxyContext ctx) {
+        return ChannelProtocolType.REMOTING.getName().equals(ctx.getProtocolType());
     }
 }

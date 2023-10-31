@@ -19,6 +19,7 @@ package com.automq.rocketmq.proxy.service;
 
 import apache.rocketmq.controller.v1.Code;
 import apache.rocketmq.controller.v1.ConsumerGroup;
+import apache.rocketmq.controller.v1.SubscriptionMode;
 import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.common.config.ProxyConfig;
 import com.automq.rocketmq.common.model.FlatMessageExt;
@@ -386,6 +387,10 @@ public class MessageServiceImpl implements MessageService {
                 throw new CompletionException(new MQBrokerException(ResponseCode.TOPIC_NOT_EXIST, "Topic not exist"));
             }
 
+            if (group.getSubMode() != SubscriptionMode.SUB_MODE_POP) {
+                throw new CompletionException(new MQBrokerException(ResponseCode.NO_PERMISSION, String.format("Group [%s] do not support pop mode.", group.getName())));
+            }
+
             topicReference.set(topic);
             consumerGroupReference.set(group);
             return null;
@@ -489,7 +494,7 @@ public class MessageServiceImpl implements MessageService {
         QueryConsumerOffsetRequestHeader requestHeader, long timeoutMillis) {
         CompletableFuture<ConsumerGroup> consumeGroupFuture = metadataService.consumerGroupOf(requestHeader.getConsumerGroup());
         CompletableFuture<Topic> topicFuture = metadataService.topicOf(requestHeader.getTopic());
-        // TODO: distinguish different offset management between pop pattern and push pattern, now only query offset in pop pattern.
+        VirtualQueue virtualQueue = new VirtualQueue(messageQueue);
 
         // TODO：Implement the bellow logic in the next iteration.
         // If the consumer doesn't have offset record on the specified queue:
@@ -499,7 +504,13 @@ public class MessageServiceImpl implements MessageService {
             .thenCompose(pair -> {
                 ConsumerGroup consumerGroup = pair.getLeft();
                 Topic topic = pair.getRight();
-                return store.getConsumeOffset(consumerGroup.getGroupId(), topic.getTopicId(), requestHeader.getQueueId());
+                if (consumerGroup.getSubMode() == SubscriptionMode.SUB_MODE_PULL) {
+                    return metadataService.consumerOffsetOf(
+                        pair.getLeft().getGroupId(),
+                        pair.getRight().getTopicId(),
+                        virtualQueue.physicalQueueId());
+                }
+                return store.getConsumeOffset(consumerGroup.getGroupId(), topic.getTopicId(), virtualQueue.physicalQueueId());
             });
     }
 
@@ -510,12 +521,18 @@ public class MessageServiceImpl implements MessageService {
         CompletableFuture<Topic> topicFuture = metadataService.topicOf(requestHeader.getTopic());
         VirtualQueue virtualQueue = new VirtualQueue(messageQueue);
 
-        // TODO: distinguish different offset management between pop pattern and push pattern, now only reset offset in pop pattern.
-        // TODO: support retry topic.
         return consumeGroupFuture.thenCombine(topicFuture, Pair::of)
             .thenCompose(pair -> {
                 ConsumerGroup consumerGroup = pair.getLeft();
                 Topic topic = pair.getRight();
+                if (consumerGroup.getSubMode() == SubscriptionMode.SUB_MODE_PULL) {
+                    return metadataService.updateConsumerOffset(
+                            consumerGroup.getGroupId(),
+                            topic.getTopicId(),
+                            virtualQueue.physicalQueueId(),
+                            requestHeader.getCommitOffset())
+                        .thenApply(nil -> new ResetConsumeOffsetResult(ResetConsumeOffsetResult.Status.SUCCESS));
+                }
                 return store.resetConsumeOffset(consumerGroup.getGroupId(), topic.getTopicId(), virtualQueue.physicalQueueId(), requestHeader.getCommitOffset());
             }).thenAccept(resetConsumeOffsetResult -> {
                 if (resetConsumeOffsetResult.status() != ResetConsumeOffsetResult.Status.SUCCESS) {
@@ -559,9 +576,23 @@ public class MessageServiceImpl implements MessageService {
             .thenCompose(pair -> {
                 Topic topic = pair.getLeft();
                 ConsumerGroup group = pair.getRight();
+                if (topic.getTopicId() != virtualQueue.topicId()) {
+                    LOGGER.error("Topic id in request header {} does not match topic id in message queue {}, maybe the topic is recreated.",
+                        topic.getTopicId(), virtualQueue.topicId());
+                    throw new CompletionException(new MQBrokerException(ResponseCode.TOPIC_NOT_EXIST, "Topic not exist"));
+                }
+
+                if (group.getSubMode() != SubscriptionMode.SUB_MODE_PULL) {
+                    throw new CompletionException(new MQBrokerException(ResponseCode.NO_PERMISSION, String.format("Group [%s] do not support pull mode.", group.getName())));
+                }
 
                 topicReference.set(topic);
                 consumerGroupReference.set(group);
+
+                // Update the consumer offset if the commit offset is specified.
+                if (requestHeader.getCommitOffset() != null && requestHeader.getCommitOffset() >= 0) {
+                    metadataService.updateConsumerOffset(group.getGroupId(), topic.getTopicId(), virtualQueue.physicalQueueId(), requestHeader.getCommitOffset());
+                }
 
                 return store.pull(group.getGroupId(), topic.getTopicId(), virtualQueue.physicalQueueId(), filter, requestHeader.getQueueOffset(), requestHeader.getMaxMsgNums(), false);
             })

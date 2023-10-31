@@ -27,6 +27,7 @@ import com.automq.rocketmq.common.config.BrokerConfig;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.metadata.api.ProxyMetadataService;
 import com.automq.rocketmq.proxy.model.VirtualQueue;
+import com.automq.rocketmq.proxy.remoting.RemotingUtil;
 import com.google.common.collect.Lists;
 import com.google.common.net.HostAndPort;
 import java.time.Duration;
@@ -43,7 +44,6 @@ import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.proxy.common.Address;
 import org.apache.rocketmq.proxy.common.ProxyContext;
 import org.apache.rocketmq.proxy.common.utils.ExceptionUtils;
-import org.apache.rocketmq.proxy.processor.channel.ChannelProtocolType;
 import org.apache.rocketmq.proxy.service.route.AddressableMessageQueue;
 import org.apache.rocketmq.proxy.service.route.MessageQueueView;
 import org.apache.rocketmq.proxy.service.route.ProxyTopicRouteData;
@@ -92,7 +92,7 @@ public class TopicRouteServiceImpl extends TopicRouteService {
 
         ProxyTopicRouteData proxyTopicRouteData = new ProxyTopicRouteData();
         proxyTopicRouteData.setQueueDatas(topicRouteData.getQueueDatas());
-        boolean isGrpc = isGrpcProtocol(ctx);
+        boolean isGrpc = !RemotingUtil.isRemotingProtocol(ctx);
 
         for (BrokerData brokerData : topicRouteData.getBrokerDatas()) {
             ProxyTopicRouteData.ProxyBrokerData proxyBrokerData = new ProxyTopicRouteData.ProxyBrokerData();
@@ -173,7 +173,7 @@ public class TopicRouteServiceImpl extends TopicRouteService {
             .exceptionallyCompose(ex -> {
                 if (ExceptionUtils.getRealException(ex) instanceof ControllerException controllerException) {
                     // If pull retry topic does not exist.
-                    boolean isRemoting = !isGrpcProtocol(ctx);
+                    boolean isRemoting = RemotingUtil.isRemotingProtocol(ctx);
                     if (controllerException.getErrorCode() == Code.NOT_FOUND.getNumber()
                         && isRemoting && topicName.startsWith(MixAll.RETRY_GROUP_TOPIC_PREFIX)) {
                         CreateTopicRequest request = CreateTopicRequest.newBuilder()
@@ -205,14 +205,6 @@ public class TopicRouteServiceImpl extends TopicRouteService {
         });
 
         return assignmentList;
-    }
-
-    private boolean isGrpcProtocol(ProxyContext ctx) {
-        if (ChannelProtocolType.GRPC_V2.getName().equals(ctx.getProtocolType()) ||
-            ChannelProtocolType.GRPC_V1.getName().equals(ctx.getProtocolType())) {
-            return true;
-        }
-        return false;
     }
 
     // Define a filter for the MessageQueueAssignment class.

@@ -243,7 +243,7 @@ class MessageServiceImplTest {
         queryConsumerOffsetRequestHeader.setConsumerGroup("group");
         queryConsumerOffsetRequestHeader.setTopic("topic");
         queryConsumerOffsetRequestHeader.setQueueId(0);
-        Long offset = messageService.queryConsumerOffset(ProxyContextExt.create(), null, queryConsumerOffsetRequestHeader, 0).join();
+        Long offset = messageService.queryConsumerOffset(ProxyContextExt.create(), messageQueue, queryConsumerOffsetRequestHeader, 0).join();
         assertEquals(100L, offset);
     }
 }
