@@ -53,6 +53,7 @@ public class MockMessageUtil {
         systemPropertiesT.setStoreTimestamp(System.currentTimeMillis());
         systemPropertiesT.setMessageId("0000000001");
         systemPropertiesT.setDeliveryAttempts(1);
+        systemPropertiesT.setDeliveryTimestamp(0);
         systemPropertiesT.setOriginalQueueOffset(0);
         flatMessageT.setSystemProperties(systemPropertiesT);
 

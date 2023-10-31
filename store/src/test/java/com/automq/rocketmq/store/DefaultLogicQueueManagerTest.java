@@ -30,6 +30,7 @@ import com.automq.rocketmq.store.service.InflightService;
 import com.automq.rocketmq.store.service.RocksDBKVService;
 import com.automq.rocketmq.store.service.TimerService;
 import com.automq.rocketmq.store.service.api.KVService;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -77,6 +78,10 @@ class DefaultLogicQueueManagerTest {
         LogicQueue logicQueue = future.join();
         assertEquals(TOPIC_ID, logicQueue.topicId());
         assertEquals(QUEUE_ID, logicQueue.queueId());
+
+        Optional<LogicQueue> optionalLogicQueue = topicQueueManager.get(TOPIC_ID, QUEUE_ID).join();
+        assertTrue(optionalLogicQueue.isPresent());
+        assertEquals(logicQueue, optionalLogicQueue.get());
     }
 
     @Test

@@ -43,7 +43,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
 import org.slf4j.Logger;
@@ -51,12 +50,9 @@ import org.slf4j.LoggerFactory;
 
 public class ReviveService {
     private static final Logger LOGGER = LoggerFactory.getLogger(ReviveService.class);
-    private final AtomicBoolean started = new AtomicBoolean(false);
     private final String checkPointNamespace;
-    private final TimerService timerService;
     private final KVService kvService;
     private final StoreMetadataService metadataService;
-    private final InflightService inflightService;
     private final LogicQueueManager logicQueueManager;
     // Indicate the timestamp that the revive service has reached.
     private volatile long reviveTimestamp = 0;
@@ -66,13 +62,11 @@ public class ReviveService {
     private final DeadLetterSender deadLetterSender;
 
     public ReviveService(String checkPointNamespace, KVService kvService, TimerService timerService,
-        StoreMetadataService metadataService, InflightService inflightService,
-        LogicQueueManager logicQueueManager, DeadLetterSender deadLetterSender) throws StoreException {
+        StoreMetadataService metadataService, InflightService inflightService, LogicQueueManager logicQueueManager,
+        DeadLetterSender deadLetterSender) throws StoreException {
         this.checkPointNamespace = checkPointNamespace;
         this.kvService = kvService;
-        this.timerService = timerService;
         this.metadataService = metadataService;
-        this.inflightService = inflightService;
         this.logicQueueManager = logicQueueManager;
         this.inflightRevive = new ConcurrentHashMap<>();
         this.deadLetterSender = deadLetterSender;

@@ -58,7 +58,7 @@ public class TimerService extends ServiceThread {
     }
 
     // All handler should not do any blocking operation.
-    public void registerHandler(Short handlerType, Consumer<TimerTag> handler) throws StoreException {
+    public void registerHandler(short handlerType, Consumer<TimerTag> handler) throws StoreException {
         if (handlerType < 0 || handlerType >= TimerHandlerType.names.length) {
             throw new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "Invalid timer tag type: " + handlerType);
         }
@@ -66,8 +66,12 @@ public class TimerService extends ServiceThread {
         timerHandlerMap.put(handlerType, handler);
     }
 
-    public void unregisterHandler(Short handlerType) {
+    public void unregisterHandler(short handlerType) {
         timerHandlerMap.remove(handlerType);
+    }
+
+    public boolean hasHandler(short handlerType) {
+        return timerHandlerMap.containsKey(handlerType);
     }
 
     private byte[] buildTimerTagKey(long deliveryTimestamp, byte[] key) {

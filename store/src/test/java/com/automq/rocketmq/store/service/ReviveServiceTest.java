@@ -50,6 +50,7 @@ import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ReviveServiceTest {
     private static final String PATH = "/tmp/test_revive_service/";
@@ -64,7 +65,6 @@ class ReviveServiceTest {
     private ReviveService reviveService;
     private DeadLetterSender deadLetterSender;
     private LogicQueue logicQueue;
-    private LogicQueueManager manager;
 
     @BeforeEach
     public void setUp() throws StoreException {
@@ -78,7 +78,7 @@ class ReviveServiceTest {
         OperationLogService operationLogService = new StreamOperationLogService(streamStore, snapshotService, new StoreConfig());
         logicQueue = new StreamLogicQueue(new StoreConfig(), TOPIC_ID, QUEUE_ID,
             metadataService, stateMachine, streamStore, operationLogService, inflightService);
-        manager = Mockito.mock(LogicQueueManager.class);
+        LogicQueueManager manager = Mockito.mock(LogicQueueManager.class);
         Mockito.doAnswer(ink -> CompletableFuture.completedFuture(logicQueue)).when(manager).getOrCreate(TOPIC_ID, QUEUE_ID);
         deadLetterSender = Mockito.mock(DeadLetterSender.class);
         reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, kvService, timerService, metadataService, inflightService,
@@ -92,7 +92,7 @@ class ReviveServiceTest {
     }
 
     @Test
-    void tryRevive_normal() throws StoreException {
+    void revive_normal() throws StoreException {
         Mockito.doAnswer(ink -> {
             long consumerGroupId = ink.getArgument(0);
             assertEquals(CONSUMER_GROUP_ID, consumerGroupId);
@@ -108,10 +108,10 @@ class ReviveServiceTest {
         logicQueue.put(message).join();
         // pop message
         int invisibleDuration = 100;
-        long reviveTimestamp = System.currentTimeMillis() + invisibleDuration;
         PopResult popResult = logicQueue.popNormal(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
         assertEquals(1, popResult.messageList().size());
         // check ck exist
+        assertTrue(popResult.messageList().get(0).receiptHandle().isPresent());
         ReceiptHandle handle = SerializeUtil.decodeReceiptHandle(popResult.messageList().get(0).receiptHandle().get());
         byte[] ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.consumerGroupId(), handle.operationId()));
         assertNotNull(ckValue);
@@ -153,7 +153,7 @@ class ReviveServiceTest {
     }
 
     @Test
-    void tryRevive_fifo() throws StoreException {
+    void revive_fifo() throws StoreException {
         Mockito.doAnswer(ink -> {
             long consumerGroupId = ink.getArgument(0);
             assertEquals(CONSUMER_GROUP_ID, consumerGroupId);
@@ -171,10 +171,10 @@ class ReviveServiceTest {
         }
         // pop message
         int invisibleDuration = 100;
-        long reviveTimestamp = System.currentTimeMillis() + invisibleDuration;
         PopResult popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
         assertEquals(1, popResult.messageList().size());
         // check ck exist
+        assertTrue(popResult.messageList().get(0).receiptHandle().isPresent());
         ReceiptHandle handle = SerializeUtil.decodeReceiptHandle(popResult.messageList().get(0).receiptHandle().get());
         byte[] ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.consumerGroupId(), handle.operationId()));
         assertNotNull(ckValue);
@@ -220,7 +220,7 @@ class ReviveServiceTest {
     }
 
     @Test
-    void tryRevive_dead_letter() throws Exception {
+    void revive_dead_letter() throws Exception {
         Mockito.doAnswer(ink -> {
             long consumerGroupId = ink.getArgument(0);
             assertEquals(CONSUMER_GROUP_ID, consumerGroupId);
@@ -236,10 +236,10 @@ class ReviveServiceTest {
         logicQueue.put(message).join();
         // pop message
         int invisibleDuration = 100;
-        long reviveTimestamp = System.currentTimeMillis() + invisibleDuration;
         PopResult popResult = logicQueue.popNormal(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
         assertEquals(1, popResult.messageList().size());
         // check ck exist
+        assertTrue(popResult.messageList().get(0).receiptHandle().isPresent());
         ReceiptHandle handle = SerializeUtil.decodeReceiptHandle(popResult.messageList().get(0).receiptHandle().get());
         byte[] ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.consumerGroupId(), handle.operationId()));
         assertNotNull(ckValue);
@@ -276,6 +276,7 @@ class ReviveServiceTest {
         // check if this message has been sent to DLQ
         Mockito.verify(deadLetterSender, Mockito.times(1)).send(Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
         // check ck not exist
+        assertTrue(retryPopResult.messageList().get(0).receiptHandle().isPresent());
         handle = SerializeUtil.decodeReceiptHandle(retryPopResult.messageList().get(0).receiptHandle().get());
         ckValue = kvService.get(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointKey(TOPIC_ID, QUEUE_ID, handle.consumerGroupId(), handle.operationId()));
         assertNull(ckValue);
