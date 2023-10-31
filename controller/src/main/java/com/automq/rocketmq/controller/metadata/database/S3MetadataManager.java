@@ -27,6 +27,7 @@ import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamState;
 import apache.rocketmq.controller.v1.SubStream;
+import apache.rocketmq.controller.v1.SubStreams;
 import apache.rocketmq.controller.v1.TrimStreamRequest;
 import com.automq.rocketmq.common.system.S3Constants;
 import com.automq.rocketmq.common.system.StreamConstants;
@@ -42,13 +43,9 @@ import com.automq.rocketmq.controller.metadata.database.mapper.S3StreamObjectMap
 import com.automq.rocketmq.controller.metadata.database.mapper.S3WalObjectMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.SequenceMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
-import com.automq.rocketmq.controller.metadata.database.serde.SubStreamDeserializer;
-import com.automq.rocketmq.controller.metadata.database.serde.SubStreamSerializer;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.reflect.TypeToken;
+import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.TextFormat;
-import java.nio.charset.StandardCharsets;
+import com.google.protobuf.util.JsonFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
@@ -72,14 +69,8 @@ public class S3MetadataManager {
 
     private final MetadataStore metadataStore;
 
-    private final Gson gson;
-
     public S3MetadataManager(MetadataStore metadataStore) {
         this.metadataStore = metadataStore;
-        this.gson = new GsonBuilder()
-            .registerTypeAdapter(SubStream.class, new SubStreamSerializer())
-            .registerTypeAdapter(SubStream.class, new SubStreamDeserializer())
-            .create();
     }
 
     public CompletableFuture<Long> prepareS3Objects(int count, int ttlInMinutes) {
@@ -161,7 +152,7 @@ public class S3MetadataManager {
                         List<long[]> offsets = java.util.stream.Stream.concat(
                             streamObjects.stream()
                                 .map(s3StreamObject -> new long[] {s3StreamObject.getStreamId(), s3StreamObject.getStartOffset(), s3StreamObject.getEndOffset()}),
-                            walObject.getSubStreamsMap().entrySet()
+                            walObject.getSubStreams().getSubStreamsMap().entrySet()
                                 .stream()
                                 .map(obj -> new long[] {obj.getKey(), obj.getValue().getStartOffset(), obj.getValue().getEndOffset()})
                         ).toList();
@@ -249,7 +240,8 @@ public class S3MetadataManager {
                         s3WALObject.setCommittedTimestamp(new Date());
                         s3WALObject.setNodeId(brokerId);
                         s3WALObject.setSequenceId(sequenceId);
-                        s3WALObject.setSubStreams(gson.toJson(walObject.getSubStreamsMap()));
+                        String subStreams = JsonFormat.printer().print(walObject.getSubStreams());
+                        s3WALObject.setSubStreams(subStreams);
                         s3WALObjectMapper.create(s3WALObject);
                     }
 
@@ -257,6 +249,8 @@ public class S3MetadataManager {
                     LOGGER.info("broker[broke-id={}] commit wal object[object-id={}] success, compacted objects[{}], stream objects[{}]",
                         brokerId, walObject.getObjectId(), compactedObjects, streamObjects);
                     future.complete(null);
+                } catch (InvalidProtocolBufferException e) {
+                    future.completeExceptionally(e);
                 }
             } else {
                 CommitWALObjectRequest request = CommitWALObjectRequest.newBuilder()
@@ -376,11 +370,14 @@ public class S3MetadataManager {
             S3WalObjectMapper s3WalObjectMapper = session.getMapper(S3WalObjectMapper.class);
             List<S3WALObject> walObjects = s3WalObjectMapper.list(metadataStore.config().nodeId(), null).stream()
                 .map(s3WALObject -> {
-                    Map<Long, SubStream> subStreams = gson.fromJson(new String(s3WALObject.getSubStreams().getBytes(StandardCharsets.UTF_8)),
-                        new TypeToken<>() {
-                        });
-                    return buildS3WALObject(s3WALObject, subStreams);
+                    try {
+                        return buildS3WALObject(s3WALObject, decode(s3WALObject.getSubStreams()));
+                    } catch (InvalidProtocolBufferException e) {
+                        LOGGER.error("Failed to deserialize SubStreams", e);
+                        return null;
+                    }
                 })
+                .filter(Objects::nonNull)
                 .toList();
             future.complete(walObjects);
         }
@@ -407,18 +404,22 @@ public class S3MetadataManager {
                 List<S3WalObject> s3WalObjects = s3WalObjectMapper.list(nodeId, null);
                 s3WalObjects.stream()
                     .map(s3WalObject -> {
-                        TypeToken<Map<Long, SubStream>> typeToken = new TypeToken<>() {
-                        };
-                        Map<Long, SubStream> subStreams = gson.fromJson(new String(s3WalObject.getSubStreams().getBytes(StandardCharsets.UTF_8)), typeToken);
-                        Map<Long, SubStream> streamsRecords = new HashMap<>();
-                        if (!Objects.isNull(subStreams) && subStreams.containsKey(streamId)) {
-                            SubStream subStream = subStreams.get(streamId);
-                            if (subStream.getStartOffset() <= endOffset && subStream.getEndOffset() > startOffset) {
-                                streamsRecords.put(streamId, subStream);
+                        try {
+                            Map<Long, SubStream> subStreams = decode(s3WalObject.getSubStreams()).getSubStreamsMap();
+                            Map<Long, SubStream> streamsRecords = new HashMap<>();
+                            if (subStreams.containsKey(streamId)) {
+                                SubStream subStream = subStreams.get(streamId);
+                                if (subStream.getStartOffset() <= endOffset && subStream.getEndOffset() > startOffset) {
+                                    streamsRecords.put(streamId, subStream);
+                                }
                             }
-                        }
-                        if (!streamsRecords.isEmpty()) {
-                            return buildS3WALObject(s3WalObject, streamsRecords);
+                            if (!streamsRecords.isEmpty()) {
+                                return buildS3WALObject(s3WalObject, SubStreams.newBuilder()
+                                    .putAllSubStreams(streamsRecords)
+                                    .build());
+                            }
+                        } catch (InvalidProtocolBufferException e) {
+                            LOGGER.error("Failed to deserialize SubStreams", e);
                         }
                         return null;
                     })
@@ -428,8 +429,8 @@ public class S3MetadataManager {
 
             // Sort by start-offset of the given stream
             s3WALObjects.sort((l, r) -> {
-                long lhs = l.getSubStreamsMap().get(streamId).getStartOffset();
-                long rhs = r.getSubStreamsMap().get(streamId).getStartOffset();
+                long lhs = l.getSubStreams().getSubStreamsMap().get(streamId).getStartOffset();
+                long rhs = r.getSubStreams().getSubStreamsMap().get(streamId).getStartOffset();
                 return Long.compare(lhs, rhs);
             });
 
@@ -466,7 +467,7 @@ public class S3MetadataManager {
 
     private S3WALObject buildS3WALObject(
         S3WalObject originalObject,
-        Map<Long, SubStream> subStreams) {
+        SubStreams subStreams) {
         return S3WALObject.newBuilder()
             .setObjectId(originalObject.getObjectId())
             .setObjectSize(originalObject.getObjectSize())
@@ -474,8 +475,14 @@ public class S3MetadataManager {
             .setSequenceId(originalObject.getSequenceId())
             .setBaseDataTimestamp(originalObject.getBaseDataTimestamp().getTime())
             .setCommittedTimestamp(originalObject.getCommittedTimestamp() != null ? originalObject.getCommittedTimestamp().getTime() : S3Constants.NOOP_OBJECT_COMMIT_TIMESTAMP)
-            .putAllSubStreams(subStreams)
+            .setSubStreams(subStreams)
             .build();
+    }
+
+    private SubStreams decode(String json) throws InvalidProtocolBufferException {
+        SubStreams.Builder builder = SubStreams.newBuilder();
+        JsonFormat.parser().ignoringUnknownFields().merge(json, builder);
+        return builder.build();
     }
 
     private boolean commitObject(Long objectId, long streamId, long objectSize, SqlSession session) {
@@ -559,15 +566,19 @@ public class S3MetadataManager {
                 s3WalObjectMapper.list(null, null)
                     .stream()
                     .map(s3WalObject -> {
-                        TypeToken<Map<Long, SubStream>> typeToken = new TypeToken<>() {
-                        };
-                        Map<Long, SubStream> subStreams = gson.fromJson(new String(s3WalObject.getSubStreams().getBytes(StandardCharsets.UTF_8)), typeToken);
-                        Map<Long, SubStream> streamsRecords = new HashMap<>();
-                        subStreams.entrySet().stream()
-                            .filter(entry -> !Objects.isNull(entry) && entry.getKey().equals(streamId))
-                            .filter(entry -> entry.getValue().getStartOffset() <= endOffset && entry.getValue().getEndOffset() > startOffset)
-                            .forEach(entry -> streamsRecords.put(entry.getKey(), entry.getValue()));
-                        return streamsRecords.isEmpty() ? null : buildS3WALObject(s3WalObject, streamsRecords);
+                        try {
+                            Map<Long, SubStream> subStreams = decode(s3WalObject.getSubStreams()).getSubStreamsMap();
+                            Map<Long, SubStream> streamsRecords = new HashMap<>();
+                            subStreams.entrySet().stream()
+                                .filter(entry -> !Objects.isNull(entry) && entry.getKey().equals(streamId))
+                                .filter(entry -> entry.getValue().getStartOffset() <= endOffset && entry.getValue().getEndOffset() > startOffset)
+                                .forEach(entry -> streamsRecords.put(entry.getKey(), entry.getValue()));
+                            return streamsRecords.isEmpty() ? null : buildS3WALObject(s3WalObject,
+                                SubStreams.newBuilder().putAllSubStreams(streamsRecords).build());
+                        } catch (InvalidProtocolBufferException e) {
+                            LOGGER.error("Failed to deserialize SubStreams", e);
+                            return null;
+                        }
                     })
                     .filter(Objects::nonNull)
                     .limit(limit)
@@ -575,8 +586,8 @@ public class S3MetadataManager {
 
                 if (!walObjects.isEmpty()) {
                     walObjects.sort((l, r) -> {
-                        long lhs = l.getSubStreamsMap().get(streamId).getStartOffset();
-                        long rhs = r.getSubStreamsMap().get(streamId).getStartOffset();
+                        long lhs = l.getSubStreams().getSubStreamsMap().get(streamId).getStartOffset();
+                        long rhs = r.getSubStreams().getSubStreamsMap().get(streamId).getStartOffset();
                         return Long.compare(lhs, rhs);
                     });
                 }
@@ -592,8 +603,8 @@ public class S3MetadataManager {
                         walObjects.stream()
                             .map(s3WALObject -> new long[] {
                                 s3WALObject.getObjectId(),
-                                s3WALObject.getSubStreamsMap().get(streamId).getStartOffset(),
-                                s3WALObject.getSubStreamsMap().get(streamId).getEndOffset()
+                                s3WALObject.getSubStreams().getSubStreamsMap().get(streamId).getStartOffset(),
+                                s3WALObject.getSubStreams().getSubStreamsMap().get(streamId).getEndOffset()
                             })
                     ).sorted((l, r) -> {
                         if (l[1] == r[1]) {
@@ -616,7 +627,6 @@ public class S3MetadataManager {
             }
         }, metadataStore.asyncExecutor());
     }
-
 
     public CompletableFuture<Void> trimStream(long streamId, long streamEpoch, long newStartOffset) {
         CompletableFuture<Void> future = new CompletableFuture<>();
@@ -706,15 +716,18 @@ public class S3MetadataManager {
                     // remove wal object or remove sub-stream range in wal object
                     s3WALObjectMapper.list(stream.getDstNodeId(), null).stream()
                         .map(s3WALObject -> {
-                            Map<Long, SubStream> subStreams = gson.fromJson(new String(s3WALObject.getSubStreams().getBytes(StandardCharsets.UTF_8)),
-                                new TypeToken<>() {
-                                });
-                            return buildS3WALObject(s3WALObject, subStreams);
+                            try {
+                                return buildS3WALObject(s3WALObject, decode(s3WALObject.getSubStreams()));
+                            } catch (InvalidProtocolBufferException e) {
+                                LOGGER.error("Failed to decode");
+                                return null;
+                            }
                         })
-                        .filter(s3WALObject -> s3WALObject.getSubStreamsMap().containsKey(streamId))
-                        .filter(s3WALObject -> s3WALObject.getSubStreamsMap().get(streamId).getEndOffset() <= newStartOffset)
+                        .filter(Objects::nonNull)
+                        .filter(s3WALObject -> s3WALObject.getSubStreams().getSubStreamsMap().containsKey(streamId))
+                        .filter(s3WALObject -> s3WALObject.getSubStreams().getSubStreamsMap().get(streamId).getEndOffset() <= newStartOffset)
                         .forEach(s3WALObject -> {
-                            if (s3WALObject.getSubStreamsMap().size() == 1) {
+                            if (s3WALObject.getSubStreams().getSubStreamsMap().size() == 1) {
                                 // only this range, but we will remove this range, so now we can remove this wal object
                                 S3Object s3Object = s3ObjectMapper.getById(s3WALObject.getObjectId());
                                 s3Object.setMarkedForDeletionTimestamp(new Date());

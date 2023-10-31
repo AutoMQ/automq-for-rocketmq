@@ -64,7 +64,6 @@ public class Node {
 
     private Date updateTime = new Date();
 
-
     public int getId() {
         return id;
     }
@@ -143,5 +142,16 @@ public class Node {
 
     public void setUpdateTime(Date updateTime) {
         this.updateTime = updateTime;
+    }
+
+    @Override
+    public String toString() {
+        return "Node {" +
+            "id=" + id +
+            ", name='" + name + '\'' +
+            ", address='" + address + '\'' +
+            ", epoch=" + epoch +
+            ", updateTime=" + updateTime +
+            '}';
     }
 }

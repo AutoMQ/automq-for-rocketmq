@@ -15,22 +15,7 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.metadata.database.serde;
+package com.automq.rocketmq.controller.metadata.database.cache;
 
-import apache.rocketmq.controller.v1.SubStream;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonSerializationContext;
-import com.google.gson.JsonSerializer;
-import java.lang.reflect.Type;
-
-public class SubStreamSerializer implements JsonSerializer<SubStream> {
-    @Override
-    public JsonElement serialize(SubStream stream, Type type, JsonSerializationContext context) {
-        JsonObject root = new JsonObject();
-        root.addProperty("streamId", stream.getStreamId());
-        root.addProperty("startOffset", stream.getStartOffset());
-        root.addProperty("endOffset", stream.getEndOffset());
-        return root;
-    }
+public class S3ObjectCache {
 }
