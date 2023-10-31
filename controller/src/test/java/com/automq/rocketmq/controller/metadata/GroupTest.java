@@ -18,6 +18,7 @@
 package com.automq.rocketmq.controller.metadata;
 
 import apache.rocketmq.controller.v1.GroupStatus;
+import apache.rocketmq.controller.v1.SubscriptionMode;
 import com.automq.rocketmq.controller.metadata.database.dao.Group;
 import com.automq.rocketmq.controller.metadata.database.dao.GroupCriteria;
 import com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper;
@@ -36,19 +37,26 @@ public class GroupTest extends DatabaseTestBase {
             group.setName("G1");
             group.setStatus(GroupStatus.GROUP_STATUS_ACTIVE);
             group.setDeadLetterTopicId(1L);
+            group.setSubMode(SubscriptionMode.SUB_MODE_POP);
             int rowsAffected = mapper.create(group);
             Assertions.assertEquals(1, rowsAffected);
 
+            List<Group> groups = mapper.byCriteria(GroupCriteria.newBuilder().setGroupId(group.getId()).build());
+            Assertions.assertEquals(1, groups.size());
+            Assertions.assertEquals(SubscriptionMode.SUB_MODE_POP, groups.get(0).getSubMode());
+
             group.setStatus(GroupStatus.GROUP_STATUS_DELETED);
             group.setDeadLetterTopicId(2L);
+            group.setSubMode(SubscriptionMode.SUB_MODE_PULL);
             mapper.update(group);
 
-            List<Group> groups = mapper.byCriteria(GroupCriteria.newBuilder().build());
+            groups = mapper.byCriteria(GroupCriteria.newBuilder().setGroupId(group.getId()).build());
             Assertions.assertEquals(1, groups.size());
             Group got = groups.get(0);
             Assertions.assertEquals("G1", got.getName());
             Assertions.assertEquals(GroupStatus.GROUP_STATUS_DELETED, got.getStatus());
             Assertions.assertEquals(2, got.getDeadLetterTopicId());
+            Assertions.assertEquals(SubscriptionMode.SUB_MODE_PULL, got.getSubMode());
 
             groups = mapper.byCriteria(GroupCriteria.newBuilder().setStatus(GroupStatus.GROUP_STATUS_ACTIVE).build());
             Assertions.assertTrue(groups.isEmpty());

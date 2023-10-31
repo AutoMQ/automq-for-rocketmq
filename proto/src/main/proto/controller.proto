@@ -349,8 +349,8 @@ message CreateGroupRequest {
   // Consumer group name
   string name = 2;
 
-  // Maximum retry attempts before forwarding messages to dead-letter-queue
-  int32 max_retry_attempt = 3;
+  // Maximum delivery attempts before forwarding messages to dead-letter-queue
+  int32 max_delivery_attempt = 3;
 
   // Type of the group, standard for max concurrency and FIFO for message-group scope ordering
   GroupType group_type = 4;
@@ -360,6 +360,9 @@ message CreateGroupRequest {
 
   // How transactional messages are consumed.
   IsolationLevel isolation = 6;
+
+  // Intended subscription mode: POP or PULL.
+  SubscriptionMode sub_mode = 7;
 }
 
 message CreateGroupReply {

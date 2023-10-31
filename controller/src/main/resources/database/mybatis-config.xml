@@ -50,6 +50,8 @@
                      javaType="apache.rocketmq.controller.v1.S3ObjectState" />
         <typeHandler handler="org.apache.ibatis.type.EnumOrdinalTypeHandler"
                      javaType="apache.rocketmq.controller.v1.MessageType" />
+        <typeHandler handler="org.apache.ibatis.type.EnumOrdinalTypeHandler"
+                     javaType="apache.rocketmq.controller.v1.SubscriptionMode" />
     </typeHandlers>
 
     <environments default="development">

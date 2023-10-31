@@ -91,12 +91,21 @@ message OngoingMessageQueueReassignment {
   int32 dst_node_id = 3;
 }
 
+enum SubscriptionMode {
+  SUB_MODE_UNSPECIFIED = 0;
+  SUB_MODE_PULL = 1;
+  SUB_MODE_POP = 2;
+}
+
 message ConsumerGroup {
   string name = 1;
   int64 group_id = 2;
   GroupType group_type = 3;
   int32 max_delivery_attempt = 4;
   int64 dead_letter_topic_id = 5;
+
+  // Indicate how this consumer group is used to subscribe messages.
+  SubscriptionMode sub_mode = 6;
 }
 
 // Bellow messages are used to represent the `Stream` resource.

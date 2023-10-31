@@ -18,6 +18,8 @@
 package com.automq.rocketmq.controller.metadata.database.dao;
 
 import apache.rocketmq.controller.v1.GroupStatus;
+import apache.rocketmq.controller.v1.GroupType;
+import apache.rocketmq.controller.v1.SubscriptionMode;
 import java.util.Date;
 
 public class GroupCriteria {
@@ -26,6 +28,10 @@ public class GroupCriteria {
     private GroupStatus status;
     private Long topicId;
     private Date updateTime;
+
+    private SubscriptionMode subMode;
+
+    private GroupType groupType;
 
     public static class GroupCriteriaBuilder {
         private final GroupCriteria criteria = new GroupCriteria();
@@ -52,6 +58,16 @@ public class GroupCriteria {
 
         public GroupCriteriaBuilder setLastUpdateTime(Date date) {
             criteria.setUpdateTime(date);
+            return this;
+        }
+
+        public GroupCriteriaBuilder setSubMode(SubscriptionMode subMode) {
+            criteria.subMode = subMode;
+            return this;
+        }
+
+        public GroupCriteriaBuilder setGroupType(GroupType groupType) {
+            criteria.groupType = groupType;
             return this;
         }
 
@@ -94,6 +110,14 @@ public class GroupCriteria {
 
     void setTopicId(Long topicId) {
         this.topicId = topicId;
+    }
+
+    public SubscriptionMode getSubMode() {
+        return subMode;
+    }
+
+    public GroupType getGroupType() {
+        return groupType;
     }
 
     public Date getUpdateTime() {

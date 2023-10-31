@@ -23,10 +23,10 @@ import apache.rocketmq.controller.v1.Cluster;
 import apache.rocketmq.controller.v1.ClusterSummary;
 import apache.rocketmq.controller.v1.Code;
 import apache.rocketmq.controller.v1.ConsumerGroup;
+import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.DescribeClusterRequest;
 import apache.rocketmq.controller.v1.GroupStatus;
-import apache.rocketmq.controller.v1.GroupType;
 import apache.rocketmq.controller.v1.ListOpenStreamsReply;
 import apache.rocketmq.controller.v1.ListOpenStreamsRequest;
 import apache.rocketmq.controller.v1.OpenStreamReply;
@@ -440,8 +440,8 @@ public class DefaultMetadataStore implements MetadataStore {
     }
 
     @Override
-    public CompletableFuture<Long> createGroup(String groupName, int maxRetry, GroupType type, long dlq) {
-        return groupManager.createGroup(groupName, maxRetry, type, dlq);
+    public CompletableFuture<Long> createGroup(CreateGroupRequest request) {
+        return groupManager.createGroup(request);
     }
 
     @Override

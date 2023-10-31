@@ -20,9 +20,9 @@ package com.automq.rocketmq.controller.metadata;
 import apache.rocketmq.controller.v1.AssignmentStatus;
 import apache.rocketmq.controller.v1.Cluster;
 import apache.rocketmq.controller.v1.ConsumerGroup;
+import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.DescribeClusterRequest;
-import apache.rocketmq.controller.v1.GroupType;
 import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
@@ -149,7 +149,7 @@ public interface MetadataStore extends Closeable {
 
     CompletableFuture<Void> commitOffset(long groupId, long topicId, int queueId, long offset);
 
-    CompletableFuture<Long> createGroup(String groupName, int maxRetry, GroupType type, long dlq);
+    CompletableFuture<Long> createGroup(CreateGroupRequest request);
 
     CompletableFuture<ConsumerGroup> describeGroup(Long groupId, String groupName);
 

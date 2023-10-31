@@ -404,8 +404,7 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
 
     @Override
     public void createGroup(CreateGroupRequest request, StreamObserver<CreateGroupReply> responseObserver) {
-        metadataStore.createGroup(request.getName(), request.getMaxRetryAttempt(), request.getGroupType(),
-                request.getDeadLetterTopicId())
+        metadataStore.createGroup(request)
             .whenComplete((groupId, e) -> {
                 if (null != e) {
                     if (e instanceof ControllerException ex) {
