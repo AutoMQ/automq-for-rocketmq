@@ -33,6 +33,7 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.rocketmq.common.message.Message;
 import org.apache.rocketmq.common.message.MessageAccessor;
 import org.apache.rocketmq.common.message.MessageConst;
@@ -84,7 +85,7 @@ public class FlatMessageUtil {
 
     public static long calculateDeliveryTimestamp(int delayLevel) {
         delayLevel = Math.min(Math.max(0, delayLevel), DELAY_LEVEL_ARRAY.length - 1);
-        return DELAY_LEVEL_ARRAY[delayLevel];
+        return System.currentTimeMillis() + DELAY_LEVEL_ARRAY[delayLevel];
     }
 
     public static long calculateDeliveryTimestamp(Message message) {
@@ -144,7 +145,8 @@ public class FlatMessageUtil {
         return FlatMessage.getRootAsFlatMessage(builder.dataBuffer());
     }
 
-    public static MessageExt convertTo(FlatMessageExt flatMessage, String topicName, long invisibleTime) {
+    public static MessageExt convertTo(FlatMessageExt flatMessage, String topicName, long invisibleTime, String host,
+        int port) {
         MessageExt messageExt = new MessageExt();
 
         VirtualQueue virtualQueue = new VirtualQueue(flatMessage.message().topicId(), flatMessage.message().queueId());
@@ -153,7 +155,8 @@ public class FlatMessageUtil {
         messageExt.setBrokerName(virtualQueue.brokerName());
         // The original queue id always is 0.
         messageExt.setQueueId(0);
-        messageExt.setQueueOffset(flatMessage.originalOffset());
+        messageExt.setQueueOffset(flatMessage.offset());
+        messageExt.setCommitLogOffset(flatMessage.offset());
 
         ByteBuffer payloadBuffer = flatMessage.message().payloadAsByteBuffer();
 
@@ -173,9 +176,8 @@ public class FlatMessageUtil {
             messageExt.setBornHost(new InetSocketAddress(bornHost, 0));
         }
         messageExt.setStoreTimestamp(systemProperties.storeTimestamp());
-        String storeHost = systemProperties.storeHost();
-        if (storeHost != null) {
-            messageExt.setStoreHost(new InetSocketAddress(storeHost, 0));
+        if (StringUtils.isNotBlank(host)) {
+            messageExt.setStoreHost(new InetSocketAddress(host, port));
         }
         messageExt.setMsgId(systemProperties.messageId());
 
@@ -193,9 +195,10 @@ public class FlatMessageUtil {
         return messageExt;
     }
 
-    public static List<MessageExt> convertTo(List<FlatMessageExt> messageList, String topicName, long invisibleTime) {
+    public static List<MessageExt> convertTo(List<FlatMessageExt> messageList, String topicName, long invisibleTime,
+        String host, int port) {
         return messageList.stream()
-            .map(messageExt -> convertTo(messageExt, topicName, invisibleTime))
+            .map(messageExt -> convertTo(messageExt, topicName, invisibleTime, host, port))
             .toList();
     }
 

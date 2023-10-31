@@ -17,13 +17,19 @@
 
 package com.automq.rocketmq.proxy.service;
 
+import apache.rocketmq.controller.v1.AcceptTypes;
+import apache.rocketmq.controller.v1.Code;
+import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.MessageQueueAssignment;
+import apache.rocketmq.controller.v1.MessageType;
 import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.common.config.BrokerConfig;
+import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.metadata.api.ProxyMetadataService;
 import com.automq.rocketmq.proxy.model.VirtualQueue;
 import com.google.common.collect.Lists;
 import com.google.common.net.HostAndPort;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -31,6 +37,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
+import org.apache.rocketmq.common.MixAll;
 import org.apache.rocketmq.common.constant.PermName;
 import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.proxy.common.Address;
@@ -67,13 +74,13 @@ public class TopicRouteServiceImpl extends TopicRouteService {
 
     @Override
     public MessageQueueView getAllMessageQueueView(ProxyContext ctx, String topicName) {
-        return new MessageQueueView(topicName, routeDataFrom(assignmentsOf(topicName, QueueFilter.ALL)));
+        return new MessageQueueView(topicName, routeDataFrom(assignmentsOf(ctx, topicName, QueueFilter.ALL)));
     }
 
     @Override
     public MessageQueueView getCurrentMessageQueueView(ProxyContext ctx, String topicName) {
         // Only return the MessageQueueAssignment that is assigned to the current broker.
-        return new MessageQueueView(topicName, routeDataFrom(assignmentsOf(topicName, nodeId -> nodeId == brokerConfig.nodeId())));
+        return new MessageQueueView(topicName, routeDataFrom(assignmentsOf(ctx, topicName, nodeId -> nodeId == brokerConfig.nodeId())));
     }
 
     @Override
@@ -160,8 +167,29 @@ public class TopicRouteServiceImpl extends TopicRouteService {
         return topicRouteData;
     }
 
-    private List<MessageQueueAssignment> assignmentsOf(String topicName, QueueFilter filter) {
-        Topic topic = metadataService.topicOf(topicName).join();
+    private List<MessageQueueAssignment> assignmentsOf(ProxyContext ctx, String topicName, QueueFilter filter) {
+        Topic topic = metadataService.topicOf(topicName)
+            .exceptionallyCompose(ex -> {
+                if (ex.getCause() != null) {
+                    ex = ex.getCause();
+                }
+                if (ex instanceof ControllerException controllerException) {
+                    // If pull retry topic does not exist.
+                    boolean isRemoting = !isGrpcProtocol(ctx);
+                    if (controllerException.getErrorCode() == Code.NOT_FOUND.getNumber()
+                        && isRemoting && topicName.startsWith(MixAll.RETRY_GROUP_TOPIC_PREFIX)) {
+                        CreateTopicRequest request = CreateTopicRequest.newBuilder()
+                            .setTopic(topicName)
+                            .setCount(1)
+                            .setAcceptTypes(AcceptTypes.newBuilder().addTypes(MessageType.DELAY).build())
+                            .setRetentionHours((int) Duration.ofDays(3).toHours())
+                            .build();
+                        return metadataService.createTopic(request);
+                    }
+                }
+                return CompletableFuture.failedFuture(ex);
+            })
+            .join();
         List<MessageQueueAssignment> assignmentList = new ArrayList<>();
         topic.getAssignmentsList().forEach(assignment -> {
             if (filter.filter(assignment.getNodeId())) {

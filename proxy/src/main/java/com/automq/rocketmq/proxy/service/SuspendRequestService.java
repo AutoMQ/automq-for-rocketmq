@@ -176,8 +176,7 @@ public class SuspendRequestService extends ServiceThread implements StartAndShut
     }
 
     public <T extends GetMessageResult> CompletableFuture<Optional<T>> suspendRequest(ProxyContext context,
-        String topic,
-        int queueId, Filter filter, long timeRemaining,
+        String topic, int queueId, Filter filter, long timeRemaining,
         Function<Long/*timeout*/, CompletableFuture<T>> supplier) {
         ((ProxyContextExt) context).setSuspended(true);
 
