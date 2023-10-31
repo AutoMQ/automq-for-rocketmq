@@ -17,6 +17,13 @@
 
 package com.automq.rocketmq.proxy.grpc;
 
+import apache.rocketmq.v2.AckMessageResponse;
+import apache.rocketmq.v2.ChangeInvisibleDurationResponse;
+import apache.rocketmq.v2.EndTransactionResponse;
+import apache.rocketmq.v2.HeartbeatResponse;
+import apache.rocketmq.v2.QueryRouteResponse;
+import apache.rocketmq.v2.ReceiveMessageResponse;
+import apache.rocketmq.v2.SendMessageResponse;
 import apache.rocketmq.v2.Status;
 import com.automq.rocketmq.proxy.metrics.ProxyMetricsManager;
 import com.automq.rocketmq.proxy.model.ProxyContextExt;
@@ -38,6 +45,22 @@ public class ExtendGrpcMessagingApplication extends GrpcMessagingApplication {
     }
 
     private <T> String getResponseStatus(T response) {
+        if (response instanceof SendMessageResponse detailResponse) {
+            return detailResponse.getStatus().getCode().name().toLowerCase();
+        } else if (response instanceof ReceiveMessageResponse detailResponse) {
+            return detailResponse.getStatus().getCode().name().toLowerCase();
+        } else if (response instanceof AckMessageResponse detailResponse) {
+            return detailResponse.getStatus().getCode().name().toLowerCase();
+        } else if (response instanceof ChangeInvisibleDurationResponse detailResponse) {
+            return detailResponse.getStatus().getCode().name().toLowerCase();
+        } else if (response instanceof EndTransactionResponse detailResponse) {
+            return detailResponse.getStatus().getCode().name().toLowerCase();
+        } else if (response instanceof QueryRouteResponse detailResponse) {
+            return detailResponse.getStatus().getCode().name().toLowerCase();
+        } else if (response instanceof HeartbeatResponse detailResponse) {
+            return detailResponse.getStatus().getCode().name().toLowerCase();
+        }
+
         try {
             Method getStatus = response.getClass().getDeclaredMethod("getStatus");
             Status status = (Status) getStatus.invoke(response);
