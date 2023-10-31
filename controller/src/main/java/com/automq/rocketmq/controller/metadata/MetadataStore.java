@@ -200,7 +200,7 @@ public interface MetadataStore extends Closeable {
 
     CompletableFuture<Long> getConsumerOffset(long consumerGroupId, long topicId, int queueId);
 
-    String addressOfNode(int nodeId);
+    CompletableFuture<String> addressOfNode(int nodeId);
 
     CompletableFuture<Pair<List<S3StreamObject>, List<S3WALObject>>> listObjects(long streamId, long startOffset,
         long endOffset, int limit);

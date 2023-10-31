@@ -78,8 +78,7 @@ public class DefaultProxyMetadataService implements ProxyMetadataService {
 
     @Override
     public CompletableFuture<String> addressOf(int nodeId) {
-        // TODO: Avoid use the ForkJoinPool.commonPool(), see the issue: https://github.com/AutoMQ/rocketmq-on-s3/issues/338
-        return CompletableFuture.supplyAsync(() -> metadataStore.addressOfNode(nodeId));
+        return metadataStore.addressOfNode(nodeId);
     }
 
     @Override
