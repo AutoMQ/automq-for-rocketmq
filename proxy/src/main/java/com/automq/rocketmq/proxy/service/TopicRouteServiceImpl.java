@@ -42,6 +42,7 @@ import org.apache.rocketmq.common.constant.PermName;
 import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.proxy.common.Address;
 import org.apache.rocketmq.proxy.common.ProxyContext;
+import org.apache.rocketmq.proxy.common.utils.ExceptionUtils;
 import org.apache.rocketmq.proxy.processor.channel.ChannelProtocolType;
 import org.apache.rocketmq.proxy.service.route.AddressableMessageQueue;
 import org.apache.rocketmq.proxy.service.route.MessageQueueView;
@@ -170,10 +171,7 @@ public class TopicRouteServiceImpl extends TopicRouteService {
     private List<MessageQueueAssignment> assignmentsOf(ProxyContext ctx, String topicName, QueueFilter filter) {
         Topic topic = metadataService.topicOf(topicName)
             .exceptionallyCompose(ex -> {
-                if (ex.getCause() != null) {
-                    ex = ex.getCause();
-                }
-                if (ex instanceof ControllerException controllerException) {
+                if (ExceptionUtils.getRealException(ex) instanceof ControllerException controllerException) {
                     // If pull retry topic does not exist.
                     boolean isRemoting = !isGrpcProtocol(ctx);
                     if (controllerException.getErrorCode() == Code.NOT_FOUND.getNumber()
