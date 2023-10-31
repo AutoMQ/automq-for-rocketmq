@@ -22,6 +22,7 @@ import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.common.config.ProxyConfig;
 import com.automq.rocketmq.common.model.FlatMessageExt;
+import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.common.util.CommonUtil;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.metadata.api.ProxyMetadataService;
@@ -29,6 +30,7 @@ import com.automq.rocketmq.proxy.metrics.ProxyMetricsManager;
 import com.automq.rocketmq.proxy.model.VirtualQueue;
 import com.automq.rocketmq.proxy.util.FlatMessageUtil;
 import com.automq.rocketmq.proxy.util.ReceiptHandleUtil;
+import com.automq.rocketmq.store.api.DeadLetterSender;
 import com.automq.rocketmq.store.api.MessageStore;
 import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PutResult;
@@ -58,6 +60,7 @@ import org.apache.rocketmq.client.consumer.PullStatus;
 import org.apache.rocketmq.client.exception.MQBrokerException;
 import org.apache.rocketmq.client.producer.SendResult;
 import org.apache.rocketmq.client.producer.SendStatus;
+import org.apache.rocketmq.common.MixAll;
 import org.apache.rocketmq.common.attribute.TopicMessageType;
 import org.apache.rocketmq.common.consumer.ReceiptHandle;
 import org.apache.rocketmq.common.filter.ExpressionType;
@@ -94,11 +97,11 @@ public class MessageServiceImpl implements MessageService {
     private final ProxyMetadataService metadataService;
     private final MessageStore store;
     private final LockService lockService;
-    private final DeadLetterService deadLetterService;
+    private final DeadLetterSender deadLetterService;
     private final SuspendRequestService suspendRequestService;
 
     public MessageServiceImpl(ProxyConfig config, MessageStore store, ProxyMetadataService metadataService,
-        LockService lockService, DeadLetterService deadLetterService) {
+        LockService lockService, DeadLetterSender deadLetterService) {
         this.config = config;
         this.store = store;
         this.metadataService = metadataService;
@@ -142,8 +145,25 @@ public class MessageServiceImpl implements MessageService {
                     topic.getTopicId(), virtualQueue.topicId());
                 return CompletableFuture.failedFuture(new MQBrokerException(ResponseCode.TOPIC_NOT_EXIST, "Topic not exist"));
             }
+            FlatMessage flatMessage = FlatMessageUtil.convertTo(topic.getTopicId(), virtualQueue.physicalQueueId(), config.hostName(), message);
 
-            return store.put(FlatMessageUtil.convertTo(topic.getTopicId(), virtualQueue.physicalQueueId(), config.hostName(), message));
+            if (requestHeader.getTopic().startsWith(MixAll.RETRY_GROUP_TOPIC_PREFIX)) {
+                flatMessage.systemProperties().mutateDeliveryAttempts(requestHeader.getReconsumeTimes() + 1);
+                if (requestHeader.getReconsumeTimes() > requestHeader.getMaxReconsumeTimes()) {
+                    String groupName = requestHeader.getTopic().replace(MixAll.RETRY_GROUP_TOPIC_PREFIX, "");
+                    FlatMessageExt flatMessageExt = FlatMessageExt.Builder.builder()
+                        .message(flatMessage)
+                        .offset(0)
+                        .build();
+                    return consumerGroupOf(groupName)
+                        .thenCompose(group -> deadLetterService.send(group.getGroupId(), flatMessageExt))
+                        .thenApply(ignore -> new PutResult(PutResult.Status.PUT_OK, 0));
+                } else {
+                    return store.put(flatMessage);
+                }
+            }
+
+            return store.put(flatMessage);
         });
 
         return putFuture.thenApply(putResult -> {
@@ -165,7 +185,8 @@ public class MessageServiceImpl implements MessageService {
     public CompletableFuture<RemotingCommand> sendMessageBack(ProxyContext ctx, ReceiptHandle handle, String messageId,
         ConsumerSendMsgBackRequestHeader requestHeader, long timeoutMillis) {
         // Build the response.
-        final RemotingCommand response = RemotingCommand.createResponseCommand(null);
+        final RemotingCommand response = RemotingCommand.createResponseCommand(ResponseCode.SUCCESS, null, null);
+
         Integer delayLevel = requestHeader.getDelayLevel();
         if (Objects.isNull(delayLevel)) {
             response.setCode(ResponseCode.ILLEGAL_OPERATION);
@@ -195,45 +216,61 @@ public class MessageServiceImpl implements MessageService {
             Topic topic = pair.getLeft();
             ConsumerGroup group = pair.getRight();
 
-            CompletableFuture<FlatMessageExt> pullFuture =
-                store.pull(group.getGroupId(), topic.getTopicId(), virtualQueue.physicalQueueId(),
-                        Filter.DEFAULT_FILTER, requestHeader.getOffset(), 1, false)
-                    .thenApply(pullResult -> {
-                        if (pullResult.status() == com.automq.rocketmq.store.model.message.PullResult.Status.FOUND) {
-                            return pullResult.messageList().get(0);
-                        }
-                        throw new IllegalArgumentException("Message not found");
-                    });
+            return store.pull(group.getGroupId(), topic.getTopicId(), virtualQueue.physicalQueueId(),
+                    Filter.DEFAULT_FILTER, requestHeader.getOffset(), 1, false)
+                .thenApply(pullResult -> {
+                    if (pullResult.status() == com.automq.rocketmq.store.model.message.PullResult.Status.FOUND) {
+                        return pullResult.messageList().get(0);
+                    }
+                    throw new IllegalArgumentException("Message not found");
+                }).thenCompose(messageExt -> {
+                    if (messageExt.deliveryAttempts() > group.getMaxDeliveryAttempt()) {
+                        return deadLetterService.send(group.getGroupId(), messageExt);
+                    }
 
-            // Message consume retry strategy
-            // <0: no retry,put into DLQ directly
-            // =0: broker control retry frequency
-            // >0: client control retry frequency
-            return switch (Integer.compare(delayLevel, 0)) {
-                case -1 -> pullFuture.thenCompose(message -> deadLetterService.send(group.getGroupId(), message));
-                case 0 -> pullFuture.thenCompose(message -> {
-                    // TODO: send delay message.
-                    // Keep the same logic as apache RocketMQ.
-                    int serverDelayLevel = 2 + message.deliveryAttempts();
-                    message.message().systemProperties().mutateDeliveryTimestamp(FlatMessageUtil.calculateDeliveryTimestamp(serverDelayLevel));
-                    return store.put(message.message())
-                        .exceptionally(ex -> {
-                            LOGGER.error("Put message to retry topic failed", ex);
-                            return null;
-                        })
-                        .thenApply(ignore -> null);
+                    // Message consume retry strategy
+                    // <0: no retry,put into DLQ directly
+                    // =0: broker control retry frequency
+                    // >0: client control retry frequency
+                    return switch (Integer.compare(delayLevel, 0)) {
+                        case -1 -> deadLetterService.send(group.getGroupId(), messageExt);
+                        case 0 -> topicOf(MixAll.RETRY_GROUP_TOPIC_PREFIX + requestHeader.getGroup())
+                            .thenCompose(retryTopic -> {
+                                // Keep the same logic as apache RocketMQ.
+                                int serverDelayLevel = messageExt.deliveryAttempts() + 1;
+                                messageExt.setDeliveryAttempts(serverDelayLevel);
+                                messageExt.setOriginalQueueOffset(messageExt.originalOffset());
+
+                                FlatMessage message = messageExt.message();
+                                message.mutateTopicId(retryTopic.getTopicId());
+
+                                message.systemProperties().mutateDeliveryTimestamp(FlatMessageUtil.calculateDeliveryTimestamp(serverDelayLevel));
+                                return store.put(message)
+                                    .exceptionally(ex -> {
+                                        LOGGER.error("Put messageExt to retry topic failed", ex);
+                                        return null;
+                                    })
+                                    .thenApply(ignore -> null);
+                            });
+                        case 1 -> topicOf(MixAll.RETRY_GROUP_TOPIC_PREFIX + requestHeader.getGroup())
+                            .thenCompose(retryTopic -> {
+                                messageExt.setDeliveryAttempts(messageExt.deliveryAttempts() + 1);
+                                messageExt.setOriginalQueueOffset(messageExt.originalOffset());
+
+                                FlatMessage message = messageExt.message();
+                                message.mutateTopicId(retryTopic.getTopicId());
+
+                                message.systemProperties().mutateDeliveryTimestamp(FlatMessageUtil.calculateDeliveryTimestamp(delayLevel));
+                                return store.put(message)
+                                    .exceptionally(ex -> {
+                                        LOGGER.error("Put message to retry topic failed", ex);
+                                        return null;
+                                    })
+                                    .thenApply(ignore -> null);
+                            });
+                        default -> throw new IllegalStateException("Never reach here");
+                    };
                 });
-                case 1 -> pullFuture.thenCompose(message -> {
-                    message.message().systemProperties().mutateDeliveryTimestamp(FlatMessageUtil.calculateDeliveryTimestamp(delayLevel));
-                    return store.put(message.message())
-                        .exceptionally(ex -> {
-                            LOGGER.error("Put message to retry topic failed", ex);
-                            return null;
-                        })
-                        .thenApply(ignore -> null);
-                });
-                default -> throw new IllegalStateException("Never reach here");
-            };
         }).whenComplete((nil, throwable) -> {
             if (throwable != null) {
                 response.setCode(ResponseCode.SYSTEM_ERROR);
@@ -369,11 +406,11 @@ public class MessageServiceImpl implements MessageService {
                             if (suspendResult.isEmpty() || suspendResult.get().messageList().isEmpty()) {
                                 return new PopResult(PopStatus.POLLING_NOT_FOUND, Collections.emptyList());
                             }
-                            return new PopResult(PopStatus.FOUND, FlatMessageUtil.convertTo(suspendResult.get().messageList(), requestHeader.getTopic(), requestHeader.getInvisibleTime()));
+                            return new PopResult(PopStatus.FOUND, FlatMessageUtil.convertTo(suspendResult.get().messageList(), requestHeader.getTopic(), requestHeader.getInvisibleTime(), config.hostName(), config.grpcListenPort()));
                         });
                 }
             }
-            return CompletableFuture.completedFuture(new PopResult(PopStatus.FOUND, FlatMessageUtil.convertTo(result.messageList, requestHeader.getTopic(), requestHeader.getInvisibleTime())));
+            return CompletableFuture.completedFuture(new PopResult(PopStatus.FOUND, FlatMessageUtil.convertTo(result.messageList, requestHeader.getTopic(), requestHeader.getInvisibleTime(), config.hostName(), config.grpcListenPort())));
         });
     }
 
@@ -545,13 +582,13 @@ public class MessageServiceImpl implements MessageService {
                                 }
                                 com.automq.rocketmq.store.model.message.PullResult suspendResult = resultWrapper.get().inner();
                                 return new PullResult(PullStatus.FOUND, suspendResult.nextBeginOffset(), suspendResult.minOffset(), suspendResult.maxOffset(),
-                                    FlatMessageUtil.convertTo(suspendResult.messageList(), requestHeader.getTopic(), 0));
+                                    FlatMessageUtil.convertTo(suspendResult.messageList(), requestHeader.getTopic(), 0, config.hostName(), config.remotingListenPort()));
                             });
                     }
                 }
                 return CompletableFuture.completedFuture(
                     new PullResult(PullStatus.FOUND, result.nextBeginOffset(), result.minOffset(), result.maxOffset(),
-                        FlatMessageUtil.convertTo(result.messageList(), requestHeader.getTopic(), 0))
+                        FlatMessageUtil.convertTo(result.messageList(), requestHeader.getTopic(), 0, config.hostName(), config.remotingListenPort()))
                 );
             });
     }

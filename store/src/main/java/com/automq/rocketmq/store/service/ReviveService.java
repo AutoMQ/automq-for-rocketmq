@@ -83,9 +83,11 @@ public class ReviveService {
     }
 
     class ReviveTask implements Runnable {
+        private final long deliveryTimestamp;
         private final ByteBuffer payload;
 
-        ReviveTask(ByteBuffer payload) {
+        ReviveTask(long deliveryTimestamp, ByteBuffer payload) {
+            this.deliveryTimestamp = deliveryTimestamp;
             this.payload = payload;
         }
 
@@ -103,6 +105,7 @@ public class ReviveService {
                 LOGGER.trace("{}: Inflight revive operation: {}", identity, operationId);
                 return;
             }
+            reviveTimestamp = deliveryTimestamp;
 
             CompletableFuture<Triple<LogicQueue, PullResult, PopOperation.PopOperationType>> fetchMessageFuture =
                 future.thenCompose(nil -> logicQueueManager.getOrCreate(topicId, queueId))
@@ -219,8 +222,7 @@ public class ReviveService {
     }
 
     protected void tryRevive(TimerTag timerTag) {
-        backgroundExecutor.execute(new ReviveTask(timerTag.payloadAsByteBuffer()));
-        reviveTimestamp = timerTag.deliveryTimestamp();
+        backgroundExecutor.execute(new ReviveTask(timerTag.deliveryTimestamp(), timerTag.payloadAsByteBuffer()));
     }
 
     public long reviveTimestamp() {
