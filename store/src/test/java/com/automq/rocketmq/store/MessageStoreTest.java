@@ -46,11 +46,11 @@ import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import org.apache.rocketmq.common.UtilAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -123,12 +123,15 @@ public class MessageStoreTest {
         PopResult popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, invisibleDuration).join();
         assertEquals(3, popResult.messageList().size());
         for (FlatMessageExt message : popResult.messageList()) {
+            assertTrue(message.receiptHandle().isPresent());
             receiptHandles.add(message.receiptHandle().get());
         }
         // 3. pop 3 message
+        long nextVisibleTimestamp = System.currentTimeMillis() + invisibleDuration;
         popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, invisibleDuration).join();
         assertEquals(2, popResult.messageList().size());
         for (FlatMessageExt message : popResult.messageList()) {
+            assertTrue(message.receiptHandle().isPresent());
             receiptHandles.add(message.receiptHandle().get());
         }
 
@@ -143,13 +146,10 @@ public class MessageStoreTest {
         assertEquals(PopResult.Status.END_OF_QUEUE, popResult.status());
 
         // 6. after 1100ms, pop again
-        AtomicReference<PopResult> popRetryResult = new AtomicReference<>();
         await().atMost(Duration.ofSeconds(3))
-            .until(() -> {
-                popRetryResult.set(messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, true, invisibleDuration).join());
-                return popRetryResult.get().status() == PopResult.Status.FOUND;
-            });
-        popResult = popRetryResult.get();
+            .until(() -> reviveService.reviveTimestamp() >= nextVisibleTimestamp && reviveService.inflightReviveCount() == 0);
+        long nextVisibleTimestamp1 = System.currentTimeMillis() + invisibleDuration;
+        popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, true, invisibleDuration).join();
         assertEquals(3, popResult.messageList().size());
         assertEquals(0, popResult.messageList().get(0).offset());
         assertEquals(0, popResult.messageList().get(0).originalOffset());
@@ -166,11 +166,9 @@ public class MessageStoreTest {
 
         // 7. after 1100ms, pop again
         await().atMost(Duration.ofSeconds(3))
-            .until(() -> {
-                popRetryResult.set(messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, true, invisibleDuration).join());
-                return popRetryResult.get().status() == PopResult.Status.FOUND;
-            });
-        popResult = popRetryResult.get();
+            .until(() -> reviveService.reviveTimestamp() >= nextVisibleTimestamp1 && reviveService.inflightReviveCount() == 0);
+
+        popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, true, invisibleDuration).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(3, popResult.messageList().size());
         assertEquals(3, popResult.messageList().get(0).offset());
@@ -200,6 +198,7 @@ public class MessageStoreTest {
         PopResult popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, true, false, invisibleDuration).join();
         assertEquals(3, popResult.messageList().size());
         for (FlatMessageExt message : popResult.messageList()) {
+            assertTrue(message.receiptHandle().isPresent());
             receiptHandles.add(message.receiptHandle().get());
         }
         // 3. pop 3 message
@@ -231,7 +230,9 @@ public class MessageStoreTest {
         assertEquals(3, popResult.messageList().get(0).offset());
         assertEquals(4, popResult.messageList().get(1).offset());
         for (int i = 0; i < 2; i++) {
-            receiptHandles.add(popResult.messageList().get(i).receiptHandle().get());
+            Optional<String> receiptHandle = popResult.messageList().get(i).receiptHandle();
+            assertTrue(receiptHandle.isPresent());
+            receiptHandles.add(receiptHandle.get());
         }
 
         // 10. pop again
@@ -266,6 +267,7 @@ public class MessageStoreTest {
         PopResult popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, invisibleDuration).join();
         assertEquals(3, popResult.messageList().size());
         for (FlatMessageExt message : popResult.messageList()) {
+            assertTrue(message.receiptHandle().isPresent());
             receiptHandles.add(message.receiptHandle().get());
         }
 
@@ -278,6 +280,7 @@ public class MessageStoreTest {
         popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, invisibleDuration).join();
         assertEquals(2, popResult.messageList().size());
         for (FlatMessageExt message : popResult.messageList()) {
+            assertTrue(message.receiptHandle().isPresent());
             receiptHandles.add(message.receiptHandle().get());
         }
 
@@ -322,8 +325,13 @@ public class MessageStoreTest {
         assertEquals(0, logicQueue.getRetryAckOffset(CONSUMER_GROUP_ID));
 
         // 7. ack msg_0, msg_3, msg_4
+        assertTrue(popResult.messageList().get(0).receiptHandle().isPresent());
         messageStore.ack(popResult.messageList().get(0).receiptHandle().get()).join();
+
+        assertTrue(popResult.messageList().get(1).receiptHandle().isPresent());
         messageStore.ack(popResult.messageList().get(1).receiptHandle().get()).join();
+
+        assertTrue(popResult.messageList().get(2).receiptHandle().isPresent());
         messageStore.ack(popResult.messageList().get(2).receiptHandle().get()).join();
 
         assertEquals(3, logicQueue.getRetryAckOffset(CONSUMER_GROUP_ID));
@@ -343,6 +351,7 @@ public class MessageStoreTest {
         PopResult popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, 800).join();
         assertEquals(3, popResult.messageList().size());
         for (FlatMessageExt message : popResult.messageList()) {
+            assertTrue(message.receiptHandle().isPresent());
             receiptHandles.add(message.receiptHandle().get());
         }
 
@@ -354,6 +363,7 @@ public class MessageStoreTest {
         popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, 800).join();
         assertEquals(2, popResult.messageList().size());
         for (FlatMessageExt message : popResult.messageList()) {
+            assertTrue(message.receiptHandle().isPresent());
             receiptHandles.add(message.receiptHandle().get());
         }
 
@@ -413,8 +423,13 @@ public class MessageStoreTest {
         assertEquals(0, logicQueue.getRetryAckOffset(CONSUMER_GROUP_ID));
 
         // 7. ack msg_0, msg_3, msg_4
+        assertTrue(popResult.messageList().get(0).receiptHandle().isPresent());
         messageStore.ack(popResult.messageList().get(0).receiptHandle().get()).join();
+
+        assertTrue(popResult.messageList().get(1).receiptHandle().isPresent());
         messageStore.ack(popResult.messageList().get(1).receiptHandle().get()).join();
+
+        assertTrue(popResult.messageList().get(2).receiptHandle().isPresent());
         messageStore.ack(popResult.messageList().get(2).receiptHandle().get()).join();
 
         assertEquals(3, logicQueue.getRetryAckOffset(CONSUMER_GROUP_ID));
@@ -427,14 +442,13 @@ public class MessageStoreTest {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
             messageStore.put(message).join();
         }
-        List<String> receiptHandles = new ArrayList<>();
         // 2. pop 3 message
         // regard as forever invisible
         int invisibleDuration = 999999999;
         PopResult popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, true, false, invisibleDuration).join();
         assertEquals(3, popResult.messageList().size());
         for (FlatMessageExt message : popResult.messageList()) {
-            receiptHandles.add(message.receiptHandle().get());
+            assertTrue(message.receiptHandle().isPresent());
         }
 
         // verify rocksdb is not empty
@@ -460,14 +474,13 @@ public class MessageStoreTest {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
             messageStore.put(message).join();
         }
-        List<String> receiptHandles = new ArrayList<>();
         // 2. pop 3 message
         // regard as forever invisible
         int invisibleDuration = 999999999;
         PopResult popResult = messageStore.pop(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, true, false, invisibleDuration).join();
         assertEquals(3, popResult.messageList().size());
         for (FlatMessageExt message : popResult.messageList()) {
-            receiptHandles.add(message.receiptHandle().get());
+            assertTrue(message.receiptHandle().isPresent());
         }
 
         // verify rocksdb is not empty
@@ -493,25 +506,16 @@ public class MessageStoreTest {
     private boolean verifyStatesExist() {
         AtomicBoolean exist = new AtomicBoolean(false);
         try {
-            kvService.iterate(KV_NAMESPACE_TIMER_TAG, (key, value) -> {
-                exist.set(true);
-            });
+            kvService.iterate(KV_NAMESPACE_TIMER_TAG, (key, value) -> exist.set(true));
             if (exist.get()) {
                 return true;
             }
-            kvService.iterate(KV_NAMESPACE_CHECK_POINT, (key, value) -> {
-                exist.set(true);
-            });
+            kvService.iterate(KV_NAMESPACE_CHECK_POINT, (key, value) -> exist.set(true));
             if (exist.get()) {
                 return true;
             }
-            kvService.iterate(KV_NAMESPACE_FIFO_INDEX, (key, value) -> {
-                exist.set(true);
-            });
-            if (exist.get()) {
-                return true;
-            }
-            return false;
+            kvService.iterate(KV_NAMESPACE_FIFO_INDEX, (key, value) -> exist.set(true));
+            return exist.get();
         } catch (Exception e) {
             Assertions.fail(e);
             return false;
