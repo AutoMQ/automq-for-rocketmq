@@ -173,7 +173,7 @@ public class ConsumeMessage implements Callable<Void> {
         GrpcControllerClient client = new GrpcControllerClient(new CliClientConfig());
         CreateGroupRequest request = CreateGroupRequest.newBuilder()
             .setName(groupName)
-            .setMaxRetryAttempt(16)
+            .setMaxDeliveryAttempt(16)
             .setGroupType(groupType)
             .build();
 

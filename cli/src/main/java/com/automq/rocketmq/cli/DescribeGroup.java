@@ -49,7 +49,7 @@ public class DescribeGroup implements Callable<Void> {
 
             AsciiTable groupTable = new AsciiTable();
             groupTable.addRule();
-            AT_Row row = groupTable.addRow("NAME", "ID", "TYPE", "MAX DELIVERY ATTEMPT", "DEAD LETTER TOPIC ID");
+            AT_Row row = groupTable.addRow("NAME", "ID", "TYPE", "SUBSCRIPTION MODE", "MAX DELIVERY ATTEMPT", "DEAD LETTER TOPIC ID");
             centralize(row);
             groupTable.addRule();
             String groupType;
@@ -58,12 +58,21 @@ public class DescribeGroup implements Callable<Void> {
                 case GROUP_TYPE_FIFO -> groupType = "FIFO";
                 default -> groupType = "Unknown";
             }
-            row = groupTable.addRow(group.getName(), group.getGroupId(), groupType, group.getMaxDeliveryAttempt(), group.getDeadLetterTopicId());
+
+            String subMode;
+            switch (group.getSubMode()) {
+                case SUB_MODE_POP -> subMode = "POP";
+                case SUB_MODE_PULL -> subMode = "PULL";
+                default -> subMode = "UNSPECIFIED";
+            }
+
+            row = groupTable.addRow(group.getName(), group.getGroupId(), groupType, subMode,
+                group.getMaxDeliveryAttempt(), group.getDeadLetterTopicId());
             centralize(row);
             groupTable.addRule();
 
             CWC_LongestLine cwc = new CWC_LongestLine();
-            IntStream.range(0, 5).forEach((i) -> {
+            IntStream.range(0, row.getCells().size()).forEach((i) -> {
                 cwc.add(10, 0);
             });
             groupTable.getRenderer().setCWC(cwc);

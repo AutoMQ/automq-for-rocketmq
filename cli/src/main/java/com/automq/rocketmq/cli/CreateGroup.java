@@ -20,6 +20,7 @@ package com.automq.rocketmq.cli;
 import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.GroupType;
+import apache.rocketmq.controller.v1.SubscriptionMode;
 import com.automq.rocketmq.controller.metadata.ControllerClient;
 import com.automq.rocketmq.controller.metadata.GrpcControllerClient;
 import java.util.concurrent.Callable;
@@ -33,19 +34,23 @@ public class CreateGroup implements Callable<Void> {
     @CommandLine.Option(names = {"-g", "--groupName"}, description = "Group name", required = true)
     String groupName;
 
-    @CommandLine.Option(names = {"-r", "--maxRetryAttempt"}, description = "Max retry attempt")
-    int maxRetryAttempt = 16;
+    @CommandLine.Option(names = {"-d", "--maxDeliveryAttempt"}, description = "Max delivery attempt")
+    int maxDeliveryAttempt = 16;
 
     @CommandLine.Option(names = {"-t", "--groupType"}, description = "Group type")
     GroupType groupType = GroupType.GROUP_TYPE_STANDARD;
+
+    @CommandLine.Option(names = {"-m", "--subMode"}, description = "Subscription mode")
+    SubscriptionMode subMode = SubscriptionMode.SUB_MODE_POP;
 
     @Override
     public Void call() throws Exception {
         try (ControllerClient client = new GrpcControllerClient(new CliClientConfig())) {
             CreateGroupRequest request = CreateGroupRequest.newBuilder()
                 .setName(groupName)
-                .setMaxRetryAttempt(maxRetryAttempt)
+                .setMaxDeliveryAttempt(maxDeliveryAttempt)
                 .setGroupType(groupType)
+                .setSubMode(subMode)
                 .build();
 
             CreateGroupReply groupReply = client.createGroup(mqAdmin.endpoint, request).join();

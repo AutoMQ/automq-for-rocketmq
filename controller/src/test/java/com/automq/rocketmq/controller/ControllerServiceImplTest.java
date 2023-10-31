@@ -416,7 +416,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                     .setGroupType(GroupType.GROUP_TYPE_STANDARD)
                     .setName("G-abc")
                     .setDeadLetterTopicId(topicId)
-                    .setMaxRetryAttempt(5)
+                    .setMaxDeliveryAttempt(5)
                     .build();
 
                 String target = String.format("localhost:%d", port);

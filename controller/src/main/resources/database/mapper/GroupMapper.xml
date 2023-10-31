@@ -21,14 +21,14 @@
 
 <mapper namespace="com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper">
     <insert id="create" parameterType="Group" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
-        INSERT INTO consumer_group (name, status, dead_letter_topic_id, max_delivery_attempt, group_type)
-        VALUES (#{name}, #{status}, #{deadLetterTopicId}, #{maxDeliveryAttempt}, #{groupType})
+        INSERT INTO consumer_group (name, status, dead_letter_topic_id, max_delivery_attempt, group_type, sub_mode)
+        VALUES (#{name}, #{status}, #{deadLetterTopicId}, #{maxDeliveryAttempt}, #{groupType}, #{subMode})
     </insert>
 
     <update id="update" parameterType="Group">
         UPDATE consumer_group
         SET name = #{name}, status = #{status}, dead_letter_topic_id = #{deadLetterTopicId}, group_type = #{groupType},
-            max_delivery_attempt = #{maxDeliveryAttempt}
+            max_delivery_attempt = #{maxDeliveryAttempt}, sub_mode = #{subMode}
         WHERE id = #{id}
     </update>
 
@@ -46,13 +46,15 @@
     </delete>
 
     <select id="byCriteria" resultType="Group" parameterType="GroupCriteria">
-        SELECT id, name, status, dead_letter_topic_id, max_delivery_attempt, group_type, create_time, update_time
+        SELECT id, name, status, dead_letter_topic_id, max_delivery_attempt, group_type, sub_mode, create_time, update_time
         FROM consumer_group
         <where>
             <if test="null != id">id = #{id}</if>
             <if test="null != name">AND name = #{name}</if>
             <if test="null != status">AND status = #{status}</if>
             <if test="null != topicId">AND dead_letter_topic_id = #{topicId}</if>
+            <if test="null != groupType">AND group_type = #{groupType}</if>
+            <if test="null != subMode">AND sub_mode = #{subMode}</if>
             <if test="null != updateTime">AND update_time >= #{updateTime}</if>
         </where>
     </select>

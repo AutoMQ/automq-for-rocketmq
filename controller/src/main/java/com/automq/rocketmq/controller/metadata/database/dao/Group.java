@@ -19,6 +19,7 @@ package com.automq.rocketmq.controller.metadata.database.dao;
 
 import apache.rocketmq.controller.v1.GroupStatus;
 import apache.rocketmq.controller.v1.GroupType;
+import apache.rocketmq.controller.v1.SubscriptionMode;
 import java.util.Date;
 
 public class Group {
@@ -32,6 +33,8 @@ public class Group {
     private int maxDeliveryAttempt;
 
     private GroupType groupType = GroupType.GROUP_TYPE_STANDARD;
+
+    private SubscriptionMode subMode = SubscriptionMode.SUB_MODE_UNSPECIFIED;
 
     private Date createTime;
     private Date updateTime;
@@ -98,5 +101,13 @@ public class Group {
 
     public void setGroupType(GroupType groupType) {
         this.groupType = groupType;
+    }
+
+    public SubscriptionMode getSubMode() {
+        return subMode;
+    }
+
+    public void setSubMode(SubscriptionMode subMode) {
+        this.subMode = subMode;
     }
 }

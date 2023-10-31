@@ -63,7 +63,7 @@ public class GroupManager {
         this.nameRequests = new ConcurrentHashMap<>();
     }
 
-    public CompletableFuture<Long> createGroup(String groupName, int maxRetry, GroupType type, long deadLetterTopicId) {
+    public CompletableFuture<Long> createGroup(CreateGroupRequest request) {
         CompletableFuture<Long> future = new CompletableFuture<>();
         for (; ; ) {
             if (metadataStore.isLeader()) {
@@ -72,19 +72,22 @@ public class GroupManager {
                         continue;
                     }
                     GroupMapper groupMapper = session.getMapper(GroupMapper.class);
-                    List<Group> groups = groupMapper.byCriteria(GroupCriteria.newBuilder().setGroupName(groupName).build());
+                    List<Group> groups = groupMapper.byCriteria(GroupCriteria.newBuilder()
+                        .setGroupName(request.getName())
+                        .build());
                     if (!groups.isEmpty()) {
-                        ControllerException e = new ControllerException(Code.DUPLICATED_VALUE, String.format("Group name '%s' is not available", groupName));
+                        ControllerException e = new ControllerException(Code.DUPLICATED_VALUE,
+                            String.format("Group name '%s' is not available", request.getName()));
                         future.completeExceptionally(e);
                         return future;
                     }
 
-                    if (deadLetterTopicId > 0) {
+                    if (request.getDeadLetterTopicId() > 0) {
                         TopicMapper topicMapper = session.getMapper(TopicMapper.class);
-                        Topic t = topicMapper.get(deadLetterTopicId, null);
+                        Topic t = topicMapper.get(request.getDeadLetterTopicId(), null);
                         if (null == t || t.getStatus() == TopicStatus.TOPIC_STATUS_DELETED) {
                             String msg = String.format("Specified dead letter topic[topic-id=%d] does not exist",
-                                deadLetterTopicId);
+                                request.getDeadLetterTopicId());
                             ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE, msg);
                             future.completeExceptionally(e);
                             return future;
@@ -92,11 +95,12 @@ public class GroupManager {
                     }
 
                     Group group = new Group();
-                    group.setName(groupName);
-                    group.setMaxDeliveryAttempt(maxRetry);
-                    group.setDeadLetterTopicId(deadLetterTopicId);
+                    group.setName(request.getName());
+                    group.setMaxDeliveryAttempt(request.getMaxDeliveryAttempt());
+                    group.setDeadLetterTopicId(request.getDeadLetterTopicId());
                     group.setStatus(GroupStatus.GROUP_STATUS_ACTIVE);
-                    group.setGroupType(type);
+                    group.setGroupType(request.getGroupType());
+                    group.setSubMode(request.getSubMode());
                     groupMapper.create(group);
                     session.commit();
                     // Cache group metadata
@@ -104,13 +108,6 @@ public class GroupManager {
                     future.complete(group.getId());
                 }
             } else {
-                CreateGroupRequest request = CreateGroupRequest.newBuilder()
-                    .setName(groupName)
-                    .setMaxRetryAttempt(maxRetry)
-                    .setGroupType(type)
-                    .setDeadLetterTopicId(deadLetterTopicId)
-                    .build();
-
                 try {
                     metadataStore.controllerClient().createGroup(metadataStore.leaderAddress(), request).whenComplete((reply, e) -> {
                         if (null != e) {
@@ -252,6 +249,7 @@ public class GroupManager {
             .setGroupId(group.getId())
             .setName(group.getName())
             .setGroupType(group.getGroupType())
+            .setSubMode(group.getSubMode())
             .setMaxDeliveryAttempt(group.getMaxDeliveryAttempt())
             .setDeadLetterTopicId(group.getDeadLetterTopicId())
             .build();

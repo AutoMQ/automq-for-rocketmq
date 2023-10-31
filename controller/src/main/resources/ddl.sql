@@ -88,9 +88,10 @@ CREATE TABLE IF NOT EXISTS consumer_group
     id                   BIGINT       NOT NULL PRIMARY KEY AUTO_INCREMENT,
     name                 VARCHAR(255) NOT NULL,
     status               TINYINT      NOT NULL DEFAULT 0,
-    dead_letter_topic_id BIGINT,
+    dead_letter_topic_id BIGINT       NOT NULL DEFAULT 0,
     max_delivery_attempt INT          NOT NULL DEFAULT 16,
-    group_type           TINYINT      NOT NULL,
+    group_type           TINYINT      NOT NULL DEFAULT 0,
+    sub_mode             TINYINT      NOT NULL DEFAULT 0,
     create_time          DATETIME              DEFAULT CURRENT_TIMESTAMP,
     update_time          DATETIME              DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE INDEX idx_name (name)
@@ -131,14 +132,14 @@ CREATE TABLE IF NOT EXISTS `range`
 
 CREATE TABLE IF NOT EXISTS s3object
 (
-    id                            BIGINT  NOT NULL PRIMARY KEY,
+    id                            BIGINT       NOT NULL PRIMARY KEY,
     object_size                   BIGINT,
     stream_id                     BIGINT,
-    prepared_timestamp            TIMESTAMP(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    prepared_timestamp            TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     committed_timestamp           TIMESTAMP(3),
-    expired_timestamp             TIMESTAMP(3)  NOT NULL,
+    expired_timestamp             TIMESTAMP(3) NOT NULL,
     marked_for_deletion_timestamp TIMESTAMP(3),
-    state                         TINYINT NOT NULL DEFAULT 1
+    state                         TINYINT      NOT NULL DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS s3streamobject
@@ -170,9 +171,11 @@ CREATE TABLE IF NOT EXISTS s3walobject
     INDEX idx_s3_wal_object_object_id (object_id)
 );
 
-CREATE TABLE IF NOT EXISTS sequence (
+CREATE TABLE IF NOT EXISTS sequence
+(
     name VARCHAR(255) NOT NULL,
-    next BIGINT NOT NULL DEFAULT 1,
-    UNIQUE INDEX idx_name(name)
+    next BIGINT       NOT NULL DEFAULT 1,
+    UNIQUE INDEX idx_name (name)
 );
-INSERT INTO sequence(name) VALUES ('S3_OBJECT_ID_SEQ');
+INSERT INTO sequence(name)
+VALUES ('S3_OBJECT_ID_SEQ');
