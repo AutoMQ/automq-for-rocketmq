@@ -148,18 +148,25 @@ jobs:
         version: ${{ fromJSON(needs.list-version.outputs.version-json) }}
     steps:
       - uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: Install flatc
+        run: sudo bash install_flatc.sh
+      - uses: actions/setup-java@v3
+        with:
+          distribution: "temurin"
+          java-version: "17"
+          cache: "maven"
+      - name: Build distribution tar
+        run: |
+          mvn -Prelease-all clean install -U
+      - uses: actions/checkout@v3
         if: always()
         with:
           repository: AutoMQ/rocketmq-e2e
           ref: master
           path: rocketmq-e2e
           token: ${{ secrets.PAT_E2E }}
-      - name: Set up JDK 8
-        uses: actions/setup-java@v3
-        with:
-          distribution: 'temurin'
-          java-version: '8'
-          overwrite-settings: false
       - name: e2e test
         env:
           NAMESPACE: ${{ needs.deploy.outputs.namespace }}
@@ -195,6 +202,19 @@ jobs:
       matrix:
         version: ${{ fromJSON(needs.list-version.outputs.version-json) }}
     steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: Install flatc
+        run: sudo bash install_flatc.sh
+      - uses: actions/setup-java@v3
+        with:
+          distribution: "temurin"
+          java-version: "17"
+          cache: "maven"
+      - name: Build distribution tar
+        run: |
+          mvn -Prelease-all clean install -U
       - uses: actions/checkout@v3
         if: always()
         with:
@@ -244,18 +264,25 @@ jobs:
         version: ${{ fromJSON(needs.list-version.outputs.version-json) }}
     steps:
       - uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: Install flatc
+        run: sudo bash install_flatc.sh
+      - uses: actions/setup-java@v3
+        with:
+          distribution: "temurin"
+          java-version: "17"
+          cache: "maven"
+      - name: Build distribution tar
+        run: |
+          mvn -Prelease-all clean install -U
+      - uses: actions/checkout@v3
         if: always()
         with:
           repository: AutoMQ/rocketmq-e2e
           ref: master
           path: rocketmq-e2e
           token: ${{ secrets.PAT_E2E }}
-      - name: Set up JDK 8
-        uses: actions/setup-java@v3
-        with:
-          distribution: 'temurin'
-          java-version: '8'
-          overwrite-settings: false
       - name: e2e test
         env:
           NAMESPACE: ${{ needs.deploy.outputs.namespace }}
