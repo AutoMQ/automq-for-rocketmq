@@ -112,10 +112,10 @@ public class ConsoleHelper {
         AT_Row row = assignmentTable.addRow(null, "ASSIGNMENT");
         row.getCells().get(1).getContext().setTextAlignment(TextAlignment.CENTER);
         assignmentTable.addRule();
-        assignmentTable.addRow("NODE ID", "QUEUE ID");
+        assignmentTable.addRow("QUEUE ID", "NODE ID");
         assignmentTable.addRule();
         for (MessageQueueAssignment assignment : topic.getAssignmentsList()) {
-            assignmentTable.addRow(assignment.getNodeId(), assignment.getQueue().getQueueId());
+            assignmentTable.addRow(assignment.getQueue().getQueueId(), assignment.getNodeId());
             assignmentTable.addRule();
         }
         render = assignmentTable.render();
