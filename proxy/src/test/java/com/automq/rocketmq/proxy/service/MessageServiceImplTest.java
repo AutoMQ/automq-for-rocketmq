@@ -25,6 +25,7 @@ import com.automq.rocketmq.proxy.model.ProxyContextExt;
 import com.automq.rocketmq.proxy.model.VirtualQueue;
 import com.automq.rocketmq.proxy.util.FlatMessageUtil;
 import com.automq.rocketmq.proxy.util.ReceiptHandleUtil;
+import com.automq.rocketmq.store.api.DeadLetterSender;
 import com.automq.rocketmq.store.api.MessageStore;
 import com.automq.rocketmq.store.model.message.TagFilter;
 import java.lang.reflect.Field;
@@ -54,6 +55,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -79,7 +81,7 @@ class MessageServiceImplTest {
         metadataService = new MockProxyMetadataService();
         messageStore = new MockMessageStore();
         ProxyConfig config = new ProxyConfig();
-        messageService = new MessageServiceImpl(config, messageStore, metadataService, new LockService(config));
+        messageService = new MessageServiceImpl(config, messageStore, metadataService, new LockService(config), Mockito.mock(DeadLetterSender.class));
     }
 
     @Test
