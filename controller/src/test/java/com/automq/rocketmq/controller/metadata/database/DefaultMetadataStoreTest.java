@@ -534,7 +534,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
             buildS3WalObjs(1, 1).stream().peek(s3WalObject -> {
                 Map<Long, SubStream> subStreams = buildWalSubStreams(4, 0, 10);
-                s3WalObject.setSubStreams(gson.toJson(subStreams));
+                s3WalObject.setSubStreams(toJson(subStreams));
             }).forEach(s3WALObjectMapper::create);
 
             session.commit();
@@ -555,7 +555,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Assertions.assertEquals(100, s3WALObject.getObjectSize());
             Assertions.assertEquals(1, s3WALObject.getBrokerId());
             Assertions.assertEquals(1, s3WALObject.getSequenceId());
-            Assertions.assertEquals(expectedSubStream, s3WALObject.getSubStreamsMap());
+            Assertions.assertEquals(expectedSubStream, s3WALObject.getSubStreams().getSubStreamsMap());
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -572,7 +572,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
             buildS3WalObjs(1, 1).stream().peek(s3WalObject1 -> {
                 Map<Long, SubStream> subStreams = buildWalSubStreams(4, 0, 10);
-                s3WalObject1.setSubStreams(gson.toJson(subStreams));
+                s3WalObject1.setSubStreams(toJson(subStreams));
             }).forEach(s3WALObjectMapper::create);
 
             session.commit();
@@ -593,7 +593,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Assertions.assertEquals(100, s3WALObject.getObjectSize());
             Assertions.assertEquals(1, s3WALObject.getBrokerId());
             Assertions.assertEquals(1, s3WALObject.getSequenceId());
-            Assertions.assertEquals(subStreams, s3WALObject.getSubStreamsMap());
+            Assertions.assertEquals(subStreams, s3WALObject.getSubStreams().getSubStreamsMap());
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -615,7 +615,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
             buildS3WalObjs(1, 1).stream().peek(s3WalObject1 -> {
                 Map<Long, SubStream> subStreams = buildWalSubStreams(4, 10, 10);
-                s3WalObject1.setSubStreams(gson.toJson(subStreams));
+                s3WalObject1.setSubStreams(toJson(subStreams));
             }).forEach(s3WALObjectMapper::create);
 
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
@@ -659,7 +659,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
             buildS3WalObjs(1, 1).stream().peek(s3WalObject1 -> {
                 Map<Long, SubStream> subStreams = buildWalSubStreams(4, 10, 10);
-                s3WalObject1.setSubStreams(gson.toJson(subStreams));
+                s3WalObject1.setSubStreams(toJson(subStreams));
             }).forEach(s3WALObjectMapper::create);
 
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
@@ -684,7 +684,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Assertions.assertEquals(100, s3WALObject.getObjectSize());
             Assertions.assertEquals(1, s3WALObject.getBrokerId());
             Assertions.assertEquals(1, s3WALObject.getSequenceId());
-            Assertions.assertEquals(subStreams, s3WALObject.getSubStreamsMap());
+            Assertions.assertEquals(subStreams, s3WALObject.getSubStreams().getSubStreamsMap());
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -706,7 +706,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
             buildS3WalObjs(1, 1).stream().peek(s3WalObject1 -> {
                 Map<Long, SubStream> subStreams = buildWalSubStreams(4, 10, 10);
-                s3WalObject1.setSubStreams(gson.toJson(subStreams));
+                s3WalObject1.setSubStreams(toJson(subStreams));
             }).forEach(s3WALObjectMapper::create);
 
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
@@ -738,7 +738,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Assertions.assertEquals(100, s3WALObject.getObjectSize());
             Assertions.assertEquals(1, s3WALObject.getBrokerId());
             Assertions.assertEquals(1, s3WALObject.getSequenceId());
-            Assertions.assertEquals(subStreams, s3WALObject.getSubStreamsMap());
+            Assertions.assertEquals(subStreams, s3WALObject.getSubStreams().getSubStreamsMap());
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -763,12 +763,12 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
             buildS3WalObjs(1, 1).stream().peek(s3WalObject -> {
                 Map<Long, SubStream> subStreams = buildWalSubStreams(1, 0, 10);
-                s3WalObject.setSubStreams(gson.toJson(subStreams));
+                s3WalObject.setSubStreams(toJson(subStreams));
             }).forEach(s3WALObjectMapper::create);
 
             buildS3WalObjs(2, 1).stream().peek(s3WalObject -> {
                 Map<Long, SubStream> subStreams = buildWalSubStreams(1, 20, 20);
-                s3WalObject.setSubStreams(gson.toJson(subStreams));
+                s3WalObject.setSubStreams(toJson(subStreams));
             }).forEach(s3WALObjectMapper::create);
 
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
@@ -808,14 +808,14 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Assertions.assertEquals(100, s3WALObject.getObjectSize());
             Assertions.assertEquals(1, s3WALObject.getBrokerId());
             Assertions.assertEquals(1, s3WALObject.getSequenceId());
-            Assertions.assertEquals(subStreams1, s3WALObject.getSubStreamsMap());
+            Assertions.assertEquals(subStreams1, s3WALObject.getSubStreams().getSubStreamsMap());
 
             S3WALObject s3WALObject1 = s3WALObjects.get(1);
             Assertions.assertEquals(2, s3WALObject1.getObjectId());
             Assertions.assertEquals(100, s3WALObject1.getObjectSize());
             Assertions.assertEquals(1, s3WALObject1.getBrokerId());
             Assertions.assertEquals(2, s3WALObject1.getSequenceId());
-            Assertions.assertEquals(subStreams2, s3WALObject1.getSubStreamsMap());
+            Assertions.assertEquals(subStreams2, s3WALObject1.getSubStreams().getSubStreamsMap());
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -1349,7 +1349,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testTrimStream() throws IOException, ControllerException {
+    public void testTrimStream() throws IOException {
         long streamId, streamEpoch = 1, newStartOffset = 2000;
         int nodeId = 1, rangId = 0;
         try (SqlSession session = this.getSessionFactory().openSession()) {
@@ -1730,12 +1730,12 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
             buildS3WalObjs(objectId + 2, 1).stream().peek(s3WalObject -> {
                 Map<Long, SubStream> subStreams = buildWalSubStreams(1, 20L, 10L);
-                s3WalObject.setSubStreams(gson.toJson(subStreams));
+                s3WalObject.setSubStreams(toJson(subStreams));
             }).forEach(s3WALObjectMapper::create);
 
             buildS3WalObjs(objectId + 3, 1).stream().peek(s3WalObject -> {
                 Map<Long, SubStream> subStreams = buildWalSubStreams(1, 30L, 10L);
-                s3WalObject.setSubStreams(gson.toJson(subStreams));
+                s3WalObject.setSubStreams(toJson(subStreams));
             }).forEach(s3WALObjectMapper::create);
 
             session.commit();
@@ -2039,7 +2039,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Awaitility.await().with().atMost(10, TimeUnit.SECONDS).pollInterval(100, TimeUnit.MILLISECONDS)
                 .until(metadataStore::isLeader);
             String address = metadataStore.addressOfNode(1).get();
-            Assertions.assertEquals(null, address);
+            Assertions.assertNull(address);
         }
     }
 

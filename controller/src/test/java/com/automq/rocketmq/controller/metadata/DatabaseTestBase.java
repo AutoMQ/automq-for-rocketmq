@@ -18,6 +18,7 @@
 package com.automq.rocketmq.controller.metadata;
 
 import apache.rocketmq.controller.v1.SubStream;
+import apache.rocketmq.controller.v1.SubStreams;
 import com.automq.rocketmq.common.config.ControllerConfig;
 import com.automq.rocketmq.controller.metadata.database.dao.Lease;
 import com.automq.rocketmq.controller.metadata.database.dao.S3WalObject;
@@ -33,10 +34,8 @@ import com.automq.rocketmq.controller.metadata.database.mapper.S3WalObjectMapper
 import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
 
-import com.automq.rocketmq.controller.metadata.database.serde.SubStreamDeserializer;
-import com.automq.rocketmq.controller.metadata.database.serde.SubStreamSerializer;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.util.JsonFormat;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -52,6 +51,7 @@ import org.apache.ibatis.io.Resources;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.apache.ibatis.session.SqlSessionFactoryBuilder;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.mockito.Mockito;
@@ -63,8 +63,6 @@ public class DatabaseTestBase {
     protected ControllerConfig config;
 
     AtomicLong s3ObjectIdSequence;
-
-    protected Gson gson;
 
     public DatabaseTestBase() {
         this.s3ObjectIdSequence = new AtomicLong(1);
@@ -78,10 +76,6 @@ public class DatabaseTestBase {
         Mockito.when(config.recycleS3IntervalInSecs()).thenCallRealMethod();
         Mockito.when(config.goingAway()).thenReturn(false);
         Mockito.when(config.rpcTimeout()).thenCallRealMethod();
-        gson = new GsonBuilder()
-            .registerTypeAdapter(SubStream.class, new SubStreamSerializer())
-            .registerTypeAdapter(SubStream.class, new SubStreamDeserializer())
-            .create();
     }
 
     protected long nextS3ObjectId() {
@@ -122,7 +116,6 @@ public class DatabaseTestBase {
             session.getMapper(S3StreamObjectMapper.class).delete(null, null, null);
             session.getMapper(S3WalObjectMapper.class).delete(null, null, null);
 
-
             LeaseMapper mapper = session.getMapper(LeaseMapper.class);
             Lease lease = mapper.currentWithWriteLock();
             lease.setNodeId(1);
@@ -134,8 +127,18 @@ public class DatabaseTestBase {
         }
     }
 
+    protected String toJson(Map<Long, SubStream> map) {
+        SubStreams subStreams = SubStreams.newBuilder().putAllSubStreams(map).build();
+        try {
+            return JsonFormat.printer().print(subStreams);
+        } catch (InvalidProtocolBufferException e) {
+            Assertions.fail(e);
+            throw new RuntimeException(e);
+        }
+    }
 
-    protected List<com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject> buildS3StreamObjs(long objectId, int count, long startOffset, long interval) {
+    protected List<com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject> buildS3StreamObjs(long objectId,
+        int count, long startOffset, long interval) {
         List<com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject> s3StreamObjects = new ArrayList<>();
 
         for (long i = 0; i < count; i++) {

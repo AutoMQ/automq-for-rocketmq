@@ -21,17 +21,13 @@ import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
 import com.automq.rocketmq.controller.metadata.database.dao.Node;
 import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
-import com.google.gson.Gson;
 import java.util.List;
 import org.apache.ibatis.session.SqlSession;
 
 public class ScanNodeTask extends ScanTask {
 
-    private final Gson gson;
-
     public ScanNodeTask(MetadataStore metadataStore) {
         super(metadataStore);
-        gson = new Gson();
     }
 
     @Override
@@ -41,7 +37,7 @@ public class ScanNodeTask extends ScanTask {
             List<Node> nodes = mapper.list(this.lastScanTime);
             if (!nodes.isEmpty() && LOGGER.isDebugEnabled()) {
                 for (Node node : nodes) {
-                    LOGGER.debug("Found broker node: {}", gson.toJson(node));
+                    LOGGER.debug("Found broker node: {}", node);
                 }
             }
             updateBrokers(nodes);

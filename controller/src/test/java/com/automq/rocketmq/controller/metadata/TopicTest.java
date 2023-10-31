@@ -22,11 +22,10 @@ import apache.rocketmq.controller.v1.MessageType;
 import apache.rocketmq.controller.v1.TopicStatus;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
+import com.google.protobuf.util.JsonFormat;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 
-import com.google.gson.Gson;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -41,12 +40,17 @@ public class TopicTest extends DatabaseTestBase {
             String name = "T1";
             int queueNum = 16;
             TopicStatus status = TopicStatus.TOPIC_STATUS_DELETED;
-            String acceptMessageTypes = "[\"NORMAL\",\"FIFO\",\"DELAY\"]";
+            AcceptTypes acceptTypes = AcceptTypes.newBuilder()
+                .addTypes(MessageType.NORMAL)
+                .addTypes(MessageType.FIFO)
+                .addTypes(MessageType.DELAY)
+                .build();
+            String acceptTypesJson = JsonFormat.printer().print(acceptTypes);
 
             topic.setName(name);
             topic.setQueueNum(queueNum);
             topic.setStatus(status);
-            topic.setAcceptMessageTypes(acceptMessageTypes);
+            topic.setAcceptMessageTypes(acceptTypesJson);
             int affectedRows = topicMapper.create(topic);
 
             Assertions.assertEquals(1, affectedRows);
@@ -58,8 +62,9 @@ public class TopicTest extends DatabaseTestBase {
             affectedRows = topicMapper.updateStatusById(topic.getId(), TopicStatus.TOPIC_STATUS_ACTIVE);
             Assertions.assertEquals(1, affectedRows);
 
-            got = topicMapper.get(topic.getId(),null);
+            got = topicMapper.get(topic.getId(), null);
             Assertions.assertEquals(TopicStatus.TOPIC_STATUS_ACTIVE, got.getStatus());
+            Assertions.assertEquals(acceptTypesJson, got.getAcceptMessageTypes());
 
             List<Topic> topics = topicMapper.list(null, null);
             Assertions.assertEquals(1, topics.size());
@@ -70,32 +75,18 @@ public class TopicTest extends DatabaseTestBase {
             topics = topicMapper.list(TopicStatus.TOPIC_STATUS_DELETED, null);
             Assertions.assertEquals(0, topics.size());
 
-            Topic topic1 = topicMapper.get(topic.getId(), null);
-            List<MessageType> messageTypeList = new ArrayList<>();
-            messageTypeList.add(MessageType.NORMAL);
-            messageTypeList.add(MessageType.FIFO);
-            messageTypeList.add(MessageType.DELAY);
-            Gson gson = new Gson();
-            String expect = gson.toJson(messageTypeList);
-            apache.rocketmq.controller.v1.Topic topic2 = apache.rocketmq.controller.v1.Topic.newBuilder()
-                    .setTopicId(topic1.getId())
-                    .setName(topic1.getName())
-                    .setCount(topic1.getQueueNum())
-                    .setAcceptTypes(AcceptTypes.newBuilder()
-                        .addTypes(MessageType.NORMAL)
-                        .addTypes(MessageType.FIFO)
-                        .addTypes(MessageType.DELAY)
-                        .build())
-                    .build();
-
-            String updateMessageType = "[\"NORMAL\",\"DELAY\"]";
+            acceptTypes = AcceptTypes.newBuilder()
+                .addTypes(MessageType.NORMAL)
+                .addTypes(MessageType.DELAY)
+                .build();
+            acceptTypesJson = JsonFormat.printer().print(acceptTypes);
             Topic topic3 = new Topic();
-            topic3.setId(topic1.getId());
-            topic3.setAcceptMessageTypes(updateMessageType);
+            topic3.setId(topic.getId());
+            topic3.setAcceptMessageTypes(acceptTypesJson);
             topicMapper.update(topic3);
 
             Topic topic4 = topicMapper.get(topic.getId(), null);
-            Assertions.assertEquals(updateMessageType, topic4.getAcceptMessageTypes());
+            Assertions.assertEquals(acceptTypesJson, topic4.getAcceptMessageTypes());
         }
     }
 }

@@ -244,8 +244,13 @@ message S3WALObject {
   int64 committed_timestamp = 5;
   // The size of the object.
   int64 object_size = 6;
-  // The data of the WAL object consists of many sub streams.
-  map<int64, SubStream> sub_streams = 7;
+
+  // The data of the WAL object may contain multiple sub-streams.
+  SubStreams sub_streams = 7;
+}
+
+message SubStreams {
+  map<int64, SubStream> sub_streams = 1;
 }
 
 // The `SubStream` is used to represent a segment of a stream in the WAL.

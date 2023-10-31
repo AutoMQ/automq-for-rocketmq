@@ -20,6 +20,7 @@ package com.automq.rocketmq.store;
 import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.SubStream;
+import apache.rocketmq.controller.v1.SubStreams;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.stream.s3.metadata.S3ObjectMetadata;
 import com.automq.stream.s3.metadata.S3ObjectType;
@@ -147,7 +148,12 @@ class S3ObjectManagerTest {
     void getObjects_OffsetTooMin() {
         // WALObject contains stream range [20, 100)
         S3WALObject.Builder builder = S3WALObject.newBuilder();
-        builder.putAllSubStreams(Collections.singletonMap(1L, SubStream.newBuilder().setStartOffset(20).setEndOffset(100).build()));
+        var subStreams = Collections.singletonMap(1L,
+            SubStream.newBuilder()
+                .setStartOffset(20)
+                .setEndOffset(100)
+                .build());
+        builder.setSubStreams(SubStreams.newBuilder().putAllSubStreams(subStreams));
 
         // WALObject contains stream range [20, 100) and no stream object
         when(metadataService.listWALObjects(anyLong(), anyLong(), anyLong(), anyInt()))
@@ -211,7 +217,10 @@ class S3ObjectManagerTest {
         subStreams.add(SubStream.newBuilder().setStreamId(1L).setStartOffset(100).setEndOffset(200).build());
         subStreams.add(SubStream.newBuilder().setStreamId(2L).setStartOffset(200).setEndOffset(300).build());
         subStreams.add(SubStream.newBuilder().setStreamId(3L).setStartOffset(300).setEndOffset(400).build());
-        builder.putAllSubStreams(subStreams.stream().collect(Collectors.toMap(SubStream::getStreamId, s -> s)));
+        builder.setSubStreams(SubStreams.newBuilder()
+            .putAllSubStreams(subStreams.stream()
+                .collect(Collectors.toMap(SubStream::getStreamId, s -> s)))
+            .build());
         builder.setObjectId(1);
 
         walObjects.add(builder.build());
@@ -220,7 +229,10 @@ class S3ObjectManagerTest {
         subStreams.clear();
         subStreams.add(SubStream.newBuilder().setStreamId(1L).setStartOffset(400).setEndOffset(500).build());
         builder.setObjectId(2);
-        builder.putAllSubStreams(subStreams.stream().collect(Collectors.toMap(SubStream::getStreamId, s -> s)));
+        builder.setSubStreams(SubStreams.newBuilder().putAllSubStreams(subStreams
+                .stream()
+                .collect(Collectors.toMap(SubStream::getStreamId, s -> s)))
+            .build());
         walObjects.add(builder.build());
 
         when(metadataService.listWALObjects(anyLong(), anyLong(), anyLong(), anyInt()))

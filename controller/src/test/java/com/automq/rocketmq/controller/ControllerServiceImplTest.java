@@ -1161,7 +1161,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             buildS3WalObjs(objectId, 1).stream()
                 .peek(s3WalObject -> {
                     Map<Long, SubStream> subStreams = buildWalSubStreams(1, 0, 10);
-                    s3WalObject.setSubStreams(gson.toJson(subStreams));
+                    s3WalObject.setSubStreams(toJson(subStreams));
                 }).forEach(s3WALObjectMapper::create);
             session.commit();
         }
@@ -1648,13 +1648,13 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 buildS3WalObjs(objectId + 2, 1).stream()
                     .peek(s3WalObject -> {
                         Map<Long, SubStream> subStreams = buildWalSubStreams(1, 0, 10);
-                        s3WalObject.setSubStreams(gson.toJson(subStreams));
+                        s3WalObject.setSubStreams(toJson(subStreams));
                     }).forEach(s3WALObjectMapper::create);
 
                 buildS3WalObjs(objectId + 3, 1).stream()
                     .peek(s3WalObject -> {
                         Map<Long, SubStream> subStreams = buildWalSubStreams(1, 10, 10);
-                        s3WalObject.setSubStreams(gson.toJson(subStreams));
+                        s3WalObject.setSubStreams(toJson(subStreams));
                     }).forEach(s3WALObjectMapper::create);
                 session.commit();
             }
@@ -1797,13 +1797,13 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 buildS3WalObjs(objectId + 2, 1).stream()
                     .peek(s3WalObject -> {
                         Map<Long, SubStream> subStreams = buildWalSubStreams(1, 0, 10);
-                        s3WalObject.setSubStreams(gson.toJson(subStreams));
+                        s3WalObject.setSubStreams(toJson(subStreams));
                     }).forEach(s3WALObjectMapper::create);
 
                 buildS3WalObjs(objectId + 3, 1).stream()
                     .peek(s3WalObject -> {
                         Map<Long, SubStream> subStreams = buildWalSubStreams(1, 10, 10);
-                        s3WalObject.setSubStreams(gson.toJson(subStreams));
+                        s3WalObject.setSubStreams(toJson(subStreams));
                     }).forEach(s3WALObjectMapper::create);
 
                 session.commit();
@@ -1881,13 +1881,13 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 buildS3WalObjs(objectId + 2, 1).stream()
                     .peek(s3WalObject -> {
                         Map<Long, SubStream> subStreams = buildWalSubStreams(1, 0, 10);
-                        s3WalObject.setSubStreams(gson.toJson(subStreams));
+                        s3WalObject.setSubStreams(toJson(subStreams));
                     }).forEach(s3WALObjectMapper::create);
 
                 buildS3WalObjs(objectId + 3, 1).stream()
                     .peek(s3WalObject -> {
                         Map<Long, SubStream> subStreams = buildWalSubStreams(1, 10, 10);
-                        s3WalObject.setSubStreams(gson.toJson(subStreams));
+                        s3WalObject.setSubStreams(toJson(subStreams));
                     }).forEach(s3WALObjectMapper::create);
 
                 session.commit();
@@ -1997,13 +1997,13 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 buildS3WalObjs(objectId + 2, 1).stream()
                     .peek(s3WalObject -> {
                         Map<Long, SubStream> subStreams = buildWalSubStreams(1, 0, 10);
-                        s3WalObject.setSubStreams(gson.toJson(subStreams));
+                        s3WalObject.setSubStreams(toJson(subStreams));
                     }).forEach(s3WALObjectMapper::create);
 
                 buildS3WalObjs(objectId + 3, 1).stream()
                     .peek(s3WalObject -> {
                         Map<Long, SubStream> subStreams = buildWalSubStreams(1, 10, 10);
-                        s3WalObject.setSubStreams(gson.toJson(subStreams));
+                        s3WalObject.setSubStreams(toJson(subStreams));
                     }).forEach(s3WALObjectMapper::create);
 
                 session.commit();

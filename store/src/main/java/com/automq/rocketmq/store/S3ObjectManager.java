@@ -20,6 +20,7 @@ package com.automq.rocketmq.store;
 import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.SubStream;
+import apache.rocketmq.controller.v1.SubStreams;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.stream.s3.metadata.S3ObjectMetadata;
 import com.automq.stream.s3.metadata.S3ObjectType;
@@ -81,7 +82,7 @@ public class S3ObjectManager implements ObjectManager {
                     return subStreamBuilder.build();
                 }));
 
-        builder.putAllSubStreams(subStreams);
+        builder.setSubStreams(SubStreams.newBuilder().putAllSubStreams(subStreams).build());
         S3WALObject walObject = builder.build();
 
         // Build stream objects
@@ -160,8 +161,8 @@ public class S3ObjectManager implements ObjectManager {
             // Sort the walObjects in ascending order of startOffset
             Queue<S3ObjectMetadataWrapper> walObjects = pair.getRight().stream()
                 .map(obj -> {
-                    long start = obj.getSubStreamsMap().get(streamId).getStartOffset();
-                    long end = obj.getSubStreamsMap().get(streamId).getEndOffset();
+                    long start = obj.getSubStreams().getSubStreamsMap().get(streamId).getStartOffset();
+                    long end = obj.getSubStreams().getSubStreamsMap().get(streamId).getEndOffset();
                     return new S3ObjectMetadataWrapper(convertFrom(obj), start, end);
                 })
                 .sorted((Comparator.comparingLong(S3ObjectMetadataWrapper::getStartOffset)))
@@ -173,7 +174,7 @@ public class S3ObjectManager implements ObjectManager {
             while (need > 0
                 && nextStartOffset < endOffset
                 && (!streamObjects.isEmpty() || !walObjects.isEmpty())) {
-                S3ObjectMetadataWrapper cur = null;
+                S3ObjectMetadataWrapper cur;
                 if (walObjects.isEmpty() || !streamObjects.isEmpty() && streamObjects.peek().getStartOffset() <= walObjects.peek().getStartOffset()) {
                     // Stream object has higher priority
                     cur = streamObjects.poll();
@@ -181,7 +182,7 @@ public class S3ObjectManager implements ObjectManager {
                     cur = walObjects.poll();
                 }
                 // Skip the object if it is not in the range
-                if (cur.getEndOffset() <= nextStartOffset) {
+                if (null == cur || cur.getEndOffset() <= nextStartOffset) {
                     continue;
                 }
                 if (cur.getStartOffset() > nextStartOffset) {
@@ -223,7 +224,7 @@ public class S3ObjectManager implements ObjectManager {
     }
 
     private S3ObjectMetadata convertFrom(S3WALObject object) {
-        List<StreamOffsetRange> offsetRanges = object.getSubStreamsMap().values()
+        List<StreamOffsetRange> offsetRanges = object.getSubStreams().getSubStreamsMap().values()
             .stream()
             .map(subStream -> new StreamOffsetRange(subStream.getStreamId(), subStream.getStartOffset(), subStream.getEndOffset())).toList();
         return new S3ObjectMetadata(object.getObjectId(), S3ObjectType.WAL, offsetRanges, object.getBaseDataTimestamp(),
