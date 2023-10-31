@@ -394,7 +394,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             topic.setName("T1");
             topic.setStatus(TopicStatus.TOPIC_STATUS_ACTIVE);
             topic.setQueueNum(4);
-            topic.setAcceptMessageTypes("abc");
+            topic.setAcceptMessageTypes("{}");
             topicMapper.create(topic);
             topicId = topic.getId();
             session.commit();

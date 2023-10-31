@@ -18,8 +18,11 @@
 
 package com.automq.rocketmq.controller.metadata;
 
+import apache.rocketmq.controller.v1.SubStream;
+import apache.rocketmq.controller.v1.SubStreams;
 import com.automq.rocketmq.controller.metadata.database.dao.S3WalObject;
 import com.automq.rocketmq.controller.metadata.database.mapper.S3WalObjectMapper;
+import com.google.protobuf.util.JsonFormat;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.MethodOrderer;
@@ -44,7 +47,7 @@ public class S3WalObjectTest extends DatabaseTestBase {
             s3WALObject.setObjectSize(22L);
             s3WALObject.setNodeId(1);
             s3WALObject.setSequenceId(999L);
-            s3WALObject.setSubStreams("<json><json>");
+            s3WALObject.setSubStreams("{}");
 
             Calendar calendar = Calendar.getInstance();
             calendar.add(Calendar.SECOND, 30);
@@ -72,7 +75,7 @@ public class S3WalObjectTest extends DatabaseTestBase {
             Assertions.assertEquals(22, s3WalObjects.get(0).getObjectSize());
             Assertions.assertEquals(1, s3WalObjects.get(0).getNodeId());
             Assertions.assertEquals(999, s3WalObjects.get(0).getSequenceId());
-            Assertions.assertEquals("<json><json>", s3WalObjects.get(0).getSubStreams());
+            Assertions.assertEquals("{}", s3WalObjects.get(0).getSubStreams());
             Assertions.assertEquals(time, s3WalObjects.get(0).getBaseDataTimestamp());
 
             // test delete
@@ -92,7 +95,7 @@ public class S3WalObjectTest extends DatabaseTestBase {
             s3WALObject.setObjectSize(22L);
             s3WALObject.setNodeId(1);
             s3WALObject.setSequenceId(999L);
-            s3WALObject.setSubStreams("<json><json>");
+            s3WALObject.setSubStreams("{}");
 
             Calendar calendar = Calendar.getInstance();
             calendar.add(Calendar.SECOND, 30);
@@ -120,6 +123,38 @@ public class S3WalObjectTest extends DatabaseTestBase {
             s3WalObjectMapper.delete(null, s3WalObject1.getNodeId(), null);
             List<S3WalObject> s3WalObjects = s3WalObjectMapper.list(null, s3WalObject1.getSequenceId());
             Assertions.assertTrue(s3WalObjects.isEmpty());
+        }
+    }
+
+    @Test
+    public void testStreamExclusive() throws IOException {
+        try (SqlSession session = getSessionFactory().openSession()) {
+            S3WalObjectMapper mapper = session.getMapper(S3WalObjectMapper.class);
+
+            S3WalObject walObject = new S3WalObject();
+            walObject.setNodeId(1);
+            walObject.setObjectSize(128L);
+            walObject.setObjectId(2L);
+            walObject.setSequenceId(3L);
+            walObject.setBaseDataTimestamp(new Date());
+            walObject.setCommittedTimestamp(new Date());
+            walObject.setCreatedTimestamp(new Date());
+            SubStreams subStreams = SubStreams.newBuilder()
+                .putSubStreams(1, SubStream.newBuilder().setStreamId(1).setStartOffset(0).setEndOffset(10).build())
+                .putSubStreams(2, SubStream.newBuilder().setStreamId(2).setStartOffset(0).setEndOffset(10).build())
+                .putSubStreams(3, SubStream.newBuilder().setStreamId(3).setStartOffset(0).setEndOffset(10).build())
+                .build();
+            walObject.setSubStreams(JsonFormat.printer().print(subStreams));
+            int rowsAffected = mapper.create(walObject);
+            Assertions.assertEquals(1, rowsAffected);
+
+            Assertions.assertTrue(mapper.streamExclusive(1, 1));
+            Assertions.assertTrue(mapper.streamExclusive(1, 2));
+            Assertions.assertTrue(mapper.streamExclusive(1, 3));
+
+            Assertions.assertFalse(mapper.streamExclusive(2, 1));
+            Assertions.assertFalse(mapper.streamExclusive(2, 2));
+            Assertions.assertFalse(mapper.streamExclusive(2, 3));
         }
     }
 }

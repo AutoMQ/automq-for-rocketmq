@@ -22,11 +22,13 @@ import apache.rocketmq.controller.v1.MessageType;
 import apache.rocketmq.controller.v1.TopicStatus;
 import com.automq.rocketmq.controller.metadata.database.dao.Topic;
 import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
+import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 import java.io.IOException;
 import java.util.List;
 
 import org.apache.ibatis.session.SqlSession;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -64,7 +66,8 @@ public class TopicTest extends DatabaseTestBase {
 
             got = topicMapper.get(topic.getId(), null);
             Assertions.assertEquals(TopicStatus.TOPIC_STATUS_ACTIVE, got.getStatus());
-            Assertions.assertEquals(acceptTypesJson, got.getAcceptMessageTypes());
+            AcceptTypes gotAcceptedTypes = decodeAcceptTypes(got.getAcceptMessageTypes());
+            Assertions.assertEquals(acceptTypes, gotAcceptedTypes);
 
             List<Topic> topics = topicMapper.list(null, null);
             Assertions.assertEquals(1, topics.size());
@@ -86,7 +89,14 @@ public class TopicTest extends DatabaseTestBase {
             topicMapper.update(topic3);
 
             Topic topic4 = topicMapper.get(topic.getId(), null);
-            Assertions.assertEquals(acceptTypesJson, topic4.getAcceptMessageTypes());
+            Assertions.assertEquals(acceptTypes, decodeAcceptTypes(topic4.getAcceptMessageTypes()));
         }
+    }
+
+    @NotNull
+    private static AcceptTypes decodeAcceptTypes(String json) throws InvalidProtocolBufferException {
+        AcceptTypes.Builder builder = AcceptTypes.newBuilder();
+        JsonFormat.parser().ignoringUnknownFields().merge(json, builder);
+        return builder.build();
     }
 }
