@@ -2031,4 +2031,37 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         }
 
     }
+
+    @Test
+    public void addressOfNode_None() throws IOException, ExecutionException, InterruptedException {
+        try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            metadataStore.start();
+            Awaitility.await().with().atMost(10, TimeUnit.SECONDS).pollInterval(100, TimeUnit.MILLISECONDS)
+                .until(metadataStore::isLeader);
+            String address = metadataStore.addressOfNode(1).get();
+            Assertions.assertEquals(null, address);
+        }
+    }
+
+    @Test
+    public void addressOfNode() throws IOException, ExecutionException, InterruptedException {
+        String name = "broker-0";
+        String address = "localhost:1234";
+        String instanceId = "i-register";
+
+        try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            metadataStore.start();
+            Awaitility.await().with().atMost(10, TimeUnit.SECONDS).pollInterval(100, TimeUnit.MILLISECONDS)
+                .until(metadataStore::isLeader);
+            Node node = new Node();
+            node.setName(name);
+            node.setAddress(address);
+            node.setInstanceId(instanceId);
+            node.setId(1);
+
+            metadataStore.addBrokerNode(node);
+            String adr = metadataStore.addressOfNode(1).get();
+            Assertions.assertEquals(address, adr);
+        }
+    }
 }
