@@ -315,12 +315,13 @@ public class CompactionManager {
             }
             // prepare N stream objects at one time
             objectManager.prepareObject(batchGroup.size(), TimeUnit.MINUTES.toMillis(CompactionConstants.S3_OBJECT_TTL_MINUTES))
-                    .thenAcceptAsync(objectId -> {
+                    .thenComposeAsync(objectId -> {
                         List<StreamDataBlock> blocksToRead = batchGroup.stream().flatMap(p -> p.getLeft().stream()).toList();
                         DataBlockReader reader = new DataBlockReader(objectMetadata, s3Operator);
                         // batch read
                         reader.readBlocks(blocksToRead, Math.min(CompactionConstants.S3_OBJECT_MAX_READ_BATCH, networkInboundBandwidth));
 
+                        List<CompletableFuture<Void>> cfs = new ArrayList<>();
                         for (Pair<List<StreamDataBlock>, CompletableFuture<StreamObject>> pair : batchGroup) {
                             List<StreamDataBlock> blocks = pair.getLeft();
                             DataBlockWriter writer = new DataBlockWriter(objectId, s3Operator, kafkaConfig.s3ObjectPartSize());
@@ -328,7 +329,7 @@ public class CompactionManager {
                                 writer.write(block);
                             }
                             long finalObjectId = objectId;
-                            writer.close().thenAccept(v -> {
+                            cfs.add(writer.close().thenAccept(v -> {
                                 StreamObject streamObject = new StreamObject();
                                 streamObject.setObjectId(finalObjectId);
                                 streamObject.setStreamId(blocks.get(0).getStreamId());
@@ -336,10 +337,12 @@ public class CompactionManager {
                                 streamObject.setEndOffset(blocks.get(blocks.size() - 1).getEndOffset());
                                 streamObject.setObjectSize(writer.size());
                                 pair.getValue().complete(streamObject);
-                            });
+                            }));
                             objectId++;
                         }
-                    }, forceSplitThreadPool).exceptionally(ex -> {
+                        return CompletableFuture.allOf(cfs.toArray(new CompletableFuture[0]));
+                    }, forceSplitThreadPool)
+                    .exceptionally(ex -> {
                         //TODO: clean up buffer
                         logger.error("Force split object failed", ex);
                         for (Pair<List<StreamDataBlock>, CompletableFuture<StreamObject>> pair : groupedDataBlocks) {
