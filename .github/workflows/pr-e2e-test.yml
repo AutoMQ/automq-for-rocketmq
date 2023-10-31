@@ -172,7 +172,7 @@ jobs:
           NAMESPACE: ${{ needs.deploy.outputs.namespace }}
         run: |
           cd rocketmq-e2e
-          cd java/e2e && mvn -B clean test -DnamesrvAddr=rocketmq-on-s3-broker.${NAMESPACE}.svc.cluster.local -DendPoint=rocketmq-on-s3-broker.${NAMESPACE}.svc.cluster.local
+          cd java/e2e && mvn -B clean test -DnamesrvAddr=rocketmq-on-s3-broker.${NAMESPACE}.svc.pve1.local:8081 -DendPoint=rocketmq-on-s3-broker.${NAMESPACE}.svc.pve1.local:8081
       - name: Publish Test Report
         uses: mikepenz/action-junit-report@v3
         if: always() # always run even if the previous step fails
@@ -223,7 +223,7 @@ jobs:
           NAMESPACE: ${{ needs.deploy.outputs.namespace }}
         run: |
           cd rocketmq-e2e
-          cd java/e2e-v4 && mvn -B clean test -DnamesrvAddr=rocketmq-on-s3-broker.${NAMESPACE}.svc.cluster.local -DendPoint=rocketmq-on-s3-broker.${NAMESPACE}.svc.cluster.local
+          cd java/e2e-v4 && mvn -B clean test -DnamesrvAddr=rocketmq-on-s3-broker.${NAMESPACE}.svc.pve1.local:8081 -DendPoint=rocketmq-on-s3-broker.${NAMESPACE}.svc.pve1.local:8081
       - name: Publish Test Report
         uses: mikepenz/action-junit-report@v3
         if: always() # always run even if the previous step fails
