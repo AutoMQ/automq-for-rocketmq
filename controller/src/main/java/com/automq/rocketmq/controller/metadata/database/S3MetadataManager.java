@@ -101,7 +101,7 @@ public class S3MetadataManager {
                     future.complete(next);
                 } catch (Exception e) {
                     LOGGER.error("PrepareS3Objects failed", e);
-                    ControllerException ex = new ControllerException(Code.INTERNAL_VALUE, "PrepareS3Objects failed");
+                    ControllerException ex = new ControllerException(Code.INTERNAL_VALUE, "PrepareS3Objects failed" + e.getMessage());
                     future.completeExceptionally(ex);
                 }
             } else {
@@ -255,7 +255,7 @@ public class S3MetadataManager {
                     future.complete(null);
                 } catch (Exception e) {
                     LOGGER.error("CommitWalObject failed", e);
-                    ControllerException ex = new ControllerException(Code.INTERNAL_VALUE, "CommitWalObject failed");
+                    ControllerException ex = new ControllerException(Code.INTERNAL_VALUE, "CommitWalObject failed" + e.getMessage());
                     future.completeExceptionally(ex);
                 }
             } else {
@@ -349,7 +349,7 @@ public class S3MetadataManager {
                     future.complete(null);
                 } catch (Exception e) {
                     LOGGER.error("CommitStream failed", e);
-                    ControllerException ex = new ControllerException(Code.INTERNAL_VALUE, "CommitStream failed");
+                    ControllerException ex = new ControllerException(Code.INTERNAL_VALUE, "CommitStream failed" + e.getMessage());
                     future.completeExceptionally(ex);
                 }
             } else {
@@ -752,7 +752,7 @@ public class S3MetadataManager {
                     future.complete(null);
                 } catch (Exception e) {
                     LOGGER.error("TrimStream failed", e);
-                    ControllerException ex = new ControllerException(Code.INTERNAL_VALUE, "TrimStream failed");
+                    ControllerException ex = new ControllerException(Code.INTERNAL_VALUE, "TrimStream failed" + e.getMessage());
                     future.completeExceptionally(ex);
                 }
             } else {
