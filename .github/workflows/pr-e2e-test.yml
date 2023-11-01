@@ -2,15 +2,12 @@ name: E2E test for pull request
 
 # read-write repo token
 # access to secrets
-#on:
-#  workflow_run:
-#    workflows: ["BUILD-CI"]
-#    types:
-#      - completed
-#    branches: ['**']
-
 on:
-  workflow_call:
+  workflow_run:
+    workflows: ["BUILD-CI"]
+    types:
+      - completed
+    branches: ['**']
 
 
 env:
@@ -26,10 +23,9 @@ env:
 jobs:
   docker:
     runs-on: ubuntu-latest
-    if: always()
-#    if: >
-#      github.event.workflow_run.event == 'pull_request' &&
-#      github.event.workflow_run.conclusion == 'success'
+    if: >
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
     timeout-minutes: 30
     strategy:
       matrix:
@@ -43,10 +39,6 @@ jobs:
         with:
           name: rocketmq
           path: ${{github.workspace}}/rocketmq-on-s3/distribution/target
-      - run: |
-          cd rocketmq-on-s3/distribution/target
-          ls
-          pwd
       - name: docker-login
         uses: docker/login-action@v2
         with:
@@ -57,8 +49,6 @@ jobs:
         id: build-images
         working-directory: ./distribution/docker
         run: |
-          pwd
-          ls
           mkdir versionlist
           full_node_version=$(git ls-remote --tags | awk -F '/' 'END{print $3}')
           commit_version=$(git rev-parse --short HEAD)
@@ -91,7 +81,6 @@ jobs:
       - name: Show versions
         id: show_versions
         run: |
-          pwd
           a=(`ls versionlist`)
           printf '%s\n' "${a[@]}" | jq -R . | jq -s .
           echo version-json=`printf '%s\n' "${a[@]}" | jq -R . | jq -s .` >> $GITHUB_OUTPUT
@@ -164,7 +153,7 @@ jobs:
         if: always()
         with:
           repository: AutoMQ/rocketmq-e2e
-          ref: ros_adaptation
+          ref: master
           path: rocketmq-e2e
           token: ${{ secrets.PAT_E2E }}
       - name: e2e test
@@ -177,7 +166,7 @@ jobs:
         uses: mikepenz/action-junit-report@v3
         if: always() # always run even if the previous step fails
         with:
-          report_paths: '**/test_report/TEST-*.xml'
+          report_paths: '**/surefire-reports/TEST-*.xml'
           annotate_only: true
           include_passed: true
           detailed_summary: true
@@ -215,7 +204,7 @@ jobs:
         if: always()
         with:
           repository: AutoMQ/rocketmq-e2e
-          ref: ros_adaptation
+          ref: master
           path: rocketmq-e2e
           token: ${{ secrets.PAT_E2E }}
       - name: e2e test
@@ -228,7 +217,7 @@ jobs:
         uses: mikepenz/action-junit-report@v3
         if: always() # always run even if the previous step fails
         with:
-          report_paths: '**/test_report/TEST-*.xml'
+          report_paths: '**/surefire-reports/TEST-*.xml'
           annotate_only: true
           include_passed: true
           detailed_summary: true
