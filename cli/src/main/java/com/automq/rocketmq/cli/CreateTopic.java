@@ -21,7 +21,7 @@ import apache.rocketmq.controller.v1.AcceptTypes;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.MessageType;
 import com.automq.rocketmq.common.util.DurationUtil;
-import com.automq.rocketmq.controller.metadata.GrpcControllerClient;
+import com.automq.rocketmq.controller.client.GrpcControllerClient;
 import java.util.concurrent.Callable;
 import picocli.CommandLine;
 

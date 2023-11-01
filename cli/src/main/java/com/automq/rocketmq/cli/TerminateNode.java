@@ -19,8 +19,8 @@ package com.automq.rocketmq.cli;
 
 import apache.rocketmq.controller.v1.TerminateNodeReply;
 import apache.rocketmq.controller.v1.TerminateNodeRequest;
-import com.automq.rocketmq.controller.metadata.ControllerClient;
-import com.automq.rocketmq.controller.metadata.GrpcControllerClient;
+import com.automq.rocketmq.controller.ControllerClient;
+import com.automq.rocketmq.controller.client.GrpcControllerClient;
 import io.grpc.stub.StreamObserver;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;

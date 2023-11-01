@@ -1,0 +1,85 @@
+<!--
+  ~ Licensed to the Apache Software Foundation (ASF) under one or more
+  ~ contributor license agreements.  See the NOTICE file distributed with
+  ~ this work for additional information regarding copyright ownership.
+  ~ The ASF licenses this file to You under the Apache License, Version 2.0
+  ~ (the "License"); you may not use this file except in compliance with
+  ~ the License.  You may obtain a copy of the License at
+  ~
+  ~     http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  -->
+
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.automq.rocketmq.metadata.mapper.S3ObjectMapper">
+    <delete id="rollback">
+        DELETE
+        FROM s3object
+        WHERE state = 1
+        AND #{current} >= expired_timestamp
+    </delete>
+
+    <select id="getById" resultType="S3Object">
+        SELECT id, stream_id, object_size, prepared_timestamp, committed_timestamp, expired_timestamp,
+        marked_for_deletion_timestamp, state
+        FROM s3object
+        WHERE id = #{id}
+    </select>
+
+    <update id="markToDelete">
+        UPDATE s3object
+        SET marked_for_deletion_timestamp = #{time},
+            state = 3
+        WHERE
+            id = #{id}
+    </update>
+
+    <delete id="delete">
+        DELETE
+        FROM s3object
+        <where>
+            <if test="null != id">id = #{id}</if>
+        </where>
+    </delete>
+
+    <delete id="batchDelete">
+        DELETE FROM s3object
+        <where>
+            <foreach item="item" collection="ids" open="id IN (" close=")" separator=",">
+                #{item}
+            </foreach>
+        </where>
+    </delete>
+
+    <insert id="prepare" parameterType="S3Object">
+        INSERT INTO s3object (id, prepared_timestamp, expired_timestamp)
+        VALUES (#{id}, #{preparedTimestamp}, #{expiredTimestamp})
+    </insert>
+
+    <update id="commit">
+        UPDATE s3object
+        SET state = 2,
+        object_size = #{objectSize},
+        stream_id = #{streamId},
+        committed_timestamp = #{committedTimestamp}
+        WHERE id = #{id}
+    </update>
+
+    <select id="list" resultType="S3Object">
+        SELECT id, object_size, stream_id, prepared_timestamp, committed_timestamp, expired_timestamp,
+        marked_for_deletion_timestamp, state
+        FROM s3object
+        <where>
+            <if test="null != state">state = #{state}</if>
+            <if test="null != streamId">AND stream_id = #{streamId}</if>
+        </where>
+    </select>
+    
+</mapper>

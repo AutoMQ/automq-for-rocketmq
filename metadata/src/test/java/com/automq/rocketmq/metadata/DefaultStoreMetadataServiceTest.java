@@ -23,7 +23,7 @@ import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.StreamRole;
 import com.automq.rocketmq.common.config.ControllerConfig;
 import com.automq.rocketmq.controller.exception.ControllerException;
-import com.automq.rocketmq.controller.metadata.MetadataStore;
+import com.automq.rocketmq.controller.MetadataStore;
 import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;

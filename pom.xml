@@ -26,16 +26,22 @@
     <version>5.1.3-automq-0-SNAPSHOT</version>
     <packaging>pom</packaging>
     <modules>
-        <module>broker</module>
-        <module>cli</module>
-        <module>common</module>
-        <module>controller</module>
-        <module>distribution</module>
+        <!-- Control Plane Modules -->
+        <module>proto</module>
         <module>metadata</module>
-        <module>proxy</module>
+        <module>metadata-jdbc</module>
+        <module>controller</module>
+
+        <!-- Data Plane Modules-->
         <module>s3stream</module>
         <module>store</module>
-        <module>proto</module>
+        <module>broker</module>
+        <module>proxy</module>
+
+        <!-- Misc -->
+        <module>common</module>
+        <module>cli</module>
+        <module>distribution</module>
     </modules>
 
     <properties>
