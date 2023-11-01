@@ -99,6 +99,10 @@ public class S3MetadataManager {
                     });
                     session.commit();
                     future.complete(next);
+                } catch (Exception e) {
+                    LOGGER.error("PrepareS3Objects failed", e);
+                    ControllerException ex = new ControllerException(Code.INTERNAL_VALUE, "PrepareS3Objects failed" + e.getMessage());
+                    future.completeExceptionally(ex);
                 }
             } else {
                 PrepareS3ObjectsRequest request = PrepareS3ObjectsRequest.newBuilder()
@@ -218,7 +222,7 @@ public class S3MetadataManager {
                             object.setObjectId(s3StreamObject.getObjectId());
                             object.setCommittedTimestamp(new Date());
                             object.setStartOffset(s3StreamObject.getStartOffset());
-                            object.setBaseDataTimestamp(new Date(s3StreamObject.getBaseDataTimestamp()));
+                            object.setBaseDataTimestamp(new Date());
                             object.setEndOffset(s3StreamObject.getEndOffset());
                             object.setObjectSize(s3StreamObject.getObjectSize());
                             s3StreamObjectMapper.commit(object);
@@ -249,8 +253,10 @@ public class S3MetadataManager {
                     LOGGER.info("broker[broke-id={}] commit wal object[object-id={}] success, compacted objects[{}], stream objects[{}]",
                         brokerId, walObject.getObjectId(), compactedObjects, streamObjects);
                     future.complete(null);
-                } catch (InvalidProtocolBufferException e) {
-                    future.completeExceptionally(e);
+                } catch (Exception e) {
+                    LOGGER.error("CommitWalObject failed", e);
+                    ControllerException ex = new ControllerException(Code.INTERNAL_VALUE, "CommitWalObject failed" + e.getMessage());
+                    future.completeExceptionally(ex);
                 }
             } else {
                 CommitWALObjectRequest request = CommitWALObjectRequest.newBuilder()
@@ -341,6 +347,10 @@ public class S3MetadataManager {
                     session.commit();
                     LOGGER.info("S3StreamObject[object-id={}] commit success, compacted objects: {}", streamObject.getObjectId(), compactedObjects);
                     future.complete(null);
+                } catch (Exception e) {
+                    LOGGER.error("CommitStream failed", e);
+                    ControllerException ex = new ControllerException(Code.INTERNAL_VALUE, "CommitStream failed" + e.getMessage());
+                    future.completeExceptionally(ex);
                 }
             } else {
                 CommitStreamObjectRequest request = CommitStreamObjectRequest.newBuilder()
@@ -740,6 +750,10 @@ public class S3MetadataManager {
                     LOGGER.info("Node[node-id={}] trim stream [stream-id={}] with epoch={} and newStartOffset={}",
                         metadataStore.config().nodeId(), streamId, streamEpoch, newStartOffset);
                     future.complete(null);
+                } catch (Exception e) {
+                    LOGGER.error("TrimStream failed", e);
+                    ControllerException ex = new ControllerException(Code.INTERNAL_VALUE, "TrimStream failed" + e.getMessage());
+                    future.completeExceptionally(ex);
                 }
             } else {
                 TrimStreamRequest request = TrimStreamRequest.newBuilder()
