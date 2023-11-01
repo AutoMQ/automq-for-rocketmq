@@ -34,5 +34,10 @@
             <artifactId>rocketmq-controller</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>com.automq.rocketmq</groupId>
+            <artifactId>metadata-jdbc</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
 </project>

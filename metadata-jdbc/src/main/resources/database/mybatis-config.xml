@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  ~ Licensed to the Apache Software Foundation (ASF) under one or more
+  ~ contributor license agreements.  See the NOTICE file distributed with
+  ~ this work for additional information regarding copyright ownership.
+  ~ The ASF licenses this file to You under the Apache License, Version 2.0
+  ~ (the "License"); you may not use this file except in compliance with
+  ~ the License.  You may obtain a copy of the License at
+  ~
+  ~     http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  -->
+<!DOCTYPE configuration
+    PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
+    "https://mybatis.org/dtd/mybatis-3-config.dtd">
+<configuration>
+    <properties resource="database/config.properties">
+    </properties>
+
+    <settings>
+        <setting name="useGeneratedKeys" value="true" />
+        <setting name="logImpl" value="SLF4J" />
+        <setting name="mapUnderscoreToCamelCase" value="true" />
+        <setting name="jdbcTypeForNull" value="NULL" />
+    </settings>
+
+    <typeAliases>
+        <package name="com.automq.rocketmq.metadata.dao"/>
+    </typeAliases>
+
+    <typeHandlers>
+        <typeHandler handler="org.apache.ibatis.type.EnumOrdinalTypeHandler"
+                     javaType="apache.rocketmq.controller.v1.GroupStatus" />
+        <typeHandler handler="org.apache.ibatis.type.EnumOrdinalTypeHandler"
+                     javaType="apache.rocketmq.controller.v1.GroupType" />
+        <typeHandler handler="org.apache.ibatis.type.EnumOrdinalTypeHandler"
+                     javaType="apache.rocketmq.controller.v1.TopicStatus" />
+        <typeHandler handler="org.apache.ibatis.type.EnumOrdinalTypeHandler"
+                     javaType="apache.rocketmq.controller.v1.AssignmentStatus" />
+        <typeHandler handler="org.apache.ibatis.type.EnumOrdinalTypeHandler"
+                     javaType="apache.rocketmq.controller.v1.StreamRole" />
+        <typeHandler handler="org.apache.ibatis.type.EnumOrdinalTypeHandler"
+                     javaType="apache.rocketmq.controller.v1.StreamState" />
+        <typeHandler handler="org.apache.ibatis.type.EnumOrdinalTypeHandler"
+                     javaType="apache.rocketmq.controller.v1.S3ObjectState" />
+        <typeHandler handler="org.apache.ibatis.type.EnumOrdinalTypeHandler"
+                     javaType="apache.rocketmq.controller.v1.MessageType" />
+        <typeHandler handler="org.apache.ibatis.type.EnumOrdinalTypeHandler"
+                     javaType="apache.rocketmq.controller.v1.SubscriptionMode" />
+    </typeHandlers>
+
+    <environments default="development">
+        <environment id="development">
+            <transactionManager type="JDBC"/>
+            <dataSource type="com.automq.rocketmq.metadata.HikariCPDataSourceFactory">
+                <property name="jdbcUrl" value="${jdbcUrl}"/>
+                <property name="username" value="${userName}"/>
+                <property name="password" value="${password}"/>
+            </dataSource>
+        </environment>
+    </environments>
+
+    <mappers>
+        <mapper resource="database/mapper/SequenceMapper.xml" />
+        <mapper resource="database/mapper/GroupMapper.xml" />
+        <mapper resource="database/mapper/GroupProgressMapper.xml" />
+        <mapper resource="database/mapper/SubscriptionMapper.xml" />
+        <mapper resource="database/mapper/LeaseMapper.xml" />
+        <mapper resource="database/mapper/NodeMapper.xml" />
+        <mapper resource="database/mapper/StreamMapper.xml" />
+        <mapper resource="database/mapper/RangeMapper.xml" />
+        <mapper resource="database/mapper/S3ObjectMapper.xml" />
+        <mapper resource="database/mapper/TopicMapper.xml" />
+        <mapper resource="database/mapper/QueueAssignmentMapper.xml" />
+        <mapper resource="database/mapper/S3StreamObjectMapper.xml" />
+        <mapper resource="database/mapper/S3WalObjectMapper.xml" />
+    </mappers>
+</configuration>

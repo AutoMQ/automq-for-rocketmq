@@ -18,8 +18,8 @@
 package com.automq.rocketmq.cli;
 
 import apache.rocketmq.controller.v1.ConsumerGroup;
-import com.automq.rocketmq.controller.metadata.ControllerClient;
-import com.automq.rocketmq.controller.metadata.GrpcControllerClient;
+import com.automq.rocketmq.controller.ControllerClient;
+import com.automq.rocketmq.controller.client.GrpcControllerClient;
 import de.vandermeer.asciitable.AT_Row;
 import de.vandermeer.asciitable.AsciiTable;
 import de.vandermeer.asciitable.CWC_LongestLine;

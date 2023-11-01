@@ -21,7 +21,7 @@ import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.Topic;
-import com.automq.rocketmq.controller.metadata.MetadataStore;
+import com.automq.rocketmq.controller.MetadataStore;
 import com.automq.rocketmq.metadata.api.ProxyMetadataService;
 import com.google.common.base.Stopwatch;
 import java.util.List;

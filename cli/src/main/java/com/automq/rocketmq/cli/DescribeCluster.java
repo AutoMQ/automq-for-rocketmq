@@ -19,8 +19,8 @@ package com.automq.rocketmq.cli;
 
 import apache.rocketmq.controller.v1.Cluster;
 import apache.rocketmq.controller.v1.DescribeClusterRequest;
-import com.automq.rocketmq.controller.metadata.ControllerClient;
-import com.automq.rocketmq.controller.metadata.GrpcControllerClient;
+import com.automq.rocketmq.controller.ControllerClient;
+import com.automq.rocketmq.controller.client.GrpcControllerClient;
 import java.util.concurrent.Callable;
 import picocli.CommandLine;
 

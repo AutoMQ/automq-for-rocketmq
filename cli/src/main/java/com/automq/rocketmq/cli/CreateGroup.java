@@ -21,8 +21,8 @@ import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.GroupType;
 import apache.rocketmq.controller.v1.SubscriptionMode;
-import com.automq.rocketmq.controller.metadata.ControllerClient;
-import com.automq.rocketmq.controller.metadata.GrpcControllerClient;
+import com.automq.rocketmq.controller.ControllerClient;
+import com.automq.rocketmq.controller.client.GrpcControllerClient;
 import java.util.concurrent.Callable;
 import picocli.CommandLine;
 

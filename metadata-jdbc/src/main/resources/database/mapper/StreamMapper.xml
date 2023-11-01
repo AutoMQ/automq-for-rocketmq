@@ -1,0 +1,138 @@
+<!--
+  ~ Licensed to the Apache Software Foundation (ASF) under one or more
+  ~ contributor license agreements.  See the NOTICE file distributed with
+  ~ this work for additional information regarding copyright ownership.
+  ~ The ASF licenses this file to You under the Apache License, Version 2.0
+  ~ (the "License"); you may not use this file except in compliance with
+  ~ the License.  You may obtain a copy of the License at
+  ~
+  ~     http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  -->
+
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.automq.rocketmq.metadata.mapper.StreamMapper">
+
+    <insert id="create" parameterType="Stream" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO stream (
+            topic_id, queue_id, stream_role, group_id, src_node_id, dst_node_id, epoch, range_id, start_offset, state
+        )
+        VALUES (
+            #{topicId},
+            #{queueId},
+            #{streamRole},
+            #{groupId},
+            #{srcNodeId},
+            #{dstNodeId},
+            #{epoch},
+            #{rangeId},
+            #{startOffset},
+            #{state}
+        )
+    </insert>
+
+    <update id="increaseEpoch" parameterType="long">
+        UPDATE stream
+        SET epoch = epoch + 1
+        WHERE id = #{id}
+    </update>
+
+    <select id="getByStreamId" resultType="Stream" parameterType="long">
+        SELECT id, topic_id, queue_id, stream_role, group_id, src_node_id, dst_node_id, epoch, range_id, start_offset,
+               state
+        FROM stream
+        WHERE id = #{id}
+    </select>
+
+    <update id="updateLastRange">
+        UPDATE stream
+        SET range_id = #{lastRangeId}
+        WHERE id = #{id}
+    </update>
+
+    <update id="update">
+        UPDATE stream
+        <set>
+            <if test="null != epoch">epoch = #{epoch},</if>
+            <if test="null != startOffset">start_offset = #{startOffset},</if>
+            <if test="null != rangeId">range_id = #{rangeId},</if>
+            <if test="null != state">state = #{state},</if>
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateStreamState">
+        UPDATE stream
+        SET state = #{state}
+        <where>
+            <if test="null != criteria.ids">
+                <foreach item="item" collection="criteria.ids" open="id IN (" separator="," close=")">
+                    #{item}
+                </foreach>
+            </if>
+            <if test="null != criteria.topicId">AND topic_id = #{criteria.topicId}</if>
+            <if test="null != criteria.queueId">AND queue_id = #{criteria.queueId}</if>
+            <if test="null != criteria.state">AND state = #{criteria.state}</if>
+        </where>
+    </update>
+
+    <update id="planMove">
+        UPDATE stream
+        SET src_node_id = #{srcNodeId},
+            dst_node_id = #{dstNodeId},
+            state = #{state}
+        <where>
+            <if test="null != criteria.ids">
+                <foreach item="item" collection="criteria.ids" open="id IN (" separator="," close=")">
+                    #{item}
+                </foreach>
+            </if>
+            <if test="null != criteria.topicId">AND topic_id = #{criteria.topicId}</if>
+            <if test="null != criteria.queueId">AND queue_id = #{criteria.queueId}</if>
+            <if test="null != criteria.state">AND state = #{criteria.state}</if>
+            <if test="null != criteria.updateTime">AND update_time >= #{criteria.updateTime}</if>
+        </where>
+    </update>
+
+    <delete id="delete">
+        DELETE FROM stream
+        <where>
+            <if test="null != id">id = #{id}</if>
+        </where>
+    </delete>
+
+    <select id="queueEpoch" resultType="long">
+        SELECT MAX(epoch)
+        FROM stream
+        WHERE topic_id = #{topicId} AND queue_id = #{queueId}
+    </select>
+
+    <select id="byCriteria" resultType="Stream">
+        SELECT id, topic_id, queue_id, stream_role, group_id, src_node_id, dst_node_id, epoch, range_id, start_offset,
+        state
+        FROM stream
+        <where>
+            <if test="null != criteria.ids">
+                <foreach item="item" collection="criteria.ids" open="id IN (" separator="," close=")">
+                    #{item}
+                </foreach>
+            </if>
+            <if test="null != criteria.topicId">AND topic_id = #{criteria.topicId}</if>
+            <if test="null != criteria.queueId">AND queue_id = #{criteria.queueId}</if>
+            <if test="null != criteria.state">AND state = #{criteria.state}</if>
+            <if test="null != criteria.updateTime">AND update_time >= #{criteria.updateTime}</if>
+            <if test="null != criteria.srcNodeId">AND src_node_id = #{criteria.srcNodeId}</if>
+            <if test="null != criteria.dstNodeId">AND dst_node_id = #{criteria.dstNodeId}</if>
+            <if test="null != criteria.groupId">AND group_id = #{criteria.groupId}</if>
+        </where>
+    </select>
+
+</mapper>

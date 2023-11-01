@@ -1,0 +1,62 @@
+<!--
+  ~ Licensed to the Apache Software Foundation (ASF) under one or more
+  ~ contributor license agreements.  See the NOTICE file distributed with
+  ~ this work for additional information regarding copyright ownership.
+  ~ The ASF licenses this file to You under the Apache License, Version 2.0
+  ~ (the "License"); you may not use this file except in compliance with
+  ~ the License.  You may obtain a copy of the License at
+  ~
+  ~     http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  -->
+
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.automq.rocketmq.metadata.mapper.GroupMapper">
+    <insert id="create" parameterType="Group" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO consumer_group (name, status, dead_letter_topic_id, max_delivery_attempt, group_type, sub_mode)
+        VALUES (#{name}, #{status}, #{deadLetterTopicId}, #{maxDeliveryAttempt}, #{groupType}, #{subMode})
+    </insert>
+
+    <update id="update" parameterType="Group">
+        UPDATE consumer_group
+        SET name = #{name}, status = #{status}, dead_letter_topic_id = #{deadLetterTopicId}, group_type = #{groupType},
+            max_delivery_attempt = #{maxDeliveryAttempt}, sub_mode = #{subMode}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="delete">
+        DELETE FROM consumer_group
+        <where>
+            <if test="null != id">id = #{id}</if>
+        </where>
+    </delete>
+
+    <delete id="recycle">
+        DELETE FROM consumer_group
+        WHERE status = #{status}
+        AND #{updateTime} >= update_time
+    </delete>
+
+    <select id="byCriteria" resultType="Group" parameterType="GroupCriteria">
+        SELECT id, name, status, dead_letter_topic_id, max_delivery_attempt, group_type, sub_mode, create_time, update_time
+        FROM consumer_group
+        <where>
+            <if test="null != id">id = #{id}</if>
+            <if test="null != name">AND name = #{name}</if>
+            <if test="null != status">AND status = #{status}</if>
+            <if test="null != topicId">AND dead_letter_topic_id = #{topicId}</if>
+            <if test="null != groupType">AND group_type = #{groupType}</if>
+            <if test="null != subMode">AND sub_mode = #{subMode}</if>
+            <if test="null != updateTime">AND update_time >= #{updateTime}</if>
+        </where>
+    </select>
+
+</mapper>

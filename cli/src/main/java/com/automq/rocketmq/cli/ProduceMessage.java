@@ -24,7 +24,7 @@ import apache.rocketmq.controller.v1.MessageType;
 import com.automq.rocketmq.cli.tools.CliUtils;
 import com.automq.rocketmq.common.PrefixThreadFactory;
 import com.automq.rocketmq.controller.exception.ControllerException;
-import com.automq.rocketmq.controller.metadata.GrpcControllerClient;
+import com.automq.rocketmq.controller.client.GrpcControllerClient;
 import com.codahale.metrics.ConsoleReporter;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Timer;

@@ -60,33 +60,32 @@ import apache.rocketmq.controller.v1.UpdateTopicReply;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.common.system.StreamConstants;
 import com.automq.rocketmq.controller.exception.ControllerException;
-import com.automq.rocketmq.controller.metadata.ControllerClient;
-import com.automq.rocketmq.controller.metadata.DatabaseTestBase;
-import com.automq.rocketmq.controller.metadata.GrpcControllerClient;
-import com.automq.rocketmq.controller.metadata.MetadataStore;
-import com.automq.rocketmq.controller.metadata.database.DefaultMetadataStore;
-import com.automq.rocketmq.controller.metadata.database.dao.Group;
-import com.automq.rocketmq.controller.metadata.database.dao.GroupCriteria;
-import com.automq.rocketmq.controller.metadata.database.dao.GroupProgress;
-import com.automq.rocketmq.controller.metadata.database.dao.Node;
-import com.automq.rocketmq.controller.metadata.database.dao.QueueAssignment;
-import com.automq.rocketmq.controller.metadata.database.dao.Range;
-import com.automq.rocketmq.controller.metadata.database.dao.S3Object;
-import com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject;
-import com.automq.rocketmq.controller.metadata.database.dao.S3WalObject;
-import com.automq.rocketmq.controller.metadata.database.dao.Stream;
-import com.automq.rocketmq.controller.metadata.database.dao.StreamCriteria;
-import com.automq.rocketmq.controller.metadata.database.dao.Topic;
-import com.automq.rocketmq.controller.metadata.database.mapper.GroupMapper;
-import com.automq.rocketmq.controller.metadata.database.mapper.GroupProgressMapper;
-import com.automq.rocketmq.controller.metadata.database.mapper.NodeMapper;
-import com.automq.rocketmq.controller.metadata.database.mapper.QueueAssignmentMapper;
-import com.automq.rocketmq.controller.metadata.database.mapper.RangeMapper;
-import com.automq.rocketmq.controller.metadata.database.mapper.S3ObjectMapper;
-import com.automq.rocketmq.controller.metadata.database.mapper.S3StreamObjectMapper;
-import com.automq.rocketmq.controller.metadata.database.mapper.S3WalObjectMapper;
-import com.automq.rocketmq.controller.metadata.database.mapper.StreamMapper;
-import com.automq.rocketmq.controller.metadata.database.mapper.TopicMapper;
+import com.automq.rocketmq.controller.server.ControllerServiceImpl;
+import com.automq.rocketmq.controller.store.DatabaseTestBase;
+import com.automq.rocketmq.controller.client.GrpcControllerClient;
+import com.automq.rocketmq.controller.server.store.DefaultMetadataStore;
+import com.automq.rocketmq.metadata.dao.Group;
+import com.automq.rocketmq.metadata.dao.GroupCriteria;
+import com.automq.rocketmq.metadata.dao.GroupProgress;
+import com.automq.rocketmq.metadata.dao.Node;
+import com.automq.rocketmq.metadata.dao.QueueAssignment;
+import com.automq.rocketmq.metadata.dao.Range;
+import com.automq.rocketmq.metadata.dao.S3Object;
+import com.automq.rocketmq.metadata.dao.S3StreamObject;
+import com.automq.rocketmq.metadata.dao.S3WalObject;
+import com.automq.rocketmq.metadata.dao.Stream;
+import com.automq.rocketmq.metadata.dao.StreamCriteria;
+import com.automq.rocketmq.metadata.dao.Topic;
+import com.automq.rocketmq.metadata.mapper.GroupMapper;
+import com.automq.rocketmq.metadata.mapper.GroupProgressMapper;
+import com.automq.rocketmq.metadata.mapper.NodeMapper;
+import com.automq.rocketmq.metadata.mapper.QueueAssignmentMapper;
+import com.automq.rocketmq.metadata.mapper.RangeMapper;
+import com.automq.rocketmq.metadata.mapper.S3ObjectMapper;
+import com.automq.rocketmq.metadata.mapper.S3StreamObjectMapper;
+import com.automq.rocketmq.metadata.mapper.S3WalObjectMapper;
+import com.automq.rocketmq.metadata.mapper.StreamMapper;
+import com.automq.rocketmq.metadata.mapper.TopicMapper;
 import com.google.protobuf.util.JsonFormat;
 import io.grpc.Grpc;
 import io.grpc.InsecureChannelCredentials;
@@ -1439,11 +1438,11 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
                 S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
                 for (long index = objectId; index < objectId + 2; index++) {
-                    com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = s3StreamObjectMapper.getByObjectId(index);
+                    S3StreamObject object = s3StreamObjectMapper.getByObjectId(index);
                     Assertions.assertNull(object);
                 }
 
-                com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = s3StreamObjectMapper.getByObjectId(objectId + 2);
+                S3StreamObject object = s3StreamObjectMapper.getByObjectId(objectId + 2);
                 Assertions.assertTrue(object.getBaseDataTimestamp().getTime() > 0);
                 Assertions.assertTrue(object.getCommittedTimestamp().getTime() > 0);
             }
@@ -1564,7 +1563,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 Assertions.assertEquals(111L, s3Object.getObjectSize());
                 Assertions.assertEquals(streamId, s3Object.getStreamId());
 
-                com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = s3StreamObjectMapper.getByObjectId(objectId + 2);
+                S3StreamObject object = s3StreamObjectMapper.getByObjectId(objectId + 2);
                 Assertions.assertTrue(object.getBaseDataTimestamp().getTime() > 1);
                 Assertions.assertTrue(object.getBaseDataTimestamp().getTime() > 0);
                 Assertions.assertTrue(object.getCommittedTimestamp().getTime() > 0);
@@ -1627,7 +1626,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 S3Object s3Object = s3ObjectMapper.getById(objectId + 2);
                 Assertions.assertEquals(S3ObjectState.BOS_COMMITTED, s3Object.getState());
 
-                com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = s3StreamObjectMapper.getByObjectId(objectId + 2);
+                S3StreamObject object = s3StreamObjectMapper.getByObjectId(objectId + 2);
                 Assertions.assertTrue(object.getBaseDataTimestamp().getTime() > 0);
                 Assertions.assertTrue(object.getCommittedTimestamp().getTime() > 0);
             }
@@ -1962,7 +1961,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
                 S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
                 for (long index = objectId; index < objectId + 2; index++) {
-                    com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = s3StreamObjectMapper.getByObjectId(index);
+                    S3StreamObject object = s3StreamObjectMapper.getByObjectId(index);
                     if (object.getCommittedTimestamp().getTime() - time > 5 * 60) {
                         Assertions.fail();
                     }
@@ -2079,7 +2078,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
                 S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
                 for (long index = objectId; index < objectId + 2; index++) {
-                    com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = s3StreamObjectMapper.getByObjectId(index);
+                    S3StreamObject object = s3StreamObjectMapper.getByObjectId(index);
                     if (object.getCommittedTimestamp().getTime() - time > 5 * 60) {
                         Assertions.fail();
                     }

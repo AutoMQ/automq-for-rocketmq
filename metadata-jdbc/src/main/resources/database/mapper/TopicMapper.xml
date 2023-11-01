@@ -1,0 +1,85 @@
+<!--
+  ~ Licensed to the Apache Software Foundation (ASF) under one or more
+  ~ contributor license agreements.  See the NOTICE file distributed with
+  ~ this work for additional information regarding copyright ownership.
+  ~ The ASF licenses this file to You under the Apache License, Version 2.0
+  ~ (the "License"); you may not use this file except in compliance with
+  ~ the License.  You may obtain a copy of the License at
+  ~
+  ~     http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  -->
+
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.automq.rocketmq.metadata.mapper.TopicMapper">
+
+    <insert id="create" parameterType="Topic" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO topic(name, queue_num, retention_hours, status, accept_message_types)
+        VALUES (
+            #{name},
+            #{queueNum},
+            #{retentionHours},
+            #{status},
+            #{acceptMessageTypes}
+        )
+    </insert>
+
+    <update id="updateStatusById">
+        UPDATE topic
+        SET status = #{status}
+        WHERE id = #{id}
+    </update>
+
+
+    <update id="update">
+        UPDATE topic
+        <set>
+            <if test="null != status">status = #{status},</if>
+            <if test="null != name">name = #{name},</if>
+            <if test="null != queueNum">queue_num = #{queueNum},</if>
+            <if test="null != retentionHours">retention_hours = #{retentionHours},</if>
+            <if test="null != acceptMessageTypes">accept_message_types = #{acceptMessageTypes},</if>
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <delete id="delete">
+        DELETE
+        FROM topic
+        <where>
+            <if test="null != id">id = #{id}</if>
+        </where>
+    </delete>
+
+    <delete id="recycle">
+        DELETE FROM topic
+        WHERE status = #{status}
+        AND #{updateTime} >= update_time
+    </delete>
+
+    <select id="get" resultType="Topic">
+        SELECT id, name, queue_num, retention_hours, status, create_time, update_time, accept_message_types
+        FROM topic
+        <where>
+            <if test="null != id">AND id = #{id}</if>
+            <if test="null != name and '' != name">AND name = #{name}</if>
+        </where>
+    </select>
+
+    <select id="list" resultType="Topic">
+        SELECT id, name, queue_num, retention_hours, status, create_time, update_time, accept_message_types
+        FROM topic
+        <where>
+            <if test="status != null">AND status = #{status}</if>
+            <if test="updateTime != null">AND update_time >= #{updateTime}</if>
+        </where>
+    </select>
+</mapper>
