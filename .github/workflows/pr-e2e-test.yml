@@ -2,12 +2,14 @@ name: E2E test for pull request
 
 # read-write repo token
 # access to secrets
+#on:
+#  workflow_run:
+#    workflows: ["BUILD-CI"]
+#    types:
+#      - completed
+#    branches: ['**']
 on:
-  workflow_run:
-    workflows: ["BUILD-CI"]
-    types:
-      - completed
-    branches: ['**']
+  workflow_call:
 
 
 env:

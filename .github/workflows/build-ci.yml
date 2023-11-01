@@ -32,3 +32,9 @@ jobs:
         with:
           name: rocketmq
           path: distribution/target/rocketmq*.zip
+
+  pr-e2e:
+    name: PR e2e test
+    uses: ./.github/workflows/pr-e2e-test.yml
+    secrets: inherit
+    needs: dist-tar
