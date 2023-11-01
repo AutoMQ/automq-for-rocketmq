@@ -26,6 +26,7 @@ ignore:
   - "**/config/**"
   - "**/generated/**"
   - "**/model/**"
+  - "**/metrics/**"
   - "**/metadata/database/dao/*"
   - "**/*Exception*"
   - "apache/rocketmq/controller/**/*"
