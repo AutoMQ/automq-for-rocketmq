@@ -83,7 +83,7 @@ public class MockProxyMetadataService implements ProxyMetadataService {
                 .setName(groupName)
                 .setGroupId(groupId)
                 .setMaxDeliveryAttempt(16)
-                .setSubMode(SubscriptionMode.SUB_MODE_POP)
+                .setSubMode(groupName.contains("pull") ? SubscriptionMode.SUB_MODE_PULL : SubscriptionMode.SUB_MODE_POP)
                 .build());
     }
 
