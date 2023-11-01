@@ -21,6 +21,7 @@ import com.automq.rocketmq.common.config.ProxyConfig;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LockServiceTest {
@@ -29,47 +30,54 @@ class LockServiceTest {
     void lock() {
         LockService lockService = new LockService(new ProxyConfig());
 
-        boolean result = lockService.tryLock(0, 0, "client1", false);
+        boolean result = lockService.tryLock(0, 0, "client1", false, false);
         assertTrue(result);
 
         // Check if the lock is reentrant.
-        result = lockService.tryLock(0, 0, "client1", false);
+        result = lockService.tryLock(0, 0, "client1", false, false);
         assertFalse(result);
 
         // Check if client can lock another queue.
-        result = lockService.tryLock(1, 1, "client1", false);
+        result = lockService.tryLock(1, 1, "client1", false, false);
         assertTrue(result);
 
         // Try to release and lock again.
         lockService.release(0, 0);
-        result = lockService.tryLock(0, 0, "client1", false);
+        result = lockService.tryLock(0, 0, "client1", false, true);
+        assertTrue(result);
+
+        // Check if the lock is reentrant.
+        result = lockService.tryLock(0, 0, "client1", false, true);
         assertTrue(result);
     }
 
     @Test
-    void lock_WithFifo() {
+    void lock_preempt() {
         LockService lockService = new LockService(new ProxyConfig());
 
-        boolean result = lockService.tryLock(0, 0, "client1", true);
+        // Set both preempt and reentrant to true.
+        assertThrowsExactly(IllegalArgumentException.class, () -> lockService.tryLock(0, 0, "client1", true, true));
+
+        boolean result = lockService.tryLock(0, 0, "client1", true, false);
         assertTrue(result);
 
         // Other clients can not acquire the lock before the lock is expired.
         lockService.release(0, 0);
-        result = lockService.tryLock(0, 0, "client2", true);
+        result = lockService.tryLock(0, 0, "client2", true, false);
         assertFalse(result);
 
-        result = lockService.tryLock(0, 0, "client1", true);
+        result = lockService.tryLock(0, 0, "client1", true, false);
         assertTrue(result);
 
         // Can not expire the lock when there is a ongoing pop request.
         lockService.tryExpire(0, 0, 0);
-        result = lockService.tryLock(0, 0, "client2", true);
+        result = lockService.tryLock(0, 0, "client2", true, false);
         assertFalse(result);
 
         // Expire the lock immediately, so other clients can acquire the lock.
         lockService.release(0, 0);
         lockService.tryExpire(0, 0, 0);
-        result = lockService.tryLock(0, 0, "client2", true);
+        result = lockService.tryLock(0, 0, "client2", true, false);
         assertTrue(result);
     }
 }

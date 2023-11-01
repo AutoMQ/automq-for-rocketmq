@@ -103,7 +103,23 @@ public class MockMessageStore implements MessageStore {
     @Override
     public CompletableFuture<PullResult> pull(long consumerGroupId, long topicId, int queueId, Filter filter,
         long offset, int batchSize, boolean retry) {
-        return null;
+        if (retry) {
+            return CompletableFuture.completedFuture(new PullResult(PullResult.Status.NO_NEW_MSG, 0L, 0L, 0L, new ArrayList<>()));
+        }
+
+        List<FlatMessageExt> messageList = messageMap.computeIfAbsent(topicId + queueId, v -> new ArrayList<>());
+        int start = offset >= messageList.size() ? -1 : (int) offset;
+        int end = offset + batchSize >= messageList.size() ? messageList.size() : (int) offset + batchSize;
+
+        PullResult.Status status;
+        if (start < 0) {
+            status = PullResult.Status.NO_NEW_MSG;
+            messageList = new ArrayList<>();
+        } else {
+            status = PullResult.Status.FOUND;
+            messageList = messageList.subList(start, end);
+        }
+        return CompletableFuture.completedFuture(new PullResult(status, offset + messageList.size(), 0L, messageList.size() - end, messageList));
     }
 
     @Override

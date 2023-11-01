@@ -223,7 +223,7 @@ public class MessageServiceImpl implements MessageService {
                     if (pullResult.status() == com.automq.rocketmq.store.model.message.PullResult.Status.FOUND) {
                         return pullResult.messageList().get(0);
                     }
-                    throw new IllegalArgumentException("Message not found");
+                    throw new IllegalArgumentException("Message not found.");
                 }).thenCompose(messageExt -> {
                     if (messageExt.deliveryAttempts() > group.getMaxDeliveryAttempt()) {
                         return deadLetterService.send(group.getGroupId(), messageExt);
@@ -344,7 +344,7 @@ public class MessageServiceImpl implements MessageService {
         Topic topic, int queueId, Filter filter, int batchSize, boolean fifo, long invisibleDuration,
         long timeoutMillis) {
         long topicId = topic.getTopicId();
-        if (lockService.tryLock(topicId, queueId, clientId, fifo)) {
+        if (lockService.tryLock(topicId, queueId, clientId, fifo, false)) {
             return popSpecifiedQueueUnsafe(consumerGroup, topic, queueId, filter, batchSize, fifo, invisibleDuration)
                 .orTimeout(timeoutMillis, TimeUnit.MILLISECONDS)
                 .whenComplete((v, throwable) -> {
@@ -388,7 +388,7 @@ public class MessageServiceImpl implements MessageService {
             }
 
             if (group.getSubMode() != SubscriptionMode.SUB_MODE_POP) {
-                throw new CompletionException(new MQBrokerException(ResponseCode.NO_PERMISSION, String.format("Group [%s] do not support pop mode.", group.getName())));
+                throw new CompletionException(new MQBrokerException(ResponseCode.NO_PERMISSION, String.format("The consumer group [pullGroup] is not allowed to consume message with pop mode.", group.getName())));
             }
 
             topicReference.set(topic);
@@ -583,7 +583,7 @@ public class MessageServiceImpl implements MessageService {
                 }
 
                 if (group.getSubMode() != SubscriptionMode.SUB_MODE_PULL) {
-                    throw new CompletionException(new MQBrokerException(ResponseCode.NO_PERMISSION, String.format("Group [%s] do not support pull mode.", group.getName())));
+                    throw new CompletionException(new MQBrokerException(ResponseCode.NO_PERMISSION, String.format("The consumer group [%s] is not allowed to consume message with pull mode.", group.getName())));
                 }
 
                 topicReference.set(topic);
@@ -632,7 +632,7 @@ public class MessageServiceImpl implements MessageService {
         for (MessageQueue queue : requestBody.getMqSet()) {
             VirtualQueue virtualQueue = new VirtualQueue(queue.getBrokerName());
             // Expire time is 60 seconds which is a magic number from apache rocketmq.
-            boolean result = lockService.tryLock(virtualQueue.topicId(), virtualQueue.physicalQueueId(), requestBody.getClientId(), true, 60_000);
+            boolean result = lockService.tryLock(virtualQueue.topicId(), virtualQueue.physicalQueueId(), requestBody.getClientId(), false, true, 60_000);
             if (result) {
                 successSet.add(queue);
             }
@@ -646,7 +646,7 @@ public class MessageServiceImpl implements MessageService {
         UnlockBatchRequestBody requestBody, long timeoutMillis) {
         for (MessageQueue queue : requestBody.getMqSet()) {
             VirtualQueue virtualQueue = new VirtualQueue(queue.getBrokerName());
-            lockService.tryExpire(virtualQueue.topicId(), virtualQueue.physicalQueueId(), 0);
+            lockService.release(virtualQueue.topicId(), virtualQueue.physicalQueueId());
         }
 
         return CompletableFuture.completedFuture(null);
