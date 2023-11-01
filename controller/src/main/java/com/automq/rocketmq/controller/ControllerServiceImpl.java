@@ -66,6 +66,7 @@ import apache.rocketmq.controller.v1.PrepareS3ObjectsRequest;
 import apache.rocketmq.controller.v1.ReassignMessageQueueReply;
 import apache.rocketmq.controller.v1.ReassignMessageQueueRequest;
 import apache.rocketmq.controller.v1.Status;
+import apache.rocketmq.controller.v1.SubscriptionMode;
 import apache.rocketmq.controller.v1.TerminateNodeReply;
 import apache.rocketmq.controller.v1.TerminateNodeRequest;
 import apache.rocketmq.controller.v1.TerminationStage;
@@ -404,6 +405,14 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
 
     @Override
     public void createGroup(CreateGroupRequest request, StreamObserver<CreateGroupReply> responseObserver) {
+        if (request.getSubMode() == SubscriptionMode.SUB_MODE_UNSPECIFIED) {
+            CreateGroupReply reply = CreateGroupReply.newBuilder()
+                .setStatus(Status.newBuilder().setCode(Code.BAD_REQUEST).setMessage("SubMode is required").build())
+                .build();
+            responseObserver.onNext(reply);
+            responseObserver.onCompleted();
+            return;
+        }
         metadataStore.createGroup(request)
             .whenComplete((groupId, e) -> {
                 if (null != e) {
