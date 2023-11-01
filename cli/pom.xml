@@ -22,7 +22,7 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>com.automq.rocketmq</groupId>
-        <artifactId>rocketmq-on-s3</artifactId>
+        <artifactId>automq-for-rocketmq</artifactId>
         <version>5.1.3-automq-0-SNAPSHOT</version>
     </parent>
 

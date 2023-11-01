@@ -20,9 +20,9 @@ metadata:
   labels:
     {{- include "rocketmq-broker.selectorLabels" . | nindent 8 }}
 spec:
-  type: rocketmq-on-s3
+  type: automq-for-rocketmq
   componentDefs:
-    - name: rocketmq-on-s3-broker
+    - name: automq-for-rocketmq-broker
       description: |-
         Rocketmq broker that act as both brokers and controllers are referred to as "combined" servers.
       workloadType: Stateful
@@ -44,7 +44,7 @@ spec:
         containers:
           - name: broker
             command: [ "/bin/sh" ]
-            args: [ "-c", "./run-server.sh com.automq.rocketmq.broker.BrokerStartup -c /home/rocketmq/rocketmq-on-s3-5.1.3/conf/broker/$(POD_NAME)" ]
+            args: [ "-c", "./run-server.sh com.automq.rocketmq.broker.BrokerStartup -c /home/rocketmq/automq-for-rocketmq-5.1.3/conf/broker/$(POD_NAME)" ]
             env:
               - name: POD_NAME
                 valueFrom:
@@ -93,7 +93,7 @@ spec:
               tcpSocket:
                 port: rocketmq-broker
             volumeMounts:
-              - mountPath: /home/rocketmq/rocketmq-on-s3-5.1.3/conf/broker
+              - mountPath: /home/rocketmq/automq-for-rocketmq-5.1.3/conf/broker
                 name: broker-conf
               - mountPath: /root/logs/rocketmqlogs
                 name: broker-storage

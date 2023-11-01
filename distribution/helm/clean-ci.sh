@@ -17,7 +17,7 @@
 
 helm uninstall s3-localstack
 helm uninstall mysql
-helm uninstall rocketmq-on-s3
+helm uninstall automq-for-rocketmq
 
 kubectl delete -f deploy/init-db-configmap.yaml
 rm deploy/init-db-configmap.yaml

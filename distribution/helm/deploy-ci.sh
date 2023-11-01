@@ -47,7 +47,7 @@ helm install mysql bitnami/mysql -f deploy/mysql.yaml
 
 sleep 10
 echo "Deploying rocketmq..."
-# deploy rocketmq-on-s3
-helm install rocketmq-on-s3 . -f deploy/helm_sample_values.yaml
+# deploy automq-for-rocketmq
+helm install automq-for-rocketmq . -f deploy/helm_sample_values.yaml
 
 
