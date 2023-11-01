@@ -33,6 +33,7 @@ import com.automq.rocketmq.common.system.S3Constants;
 import com.automq.rocketmq.common.system.StreamConstants;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.metadata.MetadataStore;
+import com.automq.rocketmq.controller.metadata.database.cache.S3StreamObjectCache;
 import com.automq.rocketmq.controller.metadata.database.dao.Range;
 import com.automq.rocketmq.controller.metadata.database.dao.S3Object;
 import com.automq.rocketmq.controller.metadata.database.dao.S3WalObject;
@@ -69,16 +70,20 @@ public class S3MetadataManager {
 
     private final MetadataStore metadataStore;
 
+    private final S3StreamObjectCache s3StreamObjectCache;
+
     public S3MetadataManager(MetadataStore metadataStore) {
         this.metadataStore = metadataStore;
+        this.s3StreamObjectCache = new S3StreamObjectCache();
     }
 
     public CompletableFuture<Long> prepareS3Objects(int count, int ttlInMinutes) {
         CompletableFuture<Long> future = new CompletableFuture<>();
         for (; ; ) {
-            if (metadataStore.isLeader()) {
+            if (metadataStore.config().circuitStreamMetadata() || metadataStore.isLeader()) {
                 try (SqlSession session = metadataStore.openSession()) {
-                    if (!metadataStore.maintainLeadershipWithSharedLock(session)) {
+                    if (!metadataStore.config().circuitStreamMetadata() &&
+                        !metadataStore.maintainLeadershipWithSharedLock(session)) {
                         continue;
                     }
 
@@ -138,9 +143,10 @@ public class S3MetadataManager {
 
         CompletableFuture<Void> future = new CompletableFuture<>();
         for (; ; ) {
-            if (metadataStore.isLeader()) {
+            if (metadataStore.config().circuitStreamMetadata() || metadataStore.isLeader()) {
                 try (SqlSession session = metadataStore.openSession()) {
-                    if (!metadataStore.maintainLeadershipWithSharedLock(session)) {
+                    if (!metadataStore.config().circuitStreamMetadata() &&
+                        !metadataStore.maintainLeadershipWithSharedLock(session)) {
                         continue;
                     }
 
@@ -203,6 +209,9 @@ public class S3MetadataManager {
                         }
                     }
 
+                    Map<Long, List<com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject>> toCache =
+                        new HashMap<>();
+
                     // commit stream objects;
                     if (!streamObjects.isEmpty()) {
                         for (apache.rocketmq.controller.v1.S3StreamObject s3StreamObject : streamObjects) {
@@ -210,14 +219,16 @@ public class S3MetadataManager {
                             long objectSize = s3StreamObject.getObjectSize();
                             long streamId = s3StreamObject.getStreamId();
                             if (!commitObject(oId, streamId, objectSize, session)) {
-                                ControllerException e = new ControllerException(Code.ILLEGAL_STATE_VALUE, String.format("S3StreamObject[object-id=%d] is not ready for commit", oId));
+                                String msg = String.format("S3StreamObject[object-id=%d] is not ready to commit", oId);
+                                ControllerException e = new ControllerException(Code.ILLEGAL_STATE_VALUE, msg);
                                 future.completeExceptionally(e);
                                 return future;
                             }
                         }
                         // create stream object records
                         streamObjects.forEach(s3StreamObject -> {
-                            com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object = new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
+                            com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject object =
+                                new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
                             object.setStreamId(s3StreamObject.getStreamId());
                             object.setObjectId(s3StreamObject.getObjectId());
                             object.setCommittedTimestamp(new Date());
@@ -226,6 +237,11 @@ public class S3MetadataManager {
                             object.setEndOffset(s3StreamObject.getEndOffset());
                             object.setObjectSize(s3StreamObject.getObjectSize());
                             s3StreamObjectMapper.commit(object);
+                            if (toCache.containsKey(object.getStreamId())) {
+                                toCache.get(object.getStreamId()).add(object);
+                            } else {
+                                toCache.put(object.getStreamId(), List.of(object));
+                            }
                         });
                     }
 
@@ -248,8 +264,13 @@ public class S3MetadataManager {
                         s3WALObject.setSubStreams(subStreams);
                         s3WALObjectMapper.create(s3WALObject);
                     }
-
                     session.commit();
+
+                    // Update Cache
+                    for (Map.Entry<Long, List<com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject>> entry
+                        : toCache.entrySet()) {
+                        s3StreamObjectCache.cache(entry.getKey(), entry.getValue());
+                    }
                     LOGGER.info("broker[broke-id={}] commit wal object[object-id={}] success, compacted objects[{}], stream objects[{}]",
                         brokerId, walObject.getObjectId(), compactedObjects, streamObjects);
                     future.complete(null);
@@ -282,21 +303,23 @@ public class S3MetadataManager {
     }
 
     public CompletableFuture<Void> commitStreamObject(apache.rocketmq.controller.v1.S3StreamObject streamObject,
-        List<Long> compactedObjects) throws ControllerException {
-
+        List<Long> compactedObjects) {
         LOGGER.info("commitStreamObject with streamObject: {}, compactedObjects: {}", TextFormat.shortDebugString(streamObject),
             compactedObjects);
 
         CompletableFuture<Void> future = new CompletableFuture<>();
         for (; ; ) {
-            if (metadataStore.isLeader()) {
+            if (metadataStore.config().circuitStreamMetadata() || metadataStore.isLeader()) {
                 try (SqlSession session = metadataStore.openSession()) {
-                    if (!metadataStore.maintainLeadershipWithSharedLock(session)) {
+                    if (!metadataStore.config().circuitStreamMetadata() &&
+                        !metadataStore.maintainLeadershipWithSharedLock(session)) {
                         continue;
                     }
                     if (streamObject.getObjectId() == S3Constants.NOOP_OBJECT_ID) {
                         LOGGER.error("S3StreamObject[object-id={}] is null or objectId is unavailable", streamObject.getObjectId());
-                        ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE, String.format("S3StreamObject[object-id=%d] is null or objectId is unavailable", streamObject.getObjectId()));
+                        String msg = String.format("S3StreamObject[object-id=%d] is null or objectId is unavailable",
+                            streamObject.getObjectId());
+                        ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE, msg);
                         future.completeExceptionally(e);
                         return future;
                     }
@@ -307,7 +330,9 @@ public class S3MetadataManager {
 
                     // commit object
                     if (!commitObject(streamObject.getObjectId(), streamObject.getStreamId(), streamObject.getObjectSize(), session)) {
-                        ControllerException e = new ControllerException(Code.ILLEGAL_STATE_VALUE, String.format("S3StreamObject[object-id=%d] is not ready for commit", streamObject.getObjectId()));
+                        String msg = String.format("S3StreamObject[object-id=%d] is not ready for commit",
+                            streamObject.getObjectId());
+                        ControllerException e = new ControllerException(Code.ILLEGAL_STATE_VALUE, msg);
                         future.completeExceptionally(e);
                         return future;
                     }
@@ -322,14 +347,20 @@ public class S3MetadataManager {
                                 s3ObjectMapper.markToDelete(object.getId(), new Date());
 
                                 // update dataTs to the min compacted object's dataTs
-                                com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject s3StreamObject = s3StreamObjectMapper.getByObjectId(id);
+                                com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject s3StreamObject =
+                                    s3StreamObjectMapper.getByObjectId(id);
                                 return s3StreamObject.getBaseDataTimestamp().getTime();
                             })
                             .min(Long::compareTo).get();
                     }
+
+                    List<com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject>
+                        toCache = new ArrayList<>();
+
                     // create a new S3StreamObject to replace committed ones
                     if (streamObject.getObjectId() != S3Constants.NOOP_OBJECT_ID) {
-                        com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject newS3StreamObj = new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
+                        com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject newS3StreamObj =
+                            new com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject();
                         newS3StreamObj.setStreamId(streamObject.getStreamId());
                         newS3StreamObj.setObjectId(streamObject.getObjectId());
                         newS3StreamObj.setObjectSize(streamObject.getObjectSize());
@@ -338,6 +369,7 @@ public class S3MetadataManager {
                         newS3StreamObj.setBaseDataTimestamp(new Date(dataTs));
                         newS3StreamObj.setCommittedTimestamp(new Date(committedTs));
                         s3StreamObjectMapper.create(newS3StreamObj);
+                        toCache.add(newS3StreamObj);
                     }
 
                     // delete the compactedObjects of S3Stream
@@ -345,7 +377,13 @@ public class S3MetadataManager {
                         compactedObjects.forEach(id -> s3StreamObjectMapper.delete(null, null, id));
                     }
                     session.commit();
-                    LOGGER.info("S3StreamObject[object-id={}] commit success, compacted objects: {}", streamObject.getObjectId(), compactedObjects);
+
+                    // Update Cache
+                    s3StreamObjectCache.cache(streamObject.getStreamId(), toCache);
+                    s3StreamObjectCache.onCompact(streamObject.getStreamId(), compactedObjects);
+
+                    LOGGER.info("S3StreamObject[object-id={}] commit success, compacted objects: {}",
+                        streamObject.getObjectId(), compactedObjects);
                     future.complete(null);
                 } catch (Exception e) {
                     LOGGER.error("CommitStream failed", e);
@@ -358,13 +396,14 @@ public class S3MetadataManager {
                     .addAllCompactedObjectIds(compactedObjects)
                     .build();
                 try {
-                    metadataStore.controllerClient().commitStreamObject(metadataStore.leaderAddress(), request).whenComplete(((reply, e) -> {
-                        if (null != e) {
-                            future.completeExceptionally(e);
-                        } else {
-                            future.complete(null);
-                        }
-                    }));
+                    metadataStore.controllerClient().commitStreamObject(metadataStore.leaderAddress(), request)
+                        .whenComplete(((reply, e) -> {
+                            if (null != e) {
+                                future.completeExceptionally(e);
+                            } else {
+                                future.complete(null);
+                            }
+                        }));
                 } catch (ControllerException e) {
                     future.completeExceptionally(e);
                 }
@@ -449,17 +488,42 @@ public class S3MetadataManager {
         return future;
     }
 
-    public CompletableFuture<List<apache.rocketmq.controller.v1.S3StreamObject>> listStreamObjects(long streamId,
-        long startOffset, long endOffset, int limit) {
-        CompletableFuture<List<apache.rocketmq.controller.v1.S3StreamObject>> future = new CompletableFuture<>();
+    public CompletableFuture<List<com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject>> listStreamObjects0(
+        long streamId, long startOffset, long endOffset, int limit) {
+        boolean skipCache = false;
+        // Serve with cache
+        if (s3StreamObjectCache.streamExclusive(streamId)) {
+            List<com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject> list =
+                s3StreamObjectCache.listStreamObjects(streamId, startOffset, endOffset, limit);
+            if (!list.isEmpty()) {
+                return CompletableFuture.completedFuture(list.stream().toList());
+            }
+            skipCache = true;
+        }
+
+        CompletableFuture<List<com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject>> future =
+            new CompletableFuture<>();
         try (SqlSession session = metadataStore.openSession()) {
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
-            List<apache.rocketmq.controller.v1.S3StreamObject> streamObjects = s3StreamObjectMapper.list(null, streamId, startOffset, endOffset, limit).stream()
-                .map(this::buildS3StreamObject)
-                .toList();
+            S3WalObjectMapper s3WalObjectMapper = session.getMapper(S3WalObjectMapper.class);
+            if (!skipCache && s3WalObjectMapper.streamExclusive(metadataStore.config().nodeId(), streamId)) {
+                s3StreamObjectCache.makeStreamExclusive(streamId);
+                List<com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject> list =
+                    s3StreamObjectMapper.listByStreamId(streamId);
+                s3StreamObjectCache.initStream(streamId, list);
+                return listStreamObjects0(streamId, startOffset, endOffset, limit);
+            }
+            List<com.automq.rocketmq.controller.metadata.database.dao.S3StreamObject> streamObjects = s3StreamObjectMapper
+                .list(null, streamId, startOffset, endOffset, limit);
             future.complete(streamObjects);
         }
         return future;
+    }
+
+    public CompletableFuture<List<S3StreamObject>> listStreamObjects(long streamId, long startOffset, long endOffset,
+        int limit) {
+        return listStreamObjects0(streamId, startOffset, endOffset, limit)
+            .thenApply(list -> list.stream().map(this::buildS3StreamObject).toList());
     }
 
     private S3StreamObject buildS3StreamObject(
@@ -471,7 +535,8 @@ public class S3MetadataManager {
             .setStartOffset(originalObject.getStartOffset())
             .setEndOffset(originalObject.getEndOffset())
             .setBaseDataTimestamp(originalObject.getBaseDataTimestamp().getTime())
-            .setCommittedTimestamp(originalObject.getCommittedTimestamp() != null ? originalObject.getCommittedTimestamp().getTime() : S3Constants.NOOP_OBJECT_COMMIT_TIMESTAMP)
+            .setCommittedTimestamp(originalObject.getCommittedTimestamp() != null ?
+                originalObject.getCommittedTimestamp().getTime() : S3Constants.NOOP_OBJECT_COMMIT_TIMESTAMP)
             .build();
     }
 
@@ -484,7 +549,8 @@ public class S3MetadataManager {
             .setBrokerId(originalObject.getNodeId())
             .setSequenceId(originalObject.getSequenceId())
             .setBaseDataTimestamp(originalObject.getBaseDataTimestamp().getTime())
-            .setCommittedTimestamp(originalObject.getCommittedTimestamp() != null ? originalObject.getCommittedTimestamp().getTime() : S3Constants.NOOP_OBJECT_COMMIT_TIMESTAMP)
+            .setCommittedTimestamp(originalObject.getCommittedTimestamp() != null ?
+                originalObject.getCommittedTimestamp().getTime() : S3Constants.NOOP_OBJECT_COMMIT_TIMESTAMP)
             .setSubStreams(subStreams)
             .build();
     }
@@ -565,12 +631,10 @@ public class S3MetadataManager {
         long streamId, long startOffset, long endOffset, int limit) {
         return CompletableFuture.supplyAsync(() -> {
             try (SqlSession session = metadataStore.openSession()) {
-                S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
                 S3WalObjectMapper s3WalObjectMapper = session.getMapper(S3WalObjectMapper.class);
-                List<apache.rocketmq.controller.v1.S3StreamObject> s3StreamObjects = s3StreamObjectMapper.list(null, streamId, startOffset, endOffset, limit)
-                    .stream()
-                    .map(this::buildS3StreamObject)
-                    .toList();
+
+                List<S3StreamObject> s3StreamObjects =
+                    listStreamObjects(streamId, startOffset, endOffset, limit).join();
 
                 List<S3WALObject> walObjects = new ArrayList<>();
                 s3WalObjectMapper.list(null, null)
@@ -641,9 +705,10 @@ public class S3MetadataManager {
     public CompletableFuture<Void> trimStream(long streamId, long streamEpoch, long newStartOffset) {
         CompletableFuture<Void> future = new CompletableFuture<>();
         for (; ; ) {
-            if (metadataStore.isLeader()) {
+            if (metadataStore.config().circuitStreamMetadata() || metadataStore.isLeader()) {
                 try (SqlSession session = metadataStore.openSession()) {
-                    if (!metadataStore.maintainLeadershipWithSharedLock(session)) {
+                    if (!metadataStore.config().circuitStreamMetadata() &&
+                        !metadataStore.maintainLeadershipWithSharedLock(session)) {
                         continue;
                     }
                     StreamMapper streamMapper = session.getMapper(StreamMapper.class);
@@ -747,6 +812,10 @@ public class S3MetadataManager {
                             // remove offset range about sub-stream ...
                         });
                     session.commit();
+
+                    // Update cache
+                    s3StreamObjectCache.onTrim(streamId, newStartOffset);
+
                     LOGGER.info("Node[node-id={}] trim stream [stream-id={}] with epoch={} and newStartOffset={}",
                         metadataStore.config().nodeId(), streamId, streamEpoch, newStartOffset);
                     future.complete(null);
