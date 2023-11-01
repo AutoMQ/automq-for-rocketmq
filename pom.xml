@@ -251,6 +251,7 @@
                         <exclude>"**/config/**"</exclude>
                         <exclude>"**/model/**"</exclude>
                         <exclude>"**/generated/**"</exclude>
+                        <exclude>"**/metrics/**"</exclude>
                         <exclude>**/*Exception*</exclude>
                         <exclude>**/metadata/database/dao/*</exclude>
                         <exclude>apache/rocketmq/controller/**/*</exclude>
