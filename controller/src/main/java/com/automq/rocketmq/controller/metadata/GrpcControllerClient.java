@@ -495,6 +495,12 @@ public class GrpcControllerClient implements ControllerClient {
                             result.getStatus().getMessage());
                         future.completeExceptionally(e);
                     }
+                    case BAD_REQUEST -> {
+                        LOGGER.info("CreateGroup request is rejected. Reason: {}", result.getStatus().getMessage());
+                        ControllerException e = new ControllerException(result.getStatus().getCodeValue(),
+                            result.getStatus().getMessage());
+                        future.completeExceptionally(e);
+                    }
                     default -> {
                         LOGGER.warn("Unexpected error while creating group {}", request.getName());
                         ControllerException e = new ControllerException(result.getStatus().getCodeValue(),

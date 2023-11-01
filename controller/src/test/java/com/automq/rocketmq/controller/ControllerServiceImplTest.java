@@ -52,6 +52,7 @@ import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.StreamState;
 import apache.rocketmq.controller.v1.SubStream;
+import apache.rocketmq.controller.v1.SubscriptionMode;
 import apache.rocketmq.controller.v1.TopicStatus;
 import apache.rocketmq.controller.v1.TrimStreamRequest;
 import apache.rocketmq.controller.v1.UpdateGroupRequest;
@@ -100,6 +101,7 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -417,6 +419,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                     .setName("G-abc")
                     .setDeadLetterTopicId(topicId)
                     .setMaxDeliveryAttempt(5)
+                    .setSubMode(SubscriptionMode.SUB_MODE_POP)
                     .build();
 
                 String target = String.format("localhost:%d", port);
@@ -428,6 +431,21 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 // Test duplication
                 client.createGroup(target, request).whenComplete(
                     (res, e) -> Assertions.assertEquals(ExecutionException.class, e.getClass()));
+
+                request = CreateGroupRequest.newBuilder()
+                    .setGroupType(GroupType.GROUP_TYPE_STANDARD)
+                    .setName("G-def")
+                    .setDeadLetterTopicId(topicId)
+                    .setMaxDeliveryAttempt(5)
+                    .build();
+                try {
+                    client.createGroup(target, request).join();
+                    Assertions.fail("Should have failed as required field subMode is missing");
+                } catch (CompletionException e) {
+                    ControllerException cause = (ControllerException) e.getCause();
+                    Assertions.assertEquals(Code.BAD_REQUEST_VALUE, cause.getErrorCode());
+                    Assertions.assertEquals("SubMode is required", cause.getMessage());
+                }
             }
         }
     }
