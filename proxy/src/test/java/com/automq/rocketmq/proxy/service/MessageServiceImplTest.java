@@ -17,8 +17,10 @@
 
 package com.automq.rocketmq.proxy.service;
 
+import apache.rocketmq.v2.Code;
 import com.automq.rocketmq.common.config.ProxyConfig;
 import com.automq.rocketmq.metadata.api.ProxyMetadataService;
+import com.automq.rocketmq.proxy.exception.ProxyException;
 import com.automq.rocketmq.proxy.mock.MockMessageStore;
 import com.automq.rocketmq.proxy.mock.MockProxyMetadataService;
 import com.automq.rocketmq.proxy.model.ProxyContextExt;
@@ -40,7 +42,6 @@ import org.apache.rocketmq.client.consumer.PopResult;
 import org.apache.rocketmq.client.consumer.PopStatus;
 import org.apache.rocketmq.client.consumer.PullResult;
 import org.apache.rocketmq.client.consumer.PullStatus;
-import org.apache.rocketmq.client.exception.MQBrokerException;
 import org.apache.rocketmq.client.producer.SendResult;
 import org.apache.rocketmq.client.producer.SendStatus;
 import org.apache.rocketmq.common.filter.ExpressionType;
@@ -218,10 +219,10 @@ class MessageServiceImplTest {
         // Reject the request from the group with pop mode.
         header.setConsumerGroup("popGroup");
         CompletionException exception = assertThrowsExactly(CompletionException.class, () -> messageService.pullMessage(ProxyContextExt.create(), messageQueue, header, 0L).join());
-        assertInstanceOf(MQBrokerException.class, ExceptionUtils.getRealException(exception));
-        MQBrokerException realException = (MQBrokerException) ExceptionUtils.getRealException(exception);
-        assertEquals(realException.getMessage(), "CODE: 16  DESC: The consumer group [popGroup] is not allowed to consume message with pull mode.\n" +
-            "For more information, please visit the url, https://rocketmq.apache.org/docs/bestPractice/06FAQ");
+        assertInstanceOf(ProxyException.class, ExceptionUtils.getRealException(exception));
+        ProxyException realException = (ProxyException) ExceptionUtils.getRealException(exception);
+        assertEquals(realException.getErrorCode(), Code.FORBIDDEN);
+        assertEquals(realException.getMessage(), "The consumer group [popGroup] is not allowed to consume message with pull mode.");
     }
 
     @Test
@@ -236,9 +237,10 @@ class MessageServiceImplTest {
         header.setDelayLevel(0);
 
         CompletionException exception = assertThrowsExactly(CompletionException.class, () -> messageService.sendMessageBack(ProxyContextExt.create(), null, null, header, 0L).join());
-        assertInstanceOf(IllegalArgumentException.class, ExceptionUtils.getRealException(exception));
-        IllegalArgumentException realException = (IllegalArgumentException) ExceptionUtils.getRealException(exception);
-        assertEquals(realException.getMessage(), "Message not found.");
+        assertInstanceOf(ProxyException.class, ExceptionUtils.getRealException(exception));
+        ProxyException realException = (ProxyException) ExceptionUtils.getRealException(exception);
+        assertEquals(realException.getErrorCode(), Code.MESSAGE_NOT_FOUND);
+        assertEquals(realException.getMessage(), "Message not found from server.");
 
         long topicId = metadataService.topicOf(topicName).join().getTopicId();
         messageStore.put(FlatMessageUtil.convertTo(topicId, 0, "", new Message(topicName, "", new byte[] {})));
@@ -361,10 +363,10 @@ class MessageServiceImplTest {
         // Reject the request from the group with pull mode.
         header.setConsumerGroup("pullGroup");
         CompletionException exception = assertThrowsExactly(CompletionException.class, () -> messageService.popMessage(ProxyContextExt.create(), messageQueue, header, 0L).join());
-        assertInstanceOf(MQBrokerException.class, ExceptionUtils.getRealException(exception));
-        MQBrokerException realException = (MQBrokerException) ExceptionUtils.getRealException(exception);
-        assertEquals(realException.getMessage(), "CODE: 16  DESC: The consumer group [pullGroup] is not allowed to consume message with pop mode.\n" +
-            "For more information, please visit the url, https://rocketmq.apache.org/docs/bestPractice/06FAQ");
+        assertInstanceOf(ProxyException.class, ExceptionUtils.getRealException(exception));
+        ProxyException realException = (ProxyException) ExceptionUtils.getRealException(exception);
+        assertEquals(realException.getErrorCode(), Code.FORBIDDEN);
+        assertEquals(realException.getMessage(), "The consumer group [pullGroup] is not allowed to consume message with pop mode.");
     }
 
     @Test

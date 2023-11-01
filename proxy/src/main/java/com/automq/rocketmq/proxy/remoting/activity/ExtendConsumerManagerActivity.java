@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.proxy.remoting.activity;
 
+import com.automq.rocketmq.proxy.exception.ExceptionHandler;
 import com.automq.rocketmq.proxy.remoting.RemotingUtil;
 import io.netty.channel.ChannelHandlerContext;
 import java.util.Optional;
@@ -284,5 +285,17 @@ public class ExtendConsumerManagerActivity extends ConsumerManagerActivity imple
             writeResponse(ctx, context, request, response);
         });
         return null;
+    }
+
+    @Override
+    protected void writeErrResponse(ChannelHandlerContext ctx, ProxyContext context, RemotingCommand request,
+        Throwable t) {
+        Optional<RemotingCommand> response = ExceptionHandler.convertToRemotingResponse(t);
+        if (response.isPresent()) {
+            writeResponse(ctx, context, request, response.get(), t);
+            return;
+        }
+
+        super.writeErrResponse(ctx, context, request, t);
     }
 }

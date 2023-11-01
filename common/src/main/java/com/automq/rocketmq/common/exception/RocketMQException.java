@@ -19,7 +19,7 @@ package com.automq.rocketmq.common.exception;
 
 public class RocketMQException extends Exception {
 
-    private int errorCode;
+    private final int errorCode;
 
     public RocketMQException(int errorCode) {
         this.errorCode = errorCode;

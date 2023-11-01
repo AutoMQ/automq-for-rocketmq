@@ -27,6 +27,7 @@ import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.common.util.CommonUtil;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.metadata.api.ProxyMetadataService;
+import com.automq.rocketmq.proxy.exception.ProxyException;
 import com.automq.rocketmq.proxy.metrics.ProxyMetricsManager;
 import com.automq.rocketmq.proxy.model.VirtualQueue;
 import com.automq.rocketmq.proxy.util.FlatMessageUtil;
@@ -58,7 +59,6 @@ import org.apache.rocketmq.client.consumer.PopResult;
 import org.apache.rocketmq.client.consumer.PopStatus;
 import org.apache.rocketmq.client.consumer.PullResult;
 import org.apache.rocketmq.client.consumer.PullStatus;
-import org.apache.rocketmq.client.exception.MQBrokerException;
 import org.apache.rocketmq.client.producer.SendResult;
 import org.apache.rocketmq.client.producer.SendStatus;
 import org.apache.rocketmq.common.MixAll;
@@ -144,7 +144,7 @@ public class MessageServiceImpl implements MessageService {
             if (topic.getTopicId() != virtualQueue.topicId()) {
                 LOGGER.error("Topic id in request header {} does not match topic id in message queue {}, maybe the topic is recreated.",
                     topic.getTopicId(), virtualQueue.topicId());
-                return CompletableFuture.failedFuture(new MQBrokerException(ResponseCode.TOPIC_NOT_EXIST, "Topic not exist"));
+                return CompletableFuture.failedFuture(new ProxyException(apache.rocketmq.v2.Code.TOPIC_NOT_FOUND, "Topic resource does not exist."));
             }
             FlatMessage flatMessage = FlatMessageUtil.convertTo(topic.getTopicId(), virtualQueue.physicalQueueId(), config.hostName(), message);
 
@@ -210,7 +210,7 @@ public class MessageServiceImpl implements MessageService {
             if (topic.getTopicId() != virtualQueue.topicId()) {
                 LOGGER.error("Topic id in request header {} does not match topic id in message queue {}, maybe the topic is recreated.",
                     topic.getTopicId(), virtualQueue.topicId());
-                throw new CompletionException(new MQBrokerException(ResponseCode.TOPIC_NOT_EXIST, "Topic not exist"));
+                throw new ProxyException(apache.rocketmq.v2.Code.TOPIC_NOT_FOUND, "Topic resource does not exist.");
             }
             return Pair.of(topic, group);
         }).thenCompose(pair -> {
@@ -223,7 +223,7 @@ public class MessageServiceImpl implements MessageService {
                     if (pullResult.status() == com.automq.rocketmq.store.model.message.PullResult.Status.FOUND) {
                         return pullResult.messageList().get(0);
                     }
-                    throw new IllegalArgumentException("Message not found.");
+                    throw new ProxyException(apache.rocketmq.v2.Code.MESSAGE_NOT_FOUND, "Message not found from server.");
                 }).thenCompose(messageExt -> {
                     if (messageExt.deliveryAttempts() > group.getMaxDeliveryAttempt()) {
                         return deadLetterService.send(group.getGroupId(), messageExt);
@@ -384,11 +384,11 @@ public class MessageServiceImpl implements MessageService {
             if (topic.getTopicId() != virtualQueue.topicId()) {
                 LOGGER.error("Topic id in request header {} does not match topic id in message queue {}, maybe the topic is recreated.",
                     topic.getTopicId(), virtualQueue.topicId());
-                throw new CompletionException(new MQBrokerException(ResponseCode.TOPIC_NOT_EXIST, "Topic not exist"));
+                throw new ProxyException(apache.rocketmq.v2.Code.TOPIC_NOT_FOUND, "Topic resource does not exist.");
             }
 
             if (group.getSubMode() != SubscriptionMode.SUB_MODE_POP) {
-                throw new CompletionException(new MQBrokerException(ResponseCode.NO_PERMISSION, String.format("The consumer group [pullGroup] is not allowed to consume message with pop mode.", group.getName())));
+                throw new ProxyException(apache.rocketmq.v2.Code.FORBIDDEN, String.format("The consumer group [%s] is not allowed to consume message with pop mode.", group.getName()));
             }
 
             topicReference.set(topic);
@@ -536,7 +536,7 @@ public class MessageServiceImpl implements MessageService {
                 return store.resetConsumeOffset(consumerGroup.getGroupId(), topic.getTopicId(), virtualQueue.physicalQueueId(), requestHeader.getCommitOffset());
             }).thenAccept(resetConsumeOffsetResult -> {
                 if (resetConsumeOffsetResult.status() != ResetConsumeOffsetResult.Status.SUCCESS) {
-                    throw new CompletionException(new MQBrokerException(ResponseCode.SYSTEM_ERROR, "Reset consume offset failed"));
+                    throw new ProxyException(apache.rocketmq.v2.Code.INTERNAL_ERROR, "Reset consume offset failed");
                 }
             });
     }
@@ -579,11 +579,11 @@ public class MessageServiceImpl implements MessageService {
                 if (topic.getTopicId() != virtualQueue.topicId()) {
                     LOGGER.error("Topic id in request header {} does not match topic id in message queue {}, maybe the topic is recreated.",
                         topic.getTopicId(), virtualQueue.topicId());
-                    throw new CompletionException(new MQBrokerException(ResponseCode.TOPIC_NOT_EXIST, "Topic not exist"));
+                    throw new ProxyException(apache.rocketmq.v2.Code.TOPIC_NOT_FOUND, "Topic resource does not exist.");
                 }
 
                 if (group.getSubMode() != SubscriptionMode.SUB_MODE_PULL) {
-                    throw new CompletionException(new MQBrokerException(ResponseCode.NO_PERMISSION, String.format("The consumer group [%s] is not allowed to consume message with pull mode.", group.getName())));
+                    throw new ProxyException(apache.rocketmq.v2.Code.FORBIDDEN, String.format("The consumer group [%s] is not allowed to consume message with pull mode.", group.getName()));
                 }
 
                 topicReference.set(topic);
@@ -685,7 +685,7 @@ public class MessageServiceImpl implements MessageService {
             Throwable t = ExceptionUtils.getRealException(throwable);
             if (t instanceof ControllerException controllerException) {
                 if (controllerException.getErrorCode() == Code.NOT_FOUND.ordinal()) {
-                    throw new CompletionException(new MQBrokerException(ResponseCode.TOPIC_NOT_EXIST, "Topic not exist"));
+                    throw new ProxyException(apache.rocketmq.v2.Code.TOPIC_NOT_FOUND, "Topic resource does not exist.");
                 }
             }
             // Rethrow other exceptions.
@@ -700,7 +700,7 @@ public class MessageServiceImpl implements MessageService {
             Throwable t = ExceptionUtils.getRealException(throwable);
             if (t instanceof ControllerException controllerException) {
                 if (controllerException.getErrorCode() == Code.NOT_FOUND.ordinal()) {
-                    throw new CompletionException(new MQBrokerException(ResponseCode.SUBSCRIPTION_GROUP_NOT_EXIST, "Consumer group not found"));
+                    throw new ProxyException(apache.rocketmq.v2.Code.CONSUMER_GROUP_NOT_FOUND, "Consumer group resource does not exist.");
                 }
             }
             // Rethrow other exceptions.
