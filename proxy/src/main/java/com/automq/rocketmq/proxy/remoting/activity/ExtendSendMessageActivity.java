@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.proxy.remoting.activity;
 
+import com.automq.rocketmq.proxy.exception.ExceptionHandler;
 import com.automq.rocketmq.proxy.processor.ExtendMessagingProcessor;
 import com.automq.rocketmq.proxy.remoting.RemotingUtil;
 import io.netty.channel.ChannelHandlerContext;
@@ -235,5 +236,17 @@ public class ExtendSendMessageActivity extends SendMessageActivity implements Co
             MessageQueue messageQueue = new MessageQueue(requestHeader.getTopic(), brokerName, requestHeader.getQueueId());
             return new AddressableMessageQueue(messageQueue, null);
         }
+    }
+
+    @Override
+    protected void writeErrResponse(ChannelHandlerContext ctx, ProxyContext context, RemotingCommand request,
+        Throwable t) {
+        Optional<RemotingCommand> response = ExceptionHandler.convertToRemotingResponse(t);
+        if (response.isPresent()) {
+            writeResponse(ctx, context, request, response.get(), t);
+            return;
+        }
+
+        super.writeErrResponse(ctx, context, request, t);
     }
 }

@@ -18,7 +18,7 @@
 package com.automq.rocketmq.common.exception;
 
 public class RocketMQRuntimeException extends RuntimeException {
-    private int errorCode;
+    protected final int errorCode;
 
     public RocketMQRuntimeException(int errorCode) {
         this.errorCode = errorCode;
