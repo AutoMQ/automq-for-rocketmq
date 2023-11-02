@@ -505,19 +505,7 @@ service ControllerService {
   // The associated queue can be reassigned after the stream is closed.
   rpc closeStream(CloseStreamRequest) returns (CloseStreamReply) {}
 
-  // Trim a stream to a new start offset.
-  rpc trimStream(TrimStreamRequest) returns (TrimStreamReply) {}
-
   // List all streams opened on a specific broker.
   rpc listOpenStreams(ListOpenStreamsRequest) returns (ListOpenStreamsReply) {}
-
-  // Prepare S3 objects before uploading.
-  rpc prepareS3Objects(PrepareS3ObjectsRequest) returns (PrepareS3ObjectsReply) {}
-
-  // Commit a WAL object.
-  rpc commitWALObject(CommitWALObjectRequest) returns (CommitWALObjectReply) {}
-
-  // Commit a stream object.
-  rpc commitStreamObject(CommitStreamObjectRequest) returns (CommitStreamObjectReply) {}
 }
 

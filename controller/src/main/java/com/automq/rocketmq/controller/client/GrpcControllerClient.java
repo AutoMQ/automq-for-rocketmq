@@ -22,10 +22,6 @@ import apache.rocketmq.controller.v1.CloseStreamRequest;
 import apache.rocketmq.controller.v1.Cluster;
 import apache.rocketmq.controller.v1.CommitOffsetReply;
 import apache.rocketmq.controller.v1.CommitOffsetRequest;
-import apache.rocketmq.controller.v1.CommitStreamObjectReply;
-import apache.rocketmq.controller.v1.CommitStreamObjectRequest;
-import apache.rocketmq.controller.v1.CommitWALObjectReply;
-import apache.rocketmq.controller.v1.CommitWALObjectRequest;
 import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
@@ -58,15 +54,11 @@ import apache.rocketmq.controller.v1.NotifyMessageQueuesAssignableReply;
 import apache.rocketmq.controller.v1.NotifyMessageQueuesAssignableRequest;
 import apache.rocketmq.controller.v1.OpenStreamReply;
 import apache.rocketmq.controller.v1.OpenStreamRequest;
-import apache.rocketmq.controller.v1.PrepareS3ObjectsReply;
-import apache.rocketmq.controller.v1.PrepareS3ObjectsRequest;
 import apache.rocketmq.controller.v1.ReassignMessageQueueReply;
 import apache.rocketmq.controller.v1.ReassignMessageQueueRequest;
 import apache.rocketmq.controller.v1.TerminateNodeReply;
 import apache.rocketmq.controller.v1.TerminateNodeRequest;
 import apache.rocketmq.controller.v1.Topic;
-import apache.rocketmq.controller.v1.TrimStreamReply;
-import apache.rocketmq.controller.v1.TrimStreamRequest;
 import apache.rocketmq.controller.v1.UpdateGroupReply;
 import apache.rocketmq.controller.v1.UpdateGroupRequest;
 import apache.rocketmq.controller.v1.UpdateTopicReply;
@@ -733,104 +725,6 @@ public class GrpcControllerClient implements ControllerClient {
         Futures.addCallback(stub.listOpenStreams(request), new FutureCallback<>() {
             @Override
             public void onSuccess(ListOpenStreamsReply result) {
-                future.complete(result);
-            }
-
-            @Override
-            public void onFailure(@Nonnull Throwable t) {
-                future.completeExceptionally(t);
-            }
-        }, MoreExecutors.directExecutor());
-        return future;
-    }
-
-    @Override
-    public CompletableFuture<TrimStreamReply> trimStream(String target,
-        TrimStreamRequest request) {
-        ControllerServiceGrpc.ControllerServiceFutureStub stub;
-        try {
-            stub = getOrCreateStubForTarget(target);
-        } catch (ControllerException e) {
-            return CompletableFuture.failedFuture(e);
-        }
-
-        CompletableFuture<TrimStreamReply> future = new CompletableFuture<>();
-        Futures.addCallback(stub.trimStream(request), new FutureCallback<>() {
-            @Override
-            public void onSuccess(TrimStreamReply result) {
-                future.complete(result);
-            }
-
-            @Override
-            public void onFailure(@Nonnull Throwable t) {
-                future.completeExceptionally(t);
-            }
-        }, MoreExecutors.directExecutor());
-        return future;
-    }
-
-    @Override
-    public CompletableFuture<PrepareS3ObjectsReply> prepareS3Objects(String target,
-        PrepareS3ObjectsRequest request) {
-        ControllerServiceGrpc.ControllerServiceFutureStub stub;
-        try {
-            stub = getOrCreateStubForTarget(target);
-        } catch (ControllerException e) {
-            return CompletableFuture.failedFuture(e);
-        }
-
-        CompletableFuture<PrepareS3ObjectsReply> future = new CompletableFuture<>();
-        Futures.addCallback(stub.prepareS3Objects(request), new FutureCallback<>() {
-            @Override
-            public void onSuccess(PrepareS3ObjectsReply result) {
-                future.complete(result);
-            }
-
-            @Override
-            public void onFailure(@Nonnull Throwable t) {
-                future.completeExceptionally(t);
-            }
-        }, MoreExecutors.directExecutor());
-        return future;
-    }
-
-    @Override
-    public CompletableFuture<CommitStreamObjectReply> commitStreamObject(String target,
-        CommitStreamObjectRequest request) {
-        ControllerServiceGrpc.ControllerServiceFutureStub stub;
-        try {
-            stub = getOrCreateStubForTarget(target);
-        } catch (ControllerException e) {
-            return CompletableFuture.failedFuture(e);
-        }
-
-        CompletableFuture<CommitStreamObjectReply> future = new CompletableFuture<>();
-        Futures.addCallback(stub.commitStreamObject(request), new FutureCallback<>() {
-            @Override
-            public void onSuccess(CommitStreamObjectReply result) {
-                future.complete(result);
-            }
-
-            @Override
-            public void onFailure(@Nonnull Throwable t) {
-                future.completeExceptionally(t);
-            }
-        }, MoreExecutors.directExecutor());
-        return future;
-    }
-
-    @Override
-    public CompletableFuture<CommitWALObjectReply> commitWALObject(String target, CommitWALObjectRequest request) {
-        ControllerServiceGrpc.ControllerServiceFutureStub stub;
-        try {
-            stub = getOrCreateStubForTarget(target);
-        } catch (ControllerException e) {
-            return CompletableFuture.failedFuture(e);
-        }
-        CompletableFuture<CommitWALObjectReply> future = new CompletableFuture<>();
-        Futures.addCallback(stub.commitWALObject(request), new FutureCallback<>() {
-            @Override
-            public void onSuccess(CommitWALObjectReply result) {
                 future.complete(result);
             }
 

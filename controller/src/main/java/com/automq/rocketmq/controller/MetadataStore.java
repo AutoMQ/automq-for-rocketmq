@@ -23,8 +23,6 @@ import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.DescribeClusterRequest;
-import apache.rocketmq.controller.v1.S3StreamObject;
-import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.TerminationStage;
@@ -48,8 +46,8 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.ibatis.session.SqlSession;
+import org.apache.ibatis.session.SqlSessionFactory;
 
 public interface MetadataStore extends Closeable {
 
@@ -66,6 +64,8 @@ public interface MetadataStore extends Closeable {
      * @return SqlSession instance
      */
     SqlSession openSession();
+
+    SqlSessionFactory sessionFactory();
 
     ControllerClient controllerClient();
 
@@ -177,35 +177,17 @@ public interface MetadataStore extends Closeable {
      */
     CompletableFuture<Void> onQueueClosed(long topicId, int queueId);
 
-    CompletableFuture<Void> trimStream(long streamId, long streamEpoch, long newStartOffset);
-
     CompletableFuture<StreamMetadata> openStream(long streamId, long streamEpoch, int nodeId);
 
     CompletableFuture<Void> closeStream(long streamId, long streamEpoch, int nodeId);
 
     CompletableFuture<List<StreamMetadata>> listOpenStreams(int nodeId);
 
-    CompletableFuture<Long> prepareS3Objects(int count, int ttlInMinutes);
-
-    CompletableFuture<Void> commitWalObject(S3WALObject walObject, List<S3StreamObject> streamObjects,
-        List<Long> compactedObjects);
-
-    CompletableFuture<Void> commitStreamObject(S3StreamObject streamObject,
-        List<Long> compactedObjects) throws ControllerException;
-
-    CompletableFuture<List<S3WALObject>> listWALObjects();
-
-    CompletableFuture<List<S3WALObject>> listWALObjects(long streamId, long startOffset, long endOffset, int limit);
-
-    CompletableFuture<List<S3StreamObject>> listStreamObjects(long streamId, long startOffset, long endOffset,
-        int limit);
 
     CompletableFuture<Long> getConsumerOffset(long consumerGroupId, long topicId, int queueId);
 
     CompletableFuture<String> addressOfNode(int nodeId);
 
-    CompletableFuture<Pair<List<S3StreamObject>, List<S3WALObject>>> listObjects(long streamId, long startOffset,
-        long endOffset, int limit);
 
     boolean maintainLeadershipWithSharedLock(SqlSession session);
 

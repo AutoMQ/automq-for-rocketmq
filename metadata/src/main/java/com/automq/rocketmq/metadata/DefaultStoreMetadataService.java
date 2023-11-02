@@ -23,25 +23,23 @@ import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.StreamRole;
 import com.automq.rocketmq.common.config.ControllerConfig;
-import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.MetadataStore;
-import com.automq.rocketmq.controller.server.store.DefaultMetadataStore;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
+import com.automq.rocketmq.metadata.api.S3MetadataService;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import org.apache.commons.lang3.tuple.Pair;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class DefaultStoreMetadataService implements StoreMetadataService {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(DefaultMetadataStore.class);
-
     private final MetadataStore metadataStore;
 
-    public DefaultStoreMetadataService(MetadataStore metadataStore) {
+    private final S3MetadataService s3MetadataService;
+
+    public DefaultStoreMetadataService(MetadataStore metadataStore, S3MetadataService s3MetadataService) {
         this.metadataStore = metadataStore;
+        this.s3MetadataService = s3MetadataService;
     }
 
     @Override
@@ -71,7 +69,7 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
 
     @Override
     public CompletableFuture<Void> trimStream(long streamId, long streamEpoch, long newStartOffset) {
-        return metadataStore.trimStream(streamId, streamEpoch, newStartOffset);
+        return s3MetadataService.trimStream(streamId, streamEpoch, newStartOffset);
     }
 
     @Override
@@ -91,7 +89,7 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
 
     @Override
     public CompletableFuture<Long> prepareS3Objects(int count, int ttlInMinutes) {
-        return metadataStore.prepareS3Objects(count, ttlInMinutes);
+        return s3MetadataService.prepareS3Objects(count, ttlInMinutes);
     }
 
     @Override
@@ -100,40 +98,35 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
         // The underlying storage layer does not know the current node id when constructing the WAL object.
         // So we should fill it here.
         S3WALObject newWal = S3WALObject.newBuilder(walObject).setBrokerId(metadataStore.config().nodeId()).build();
-        return metadataStore.commitWalObject(newWal, streamObjects, compactedObjects);
+        return s3MetadataService.commitWalObject(newWal, streamObjects, compactedObjects);
     }
 
     @Override
     public CompletableFuture<Void> commitStreamObject(S3StreamObject streamObject, List<Long> compactedObjects) {
-        try {
-            return metadataStore.commitStreamObject(streamObject, compactedObjects);
-        } catch (ControllerException e) {
-            LOGGER.error("Exception raised while commit Stream Object for {}, {}", streamObject, compactedObjects, e);
-            return null;
-        }
+        return s3MetadataService.commitStreamObject(streamObject, compactedObjects);
     }
 
     @Override
     public CompletableFuture<List<S3WALObject>> listWALObjects() {
-        return metadataStore.listWALObjects();
+        return s3MetadataService.listWALObjects();
     }
 
     @Override
     public CompletableFuture<List<S3WALObject>> listWALObjects(long streamId, long startOffset, long endOffset,
         int limit) {
-        return metadataStore.listWALObjects(streamId, startOffset, endOffset, limit);
+        return s3MetadataService.listWALObjects(streamId, startOffset, endOffset, limit);
     }
 
     @Override
     public CompletableFuture<List<S3StreamObject>> listStreamObjects(long streamId, long startOffset, long endOffset,
         int limit) {
-        return metadataStore.listStreamObjects(streamId, startOffset, endOffset, limit);
+        return s3MetadataService.listStreamObjects(streamId, startOffset, endOffset, limit);
     }
 
     @Override
     public CompletableFuture<Pair<List<S3StreamObject>, List<S3WALObject>>> listObjects(long streamId, long startOffset,
         long endOffset, int limit) {
-        return metadataStore.listObjects(streamId, startOffset, endOffset, limit);
+        return s3MetadataService.listObjects(streamId, startOffset, endOffset, limit);
     }
 
     @Override
