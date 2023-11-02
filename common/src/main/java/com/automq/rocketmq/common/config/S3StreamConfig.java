@@ -26,6 +26,10 @@ public class S3StreamConfig {
     private String s3AccessKey;
     private String s3SecretKey;
 
+    // Max bandwidth in bytes per refillPeriodMs, default to 0 which means no limit.
+    private long networkBaselineBandwidth = 0;
+    private int refillPeriodMs = 1000;
+
     public String s3Endpoint() {
         return s3Endpoint;
     }
@@ -52,5 +56,13 @@ public class S3StreamConfig {
 
     public String s3SecretKey() {
         return s3SecretKey;
+    }
+
+    public long networkBaselineBandwidth() {
+        return networkBaselineBandwidth;
+    }
+
+    public int refillPeriodMs() {
+        return refillPeriodMs;
     }
 }

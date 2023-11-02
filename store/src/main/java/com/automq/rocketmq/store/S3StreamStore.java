@@ -53,19 +53,13 @@ import org.slf4j.LoggerFactory;
 
 public class S3StreamStore implements StreamStore {
     private static final Logger LOGGER = LoggerFactory.getLogger(S3StreamStore.class);
-    private final Config s3Config;
     private final StreamClient streamClient;
     private final Storage storage;
     private final CompactionManager compactionManager;
     private final ThreadPoolExecutor storeWorkingThreadPool;
 
     public S3StreamStore(StoreConfig storeConfig, S3StreamConfig streamConfig, StoreMetadataService metadataService) {
-        this(storeConfig, streamConfig, metadataService, null, null);
-    }
-
-    public S3StreamStore(StoreConfig storeConfig, S3StreamConfig streamConfig, StoreMetadataService metadataService,
-        AsyncNetworkBandwidthLimiter networkInboundBucket, AsyncNetworkBandwidthLimiter networkOutboundBucket) {
-        this.s3Config = configFrom(streamConfig);
+        Config s3Config = configFrom(streamConfig);
 
         // Build meta service and related manager
         StreamManager streamManager = new S3StreamManager(metadataService);
@@ -85,7 +79,25 @@ public class S3StreamStore implements StreamStore {
             streamConfig.s3ForcePathStyle(), streamConfig.s3AccessKey(), streamConfig.s3SecretKey());
         this.compactionManager = new CompactionManager(s3Config, objectManager, streamManager, compactionOperator);
 
-        this.streamClient = new S3StreamClient(streamManager, storage, objectManager, defaultOperator, s3Config, networkInboundBucket, networkOutboundBucket);
+        AsyncNetworkBandwidthLimiter networkInboundLimiter = null;
+        AsyncNetworkBandwidthLimiter networkOutboundLimiter = null;
+
+        if (s3Config.networkBaselineBandwidth() > 0 && s3Config.refillPeriodMs() > 0) {
+            networkInboundLimiter = new AsyncNetworkBandwidthLimiter(
+                AsyncNetworkBandwidthLimiter.Type.INBOUND,
+                s3Config.networkBaselineBandwidth(),
+                s3Config.refillPeriodMs(),
+                s3Config.networkBaselineBandwidth()
+            );
+            networkOutboundLimiter = new AsyncNetworkBandwidthLimiter(
+                AsyncNetworkBandwidthLimiter.Type.OUTBOUND,
+                s3Config.networkBaselineBandwidth(),
+                s3Config.refillPeriodMs(),
+                s3Config.networkBaselineBandwidth()
+            );
+        }
+
+        this.streamClient = new S3StreamClient(streamManager, storage, objectManager, defaultOperator, s3Config, networkInboundLimiter, networkOutboundLimiter);
         this.storeWorkingThreadPool = ThreadPoolMonitor.createAndMonitor(
             storeConfig.workingThreadPoolNums(),
             storeConfig.workingThreadQueueCapacity(),
@@ -205,6 +217,8 @@ public class S3StreamStore implements StreamStore {
         config.s3WALPath(streamConfig.s3WALPath());
         config.s3AccessKey(streamConfig.s3AccessKey());
         config.s3SecretKey(streamConfig.s3SecretKey());
+        config.networkBaselineBandwidth(streamConfig.networkBaselineBandwidth());
+        config.refillPeriodMs(streamConfig.refillPeriodMs());
         return config;
     }
 }

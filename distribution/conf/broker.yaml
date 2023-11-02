@@ -5,12 +5,14 @@ innerAccessKey: ""
 innerSecretKey: ""
 s3Stream:
   s3WALPath: "/tmp/s3rocketmq/wal"
-  s3Endpoint: "http://minio.hellocorp.test"
-  s3Bucket: "lzh"
+  s3Endpoint: "http://minio.local:9000"
+  s3Bucket: "bucket-name"
   s3Region: "us-east-1"
   s3ForcePathStyle: true
-  s3AccessKey: "kicaSWtNBPf7XCCsdW8Z"
-  s3SecretKey: "dgWxasHBEQBBXxAxBpFmp4VWIoQ0XyDU3gGdFnaT"
+  s3AccessKey: "access-key"
+  s3SecretKey: "secret-key"
+  networkBaselineBandwidth: 15
+  refillPeriodMs: 100
 db:
   url: "jdbc:mysql://mysql-server:3306/metadata"
   userName: "root"
