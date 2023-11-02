@@ -33,11 +33,20 @@
             <SizeBasedTriggeringPolicy size="100MB" />
             <DefaultRolloverStrategy max="10"/>
         </RollingFile>
+
+        <RollingFile name="streamAppender" fileName="${LOG_DIR}/stream.log" filePattern="${LOG_DIR}/stream.%i.log">
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss,SSS} %-5p %m%n"/>
+            <SizeBasedTriggeringPolicy size="100MB"/>
+            <DefaultRolloverStrategy max="10"/>
+        </RollingFile>
     </Appenders>
 
     <Loggers>
         <Logger name="com.automq.rocketmq.controller" level="info" additivity="false">
             <AppenderRef ref="controllerAppender" />
+        </Logger>
+        <Logger name="com.automq.stream" level="info" additivity="false">
+            <AppenderRef ref="streamAppender"/>
         </Logger>
         <Root level="info">
             <AppenderRef ref="rollingFile"/>
