@@ -26,6 +26,7 @@ import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.ControllerServiceGrpc;
 import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
+import apache.rocketmq.controller.v1.CreateTopicReply;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.DeleteTopicReply;
 import apache.rocketmq.controller.v1.DeleteTopicRequest;
@@ -210,6 +211,51 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                 HeartbeatRequest request = HeartbeatRequest.newBuilder().setId(nodeId).setEpoch(1).build();
                 HeartbeatReply reply = blockingStub.heartbeat(request);
                 Assertions.assertEquals(Code.OK, reply.getStatus().getCode());
+                channel.shutdownNow();
+            }
+        }
+    }
+
+    @Test
+    public void testCreateTopic() throws IOException {
+        AcceptTypes acceptTypes = AcceptTypes.newBuilder()
+            .addTypes(MessageType.NORMAL)
+            .addTypes(MessageType.DELAY)
+            .build();
+        ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(controllerClient, getSessionFactory(), config)) {
+            metadataStore.start();
+            Node node = new Node();
+            node.setId(config.nodeId());
+            node.setName(config.name());
+            metadataStore.addBrokerNode(node);
+            Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
+                .atMost(10, TimeUnit.SECONDS)
+                .until(metadataStore::isLeader);
+            try (ControllerTestServer testServer = new ControllerTestServer(0, new ControllerServiceImpl(metadataStore))) {
+                testServer.start();
+                int port = testServer.getPort();
+                ManagedChannel channel = Grpc.newChannelBuilderForAddress("localhost", port, InsecureChannelCredentials.create()).build();
+                ControllerServiceGrpc.ControllerServiceBlockingStub blockingStub = ControllerServiceGrpc.newBlockingStub(channel);
+                CreateTopicReply reply = blockingStub.withDeadlineAfter(10, TimeUnit.SECONDS)
+                    .createTopic(CreateTopicRequest.newBuilder()
+                        .setTopic("T1")
+                        .setRetentionHours(1)
+                        .setAcceptTypes(acceptTypes)
+                        .setCount(4)
+                        .build());
+
+                Assertions.assertEquals(Code.OK, reply.getStatus().getCode());
+                try (SqlSession session = getSessionFactory().openSession()) {
+                    TopicMapper topicMapper = session.getMapper(TopicMapper.class);
+                    Topic topic = topicMapper.get(reply.getTopicId(), null);
+                    Assertions.assertEquals("T1", topic.getName());
+                    Assertions.assertEquals(1, topic.getRetentionHours());
+                    Assertions.assertEquals(4, topic.getQueueNum());
+                    AcceptTypes.Builder builder = AcceptTypes.newBuilder();
+                    JsonFormat.parser().merge(topic.getAcceptMessageTypes(), builder);
+                    Assertions.assertEquals(acceptTypes, builder.build());
+                }
                 channel.shutdownNow();
             }
         }
@@ -962,6 +1008,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             }
         }
     }
+
     @Test
     public void testCreateTopic_OpenStream_CloseStream() throws IOException, ExecutionException, InterruptedException, ControllerException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);

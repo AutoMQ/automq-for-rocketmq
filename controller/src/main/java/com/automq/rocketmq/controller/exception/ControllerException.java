@@ -20,10 +20,6 @@ package com.automq.rocketmq.controller.exception;
 import com.automq.rocketmq.common.exception.RocketMQException;
 
 public class ControllerException extends RocketMQException {
-    public ControllerException(int errorCode) {
-        super(errorCode);
-    }
-
     public ControllerException(int errorCode, String message) {
         super(errorCode, message);
     }

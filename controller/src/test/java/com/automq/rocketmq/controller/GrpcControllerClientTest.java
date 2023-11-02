@@ -137,6 +137,7 @@ class GrpcControllerClientTest {
             CreateTopicRequest request = CreateTopicRequest.newBuilder()
                 .setTopic(topicName)
                 .setCount(queueNum)
+                .setRetentionHours(1)
                 .setAcceptTypes(AcceptTypes.newBuilder()
                     .addTypes(MessageType.NORMAL)
                     .addTypes(MessageType.FIFO)

@@ -392,7 +392,7 @@ public class DefaultMetadataStore implements MetadataStore {
     public String leaderAddress() throws ControllerException {
         if (null == lease || lease.expired()) {
             LOGGER.error("No lease is populated yet or lease was expired");
-            throw new ControllerException(Code.NO_LEADER_VALUE);
+            throw new ControllerException(Code.NO_LEADER_VALUE, "No leader node is available");
         }
 
         BrokerNode brokerNode = nodes.get(this.lease.getNodeId());

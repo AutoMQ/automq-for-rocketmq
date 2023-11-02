@@ -132,7 +132,6 @@ public class TopicManager {
                     if (!metadataStore.maintainLeadershipWithSharedLock(session)) {
                         continue;
                     }
-
                     TopicMapper topicMapper = session.getMapper(TopicMapper.class);
                     if (null != topicMapper.get(null, request.getTopic())) {
                         ControllerException e = new ControllerException(Code.DUPLICATED_VALUE,
@@ -146,6 +145,7 @@ public class TopicManager {
                     topic.setQueueNum(request.getCount());
                     topic.setStatus(TopicStatus.TOPIC_STATUS_ACTIVE);
                     topic.setAcceptMessageTypes(JsonFormat.printer().print(request.getAcceptTypes()));
+                    topic.setRetentionHours(request.getRetentionHours());
                     topicMapper.create(topic);
                     long topicId = topic.getId();
                     List<QueueAssignment> assignments = createQueues(IntStream.range(0, request.getCount()),
@@ -160,6 +160,7 @@ public class TopicManager {
                 } catch (ControllerException | InvalidProtocolBufferException e) {
                     future.completeExceptionally(e);
                 }
+                return future;
             } else {
                 try {
                     metadataStore.controllerClient().createTopic(metadataStore.leaderAddress(), request).whenComplete((res, e) -> {
@@ -468,7 +469,7 @@ public class TopicManager {
             .toList();
         if (aliveNodes.isEmpty()) {
             LOGGER.warn("0 of {} broker nodes is alive", metadataStore.allNodes().size());
-            throw new ControllerException(Code.NODE_UNAVAILABLE_VALUE);
+            throw new ControllerException(Code.NODE_UNAVAILABLE_VALUE, "No broker node is available");
         }
 
         List<QueueAssignment> assignments = new ArrayList<>();
