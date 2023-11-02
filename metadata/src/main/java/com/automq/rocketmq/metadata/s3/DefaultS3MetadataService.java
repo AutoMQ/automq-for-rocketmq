@@ -45,6 +45,7 @@ import com.google.protobuf.util.JsonFormat;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -134,23 +135,39 @@ public class DefaultS3MetadataService implements S3MetadataService {
             int brokerId = walObject.getBrokerId();
             long objectId = walObject.getObjectId();
 
-            if (Objects.isNull(compactedObjects) || compactedObjects.isEmpty()) {
-                // verify stream continuity
-                List<long[]> offsets = java.util.stream.Stream.concat(
-                    streamObjects.stream()
-                        .map(s3StreamObject -> new long[] {s3StreamObject.getStreamId(), s3StreamObject.getStartOffset(), s3StreamObject.getEndOffset()}),
-                    walObject.getSubStreams().getSubStreamsMap().entrySet()
-                        .stream()
-                        .map(obj -> new long[] {obj.getKey(), obj.getValue().getStartOffset(), obj.getValue().getEndOffset()})
-                ).toList();
-
-                if (!checkStreamAdvance(session, offsets)) {
-                    LOGGER.error("S3WALObject[object-id={}]'s stream advance check failed", walObject.getObjectId());
-                    ControllerException e = new ControllerException(Code.NOT_FOUND_VALUE, String.format("S3WALObject[object-id=%d]'s stream advance check failed", walObject.getObjectId()));
-                    future.completeExceptionally(e);
-                    return future;
+            Map<Long, List<Pair<Long, Long>>> streamSegments = new HashMap<>();
+            for (S3StreamObject item : streamObjects) {
+                if (!streamSegments.containsKey(item.getStreamId())) {
+                    streamSegments.put(item.getStreamId(), new ArrayList<>());
                 }
+                streamSegments.get(item.getStreamId()).add(new ImmutablePair<>(item.getStartOffset(), item.getEndOffset()));
             }
+
+            walObject.getSubStreams().getSubStreamsMap()
+                .forEach((key, value) -> {
+                    if (!streamSegments.containsKey(key)) {
+                        streamSegments.put(key, new ArrayList<>());
+                    }
+                    assert key == value.getStreamId();
+                    streamSegments.get(key).add(new ImmutablePair<>(value.getStartOffset(), value.getEndOffset()));
+                });
+
+            // reduce and verify segment continuity
+            Map<Long, Pair<Long, Long>> reduced = new HashMap<>();
+            streamSegments.forEach((streamId, list) -> {
+                list.sort(Comparator.comparingLong(Pair::getLeft));
+                long start = list.get(0).getLeft();
+                long current = start;
+                for (Pair<Long, Long> p : list) {
+                    if (p.getLeft() != current) {
+                        LOGGER.warn("Trying to commit an unexpected disjoint stream ranges: {}", list);
+                    }
+                    current = p.getRight();
+                }
+                reduced.put(streamId, new ImmutablePair<>(start, current));
+            });
+
+            extendRange(session, reduced);
 
             // commit S3 object
             if (objectId != S3Constants.NOOP_OBJECT_ID && !commitObject(objectId, StreamConstants.NOOP_STREAM_ID, walObject.getObjectSize(), session)) {
@@ -523,19 +540,19 @@ public class DefaultS3MetadataService implements S3MetadataService {
         return true;
     }
 
-    private boolean checkStreamAdvance(SqlSession session, List<long[]> offsets) {
-        if (offsets == null || offsets.isEmpty()) {
-            return true;
+    private void extendRange(SqlSession session, Map<Long, Pair<Long, Long>> segments) {
+        if (segments.isEmpty()) {
+            return;
         }
         StreamMapper streamMapper = session.getMapper(StreamMapper.class);
         RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
-        for (long[] offset : offsets) {
-            long streamId = offset[0], startOffset = offset[1], endOffset = offset[2];
-            // verify the stream exists and is open
+
+        for (Map.Entry<Long, Pair<Long, Long>> entry : segments.entrySet()) {
+            long streamId = entry.getKey();
+            Pair<Long, Long> segment = entry.getValue();
             Stream stream = streamMapper.getByStreamId(streamId);
             if (stream.getState() != StreamState.OPEN) {
-                LOGGER.warn("Stream[stream-id={}] not opened", streamId);
-                return false;
+                LOGGER.warn("Stream[stream-id={}] state is not OPEN", streamId);
             }
 
             Range range = rangeMapper.get(stream.getRangeId(), streamId, null);
@@ -543,19 +560,16 @@ public class DefaultS3MetadataService implements S3MetadataService {
                 // should not happen
                 LOGGER.error("Stream[stream-id={}]'s current range[range-id={}] not exist when stream has been created",
                     streamId, stream.getRangeId());
-                return false;
+                continue;
             }
 
-            if (range.getEndOffset() != startOffset) {
-                LOGGER.warn("Stream[stream-id={}]'s current range[range-id={}]'s end offset[{}] is not equal to request start offset[{}]",
-                    streamId, range.getRangeId(), range.getEndOffset(), startOffset);
-                return false;
+            LOGGER.info("Extend stream range[stream-id={}, range-id={}] with segment [{}, {})",
+                streamId, range.getRangeId(), segment.getLeft(), segment.getRight());
+            if (segment.getRight() > range.getEndOffset()) {
+                range.setEndOffset(segment.getRight());
+                rangeMapper.update(range);
             }
-
-            range.setEndOffset(endOffset);
-            rangeMapper.update(range);
         }
-        return true;
     }
 
     public CompletableFuture<Pair<List<S3StreamObject>, List<S3WALObject>>> listObjects(
