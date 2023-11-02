@@ -96,7 +96,7 @@ public class S3ObjectManager implements ObjectManager {
             return streamObjectBuilder.build();
         }).toList();
 
-        LOGGER.info("Commit WAL object: {}, along with split stream objects: {}, compacted objects: {}",
+        LOGGER.debug("Commit WAL object: {}, along with split stream objects: {}, compacted objects: {}",
             walObject, streamObjects, request.getCompactedObjectIds());
 
         // Build compacted objects
