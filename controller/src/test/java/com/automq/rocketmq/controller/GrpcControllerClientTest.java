@@ -18,7 +18,7 @@
 package com.automq.rocketmq.controller;
 
 import apache.rocketmq.controller.v1.AcceptTypes;
-import apache.rocketmq.controller.v1.Code;
+import apache.rocketmq.common.v1.Code;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.MessageType;
 import apache.rocketmq.controller.v1.Topic;

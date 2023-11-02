@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package apache.rocketmq.proxy.v1;
+
+import "common.proto";
+
+option java_multiple_files = true;
+option java_package = "apache.rocketmq.proxy.v1";
+option java_generate_equals_and_hash = true;
+option java_string_check_utf8 = true;
+option java_outer_classname = "ProxyApis";
+
+message Status {
+  common.v1.Code code = 1;
+  string message = 2;
+}
+
+message ProxyRequestContext {}
+
+message ResetConsumeOffsetRequest {
+  ProxyRequestContext context = 1;
+  // Topic name
+  string topic = 2;
+  // Queue id, -1 means reset all queue
+  int32 queue_id = 3;
+  // Consumer group name
+  string group = 4;
+  // New consume offset
+  int64 new_consume_offset = 5;
+}
+
+message ResetConsumeOffsetReply {
+  Status status = 1;
+}
+
+message ResetConsumeOffsetByTimestampRequest {
+  ProxyRequestContext context = 1;
+  // Topic name
+  string topic = 2;
+  // Queue id, -1 means reset all queue
+  int32 queue_id = 3;
+  // Consumer group name
+  string group = 4;
+  // Timestamp
+  int64 timestamp = 5;
+}
+
+
+service ProxyService {
+  rpc resetConsumeOffset(ResetConsumeOffsetRequest) returns (ResetConsumeOffsetReply) {}
+  rpc resetConsumeOffsetByTimestamp(ResetConsumeOffsetByTimestampRequest) returns (ResetConsumeOffsetReply) {}
+}

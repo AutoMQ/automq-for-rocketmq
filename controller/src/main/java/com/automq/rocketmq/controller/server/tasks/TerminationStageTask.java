@@ -18,7 +18,7 @@
 package com.automq.rocketmq.controller.server.tasks;
 
 import apache.rocketmq.controller.v1.AssignmentStatus;
-import apache.rocketmq.controller.v1.Code;
+import apache.rocketmq.common.v1.Code;
 import apache.rocketmq.controller.v1.Status;
 import apache.rocketmq.controller.v1.TerminateNodeReply;
 import apache.rocketmq.controller.v1.TerminationStage;
