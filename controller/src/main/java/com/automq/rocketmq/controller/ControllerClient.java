@@ -20,10 +20,6 @@ package com.automq.rocketmq.controller;
 import apache.rocketmq.controller.v1.CloseStreamReply;
 import apache.rocketmq.controller.v1.CloseStreamRequest;
 import apache.rocketmq.controller.v1.Cluster;
-import apache.rocketmq.controller.v1.CommitStreamObjectReply;
-import apache.rocketmq.controller.v1.CommitStreamObjectRequest;
-import apache.rocketmq.controller.v1.CommitWALObjectReply;
-import apache.rocketmq.controller.v1.CommitWALObjectRequest;
 import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
@@ -36,13 +32,9 @@ import apache.rocketmq.controller.v1.ListTopicsReply;
 import apache.rocketmq.controller.v1.ListTopicsRequest;
 import apache.rocketmq.controller.v1.OpenStreamReply;
 import apache.rocketmq.controller.v1.OpenStreamRequest;
-import apache.rocketmq.controller.v1.PrepareS3ObjectsReply;
-import apache.rocketmq.controller.v1.PrepareS3ObjectsRequest;
 import apache.rocketmq.controller.v1.TerminateNodeReply;
 import apache.rocketmq.controller.v1.TerminateNodeRequest;
 import apache.rocketmq.controller.v1.Topic;
-import apache.rocketmq.controller.v1.TrimStreamReply;
-import apache.rocketmq.controller.v1.TrimStreamRequest;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.UpdateGroupRequest;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
@@ -90,14 +82,6 @@ public interface ControllerClient extends Closeable {
     CompletableFuture<CloseStreamReply> closeStream(String target, CloseStreamRequest request);
 
     CompletableFuture<ListOpenStreamsReply> listOpenStreams(String target, ListOpenStreamsRequest request);
-
-    CompletableFuture<TrimStreamReply> trimStream(String target, TrimStreamRequest request);
-
-    CompletableFuture<PrepareS3ObjectsReply> prepareS3Objects(String target, PrepareS3ObjectsRequest request);
-
-    CompletableFuture<CommitStreamObjectReply> commitStreamObject(String target, CommitStreamObjectRequest request);
-
-    CompletableFuture<CommitWALObjectReply> commitWALObject(String target, CommitWALObjectRequest request);
 
     CompletableFuture<Topic> updateTopic(String target, UpdateTopicRequest request);
 

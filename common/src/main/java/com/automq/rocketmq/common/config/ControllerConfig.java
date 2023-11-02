@@ -70,10 +70,6 @@ public interface ControllerConfig extends GrpcClientConfig {
         return 1;
     }
 
-    default boolean circuitStreamMetadata() {
-        return true;
-    }
-
     String dbUrl();
 
     String dbUserName();

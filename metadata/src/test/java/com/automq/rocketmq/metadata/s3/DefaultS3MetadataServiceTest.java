@@ -6,17 +6,16 @@
  * (the "License"); you may not use this file except in compliance with
  * the License.  You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
- *
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.store.impl;
+package com.automq.rocketmq.metadata.s3;
 
 import apache.rocketmq.controller.v1.S3ObjectState;
 import apache.rocketmq.controller.v1.S3StreamObject;
@@ -24,14 +23,10 @@ import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.StreamState;
 import apache.rocketmq.controller.v1.SubStream;
+import com.automq.rocketmq.common.config.ControllerConfig;
 import com.automq.rocketmq.common.system.StreamConstants;
-import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.ControllerClient;
-import com.automq.rocketmq.controller.store.DatabaseTestBase;
-import com.automq.rocketmq.controller.MetadataStore;
-import com.automq.rocketmq.controller.server.store.DefaultMetadataStore;
-import com.automq.rocketmq.controller.server.store.Role;
-import com.automq.rocketmq.metadata.dao.Lease;
+import com.automq.rocketmq.metadata.api.S3MetadataService;
 import com.automq.rocketmq.metadata.dao.Range;
 import com.automq.rocketmq.metadata.dao.S3Object;
 import com.automq.rocketmq.metadata.dao.S3WalObject;
@@ -41,9 +36,10 @@ import com.automq.rocketmq.metadata.mapper.S3ObjectMapper;
 import com.automq.rocketmq.metadata.mapper.S3StreamObjectMapper;
 import com.automq.rocketmq.metadata.mapper.S3WalObjectMapper;
 import com.automq.rocketmq.metadata.mapper.StreamMapper;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.ibatis.session.SqlSession;
-import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -55,14 +51,20 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 
-public class S3MetadataManagerTest extends DatabaseTestBase {
+public class DefaultS3MetadataServiceTest extends DatabaseTestBase {
 
     ControllerClient client;
 
-    public S3MetadataManagerTest() {
+    ControllerConfig config;
+
+    ExecutorService executorService;
+
+    public DefaultS3MetadataServiceTest() {
         this.client = Mockito.mock(ControllerClient.class);
+        this.config = Mockito.mock(ControllerConfig.class);
+        Mockito.when(config.nodeId()).thenReturn(1);
+        this.executorService = Executors.newSingleThreadExecutor();
     }
 
     @Test
@@ -79,8 +81,8 @@ public class S3MetadataManagerTest extends DatabaseTestBase {
             session.commit();
         }
 
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            List<S3StreamObject> s3StreamObjects = metadataStore.listStreamObjects(streamId, startOffset, endOffset, limit).get();
+        try (S3MetadataService service = new DefaultS3MetadataService(config, getSessionFactory(), executorService)) {
+            List<S3StreamObject> s3StreamObjects = service.listStreamObjects(streamId, startOffset, endOffset, limit).get();
             S3StreamObject s3StreamObject = s3StreamObjects.get(0);
             Assertions.assertEquals(1, s3StreamObject.getObjectId());
             Assertions.assertEquals(100, s3StreamObject.getObjectSize());
@@ -120,12 +122,8 @@ public class S3MetadataManagerTest extends DatabaseTestBase {
 
         Map<Long, SubStream> expectedSubStream = buildWalSubStreams(1, 0, 10);
 
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            Assertions.assertNull(metadataStore.getLease());
-            Lease lease = new Lease();
-            lease.setNodeId(config.nodeId());
-            metadataStore.setLease(lease);
-            List<S3WALObject> s3WALObjects = metadataStore.listWALObjects(streamId, startOffset, endOffset, limit).get();
+        try (S3MetadataService service = new DefaultS3MetadataService(config, getSessionFactory(), executorService)) {
+            List<S3WALObject> s3WALObjects = service.listWALObjects(streamId, startOffset, endOffset, limit).get();
 
             Assertions.assertFalse(s3WALObjects.isEmpty());
             S3WALObject s3WALObject = s3WALObjects.get(0);
@@ -158,12 +156,8 @@ public class S3MetadataManagerTest extends DatabaseTestBase {
 
         Map<Long, SubStream> subStreams = buildWalSubStreams(4, 0, 10);
 
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            Assertions.assertNull(metadataStore.getLease());
-            Lease lease = new Lease();
-            lease.setNodeId(config.nodeId());
-            metadataStore.setLease(lease);
-            List<S3WALObject> s3WALObjects = metadataStore.listWALObjects().get();
+        try (S3MetadataService service = new DefaultS3MetadataService(config, getSessionFactory(), executorService)) {
+            List<S3WALObject> s3WALObjects = service.listWALObjects().get();
 
             Assertions.assertFalse(s3WALObjects.isEmpty());
             S3WALObject s3WALObject = s3WALObjects.get(0);
@@ -201,12 +195,8 @@ public class S3MetadataManagerTest extends DatabaseTestBase {
             session.commit();
         }
 
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            Assertions.assertNull(metadataStore.getLease());
-            Lease lease = new Lease();
-            lease.setNodeId(config.nodeId());
-            metadataStore.setLease(lease);
-            Pair<List<S3StreamObject>, List<S3WALObject>> listPair = metadataStore.listObjects(1, startOffset, endOffset, limit).get();
+        try (DefaultS3MetadataService service = new DefaultS3MetadataService(config, getSessionFactory(), executorService)) {
+            Pair<List<S3StreamObject>, List<S3WALObject>> listPair = service.listObjects(1, startOffset, endOffset, limit).get();
 
             Assertions.assertFalse(listPair.getLeft().isEmpty());
             Assertions.assertTrue(listPair.getRight().isEmpty());
@@ -247,12 +237,8 @@ public class S3MetadataManagerTest extends DatabaseTestBase {
 
         Map<Long, SubStream> subStreams = buildWalSubStreams(1, 10, 10);
 
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            Assertions.assertNull(metadataStore.getLease());
-            Lease lease = new Lease();
-            lease.setNodeId(config.nodeId());
-            metadataStore.setLease(lease);
-            Pair<List<S3StreamObject>, List<S3WALObject>> listPair = metadataStore.listObjects(streamId, startOffset, endOffset, limit).get();
+        try (S3MetadataService service = new DefaultS3MetadataService(config, getSessionFactory(), executorService)) {
+            Pair<List<S3StreamObject>, List<S3WALObject>> listPair = service.listObjects(streamId, startOffset, endOffset, limit).get();
 
             Assertions.assertTrue(listPair.getLeft().isEmpty());
             Assertions.assertFalse(listPair.getRight().isEmpty());
@@ -295,12 +281,8 @@ public class S3MetadataManagerTest extends DatabaseTestBase {
 
         Map<Long, SubStream> subStreams = buildWalSubStreams(1, 10, 10);
 
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            Assertions.assertNull(metadataStore.getLease());
-            Lease lease = new Lease();
-            lease.setNodeId(config.nodeId());
-            metadataStore.setLease(lease);
-            Pair<List<S3StreamObject>, List<S3WALObject>> listPair = metadataStore.listObjects(streamId, startOffset, endOffset, limit).get();
+        try (S3MetadataService service = new DefaultS3MetadataService(config, getSessionFactory(), executorService)) {
+            Pair<List<S3StreamObject>, List<S3WALObject>> listPair = service.listObjects(streamId, startOffset, endOffset, limit).get();
 
             Assertions.assertFalse(listPair.getLeft().isEmpty());
             Assertions.assertFalse(listPair.getRight().isEmpty());
@@ -359,12 +341,8 @@ public class S3MetadataManagerTest extends DatabaseTestBase {
         Map<Long, SubStream> subStreams1 = buildWalSubStreams(1, 0, 10);
         Map<Long, SubStream> subStreams2 = buildWalSubStreams(1, 20, 20);
 
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            Assertions.assertNull(metadataStore.getLease());
-            Lease lease = new Lease();
-            lease.setNodeId(config.nodeId());
-            metadataStore.setLease(lease);
-            Pair<List<S3StreamObject>, List<S3WALObject>> listPair = metadataStore.listObjects(streamId, startOffset, endOffset, limit).get();
+        try (S3MetadataService service = new DefaultS3MetadataService(config, getSessionFactory(), executorService)) {
+            Pair<List<S3StreamObject>, List<S3WALObject>> listPair = service.listObjects(streamId, startOffset, endOffset, limit).get();
 
             Assertions.assertFalse(listPair.getLeft().isEmpty());
             Assertions.assertFalse(listPair.getRight().isEmpty());
@@ -441,12 +419,8 @@ public class S3MetadataManagerTest extends DatabaseTestBase {
             session.commit();
         }
 
-        try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            metadataStore.start();
-            Awaitility.await().with().atMost(10, TimeUnit.SECONDS).pollInterval(100, TimeUnit.MILLISECONDS)
-                .until(metadataStore::isLeader);
-
-            metadataStore.trimStream(streamId, streamEpoch, newStartOffset);
+        try (S3MetadataService service = new DefaultS3MetadataService(config, getSessionFactory(), executorService)) {
+            service.trimStream(streamId, streamEpoch, newStartOffset);
         }
 
         try (SqlSession session = this.getSessionFactory().openSession()) {
@@ -470,13 +444,8 @@ public class S3MetadataManagerTest extends DatabaseTestBase {
     public void testPrepareS3Objects() throws IOException {
         long objectId;
 
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            Assertions.assertNull(metadataStore.getLease());
-            Lease lease = new Lease();
-            lease.setNodeId(config.nodeId());
-            metadataStore.setLease(lease);
-            metadataStore.setRole(Role.Leader);
-            objectId = metadataStore.prepareS3Objects(3, 5).get();
+        try (S3MetadataService service = new DefaultS3MetadataService(config, getSessionFactory(), executorService)) {
+            objectId = service.prepareS3Objects(3, 5).get();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -491,16 +460,11 @@ public class S3MetadataManagerTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testCommitStreamObject() throws IOException, ControllerException {
+    public void testCommitStreamObject() throws IOException {
         long objectId, streamId = 1;
 
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            Assertions.assertNull(metadataStore.getLease());
-            Lease lease = new Lease();
-            lease.setNodeId(config.nodeId());
-            metadataStore.setLease(lease);
-            metadataStore.setRole(Role.Leader);
-            objectId = metadataStore.prepareS3Objects(3, 5).get();
+        try (S3MetadataService metadataService = new DefaultS3MetadataService(config, getSessionFactory(), executorService)) {
+            objectId = metadataService.prepareS3Objects(3, 5).get();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -517,17 +481,11 @@ public class S3MetadataManagerTest extends DatabaseTestBase {
             session.commit();
         }
 
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            Assertions.assertNull(metadataStore.getLease());
-            Lease lease = new Lease();
-            lease.setNodeId(config.nodeId());
-            metadataStore.setLease(lease);
-            metadataStore.setRole(Role.Leader);
-
+        try (S3MetadataService service = new DefaultS3MetadataService(config, getSessionFactory(), executorService)) {
             List<Long> compactedObjects = new ArrayList<>();
             compactedObjects.add(objectId);
             compactedObjects.add(objectId + 1);
-            metadataStore.commitStreamObject(news3StreamObject, compactedObjects);
+            service.commitStreamObject(news3StreamObject, compactedObjects);
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -553,16 +511,11 @@ public class S3MetadataManagerTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testCommitStreamObject_NoCompacted() throws IOException, ControllerException {
+    public void testCommitStreamObject_NoCompacted() throws IOException {
         long objectId, streamId = 1;
 
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            Assertions.assertNull(metadataStore.getLease());
-            Lease lease = new Lease();
-            lease.setNodeId(config.nodeId());
-            metadataStore.setLease(lease);
-            metadataStore.setRole(Role.Leader);
-            objectId = metadataStore.prepareS3Objects(3, 5).get();
+        try (S3MetadataService metadataService = new DefaultS3MetadataService(config, getSessionFactory(), executorService)) {
+            objectId = metadataService.prepareS3Objects(3, 5).get();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -573,15 +526,8 @@ public class S3MetadataManagerTest extends DatabaseTestBase {
             .setObjectSize(111L)
             .build();
 
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            Assertions.assertNull(metadataStore.getLease());
-            Lease lease = new Lease();
-            lease.setNodeId(config.nodeId());
-            metadataStore.setLease(lease);
-            metadataStore.setLease(lease);
-            metadataStore.setRole(Role.Leader);
-
-            metadataStore.commitStreamObject(news3StreamObject, Collections.emptyList());
+        try (DefaultS3MetadataService service = new DefaultS3MetadataService(config, getSessionFactory(), executorService)) {
+            service.commitStreamObject(news3StreamObject, Collections.emptyList());
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -614,14 +560,8 @@ public class S3MetadataManagerTest extends DatabaseTestBase {
         }
 
         List<Long> compactedObjects = new ArrayList<>();
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            Assertions.assertNull(metadataStore.getLease());
-            Lease lease = new Lease();
-            lease.setNodeId(config.nodeId());
-            metadataStore.setLease(lease);
-            metadataStore.setRole(Role.Leader);
-
-            Assertions.assertThrows(ExecutionException.class, () -> metadataStore.commitStreamObject(s3StreamObject, compactedObjects).get());
+        try (S3MetadataService service = new DefaultS3MetadataService(config, getSessionFactory(), executorService)) {
+            Assertions.assertThrows(ExecutionException.class, () -> service.commitStreamObject(s3StreamObject, compactedObjects).get());
         }
 
     }
@@ -642,14 +582,8 @@ public class S3MetadataManagerTest extends DatabaseTestBase {
         }
 
         List<Long> compactedObjects = new ArrayList<>();
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            Assertions.assertNull(metadataStore.getLease());
-            Lease lease = new Lease();
-            lease.setNodeId(config.nodeId());
-            metadataStore.setLease(lease);
-            metadataStore.setRole(Role.Leader);
-
-            Assertions.assertThrows(ExecutionException.class, () -> metadataStore.commitStreamObject(s3StreamObject, compactedObjects).get());
+        try (S3MetadataService service = new DefaultS3MetadataService(config, getSessionFactory(), executorService)) {
+            Assertions.assertThrows(ExecutionException.class, () -> service.commitStreamObject(s3StreamObject, compactedObjects).get());
         }
 
     }
@@ -659,13 +593,8 @@ public class S3MetadataManagerTest extends DatabaseTestBase {
         long objectId;
         int nodeId = 1;
 
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            Assertions.assertNull(metadataStore.getLease());
-            Lease lease = new Lease();
-            lease.setNodeId(config.nodeId());
-            metadataStore.setLease(lease);
-            metadataStore.setRole(Role.Leader);
-            objectId = metadataStore.prepareS3Objects(5, 5).get();
+        try (S3MetadataService s3MetadataService = new DefaultS3MetadataService(config, getSessionFactory(), executorService)) {
+            objectId = s3MetadataService.prepareS3Objects(5, 5).get();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -706,14 +635,8 @@ public class S3MetadataManagerTest extends DatabaseTestBase {
                 .setEndOffset(s3StreamObject2.getEndOffset())
                 .build()).toList();
 
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            Assertions.assertNull(metadataStore.getLease());
-            Lease lease = new Lease();
-            lease.setNodeId(config.nodeId());
-            metadataStore.setLease(lease);
-            metadataStore.setRole(Role.Leader);
-
-            metadataStore.commitWalObject(walObject, s3StreamObjects, compactedObjects).get();
+        try (S3MetadataService manager = new DefaultS3MetadataService(config, getSessionFactory(), executorService)) {
+            manager.commitWalObject(walObject, s3StreamObjects, compactedObjects).get();
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -785,15 +708,9 @@ public class S3MetadataManagerTest extends DatabaseTestBase {
         }
 
         List<Long> compactedObjects = new ArrayList<>();
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            Assertions.assertNull(metadataStore.getLease());
-            Lease lease = new Lease();
-            lease.setNodeId(config.nodeId());
-            metadataStore.setLease(lease);
-            metadataStore.setRole(Role.Leader);
-
-            List<S3StreamObject> s3StreamObjects = metadataStore.listStreamObjects(streamId, startOffset, endOffset, 2).get();
-            Assertions.assertThrows(ExecutionException.class, () -> metadataStore.commitWalObject(walObject, s3StreamObjects, compactedObjects).get());
+        try (S3MetadataService manager = new DefaultS3MetadataService(config, getSessionFactory(), executorService)) {
+            List<S3StreamObject> s3StreamObjects = manager.listStreamObjects(streamId, startOffset, endOffset, 2).get();
+            Assertions.assertThrows(ExecutionException.class, () -> manager.commitWalObject(walObject, s3StreamObjects, compactedObjects).get());
         }
 
     }
@@ -850,13 +767,7 @@ public class S3MetadataManagerTest extends DatabaseTestBase {
         }
 
         List<Long> compactedObjects = new ArrayList<>();
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            metadataStore.start();
-            Awaitility.await().with()
-                .pollInterval(100, TimeUnit.MILLISECONDS)
-                .atMost(10, TimeUnit.SECONDS)
-                .until(metadataStore::isLeader);
-
+        try (S3MetadataService manager = new DefaultS3MetadataService(config, getSessionFactory(), executorService)) {
             calendar.add(Calendar.HOUR, 2);
             S3StreamObject streamObject = S3StreamObject.newBuilder()
                 .setObjectId(objectId)
@@ -869,7 +780,7 @@ public class S3MetadataManagerTest extends DatabaseTestBase {
 
             List<S3StreamObject> s3StreamObjects = new ArrayList<>();
             s3StreamObjects.add(streamObject);
-            metadataStore.commitWalObject(walObject, s3StreamObjects, compactedObjects).get();
+            manager.commitWalObject(walObject, s3StreamObjects, compactedObjects).get();
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {

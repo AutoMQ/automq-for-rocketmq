@@ -22,10 +22,6 @@ import apache.rocketmq.controller.v1.CloseStreamRequest;
 import apache.rocketmq.controller.v1.Code;
 import apache.rocketmq.controller.v1.CommitOffsetReply;
 import apache.rocketmq.controller.v1.CommitOffsetRequest;
-import apache.rocketmq.controller.v1.CommitStreamObjectReply;
-import apache.rocketmq.controller.v1.CommitStreamObjectRequest;
-import apache.rocketmq.controller.v1.CommitWALObjectReply;
-import apache.rocketmq.controller.v1.CommitWALObjectRequest;
 import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.ControllerServiceGrpc;
 import apache.rocketmq.controller.v1.CreateGroupReply;
@@ -61,8 +57,6 @@ import apache.rocketmq.controller.v1.NotifyMessageQueuesAssignableReply;
 import apache.rocketmq.controller.v1.NotifyMessageQueuesAssignableRequest;
 import apache.rocketmq.controller.v1.OpenStreamReply;
 import apache.rocketmq.controller.v1.OpenStreamRequest;
-import apache.rocketmq.controller.v1.PrepareS3ObjectsReply;
-import apache.rocketmq.controller.v1.PrepareS3ObjectsRequest;
 import apache.rocketmq.controller.v1.ReassignMessageQueueReply;
 import apache.rocketmq.controller.v1.ReassignMessageQueueRequest;
 import apache.rocketmq.controller.v1.Status;
@@ -71,8 +65,6 @@ import apache.rocketmq.controller.v1.TerminateNodeReply;
 import apache.rocketmq.controller.v1.TerminateNodeRequest;
 import apache.rocketmq.controller.v1.TerminationStage;
 import apache.rocketmq.controller.v1.Topic;
-import apache.rocketmq.controller.v1.TrimStreamReply;
-import apache.rocketmq.controller.v1.TrimStreamRequest;
 import apache.rocketmq.controller.v1.UpdateGroupReply;
 import apache.rocketmq.controller.v1.UpdateGroupRequest;
 import apache.rocketmq.controller.v1.UpdateTopicReply;
@@ -581,22 +573,6 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
     }
 
     @Override
-    public void trimStream(TrimStreamRequest request, StreamObserver<TrimStreamReply> responseObserver) {
-        metadataStore.trimStream(request.getStreamId(), request.getStreamEpoch(), request.getNewStartOffset())
-            .whenComplete((res, e) -> {
-                if (null != e) {
-                    responseObserver.onError(e);
-                } else {
-                    TrimStreamReply reply = TrimStreamReply.newBuilder()
-                        .setStatus(Status.newBuilder().setCode(Code.OK).build())
-                        .build();
-                    responseObserver.onNext(reply);
-                    responseObserver.onCompleted();
-                }
-            });
-    }
-
-    @Override
     public void listOpenStreams(ListOpenStreamsRequest request,
         StreamObserver<ListOpenStreamsReply> responseObserver) {
         metadataStore.listOpenStreams(request.getBrokerId())
@@ -614,92 +590,6 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
                 responseObserver.onNext(reply);
                 responseObserver.onCompleted();
             });
-    }
-
-    @Override
-    public void prepareS3Objects(PrepareS3ObjectsRequest request,
-        StreamObserver<PrepareS3ObjectsReply> responseObserver) {
-        metadataStore.prepareS3Objects(request.getPreparedCount(), (int) request.getTimeToLiveMinutes())
-            .whenComplete((objectId, e) -> {
-                if (null != e) {
-                    responseObserver.onError(e);
-                    return;
-                }
-
-                PrepareS3ObjectsReply reply = PrepareS3ObjectsReply.newBuilder()
-                    .setStatus(Status.newBuilder()
-                        .setCode(Code.OK).build())
-                    .setFirstObjectId(objectId)
-                    .build();
-                responseObserver.onNext(reply);
-                responseObserver.onCompleted();
-            });
-    }
-
-    @Override
-    public void commitWALObject(CommitWALObjectRequest
-        request, StreamObserver<CommitWALObjectReply> responseObserver) {
-        metadataStore.commitWalObject(request.getS3WalObject(), request.getS3StreamObjectsList(), request.getCompactedObjectIdsList())
-            .whenComplete((res, e) -> {
-                if (null != e) {
-                    if (e instanceof ControllerException ex) {
-                        CommitWALObjectReply reply = CommitWALObjectReply.newBuilder()
-                            .setStatus(Status.newBuilder()
-                                .setCode(Code.forNumber(ex.getErrorCode()))
-                                .setMessage(e.getMessage()).build())
-                            .build();
-                        responseObserver.onNext(reply);
-                        responseObserver.onCompleted();
-                    } else {
-                        responseObserver.onError(e);
-                    }
-                } else {
-                    CommitWALObjectReply reply = CommitWALObjectReply.newBuilder()
-                        .setStatus(Status.newBuilder().setCode(Code.OK).build())
-                        .build();
-                    responseObserver.onNext(reply);
-                    responseObserver.onCompleted();
-                }
-            });
-    }
-
-    @SuppressWarnings("checkstyle:Indentation")
-    @Override
-    public void commitStreamObject(CommitStreamObjectRequest request,
-        StreamObserver<CommitStreamObjectReply> responseObserver) {
-
-        try {
-            metadataStore.commitStreamObject(request.getS3StreamObject(), request.getCompactedObjectIdsList())
-                .whenComplete((res, e) -> {
-                    if (null != e) {
-                        if (e instanceof ControllerException ex) {
-                            CommitStreamObjectReply reply = CommitStreamObjectReply.newBuilder()
-                                .setStatus(Status.newBuilder()
-                                    .setCode(Code.forNumber(ex.getErrorCode()))
-                                    .setMessage(e.getMessage()).build())
-                                .build();
-                            responseObserver.onNext(reply);
-                            responseObserver.onCompleted();
-                        } else {
-                            responseObserver.onError(e);
-                        }
-                    } else {
-                        CommitStreamObjectReply reply = CommitStreamObjectReply.newBuilder()
-                            .setStatus(Status.newBuilder().setCode(Code.OK).build())
-                            .build();
-                        responseObserver.onNext(reply);
-                        responseObserver.onCompleted();
-                    }
-                });
-        } catch (ControllerException e) {
-            CommitStreamObjectReply reply = CommitStreamObjectReply.newBuilder()
-                .setStatus(Status.newBuilder()
-                    .setCode(Code.forNumber(e.getErrorCode()))
-                    .setMessage(e.getMessage()).build())
-                .build();
-            responseObserver.onNext(reply);
-            responseObserver.onCompleted();
-        }
     }
 
     @Override

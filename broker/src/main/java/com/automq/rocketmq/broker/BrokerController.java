@@ -27,6 +27,8 @@ import com.automq.rocketmq.metadata.DefaultProxyMetadataService;
 import com.automq.rocketmq.metadata.DefaultStoreMetadataService;
 import com.automq.rocketmq.metadata.api.ProxyMetadataService;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
+import com.automq.rocketmq.metadata.s3.DefaultS3MetadataService;
+import com.automq.rocketmq.metadata.api.S3MetadataService;
 import com.automq.rocketmq.proxy.config.ProxyConfiguration;
 import com.automq.rocketmq.proxy.grpc.GrpcProtocolServer;
 import com.automq.rocketmq.proxy.processor.ExtendMessagingProcessor;
@@ -64,7 +66,9 @@ public class BrokerController implements Lifecycle {
         metadataStore = MetadataStoreBuilder.build(brokerConfig);
 
         proxyMetadataService = new DefaultProxyMetadataService(metadataStore);
-        storeMetadataService = new DefaultStoreMetadataService(metadataStore);
+        S3MetadataService s3MetadataService = new DefaultS3MetadataService(metadataStore.config(),
+            metadataStore.sessionFactory(), metadataStore.asyncExecutor());
+        storeMetadataService = new DefaultStoreMetadataService(metadataStore, s3MetadataService);
 
         dlqService = new DeadLetterService(brokerConfig, proxyMetadataService);
 

@@ -31,8 +31,6 @@ import apache.rocketmq.controller.v1.ListOpenStreamsReply;
 import apache.rocketmq.controller.v1.ListOpenStreamsRequest;
 import apache.rocketmq.controller.v1.OpenStreamReply;
 import apache.rocketmq.controller.v1.OpenStreamRequest;
-import apache.rocketmq.controller.v1.S3StreamObject;
-import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.StreamState;
@@ -46,7 +44,6 @@ import com.automq.rocketmq.controller.ControllerClient;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.MetadataStore;
 import com.automq.rocketmq.controller.server.store.impl.GroupManager;
-import com.automq.rocketmq.controller.server.store.impl.S3MetadataManager;
 import com.automq.rocketmq.controller.server.store.impl.TopicManager;
 import com.automq.rocketmq.controller.server.tasks.ScanGroupTask;
 import com.automq.rocketmq.controller.server.tasks.ScanStreamTask;
@@ -98,7 +95,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.slf4j.Logger;
@@ -129,8 +125,6 @@ public class DefaultMetadataStore implements MetadataStore {
 
     private final GroupManager groupManager;
 
-    private final S3MetadataManager s3MetadataManager;
-
     private DataStore dataStore;
 
     public DefaultMetadataStore(ControllerClient client, SqlSessionFactory sessionFactory, ControllerConfig config) {
@@ -143,7 +137,6 @@ public class DefaultMetadataStore implements MetadataStore {
             new PrefixThreadFactory("Controller"));
         this.asyncExecutorService = Executors.newFixedThreadPool(10, new PrefixThreadFactory("Controller-Async"));
         this.topicManager = new TopicManager(this);
-        this.s3MetadataManager = new S3MetadataManager(this);
         this.groupManager = new GroupManager(this);
     }
 
@@ -160,6 +153,11 @@ public class DefaultMetadataStore implements MetadataStore {
     @Override
     public SqlSession openSession() {
         return sessionFactory.openSession(false);
+    }
+
+    @Override
+    public SqlSessionFactory sessionFactory() {
+        return sessionFactory;
     }
 
     @Override
@@ -1179,50 +1177,5 @@ public class DefaultMetadataStore implements MetadataStore {
     @Override
     public void applyStreamChange(List<Stream> streams) {
         this.topicManager.getStreamCache().apply(streams);
-    }
-
-    @Override
-    public CompletableFuture<Void> trimStream(long streamId, long streamEpoch, long newStartOffset) {
-        return s3MetadataManager.trimStream(streamId, streamEpoch, newStartOffset);
-    }
-
-    @Override
-    public CompletableFuture<Long> prepareS3Objects(int count, int ttlInMinutes) {
-        return s3MetadataManager.prepareS3Objects(count, ttlInMinutes);
-    }
-
-    @Override
-    public CompletableFuture<Void> commitWalObject(S3WALObject walObject, List<S3StreamObject> streamObjects,
-        List<Long> compactedObjects) {
-        return s3MetadataManager.commitWalObject(walObject, streamObjects, compactedObjects);
-    }
-
-    @Override
-    public CompletableFuture<Void> commitStreamObject(S3StreamObject streamObject,
-        List<Long> compactedObjects) throws ControllerException {
-        return s3MetadataManager.commitStreamObject(streamObject, compactedObjects);
-    }
-
-    @Override
-    public CompletableFuture<List<S3WALObject>> listWALObjects() {
-        return s3MetadataManager.listWALObjects();
-    }
-
-    @Override
-    public CompletableFuture<List<S3WALObject>> listWALObjects(long streamId, long startOffset, long endOffset,
-        int limit) {
-        return s3MetadataManager.listWALObjects(streamId, startOffset, endOffset, limit);
-    }
-
-    @Override
-    public CompletableFuture<List<S3StreamObject>> listStreamObjects(long streamId, long startOffset, long endOffset,
-        int limit) {
-        return s3MetadataManager.listStreamObjects(streamId, startOffset, endOffset, limit);
-    }
-
-    @Override
-    public CompletableFuture<Pair<List<S3StreamObject>, List<S3WALObject>>> listObjects(long streamId, long startOffset,
-        long endOffset, int limit) {
-        return s3MetadataManager.listObjects(streamId, startOffset, endOffset, limit);
     }
 }
