@@ -43,9 +43,7 @@ import static com.automq.rocketmq.store.MessageStoreImpl.KV_NAMESPACE_CHECK_POIN
 public class MessageStoreBuilder {
     public static MessageStoreImpl build(StoreConfig storeConfig, S3StreamConfig s3StreamConfig,
         StoreMetadataService metadataService, DeadLetterSender deadLetterSender) throws StoreException {
-        S3Operator operator = new DefaultS3Operator(s3StreamConfig.s3Endpoint(), s3StreamConfig.s3Region(), s3StreamConfig.s3Bucket(),
-            s3StreamConfig.s3ForcePathStyle(), s3StreamConfig.s3AccessKey(), s3StreamConfig.s3SecretKey());
-        StreamStore streamStore = new S3StreamStore(storeConfig, s3StreamConfig, metadataService, operator);
+        StreamStore streamStore = new S3StreamStore(storeConfig, s3StreamConfig, metadataService);
         KVService kvService = new RocksDBKVService(storeConfig.kvPath());
         InflightService inflightService = new InflightService();
         SnapshotService snapshotService = new SnapshotService(streamStore, kvService);
@@ -57,6 +55,10 @@ public class MessageStoreBuilder {
             metadataService, operationLogService, inflightService, streamReclaimService);
         ReviveService reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, kvService, timerService,
             metadataService, inflightService, logicQueueManager, deadLetterSender);
+
+        // S3 object manager, such as trim expired messages, etc.
+        S3Operator operator = new DefaultS3Operator(s3StreamConfig.s3Endpoint(), s3StreamConfig.s3Region(), s3StreamConfig.s3Bucket(),
+            s3StreamConfig.s3ForcePathStyle(), s3StreamConfig.s3AccessKey(), s3StreamConfig.s3SecretKey());
         S3ObjectOperator objectOperator = new S3ObjectOperatorImpl(operator);
 
         return new MessageStoreImpl(storeConfig, streamStore, metadataService, kvService, timerService, inflightService, snapshotService, logicQueueManager, reviveService, objectOperator);
