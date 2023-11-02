@@ -20,7 +20,6 @@ package com.automq.stream.s3.metrics.stats;
 import com.automq.stream.s3.metrics.Counter;
 import com.automq.stream.s3.metrics.Gauge;
 import com.automq.stream.s3.metrics.S3StreamMetricsRegistry;
-import com.automq.stream.s3.metrics.operations.S3MetricsType;
 import com.automq.stream.s3.network.AsyncNetworkBandwidthLimiter;
 
 import java.util.Collections;
@@ -28,10 +27,10 @@ import java.util.Collections;
 public class NetworkMetricsStats {
 
     public static final Counter NETWORK_INBOUND_USAGE = S3StreamMetricsRegistry.getMetricsGroup()
-            .newCounter("network_inbound_usage", Collections.emptyMap());
+            .newCounter("network_inbound_usage" + Counter.SUFFIX, Collections.emptyMap());
 
     public static final Counter NETWORK_OUTBOUND_USAGE = S3StreamMetricsRegistry.getMetricsGroup()
-            .newCounter("network_outbound_usage", Collections.emptyMap());
+            .newCounter("network_outbound_usage" + Counter.SUFFIX, Collections.emptyMap());
 
     public static void registerNetworkInboundAvailableBandwidth(AsyncNetworkBandwidthLimiter.Type type, Gauge gauge) {
         String metricName = String.format("network_%s_available_bandwidth", type.getName().toLowerCase());
