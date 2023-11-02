@@ -29,6 +29,11 @@ public interface StreamMapper {
 
     int create(Stream stream);
 
+    /**
+     * For test purpose only.
+     */
+    int insert(Stream stream);
+
     Stream getByStreamId(long id);
 
     int increaseEpoch(long id);

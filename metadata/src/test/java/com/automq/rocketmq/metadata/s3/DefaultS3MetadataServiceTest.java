@@ -38,6 +38,7 @@ import com.automq.rocketmq.metadata.mapper.S3WalObjectMapper;
 import com.automq.rocketmq.metadata.mapper.StreamMapper;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.LongStream;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
@@ -588,6 +589,33 @@ public class DefaultS3MetadataServiceTest extends DatabaseTestBase {
 
     }
 
+    private void insertStream(SqlSession session, long streamId, StreamState state) {
+        StreamMapper mapper = session.getMapper(StreamMapper.class);
+        Stream stream = new Stream();
+        stream.setId(streamId);
+        stream.setState(state);
+        stream.setQueueId(1);
+        stream.setTopicId(1L);
+        stream.setSrcNodeId(1);
+        stream.setDstNodeId(1);
+        stream.setStartOffset(0L);
+        stream.setRangeId(0);
+        stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
+        mapper.insert(stream);
+    }
+
+    private void createRange(SqlSession session, long streamId, int rangeId, long startOffset, long endOffset) {
+        RangeMapper mapper = session.getMapper(RangeMapper.class);
+        Range range = new Range();
+        range.setRangeId(rangeId);
+        range.setStartOffset(startOffset);
+        range.setEndOffset(endOffset);
+        range.setStreamId(streamId);
+        range.setNodeId(1);
+        range.setEpoch(1L);
+        mapper.create(range);
+    }
+
     @Test
     public void testCommitWALObject() throws IOException, ExecutionException, InterruptedException {
         long objectId;
@@ -607,6 +635,11 @@ public class DefaultS3MetadataServiceTest extends DatabaseTestBase {
 
         try (SqlSession session = this.getSessionFactory().openSession()) {
             S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
+
+            LongStream.range(1, 3).forEach(streamId -> {
+                insertStream(session, streamId, StreamState.OPEN);
+                createRange(session, streamId, 0, 0, 20);
+            });
 
             buildS3WalObjs(objectId + 2, 1).stream().peek(s3WalObject -> {
                 Map<Long, SubStream> subStreams = buildWalSubStreams(1, 20L, 10L);

@@ -39,6 +39,24 @@
         )
     </insert>
 
+    <insert id="insert" parameterType="Stream" useGeneratedKeys="false">
+        INSERT INTO stream
+            (id, topic_id, queue_id, stream_role, group_id, src_node_id, dst_node_id, epoch, range_id, start_offset, state)
+        VALUES (
+            #{id},
+            #{topicId},
+            #{queueId},
+            #{streamRole},
+            #{groupId},
+            #{srcNodeId},
+            #{dstNodeId},
+            #{epoch},
+            #{rangeId},
+            #{startOffset},
+            #{state}
+        )
+    </insert>
+
     <update id="increaseEpoch" parameterType="long">
         UPDATE stream
         SET epoch = epoch + 1
