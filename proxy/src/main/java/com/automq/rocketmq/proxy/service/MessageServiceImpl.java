@@ -17,7 +17,7 @@
 
 package com.automq.rocketmq.proxy.service;
 
-import apache.rocketmq.controller.v1.Code;
+import apache.rocketmq.common.v1.Code;
 import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.SubscriptionMode;
 import apache.rocketmq.controller.v1.Topic;
@@ -98,7 +98,7 @@ import org.apache.rocketmq.remoting.protocol.header.UpdateConsumerOffsetRequestH
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class MessageServiceImpl implements MessageService {
+public class MessageServiceImpl implements MessageService, ExtendMessageService {
     private static final Logger LOGGER = LoggerFactory.getLogger(MessageServiceImpl.class);
     private final ProxyConfig config;
     private final ProxyMetadataService metadataService;
@@ -555,20 +555,28 @@ public class MessageServiceImpl implements MessageService {
             .thenCompose(pair -> {
                 ConsumerGroup consumerGroup = pair.getLeft();
                 Topic topic = pair.getRight();
-                if (consumerGroup.getSubMode() == SubscriptionMode.SUB_MODE_PULL) {
-                    return metadataService.updateConsumerOffset(
-                            consumerGroup.getGroupId(),
-                            topic.getTopicId(),
-                            virtualQueue.physicalQueueId(),
-                            requestHeader.getCommitOffset())
-                        .thenApply(nil -> new ResetConsumeOffsetResult(ResetConsumeOffsetResult.Status.SUCCESS));
-                }
-                return store.resetConsumeOffset(consumerGroup.getGroupId(), topic.getTopicId(), virtualQueue.physicalQueueId(), requestHeader.getCommitOffset());
-            }).thenAccept(resetConsumeOffsetResult -> {
-                if (resetConsumeOffsetResult.status() != ResetConsumeOffsetResult.Status.SUCCESS) {
-                    throw new ProxyException(apache.rocketmq.v2.Code.INTERNAL_ERROR, "Reset consume offset failed");
-                }
+                return resetConsumeOffsetOfQueue(topic.getTopicId(), virtualQueue.physicalQueueId(), consumerGroup, requestHeader.getCommitOffset());
             });
+    }
+
+    private CompletableFuture<Void> resetConsumeOffsetOfQueue(long topicId, int queueId, ConsumerGroup consumerGroup,
+        long newConsumeOffset) {
+        CompletableFuture<ResetConsumeOffsetResult> cf;
+        if (consumerGroup.getSubMode() == SubscriptionMode.SUB_MODE_PULL) {
+            cf = metadataService.updateConsumerOffset(
+                    consumerGroup.getGroupId(),
+                    topicId,
+                    queueId,
+                    newConsumeOffset)
+                .thenApply(nil -> new ResetConsumeOffsetResult(ResetConsumeOffsetResult.Status.SUCCESS));
+        } else {
+            cf = store.resetConsumeOffset(consumerGroup.getGroupId(), topicId, queueId, newConsumeOffset);
+        }
+        return cf.thenAccept(resetConsumeOffsetResult -> {
+            if (resetConsumeOffsetResult.status() != ResetConsumeOffsetResult.Status.SUCCESS) {
+                throw new ProxyException(apache.rocketmq.v2.Code.INTERNAL_ERROR, "Reset consume offset failed");
+            }
+        });
     }
 
     record PullResultWrapper(
@@ -578,6 +586,7 @@ public class MessageServiceImpl implements MessageService {
         public boolean needWriteResponse() {
             return inner.maxOffset() > inner.nextBeginOffset() || !inner.messageList().isEmpty();
         }
+
     }
 
     @Override
@@ -736,5 +745,25 @@ public class MessageServiceImpl implements MessageService {
             // Rethrow other exceptions.
             throw new CompletionException(t);
         });
+    }
+
+    @Override
+    public CompletableFuture<Void> resetConsumeOffset(String topicName, int queueId, String consumerGroupName,
+        long newConsumeOffset) {
+        CompletableFuture<ConsumerGroup> consumeGroupFuture = metadataService.consumerGroupOf(consumerGroupName);
+        CompletableFuture<Topic> topicFuture = metadataService.topicOf(topicName);
+
+        return consumeGroupFuture.thenCombine(topicFuture, Pair::of)
+            .thenCompose(pair -> {
+                ConsumerGroup consumerGroup = pair.getLeft();
+                Topic topic = pair.getRight();
+                return resetConsumeOffsetOfQueue(topic.getTopicId(), queueId, consumerGroup, newConsumeOffset);
+            });
+    }
+
+    @Override
+    public CompletableFuture<Void> resetConsumeOffsetByTimestamp(String topic, int queueId, String consumerGroup,
+        long timestamp) {
+        throw new UnsupportedOperationException("Not implemented yet");
     }
 }

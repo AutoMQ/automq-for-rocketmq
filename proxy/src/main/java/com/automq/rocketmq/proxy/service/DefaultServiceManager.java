@@ -45,13 +45,12 @@ public class DefaultServiceManager implements ServiceManager {
     private final DeadLetterService deadLetterService;
 
     public DefaultServiceManager(BrokerConfig config, ProxyMetadataService proxyMetadataService,
-        DeadLetterService deadLetterService,
+        DeadLetterService deadLetterService, MessageService messageService,
         MessageStore messageStore) {
         this.metadataService = proxyMetadataService;
         this.deadLetterService = deadLetterService;
         this.resourceMetadataService = new ResourceMetadataService(proxyMetadataService);
-        LockService lockService = new LockService(config.proxy());
-        this.messageService = new MessageServiceImpl(config.proxy(), messageStore, proxyMetadataService, lockService, deadLetterService);
+        this.messageService = messageService;
         this.topicRouteService = new TopicRouteServiceImpl(config, proxyMetadataService);
         this.producerManager = new ProducerManager();
         this.consumerManager = new ConsumerManager(new ConsumerIdsChangeListenerImpl(), config.proxy().channelExpiredTimeout());

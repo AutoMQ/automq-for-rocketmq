@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package apache.rocketmq.common.v1;
+
+option java_multiple_files = true;
+option java_package = "apache.rocketmq.common.v1";
+option java_generate_equals_and_hash = true;
+option java_string_check_utf8 = true;
+option java_outer_classname = "CommonDomains";
+
+// Define all error codes here
+enum Code {
+  OK = 0;
+  INTERRUPTED = 1;
+  NOT_FOUND = 404;
+  INTERNAL = 500;
+  NO_LEADER = 1000;
+  BAD_REQUEST = 1001;
+  MOCK_FAILURE = 1002;
+  DUPLICATED = 1003;
+
+  // Illegal state for the operation
+  ILLEGAL_STATE = 1004;
+
+  // Operation is fenced out as provided epoch is deprecated.
+  FENCED = 1005;
+
+  // Broker nodes are unavailable
+  NODE_UNAVAILABLE = 1006;
+
+  // Referenced
+  REFERENCED_AS_DEAD_LETTER_TOPIC = 1007;
+
+  // Invalid argument value
+  INVALID_ARGUMENT = 1008;
+}

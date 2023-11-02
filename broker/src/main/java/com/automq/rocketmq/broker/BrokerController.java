@@ -33,10 +33,14 @@ import com.automq.rocketmq.metadata.service.DefaultS3MetadataService;
 import com.automq.rocketmq.metadata.service.S3MetadataService;
 import com.automq.rocketmq.proxy.config.ProxyConfiguration;
 import com.automq.rocketmq.proxy.grpc.GrpcProtocolServer;
+import com.automq.rocketmq.proxy.grpc.ProxyServiceImpl;
 import com.automq.rocketmq.proxy.processor.ExtendMessagingProcessor;
 import com.automq.rocketmq.proxy.remoting.RemotingProtocolServer;
 import com.automq.rocketmq.proxy.service.DeadLetterService;
 import com.automq.rocketmq.proxy.service.DefaultServiceManager;
+import com.automq.rocketmq.proxy.service.ExtendMessageService;
+import com.automq.rocketmq.proxy.service.LockService;
+import com.automq.rocketmq.proxy.service.MessageServiceImpl;
 import com.automq.rocketmq.proxy.service.SuspendRequestService;
 import com.automq.rocketmq.store.DataStoreFacade;
 import com.automq.rocketmq.store.MessageStoreBuilder;
@@ -64,6 +68,7 @@ import org.apache.rocketmq.common.thread.ThreadPoolMonitor;
 import org.apache.rocketmq.logging.org.slf4j.Logger;
 import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
 import org.apache.rocketmq.proxy.service.ServiceManager;
+import org.apache.rocketmq.proxy.service.message.MessageService;
 
 import static io.opentelemetry.semconv.ResourceAttributes.SERVICE_INSTANCE_ID;
 import static io.opentelemetry.semconv.ResourceAttributes.SERVICE_NAME;
@@ -83,6 +88,8 @@ public class BrokerController implements Lifecycle {
     private final ExtendMessagingProcessor messagingProcessor;
     private final MetricsExporter metricsExporter;
     private final DeadLetterService dlqService;
+    private final MessageService messageService;
+    private final ExtendMessageService extendMessageService;
 
     public BrokerController(BrokerConfig brokerConfig) throws Exception {
         this.brokerConfig = brokerConfig;
@@ -108,6 +115,12 @@ public class BrokerController implements Lifecycle {
         metadataStore.setDataStore(dataStore);
 
         serviceManager = new DefaultServiceManager(brokerConfig, proxyMetadataService, dlqService, messageStore);
+        LockService lockService = new LockService(brokerConfig.proxy());
+        MessageServiceImpl messageServiceImpl = new MessageServiceImpl(brokerConfig.proxy(), messageStore, proxyMetadataService, lockService, dlqService);
+        this.messageService = messageServiceImpl;
+        this.extendMessageService = messageServiceImpl;
+
+        serviceManager = new DefaultServiceManager(brokerConfig, proxyMetadataService, dlqService, messageService, messageStore);
         messagingProcessor = ExtendMessagingProcessor.createForS3RocketMQ(serviceManager);
 
         // Build resource.
@@ -176,7 +189,8 @@ public class BrokerController implements Lifecycle {
 
         // TODO: Split controller to a separate port
         ControllerServiceImpl controllerService = MetadataStoreBuilder.build(metadataStore);
-        grpcServer = new GrpcProtocolServer(brokerConfig.proxy(), messagingProcessor, controllerService);
+        ProxyServiceImpl proxyService = new ProxyServiceImpl(extendMessageService);
+        grpcServer = new GrpcProtocolServer(brokerConfig.proxy(), messagingProcessor, controllerService, proxyService);
         remotingServer = new RemotingProtocolServer(messagingProcessor);
     }
 

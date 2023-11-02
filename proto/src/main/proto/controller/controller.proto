@@ -2,8 +2,9 @@ syntax = "proto3";
 
 package apache.rocketmq.controller.v1;
 
-import "model.proto";
-import "admin.proto";
+import "controller/model.proto";
+import "controller/admin.proto";
+import "common.proto";
 
 option java_multiple_files = true;
 option java_package = "apache.rocketmq.controller.v1";
@@ -16,35 +17,8 @@ message Uuid {
   int64 least_significant_bits = 2;
 }
 
-// Define all error codes here
-enum Code {
-  OK = 0;
-  INTERRUPTED = 1;
-  NOT_FOUND = 404;
-  INTERNAL = 500;
-  NO_LEADER = 1000;
-  BAD_REQUEST = 1001;
-  MOCK_FAILURE = 1002;
-  DUPLICATED = 1003;
-
-  // Illegal state for the operation
-  ILLEGAL_STATE = 1004;
-
-  // Operation is fenced out as provided epoch is deprecated.
-  FENCED = 1005;
-
-  // Broker nodes are unavailable
-  NODE_UNAVAILABLE = 1006;
-
-  // Referenced
-  REFERENCED_AS_DEAD_LETTER_TOPIC = 1007;
-
-  // Invalid argument value
-  INVALID_ARGUMENT = 1008;
-}
-
 message Status {
-  Code code = 1;
+  common.v1.Code code = 1;
   string message = 2;
 }
 

@@ -47,7 +47,7 @@ public class GrpcProtocolServer implements Lifecycle {
     private final GrpcMessagingApplication grpcMessagingApplication;
 
     public GrpcProtocolServer(ProxyConfig config, MessagingProcessor messagingProcessor,
-        ControllerServiceImpl controllerService) {
+        ControllerServiceImpl controllerService, ProxyServiceImpl proxyService) {
         grpcExecutor = createGrpcExecutor(config.grpcThreadPoolNums(), config.grpcThreadPoolQueueCapacity());
         grpcMessagingApplication = createServiceProcessor(messagingProcessor);
         grpcServer = GrpcServerBuilder.newBuilder(grpcExecutor, ConfigurationManager.getProxyConfig().getGrpcServerPort())
@@ -55,6 +55,7 @@ public class GrpcProtocolServer implements Lifecycle {
             .addService(ChannelzService.newInstance(100))
             .addService(ProtoReflectionService.newInstance())
             .addService(controllerService)
+            .addService(proxyService)
             .configInterceptor()
             .build();
     }
