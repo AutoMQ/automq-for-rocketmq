@@ -27,9 +27,9 @@ import java.util.function.Supplier;
 public class StreamMetricsHistogram extends BaseStreamMetrics implements Histogram {
     private final LongHistogram histogram;
 
-    public StreamMetricsHistogram(String type, String name, Map<String, String> tags,
+    public StreamMetricsHistogram(String name, Map<String, String> tags,
         Meter meter, Supplier<AttributesBuilder> attributesBuilderSupplier) {
-        super(type, name, tags, meter, attributesBuilderSupplier);
+        super(name, tags, meter, attributesBuilderSupplier);
         histogram = this.meter.histogramBuilder(this.metricsName)
             .ofLongs()
             .build();

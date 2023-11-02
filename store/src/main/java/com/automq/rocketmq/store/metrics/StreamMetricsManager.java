@@ -48,17 +48,17 @@ public class StreamMetricsManager implements MetricsManager, S3StreamMetricsGrou
     }
 
     @Override
-    public Counter newCounter(String type, String name, Map<String, String> tags) {
-        return new StreamMetricsCounter(type, name, tags, meter, attributesBuilderSupplier);
+    public Counter newCounter(String name, Map<String, String> tags) {
+        return new StreamMetricsCounter(name, tags, meter, attributesBuilderSupplier);
     }
 
     @Override
-    public Histogram newHistogram(String type, String name, Map<String, String> tags) {
-        return new StreamMetricsHistogram(type, name, tags, meter, attributesBuilderSupplier);
+    public Histogram newHistogram(String name, Map<String, String> tags) {
+        return new StreamMetricsHistogram(name, tags, meter, attributesBuilderSupplier);
     }
 
     @Override
-    public void newGauge(String type, String name, Map<String, String> tags, Gauge gauge) {
-        new StreamMetricsGauge(type, name, tags, meter, attributesBuilderSupplier, gauge);
+    public void newGauge(String name, Map<String, String> tags, Gauge gauge) {
+        new StreamMetricsGauge(name, tags, meter, attributesBuilderSupplier, gauge);
     }
 }
