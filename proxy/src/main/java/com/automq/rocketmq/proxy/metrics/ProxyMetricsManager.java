@@ -245,6 +245,7 @@ public class ProxyMetricsManager implements MetricsManager {
             (double) Duration.ofNanos(1000).toNanos(),
             (double) Duration.ofNanos(10_000).toNanos(),
             (double) Duration.ofMillis(1).toNanos(),
+            (double) Duration.ofMillis(2).toNanos(),
             (double) Duration.ofMillis(3).toNanos(),
             (double) Duration.ofMillis(5).toNanos(),
             (double) Duration.ofMillis(7).toNanos(),
