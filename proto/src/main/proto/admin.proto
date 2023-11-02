@@ -37,6 +37,9 @@ message Node {
 
   // Timestamp that the leader receives heartbeat from this node
   google.protobuf.Timestamp last_heartbeat = 7;
+
+  // Advertise address
+  string address = 8;
 }
 
 message ClusterSummary {

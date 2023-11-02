@@ -240,6 +240,7 @@ public class DefaultMetadataStore implements MetadataStore {
                     .setQueueNum(topicManager.queueNumOfNode(entry.getKey()))
                     .setStreamNum(topicManager.streamNumOfNode(entry.getKey()))
                     .setGoingAway(brokerNode.isGoingAway())
+                    .setAddress(brokerNode.getNode().getAddress())
                     .build();
                 builder.addNodes(node);
             }
