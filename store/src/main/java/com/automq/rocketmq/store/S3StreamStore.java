@@ -71,7 +71,7 @@ public class S3StreamStore implements StreamStore {
         ObjectManager objectManager = new S3ObjectManager(metadataService);
 
         WriteAheadLog writeAheadLog = BlockWALService.builder(s3Config.s3WALPath(), s3Config.s3WALCapacity()).config(s3Config).build();
-        S3BlockCache blockCache = new DefaultS3BlockCache(s3Config.s3CacheSize(), objectManager, operator);
+        S3BlockCache blockCache = new DefaultS3BlockCache(s3Config.s3BlockCacheSize(), objectManager, operator);
 
         // Build the s3 storage
         this.storage = new S3Storage(s3Config, writeAheadLog, streamManager, objectManager, blockCache, operator);
