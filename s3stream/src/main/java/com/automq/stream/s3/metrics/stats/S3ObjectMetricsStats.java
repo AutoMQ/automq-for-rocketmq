@@ -29,16 +29,13 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class S3ObjectMetricsStats {
     private static final Map<String, Histogram> S3_OBJECT_TIME_MAP = new ConcurrentHashMap<>();
-    public static final Counter S3_OBJECT_COUNT = S3StreamMetricsRegistry.getMetricsGroup().newCounter(S3MetricsType.S3Object.getName(),
-            S3MetricsType.S3Object.getName() + "Count", Collections.emptyMap());
-    public static final Histogram S3_OBJECT_SIZE = S3StreamMetricsRegistry.getMetricsGroup().newHistogram(S3MetricsType.S3Object.getName(),
-            S3MetricsType.S3Object.getName() + "Size", Collections.emptyMap());
+    public static final Counter S3_OBJECT_COUNT = S3StreamMetricsRegistry.getMetricsGroup().newCounter("s3_object_count", Collections.emptyMap());
+    public static final Histogram S3_OBJECT_SIZE = S3StreamMetricsRegistry.getMetricsGroup().newHistogram("s3_object_size", Collections.emptyMap());
 
     public static Histogram getOrCreateS3ObjectMetrics(S3ObjectStage stage) {
         return S3_OBJECT_TIME_MAP.computeIfAbsent(stage.getName(), op -> {
             Map<String, String> tags = Map.of("stage", stage.getName());
-            return S3StreamMetricsRegistry.getMetricsGroup().newHistogram(S3MetricsType.S3Object.getName(),
-                    S3MetricsType.S3Object.getName() + "Time", tags);
+            return S3StreamMetricsRegistry.getMetricsGroup().newHistogram("s3_object_stage_time", tags);
         });
     }
 }
