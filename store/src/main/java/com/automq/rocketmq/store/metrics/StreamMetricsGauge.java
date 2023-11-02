@@ -25,9 +25,9 @@ import java.util.function.Supplier;
 
 public class StreamMetricsGauge extends BaseStreamMetrics {
 
-    public StreamMetricsGauge(String type, String name, Map<String, String> tags,
+    public StreamMetricsGauge(String name, Map<String, String> tags,
         Meter meter, Supplier<AttributesBuilder> attributesBuilderSupplier, Gauge gauge) {
-        super(type, name, tags, meter, attributesBuilderSupplier);
+        super(name, tags, meter, attributesBuilderSupplier);
         this.meter.gaugeBuilder(this.metricsName)
             .ofLongs()
             .buildWithCallback(measurement -> measurement.record(gauge.value(), newAttributesBuilder().build()));

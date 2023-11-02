@@ -25,13 +25,12 @@ import java.util.Map;
 import java.util.function.Supplier;
 
 public class StreamMetricsCounter extends BaseStreamMetrics implements Counter {
-    private static final String STREAM_METRICS_COUNTER_SUFFIX = "_total";
     private final LongCounter counter;
 
-    public StreamMetricsCounter(String type, String name, Map<String, String> tags,
+    public StreamMetricsCounter(String name, Map<String, String> tags,
         Meter meter, Supplier<AttributesBuilder> attributesBuilderSupplier) {
-        super(type, name, tags, meter, attributesBuilderSupplier);
-        this.counter = this.meter.counterBuilder(this.metricsName + STREAM_METRICS_COUNTER_SUFFIX)
+        super(name, tags, meter, attributesBuilderSupplier);
+        this.counter = this.meter.counterBuilder(this.metricsName)
             .build();
     }
 

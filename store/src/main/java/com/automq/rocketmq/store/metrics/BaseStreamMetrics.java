@@ -31,9 +31,9 @@ public class BaseStreamMetrics {
     protected final Map<String, String> tags;
     protected final String metricsName;
 
-    protected BaseStreamMetrics(String type, String name, Map<String, String> tags,
+    protected BaseStreamMetrics(String name, Map<String, String> tags,
         Meter meter, Supplier<AttributesBuilder> attributesBuilderSupplier) {
-        this.metricsName = metricsName(type, name);
+        this.metricsName = metricsName(name);
         this.tags = tags;
         this.meter = meter;
         this.attributesBuilderSupplier = attributesBuilderSupplier;
@@ -51,10 +51,8 @@ public class BaseStreamMetrics {
         return builder;
     }
 
-    protected String metricsName(String type, String name) {
-        name = name.replace(type, "");
+    protected String metricsName(String name) {
         name = name.toLowerCase();
-        type = type.toLowerCase();
-        return STREAM_METRICS_PREFIX + type + "_" + name;
+        return STREAM_METRICS_PREFIX + "_" + name;
     }
 }
