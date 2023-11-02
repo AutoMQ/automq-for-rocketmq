@@ -78,7 +78,7 @@ public class ConsoleHelper {
         AsciiTable nodeTable = new AsciiTable();
         nodeTable.addRule();
         row = nodeTable.addRow("NODE ID", "NODE NAME", "TOPIC QUANTITY", "QUEUE QUANTITY",
-            "STREAM QUANTITY", "LAST HEARTBEAT", "ROLE", "EPOCH", "EXPIRATION");
+            "STREAM QUANTITY", "LAST HEARTBEAT", "ROLE", "EPOCH", "EXPIRATION", "ADDRESS");
 
         alignCentral(row);
 
@@ -87,7 +87,7 @@ public class ConsoleHelper {
             boolean isLeader = node.getId() == cluster.getLease().getNodeId();
             row = nodeTable.addRow(node.getId(), node.getName(), node.getTopicNum(), node.getQueueNum(), node.getStreamNum(),
                 toDate(node.getLastHeartbeat()), isLeader ? "Leader" : "Worker", isLeader ? cluster.getLease().getEpoch() : "",
-                isLeader ? toDate(cluster.getLease().getExpirationTimestamp()) : "");
+                isLeader ? toDate(cluster.getLease().getExpirationTimestamp()) : "", node.getAddress());
             alignCentral(row);
         }
         nodeTable.addRule();
