@@ -66,6 +66,8 @@ public class BrokerConfig implements ControllerConfig {
 
     private final DatabaseConfig db;
 
+    private final Controller controller;
+
     private boolean terminating;
 
     public BrokerConfig() {
@@ -74,6 +76,7 @@ public class BrokerConfig implements ControllerConfig {
         this.store = new StoreConfig();
         this.s3Stream = new S3StreamConfig();
         this.db = new DatabaseConfig();
+        this.controller = new Controller();
     }
 
     private static String parseHost(String address) {
@@ -244,5 +247,45 @@ public class BrokerConfig implements ControllerConfig {
 
     public String getInnerSecretKey() {
         return innerSecretKey;
+    }
+
+    @Override
+    public long scanIntervalInSecs() {
+        return controller.getScanIntervalInSecs();
+    }
+
+    @Override
+    public int leaseLifeSpanInSecs() {
+        return controller.getLeaseLifeSpanInSecs();
+    }
+
+    @Override
+    public long nodeAliveIntervalInSecs() {
+        return controller.getNodeAliveIntervalInSecs();
+    }
+
+    @Override
+    public int deletedTopicLingersInSecs() {
+        return controller.getDeletedTopicLingersInSecs();
+    }
+
+    @Override
+    public int deletedGroupLingersInSecs() {
+        return controller.getDeletedGroupLingersInSecs();
+    }
+
+    @Override
+    public long balanceWorkloadIntervalInSecs() {
+        return controller.getBalanceWorkloadIntervalInSecs();
+    }
+
+    @Override
+    public long recycleS3IntervalInSecs() {
+        return controller.getRecycleS3IntervalInSecs();
+    }
+
+    @Override
+    public int workloadTolerance() {
+        return controller.getWorkloadTolerance();
     }
 }

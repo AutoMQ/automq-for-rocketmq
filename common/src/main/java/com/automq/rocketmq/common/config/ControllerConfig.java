@@ -43,7 +43,7 @@ public interface ControllerConfig extends GrpcClientConfig {
         return 10;
     }
 
-    default int nodeAliveIntervalInSecs() {
+    default long nodeAliveIntervalInSecs() {
         return 60;
     }
 
