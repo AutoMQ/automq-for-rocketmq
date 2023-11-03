@@ -19,14 +19,16 @@ package com.automq.rocketmq.controller.server.tasks;
 
 import apache.rocketmq.controller.v1.Code;
 import apache.rocketmq.controller.v1.S3ObjectState;
-import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.MetadataStore;
+import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.metadata.dao.S3Object;
 import com.automq.rocketmq.metadata.mapper.S3ObjectMapper;
 import com.automq.rocketmq.metadata.mapper.S3StreamObjectMapper;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 import org.apache.ibatis.session.SqlSession;
 
 public class ReclaimS3ObjectTask extends ControllerTask {
@@ -57,7 +59,16 @@ public class ReclaimS3ObjectTask extends ControllerTask {
             List<Long> ids = s3Objects.stream().mapToLong(S3Object::getId).boxed().toList();
             if (!ids.isEmpty()) {
                 List<Long> result = metadataStore.getDataStore().batchDeleteS3Objects(ids).get();
-                if (null != result && !result.isEmpty()) {
+
+                HashSet<Long> expired = new HashSet<>(ids);
+                result.forEach(expired::remove);
+                LOGGER.info("Reclaim {} S3 objects: deleted: [{}], expired but not deleted: [{}]",
+                    result.size(),
+                    result.stream().map(String::valueOf).collect(Collectors.joining(", ")),
+                    expired.stream().map(String::valueOf).collect(Collectors.joining(", "))
+                );
+
+                if (!result.isEmpty()) {
                     s3ObjectMapper.batchDelete(result);
                     streamObjectMapper.batchDelete(result);
                 }
