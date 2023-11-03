@@ -21,6 +21,7 @@ import com.automq.rocketmq.common.MetricsManager;
 import com.automq.stream.s3.metrics.Counter;
 import com.automq.stream.s3.metrics.Gauge;
 import com.automq.stream.s3.metrics.Histogram;
+import com.automq.stream.s3.metrics.NoopS3StreamMetricsGroup;
 import com.automq.stream.s3.metrics.S3StreamMetricsGroup;
 import io.opentelemetry.api.common.AttributesBuilder;
 import io.opentelemetry.api.metrics.Meter;
@@ -31,6 +32,7 @@ public class StreamMetricsManager implements MetricsManager, S3StreamMetricsGrou
 
     private static Supplier<AttributesBuilder> attributesBuilderSupplier;
     private static Meter meter;
+    private static NoopS3StreamMetricsGroup noopS3StreamMetricsGroup = new NoopS3StreamMetricsGroup();
 
     @Override
     public void initAttributesBuilder(Supplier<AttributesBuilder> attributesBuilderSupplier) {
@@ -49,16 +51,26 @@ public class StreamMetricsManager implements MetricsManager, S3StreamMetricsGrou
 
     @Override
     public Counter newCounter(String name, Map<String, String> tags) {
-        return new StreamMetricsCounter(name, tags, meter, attributesBuilderSupplier);
+        if (meter != null && attributesBuilderSupplier != null) {
+            return new StreamMetricsCounter(name, tags, meter, attributesBuilderSupplier);
+        }
+        return noopS3StreamMetricsGroup.newCounter(name, tags);
     }
 
     @Override
     public Histogram newHistogram(String name, Map<String, String> tags) {
-        return new StreamMetricsHistogram(name, tags, meter, attributesBuilderSupplier);
+        if (meter != null && attributesBuilderSupplier != null) {
+            return new StreamMetricsHistogram(name, tags, meter, attributesBuilderSupplier);
+        }
+        return noopS3StreamMetricsGroup.newHistogram(name, tags);
     }
 
     @Override
     public void newGauge(String name, Map<String, String> tags, Gauge gauge) {
-        new StreamMetricsGauge(name, tags, meter, attributesBuilderSupplier, gauge);
+        if (meter != null && attributesBuilderSupplier != null) {
+            new StreamMetricsGauge(name, tags, meter, attributesBuilderSupplier, gauge);
+            return;
+        }
+        noopS3StreamMetricsGroup.newGauge(name, tags, gauge);
     }
 }
