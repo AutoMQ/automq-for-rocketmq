@@ -41,20 +41,16 @@
             id = #{id}
     </update>
 
-    <delete id="delete">
+    <delete id="deleteByCriteria">
         DELETE
         FROM s3object
         <where>
-            <if test="null != id">id = #{id}</if>
-        </where>
-    </delete>
-
-    <delete id="batchDelete">
-        DELETE FROM s3object
-        <where>
-            <foreach item="item" collection="ids" open="id IN (" close=")" separator=",">
-                #{item}
-            </foreach>
+            <if test="null != criteria.streamId">stream_id = #{criteria.streamId}</if>
+            <if test="null != criteria.ids">
+                <foreach item="item" collection="criteria.ids" open="AND id IN (" close=")" separator=",">
+                    #{item}
+                </foreach>
+            </if>
         </where>
     </delete>
 
