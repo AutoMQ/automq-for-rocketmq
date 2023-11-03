@@ -69,6 +69,10 @@ public class RecycleS3Task extends ControllerTask {
                 recyclable.addAll(streamObjectMapper.recyclable(streamIds, threshold));
             }
 
+            if (recyclable.isEmpty()) {
+                return;
+            }
+
             metadataStore.getDataStore().batchDeleteS3Objects(recyclable)
                 .whenComplete((list, e) -> {
                     if (null != e) {
