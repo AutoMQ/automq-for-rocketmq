@@ -30,6 +30,17 @@ public class S3StreamConfig {
     private long networkBaselineBandwidth = 0;
     private int refillPeriodMs = 1000;
 
+    private int streamObjectCompactionIntervalMinutes = 60;
+    private long streamObjectCompactionMaxSizeBytes = 10737418240L;
+    private int streamObjectCompactionLivingTimeMinutes = 60;
+
+    private int walObjectCompactionInterval = 20;
+    private long walObjectCompactionCacheSize = 200 * 1024 * 1024;
+    private int walObjectCompactionUploadConcurrency = 8;
+    private long walObjectCompactionStreamSplitSize = 16 * 1024 * 1024;
+    private int walObjectCompactionForceSplitPeriod = 120;
+    private int walObjectCompactionMaxObjectNum = 500;
+
     public String s3Endpoint() {
         return s3Endpoint;
     }
@@ -64,5 +75,41 @@ public class S3StreamConfig {
 
     public int refillPeriodMs() {
         return refillPeriodMs;
+    }
+
+    public int streamObjectCompactionIntervalMinutes() {
+        return streamObjectCompactionIntervalMinutes;
+    }
+
+    public long streamObjectCompactionMaxSizeBytes() {
+        return streamObjectCompactionMaxSizeBytes;
+    }
+
+    public int streamObjectCompactionLivingTimeMinutes() {
+        return streamObjectCompactionLivingTimeMinutes;
+    }
+
+    public int walObjectCompactionInterval() {
+        return walObjectCompactionInterval;
+    }
+
+    public long walObjectCompactionCacheSize() {
+        return walObjectCompactionCacheSize;
+    }
+
+    public int walObjectCompactionUploadConcurrency() {
+        return walObjectCompactionUploadConcurrency;
+    }
+
+    public long walObjectCompactionStreamSplitSize() {
+        return walObjectCompactionStreamSplitSize;
+    }
+
+    public int walObjectCompactionForceSplitPeriod() {
+        return walObjectCompactionForceSplitPeriod;
+    }
+
+    public int walObjectCompactionMaxObjectNum() {
+        return walObjectCompactionMaxObjectNum;
     }
 }
