@@ -70,11 +70,10 @@ choose_gc_log_directory()
             GC_LOG_DIR="/Volumes/RAMDisk"
         ;;
         *)
-            # check if /dev/shm exists on other systems
-            if [ -d "/dev/shm" ]; then
-                GC_LOG_DIR="/dev/shm"
+            if [ -d "$HOME/logs" ]; then
+                GC_LOG_DIR="$HOME/logs"
             else
-                GC_LOG_DIR=${BASE_DIR}
+                GC_LOG_DIR="/tmp/rocketmq"
             fi
         ;;
     esac
