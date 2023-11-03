@@ -15,13 +15,6 @@ on:
 env:
   HELM_NAME: automq-for-rocketmq
   DOCKER_REPO: automqinc/rocketmq_e2e
-  DB_USERNAME: "root"
-  DB_PASSWORD: "root"
-  AWS_ACCESS_KEY: foot
-  AWS_SECRET_KEY: bar
-  AWS_DEFAULT_REGION: eu-west-2
-  AWS_S3_ENDPOINT: http://localhost:4566
-  AWS_S3_BUCKET: ros
 
 jobs:
   docker:
@@ -42,7 +35,7 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: rocketmq
-          path: automq-for-rocketmq/distribution/target
+          path: ${{github.workspace}}/distribution/target
       - name: docker-login
         uses: docker/login-action@v2
         with:
