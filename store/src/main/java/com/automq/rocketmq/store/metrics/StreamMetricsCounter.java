@@ -23,8 +23,13 @@ import io.opentelemetry.api.metrics.LongCounter;
 import io.opentelemetry.api.metrics.Meter;
 import java.util.Map;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class StreamMetricsCounter extends BaseStreamMetrics implements Counter {
+    protected static final Logger LOGGER = LoggerFactory.getLogger(StreamMetricsCounter.class);
+
     private final LongCounter counter;
 
     public StreamMetricsCounter(String name, Map<String, String> tags,
@@ -41,6 +46,11 @@ public class StreamMetricsCounter extends BaseStreamMetrics implements Counter {
 
     @Override
     public void inc(long n) {
+        if (n < 0) {
+            String tag = tags.entrySet().stream().map(entry -> entry.getKey() + "=" + entry.getValue()).collect(Collectors.joining(", "));
+            LOGGER.warn("Counter value is negative, name: {}, tag: {}, value: {}", metricsName, tag, n);
+            return;
+        }
         counter.add(n, newAttributesBuilder().build());
     }
 

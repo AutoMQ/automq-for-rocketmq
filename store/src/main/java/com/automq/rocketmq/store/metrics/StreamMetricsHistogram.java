@@ -23,8 +23,13 @@ import io.opentelemetry.api.metrics.LongHistogram;
 import io.opentelemetry.api.metrics.Meter;
 import java.util.Map;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class StreamMetricsHistogram extends BaseStreamMetrics implements Histogram {
+    protected static final Logger LOGGER = LoggerFactory.getLogger(StreamMetricsHistogram.class);
+
     private final LongHistogram histogram;
 
     public StreamMetricsHistogram(String name, Map<String, String> tags,
@@ -38,6 +43,11 @@ public class StreamMetricsHistogram extends BaseStreamMetrics implements Histogr
 
     @Override
     public void update(long value) {
+        if (value < 0) {
+            String tag = tags.entrySet().stream().map(entry -> entry.getKey() + "=" + entry.getValue()).collect(Collectors.joining(", "));
+            LOGGER.warn("Histogram value is negative, name: {}, tag: {}, value: {}", metricsName, tag, value);
+            return;
+        }
         histogram.record(value, newAttributesBuilder().build());
     }
 
