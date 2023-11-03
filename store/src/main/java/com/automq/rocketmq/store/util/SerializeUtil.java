@@ -167,7 +167,8 @@ public class SerializeUtil {
                     operationStreamId, snapshotStreamId, stateMachine,
                     resetConsumeOffsetOperation.operationTimestamp(), resetConsumeOffsetOperation.consumerGroupId(), resetConsumeOffsetOperation.offset());
             }
-            default -> throw new IllegalStateException("Unexpected value: " + operationLogItem.operationType());
+            default ->
+                throw new IllegalStateException("Unexpected operation type: " + operationLogItem.operationType());
         }
     }
 
