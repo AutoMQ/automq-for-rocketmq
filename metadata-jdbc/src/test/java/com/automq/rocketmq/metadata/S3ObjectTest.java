@@ -18,6 +18,7 @@ package com.automq.rocketmq.metadata;
 
 import apache.rocketmq.controller.v1.S3ObjectState;
 import com.automq.rocketmq.metadata.dao.S3Object;
+import com.automq.rocketmq.metadata.dao.S3ObjectCriteria;
 import com.automq.rocketmq.metadata.mapper.S3ObjectMapper;
 import com.automq.rocketmq.metadata.mapper.SequenceMapper;
 import java.util.Arrays;
@@ -238,7 +239,7 @@ public class S3ObjectTest extends DatabaseTestBase {
             List<S3Object> s3Objects = s3ObjectMapper.list(S3ObjectState.BOS_PREPARED, null);
             Assertions.assertEquals(2, s3Objects.size());
 
-            affectedRows = s3ObjectMapper.batchDelete(Arrays.asList(s3Object.getId(), s3Object1.getId()));
+            affectedRows = s3ObjectMapper.deleteByCriteria(S3ObjectCriteria.newBuilder().addAll(Arrays.asList(s3Object.getId(), s3Object1.getId())).build());
             Assertions.assertEquals(2, affectedRows);
 
             s3Objects = s3ObjectMapper.list(S3ObjectState.BOS_PREPARED, null);

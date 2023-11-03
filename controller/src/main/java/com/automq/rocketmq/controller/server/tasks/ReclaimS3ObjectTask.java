@@ -22,6 +22,7 @@ import apache.rocketmq.controller.v1.S3ObjectState;
 import com.automq.rocketmq.controller.MetadataStore;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.metadata.dao.S3Object;
+import com.automq.rocketmq.metadata.dao.S3ObjectCriteria;
 import com.automq.rocketmq.metadata.mapper.S3ObjectMapper;
 import com.automq.rocketmq.metadata.mapper.S3StreamObjectMapper;
 import java.util.Date;

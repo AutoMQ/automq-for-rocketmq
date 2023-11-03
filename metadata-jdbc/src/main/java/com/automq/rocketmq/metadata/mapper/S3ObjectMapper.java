@@ -19,6 +19,7 @@ package com.automq.rocketmq.metadata.mapper;
 
 import apache.rocketmq.controller.v1.S3ObjectState;
 import com.automq.rocketmq.metadata.dao.S3Object;
+import com.automq.rocketmq.metadata.dao.S3ObjectCriteria;
 import java.util.Date;
 import org.apache.ibatis.annotations.Param;
 
@@ -34,9 +35,7 @@ public interface S3ObjectMapper {
 
     int markToDelete(@Param("id") long id, @Param("time") Date time);
 
-    int delete(@Param("id") Long id);
-
-    int batchDelete(@Param("ids") List<Long> ids);
+    int deleteByCriteria(@Param("criteria")S3ObjectCriteria criteria);
 
     List<S3Object> list(@Param("state") S3ObjectState state, @Param("streamId") Long streamId);
 

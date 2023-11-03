@@ -20,6 +20,7 @@ package com.automq.rocketmq.metadata;
 import apache.rocketmq.controller.v1.SubStream;
 import apache.rocketmq.controller.v1.SubStreams;
 import com.automq.rocketmq.metadata.dao.Lease;
+import com.automq.rocketmq.metadata.dao.S3ObjectCriteria;
 import com.automq.rocketmq.metadata.dao.S3WalObject;
 import com.automq.rocketmq.metadata.mapper.GroupMapper;
 import com.automq.rocketmq.metadata.mapper.GroupProgressMapper;
@@ -100,7 +101,7 @@ public class DatabaseTestBase {
             session.getMapper(TopicMapper.class).delete(null);
             session.getMapper(StreamMapper.class).delete(null);
             session.getMapper(RangeMapper.class).delete(null, null);
-            session.getMapper(S3ObjectMapper.class).delete(null);
+            session.getMapper(S3ObjectMapper.class).deleteByCriteria(S3ObjectCriteria.newBuilder().build());
             session.getMapper(S3StreamObjectMapper.class).delete(null, null, null);
             session.getMapper(S3WalObjectMapper.class).delete(null, null, null);
 

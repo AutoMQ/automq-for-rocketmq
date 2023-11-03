@@ -20,6 +20,7 @@ package com.automq.rocketmq.controller.server.tasks;
 import apache.rocketmq.controller.v1.TopicStatus;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.MetadataStore;
+import com.automq.rocketmq.metadata.dao.S3ObjectCriteria;
 import com.automq.rocketmq.metadata.dao.Stream;
 import com.automq.rocketmq.metadata.dao.StreamCriteria;
 import com.automq.rocketmq.metadata.dao.Topic;
@@ -74,7 +75,8 @@ public class RecycleS3Task extends ControllerTask {
                         LOGGER.error("DataStore failed to delete S3 objects", e);
                         return;
                     }
-                    s3ObjectMapper.batchDelete(list);
+                    LOGGER.info("Batch delete S3 objects, having object-id-list={}", list);
+                    s3ObjectMapper.deleteByCriteria(S3ObjectCriteria.newBuilder().addAll(list).build());
                     streamObjectMapper.batchDelete(list);
                     session.commit();
                 });
