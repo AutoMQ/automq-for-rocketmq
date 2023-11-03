@@ -25,6 +25,7 @@ public class S3StreamConfig {
     private String s3WALPath = "/tmp/s3stream_wal";
     private String s3AccessKey;
     private String s3SecretKey;
+    private String s3Namespace = "S3_ROCKETMQ";
 
     // Max bandwidth in bytes per refillPeriodMs, default to 0 which means no limit.
     private long networkBaselineBandwidth = 0;
@@ -76,6 +77,10 @@ public class S3StreamConfig {
 
     public int refillPeriodMs() {
         return refillPeriodMs;
+    }
+
+    public String s3Namespace() {
+        return s3Namespace;
     }
 
     public int streamObjectCompactionIntervalMinutes() {

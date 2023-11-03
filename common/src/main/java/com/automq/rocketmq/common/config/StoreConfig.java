@@ -35,7 +35,7 @@ public class StoreConfig {
     private int fetchBatchSizeFactor = 2;
 
     // Used for storing KV data based on RocksDB
-    private String kvPath = "/tmp/rocketmq/kvstore";
+    private String kvPath = "/tmp/s3rocketmq/kvstore";
 
     // DEFAULT is 1000 * 1000, unit in records
     private int operationSnapshotInterval = 1000 * 1000;
