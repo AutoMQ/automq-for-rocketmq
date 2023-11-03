@@ -39,7 +39,6 @@ public class BaseStreamMetrics {
         this.attributesBuilderSupplier = attributesBuilderSupplier;
     }
 
-
     protected AttributesBuilder newAttributesBuilder() {
         AttributesBuilder builder;
         if (attributesBuilderSupplier == null) {
@@ -53,6 +52,6 @@ public class BaseStreamMetrics {
 
     protected String metricsName(String name) {
         name = name.toLowerCase();
-        return STREAM_METRICS_PREFIX + "_" + name;
+        return STREAM_METRICS_PREFIX + name;
     }
 }
