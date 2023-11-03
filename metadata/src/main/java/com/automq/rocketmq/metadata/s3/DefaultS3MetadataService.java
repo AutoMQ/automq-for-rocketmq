@@ -239,11 +239,7 @@ public class DefaultS3MetadataService implements S3MetadataService {
                     object.setEndOffset(s3StreamObject.getEndOffset());
                     object.setObjectSize(s3StreamObject.getObjectSize());
                     s3StreamObjectMapper.commit(object);
-                    if (toCache.containsKey(object.getStreamId())) {
-                        toCache.get(object.getStreamId()).add(object);
-                    } else {
-                        toCache.put(object.getStreamId(), List.of(object));
-                    }
+                    toCache.computeIfAbsent(object.getStreamId(), streamId -> new ArrayList<>()).add(object);
                 });
             }
 
@@ -330,8 +326,7 @@ public class DefaultS3MetadataService implements S3MetadataService {
                     .min(Long::compareTo).get();
             }
 
-            List<com.automq.rocketmq.metadata.dao.S3StreamObject>
-                toCache = new ArrayList<>();
+            List<com.automq.rocketmq.metadata.dao.S3StreamObject> toCache = new ArrayList<>();
 
             // create a new S3StreamObject to replace committed ones
             if (streamObject.getObjectId() != S3Constants.NOOP_OBJECT_ID) {

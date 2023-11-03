@@ -45,6 +45,9 @@
         <Logger name="com.automq.rocketmq.controller" level="info" additivity="false">
             <AppenderRef ref="controllerAppender" />
         </Logger>
+        <Logger name="com.automq.rocketmq.metadata" level="info" additivity="false">
+            <AppenderRef ref="controllerAppender" />
+        </Logger>
         <Logger name="com.automq.stream" level="info" additivity="false">
             <AppenderRef ref="streamAppender"/>
         </Logger>
