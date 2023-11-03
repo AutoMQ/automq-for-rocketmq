@@ -243,7 +243,10 @@ public class MetricsExporter implements Lifecycle {
 
     @Override
     public void start() {
-        initDynamicMetrics();
+        MetricsExporterType metricsExporterType = MetricsExporterType.valueOf(metricsConfig.exporterType());
+        if (metricsExporterType != MetricsExporterType.DISABLE) {
+            initDynamicMetrics();
+        }
         this.started = true;
     }
 
