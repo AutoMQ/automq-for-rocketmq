@@ -44,6 +44,7 @@ import com.automq.rocketmq.controller.ControllerClient;
 import com.automq.rocketmq.controller.exception.ControllerException;
 import com.automq.rocketmq.controller.MetadataStore;
 import com.automq.rocketmq.controller.server.store.impl.GroupManager;
+import com.automq.rocketmq.controller.server.store.impl.StreamManager;
 import com.automq.rocketmq.controller.server.store.impl.TopicManager;
 import com.automq.rocketmq.controller.server.tasks.ScanGroupTask;
 import com.automq.rocketmq.controller.server.tasks.ScanStreamTask;
@@ -125,6 +126,8 @@ public class DefaultMetadataStore implements MetadataStore {
 
     private final GroupManager groupManager;
 
+    private final StreamManager streamManager;
+
     private DataStore dataStore;
 
     public DefaultMetadataStore(ControllerClient client, SqlSessionFactory sessionFactory, ControllerConfig config) {
@@ -138,6 +141,7 @@ public class DefaultMetadataStore implements MetadataStore {
         this.asyncExecutorService = Executors.newFixedThreadPool(10, new PrefixThreadFactory("Controller-Async"));
         this.topicManager = new TopicManager(this);
         this.groupManager = new GroupManager(this);
+        this.streamManager = new StreamManager(this);
     }
 
     @Override
@@ -1178,5 +1182,21 @@ public class DefaultMetadataStore implements MetadataStore {
     @Override
     public void applyStreamChange(List<Stream> streams) {
         this.topicManager.getStreamCache().apply(streams);
+
+        // delete associated S3 assets
+        if (isLeader()) {
+            for (Stream stream : streams) {
+                if (stream.getState() == StreamState.DELETED) {
+                    try {
+                        LOGGER.info("Delete associated S3 resources for stream[stream-id={}]", stream.getId());
+                        streamManager.deleteStream(stream.getId());
+                        LOGGER.info("Associated S3 resources deleted for stream[stream-id={}]", stream.getId());
+                    } catch (Throwable e) {
+                        LOGGER.error("Unexpected exception raised while cleaning S3 resources on stream deletion", e);
+                    }
+                }
+            }
+        }
+
     }
 }

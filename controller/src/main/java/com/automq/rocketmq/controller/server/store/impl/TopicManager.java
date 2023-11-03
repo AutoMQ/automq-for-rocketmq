@@ -41,6 +41,7 @@ import com.automq.rocketmq.metadata.dao.Stream;
 import com.automq.rocketmq.metadata.dao.StreamCriteria;
 import com.automq.rocketmq.metadata.dao.Topic;
 import com.automq.rocketmq.metadata.mapper.GroupMapper;
+import com.automq.rocketmq.metadata.mapper.GroupProgressMapper;
 import com.automq.rocketmq.metadata.mapper.QueueAssignmentMapper;
 import com.automq.rocketmq.metadata.mapper.StreamMapper;
 import com.automq.rocketmq.metadata.mapper.TopicMapper;
@@ -295,8 +296,10 @@ public class TopicManager {
                             throw new CompletionException(e);
                         }
 
+                        // Logically delete topic
                         topicMapper.updateStatusById(topicId, TopicStatus.TOPIC_STATUS_DELETED);
 
+                        // Delete queue-assignment
                         QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
                         List<QueueAssignment> assignments = assignmentMapper.list(topicId, null, null, null, null);
                         assignments.stream().filter(assignment -> assignment.getStatus() != AssignmentStatus.ASSIGNMENT_STATUS_DELETED)
@@ -315,6 +318,11 @@ public class TopicManager {
                             .withTopicId(topicId)
                             .build();
                         streamMapper.updateStreamState(criteria, StreamState.DELETED);
+
+                        // Delete group-progress
+                        GroupProgressMapper groupProgressMapper = session.getMapper(GroupProgressMapper.class);
+                        groupProgressMapper.delete(null, topicId);
+
                         session.commit();
                     }
                     notifyOnResourceChange(toNotify);
