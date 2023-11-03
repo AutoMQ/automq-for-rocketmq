@@ -35,6 +35,7 @@ import com.automq.rocketmq.store.service.StreamReclaimService;
 import com.automq.rocketmq.store.service.TimerService;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.service.api.OperationLogService;
+import com.automq.stream.s3.metadata.ObjectUtils;
 import com.automq.stream.s3.operator.DefaultS3Operator;
 import com.automq.stream.s3.operator.S3Operator;
 
@@ -43,6 +44,8 @@ import static com.automq.rocketmq.store.MessageStoreImpl.KV_NAMESPACE_CHECK_POIN
 public class MessageStoreBuilder {
     public static MessageStoreImpl build(StoreConfig storeConfig, S3StreamConfig s3StreamConfig,
         StoreMetadataService metadataService, DeadLetterSender deadLetterSender) throws StoreException {
+        // set S3 namespace
+        ObjectUtils.setNamespace(s3StreamConfig.s3Namespace());
         StreamStore streamStore = new S3StreamStore(storeConfig, s3StreamConfig, metadataService);
         KVService kvService = new RocksDBKVService(storeConfig.kvPath());
         InflightService inflightService = new InflightService();
