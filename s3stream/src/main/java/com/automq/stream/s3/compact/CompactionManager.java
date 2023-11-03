@@ -155,7 +155,7 @@ public class CompactionManager {
 
     private void forceSplitObjects(List<StreamMetadata> streamMetadataList, List<S3ObjectMetadata> objectsToForceSplit) {
         logger.info("Force split {} WAL objects", objectsToForceSplit.size());
-        TimerUtil timerUtil = new TimerUtil();
+        TimerUtil timerUtil = new TimerUtil(TimeUnit.MILLISECONDS);
         for (int i = 0; i < objectsToForceSplit.size(); i++) {
             timerUtil.reset();
             S3ObjectMetadata objectToForceSplit = objectsToForceSplit.get(i);
@@ -191,7 +191,7 @@ public class CompactionManager {
             objectsToCompact = objectsToCompact.subList(0, maxObjectNumToCompact);
         }
         logger.info("Compact {} WAL objects", objectsToCompact.size());
-        TimerUtil timerUtil = new TimerUtil();
+        TimerUtil timerUtil = new TimerUtil(TimeUnit.MILLISECONDS);
         CommitWALObjectRequest request = buildCompactRequest(streamMetadataList, objectsToCompact);
         if (request == null) {
             return;
@@ -506,7 +506,7 @@ public class CompactionManager {
                 S3ObjectMetadata metadata = s3ObjectMetadataMap.get(streamDataBlocEntry.getKey());
                 List<StreamDataBlock> streamDataBlocks = streamDataBlocEntry.getValue();
                 DataBlockReader reader = new DataBlockReader(metadata, s3Operator);
-                reader.readBlocks(streamDataBlocks, networkBandwidth);
+                reader.readBlocks(streamDataBlocks, Math.min(CompactionConstants.S3_OBJECT_MAX_READ_BATCH, networkBandwidth));
             }
             List<CompletableFuture<StreamObject>> streamObjectCFList = new ArrayList<>();
             CompletableFuture<Void> walObjectCF = null;
