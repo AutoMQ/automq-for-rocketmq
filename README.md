@@ -42,8 +42,8 @@ Pre-requirements: docker and docker-compose
 4. Start the producer and consumer to produce and consume messages,
    See [rocketmq-clients](https://github.com/apache/rocketmq-clients) for more details.
 
-[maven-build-image]: https://github.com/AutoMQ/automq-for-rocketmq/actions/workflows/build-ci.yml/badge.svg
-[maven-build-url]: https://github.com/AutoMQ/automq-for-rocketmq/actions/workflows/build-ci.yml
+[maven-build-image]: https://github.com/AutoMQ/automq-for-rocketmq/actions/workflows/coverage-ci.yml/badge.svg?branch=main
+[maven-build-url]: https://github.com/AutoMQ/automq-for-rocketmq/actions/workflows/coverage-ci.yml
 [release-image]: https://img.shields.io/badge/release-download-orange.svg
 [release-url]: https://github.com/AutoMQ/automq-for-rocketmq/releases
 [license-image]: https://img.shields.io/badge/license-Apache%202-4EB1BA.svg
