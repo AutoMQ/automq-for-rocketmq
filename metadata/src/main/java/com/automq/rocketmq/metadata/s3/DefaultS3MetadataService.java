@@ -119,12 +119,20 @@ public class DefaultS3MetadataService implements S3MetadataService {
             return CompletableFuture.failedFuture(e);
         }
 
-        LOGGER.info("commitWalObject with walObject: {}, streamObjects: {}, compactedObjects: {}",
+        LOGGER.info("commitWalObject with walObject=[{}], streamObjects=[{}], compactedObjects={}",
             TextFormat.shortDebugString(walObject),
             streamObjects.stream()
                 .map(TextFormat::shortDebugString)
                 .collect(Collectors.joining()), compactedObjects
         );
+
+        // Debug
+        for (S3StreamObject item : streamObjects) {
+            if (item.getStreamId() <= 0) {
+                LOGGER.error("Yuck, S3StreamObject is having invalid stream-id: {}",
+                    TextFormat.printer().printToString(item));
+            }
+        }
 
         CompletableFuture<Void> future = new CompletableFuture<>();
         try (SqlSession session = sessionFactory.openSession()) {
