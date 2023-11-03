@@ -73,6 +73,7 @@ choose_gc_log_directory()
             if [ -d "$HOME/logs" ]; then
                 GC_LOG_DIR="$HOME/logs"
             else
+                mkdir "/tmp/rocketmq"
                 GC_LOG_DIR="/tmp/rocketmq"
             fi
         ;;

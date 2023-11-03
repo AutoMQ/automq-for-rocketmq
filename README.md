@@ -11,9 +11,9 @@ AutoMQ for Apache RocketMQ
 [![Release][release-image]][release-url]
 [![License][license-image]][license-url]
 
-AutoMQ for Apache RocketMQ has been redesigned to utilize cloud infrastructure, allowing users to take advantage of *
-*elastic computing
-resources** and nearly **unlimited, cost-effective storage** in the cloud. It also ensures **100% functional
+AutoMQ for Apache RocketMQ has been redesigned to utilize cloud infrastructure, allowing users to take advantage of
+**elastic computing resources** and nearly **unlimited, cost-effective storage** in the cloud. It also ensures **100%
+functional
 compatibility** with Apache RocketMQ.
 
 Compared to Apache RocketMQ, AutoMQ for Apache RocketMQ offers the following advantages:

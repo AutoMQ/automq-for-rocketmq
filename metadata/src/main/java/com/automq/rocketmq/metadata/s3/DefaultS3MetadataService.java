@@ -544,8 +544,7 @@ public class DefaultS3MetadataService implements S3MetadataService {
         s3Object.setStreamId(streamId);
         s3Object.setObjectSize(objectSize);
         s3Object.setState(S3ObjectState.BOS_COMMITTED);
-        s3ObjectMapper.commit(s3Object);
-        return true;
+        return s3ObjectMapper.commit(s3Object) == 1;
     }
 
     private void extendRange(SqlSession session, Map<Long, Pair<Long, Long>> segments) {
