@@ -81,14 +81,15 @@ public class StreamOperationLogService implements OperationLogService {
             .thenAccept(result -> {
                 // load operations
                 for (RecordBatchWithContext batchWithContext : result.recordBatchList()) {
-                    // TODO: assume that a batch only contains one operation
-                    Operation operation = SerializeUtil.decodeOperation(batchWithContext.rawPayload(), stateMachine,
-                        operationStreamId, snapshotStreamId);
                     try {
+                        // TODO: assume that a batch only contains one operation
+                        Operation operation = SerializeUtil.decodeOperation(batchWithContext.rawPayload(), stateMachine,
+                            operationStreamId, snapshotStreamId);
+
                         // TODO: operation may be null
                         replay(batchWithContext.baseOffset(), operation);
                     } catch (StoreException e) {
-                        LOGGER.error("Topic {}, queue: {}: Replay operation: {} failed when recover", stateMachine.topicId(), stateMachine.queueId(), operation, e);
+                        LOGGER.error("Topic {}, queue: {}, operation stream id: {}, offset: {}: replay operation failed when recover", stateMachine.topicId(), stateMachine.queueId(), operationStreamId, batchWithContext.baseOffset(), e);
                         if (e.code() != StoreErrorCode.ILLEGAL_ARGUMENT) {
                             throw new CompletionException(e);
                         }

@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.store.util;
 
+import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.generated.CheckPoint;
 import com.automq.rocketmq.store.model.generated.ReceiptHandle;
 import com.automq.rocketmq.store.model.operation.AckOperation.AckOperationType;
@@ -112,7 +113,7 @@ public class SerializeUtilTest {
     }
 
     @Test
-    void encodePopOperation() {
+    void encodePopOperation() throws StoreException {
         com.automq.rocketmq.store.model.operation.PopOperation popOperation = new com.automq.rocketmq.store.model.operation.PopOperation(
             TOPIC_ID, QUEUE_ID, OPERATION_STREAM_ID, SNAPSHOT_STREAM_ID, null, CONSUMER_GROUP_ID, OFFSET,
             BATCH_SIZE, INVISIBLE_DURATION, OPERATION_TIMESTAMP, IS_END_MARK, POP_OPERATION_TYPE
@@ -123,7 +124,7 @@ public class SerializeUtilTest {
     }
 
     @Test
-    void encodeAckOperation() {
+    void encodeAckOperation() throws StoreException {
         com.automq.rocketmq.store.model.operation.AckOperation ackOperation = new com.automq.rocketmq.store.model.operation.AckOperation(
             TOPIC_ID, QUEUE_ID, OPERATION_STREAM_ID, SNAPSHOT_STREAM_ID, null, CONSUMER_GROUP_ID,
             OPERATION_ID, OPERATION_TIMESTAMP, ACK_OPERATION_TYPE
@@ -134,7 +135,7 @@ public class SerializeUtilTest {
     }
 
     @Test
-    void encodeChangeInvisibleDurationOperation() {
+    void encodeChangeInvisibleDurationOperation() throws StoreException {
         ChangeInvisibleDurationOperation changeInvisibleDurationOperation = new ChangeInvisibleDurationOperation(
             TOPIC_ID, QUEUE_ID, OPERATION_STREAM_ID, SNAPSHOT_STREAM_ID, null, CONSUMER_GROUP_ID, OPERATION_ID, INVISIBLE_DURATION, OPERATION_TIMESTAMP
         );
@@ -144,7 +145,7 @@ public class SerializeUtilTest {
     }
 
     @Test
-    void encodeResetConsumerOffset() {
+    void encodeResetConsumerOffset() throws StoreException {
         ResetConsumeOffsetOperation resetConsumeOffsetOperation = new ResetConsumeOffsetOperation(
             TOPIC_ID, QUEUE_ID, OPERATION_STREAM_ID, SNAPSHOT_STREAM_ID, null, CONSUMER_GROUP_ID, 0, OPERATION_TIMESTAMP
         );
