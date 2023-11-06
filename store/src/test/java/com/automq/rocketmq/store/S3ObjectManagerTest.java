@@ -25,7 +25,7 @@ import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.stream.s3.metadata.S3ObjectMetadata;
 import com.automq.stream.s3.metadata.S3ObjectType;
 import com.automq.stream.s3.objects.CommitStreamObjectRequest;
-import com.automq.stream.s3.objects.CommitWALObjectRequest;
+import com.automq.stream.s3.objects.CommitSSTObjectRequest;
 import com.automq.stream.s3.objects.ObjectStreamRange;
 import com.automq.stream.s3.objects.StreamObject;
 import java.util.ArrayList;
@@ -86,7 +86,7 @@ class S3ObjectManagerTest {
     void commitWALObject() {
         when(metadataService.commitWalObject(any(), any(), any())).thenReturn(CompletableFuture.completedFuture(null));
         // Build a CommitWALObjectRequest for testing
-        CommitWALObjectRequest walObjectRequest = new CommitWALObjectRequest();
+        CommitSSTObjectRequest walObjectRequest = new CommitSSTObjectRequest();
         walObjectRequest.setObjectId(100L);
         walObjectRequest.setOrderId(200L);
         walObjectRequest.setObjectSize(300L);
@@ -103,7 +103,7 @@ class S3ObjectManagerTest {
         streamObject.setEndOffset(2000);
         walObjectRequest.setStreamObjects(Collections.singletonList(streamObject));
 
-        objectManager.commitWALObject(walObjectRequest);
+        objectManager.commitSSTObject(walObjectRequest);
         verify(metadataService).commitWalObject(walObjectCaptor.capture(), streamObjectsCaptor.capture(), eq(compactedObjectIds));
 
         S3WALObject walObject = walObjectCaptor.getValue();
@@ -267,9 +267,9 @@ class S3ObjectManagerTest {
             S3ObjectMetadata obj3 = objects.get(2);
             assertEquals(2, obj3.objectId());
 
-            assertEquals(S3ObjectType.WAL, obj1.getType());
+            assertEquals(S3ObjectType.SST, obj1.getType());
             assertEquals(S3ObjectType.STREAM, obj2.getType());
-            assertEquals(S3ObjectType.WAL, obj3.getType());
+            assertEquals(S3ObjectType.SST, obj3.getType());
 
             assertEquals(100, obj1.startOffset());
             assertEquals(3, obj1.getOffsetRanges().size());

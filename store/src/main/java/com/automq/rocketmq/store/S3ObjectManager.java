@@ -27,8 +27,8 @@ import com.automq.stream.s3.metadata.S3ObjectType;
 import com.automq.stream.s3.metadata.S3StreamConstant;
 import com.automq.stream.s3.metadata.StreamOffsetRange;
 import com.automq.stream.s3.objects.CommitStreamObjectRequest;
-import com.automq.stream.s3.objects.CommitWALObjectRequest;
-import com.automq.stream.s3.objects.CommitWALObjectResponse;
+import com.automq.stream.s3.objects.CommitSSTObjectRequest;
+import com.automq.stream.s3.objects.CommitSSTObjectResponse;
 import com.automq.stream.s3.objects.ObjectManager;
 import com.automq.stream.s3.objects.ObjectStreamRange;
 import java.util.ArrayList;
@@ -62,7 +62,7 @@ public class S3ObjectManager implements ObjectManager {
     }
 
     @Override
-    public CompletableFuture<CommitWALObjectResponse> commitWALObject(CommitWALObjectRequest request) {
+    public CompletableFuture<CommitSSTObjectResponse> commitSSTObject(CommitSSTObjectRequest request) {
         // Build S3WALObject
         S3WALObject.Builder builder = S3WALObject.newBuilder();
         builder.setObjectId(request.getObjectId());
@@ -100,7 +100,7 @@ public class S3ObjectManager implements ObjectManager {
             walObject, streamObjects, request.getCompactedObjectIds());
 
         // Build compacted objects
-        return metaService.commitWalObject(walObject, streamObjects, request.getCompactedObjectIds()).thenApply(resp -> new CommitWALObjectResponse());
+        return metaService.commitWalObject(walObject, streamObjects, request.getCompactedObjectIds()).thenApply(resp -> new CommitSSTObjectResponse());
     }
 
     @Override
@@ -227,7 +227,7 @@ public class S3ObjectManager implements ObjectManager {
         List<StreamOffsetRange> offsetRanges = object.getSubStreams().getSubStreamsMap().values()
             .stream()
             .map(subStream -> new StreamOffsetRange(subStream.getStreamId(), subStream.getStartOffset(), subStream.getEndOffset())).toList();
-        return new S3ObjectMetadata(object.getObjectId(), S3ObjectType.WAL, offsetRanges, object.getBaseDataTimestamp(),
+        return new S3ObjectMetadata(object.getObjectId(), S3ObjectType.SST, offsetRanges, object.getBaseDataTimestamp(),
             object.getCommittedTimestamp(), object.getObjectSize(), object.getSequenceId());
     }
 }
