@@ -76,8 +76,6 @@ import com.automq.rocketmq.controller.server.tasks.ScanNodeTask;
 import com.automq.rocketmq.controller.server.tasks.ScanTopicTask;
 import com.automq.rocketmq.controller.server.tasks.ScanYieldingQueueTask;
 import com.automq.rocketmq.controller.server.tasks.SchedulerTask;
-import com.automq.rocketmq.metadata.service.DefaultS3MetadataService;
-import com.automq.rocketmq.metadata.service.S3MetadataService;
 import com.google.common.base.Strings;
 import com.google.protobuf.Timestamp;
 import java.io.IOException;
@@ -132,8 +130,6 @@ public class DefaultMetadataStore implements MetadataStore {
 
     private DataStore dataStore;
 
-    private S3MetadataService s3MetadataService;
-
     public DefaultMetadataStore(ControllerClient client, SqlSessionFactory sessionFactory, ControllerConfig config) {
         this.controllerClient = client;
         this.sessionFactory = sessionFactory;
@@ -146,7 +142,6 @@ public class DefaultMetadataStore implements MetadataStore {
         this.topicManager = new TopicManager(this);
         this.groupManager = new GroupManager(this);
         this.streamManager = new StreamManager(this);
-        this.s3MetadataService = new DefaultS3MetadataService(config, sessionFactory, asyncExecutorService);
     }
 
     @Override
@@ -1117,19 +1112,6 @@ public class DefaultMetadataStore implements MetadataStore {
             // Notify leader that this node is going away shortly
             heartbeat();
             return TerminationStage.TS_TRANSFERRING_STREAM;
-        }
-    }
-
-    @Override
-    public void trimStream(long streamId, long offset) {
-        try (SqlSession session = openSession()) {
-            StreamMapper mapper = session.getMapper(StreamMapper.class);
-            Stream stream = mapper.getByStreamId(streamId);
-            if (null != stream) {
-                s3MetadataService.trimStream(streamId, stream.getEpoch(), offset).join();
-            } else {
-                LOGGER.warn("Try to trim an non-exsiting stream, stream-id={}", streamId);
-            }
         }
     }
 

@@ -239,7 +239,7 @@ public class S3ObjectTest extends DatabaseTestBase {
             List<S3Object> s3Objects = s3ObjectMapper.list(S3ObjectState.BOS_PREPARED, null);
             Assertions.assertEquals(2, s3Objects.size());
 
-            affectedRows = s3ObjectMapper.deleteByCriteria(S3ObjectCriteria.newBuilder().addAll(Arrays.asList(s3Object.getId(), s3Object1.getId())).build());
+            affectedRows = s3ObjectMapper.deleteByCriteria(S3ObjectCriteria.newBuilder().addObjectIds(Arrays.asList(s3Object.getId(), s3Object1.getId())).build());
             Assertions.assertEquals(2, affectedRows);
 
             s3Objects = s3ObjectMapper.list(S3ObjectState.BOS_PREPARED, null);

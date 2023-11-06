@@ -213,6 +213,4 @@ public interface MetadataStore extends Closeable {
     CompletableFuture<List<StreamMetadata>> getStreams(List<Long> streamIds);
 
     TerminationStage fireClose();
-
-    void trimStream(long streamId, long offset);
 }
