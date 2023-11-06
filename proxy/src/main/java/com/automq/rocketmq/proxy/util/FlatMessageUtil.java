@@ -161,13 +161,9 @@ public class FlatMessageUtil {
         ByteBuffer payloadBuffer = flatMessage.message().payloadAsByteBuffer();
 
         // Convert buffer to byte array
-        if (payloadBuffer.hasArray()) {
-            messageExt.setBody(payloadBuffer.array());
-        } else {
-            byte[] payload = new byte[payloadBuffer.remaining()];
-            payloadBuffer.get(payload);
-            messageExt.setBody(payload);
-        }
+        byte[] payload = new byte[payloadBuffer.remaining()];
+        payloadBuffer.get(payloadBuffer.position(), payload);
+        messageExt.setBody(payload);
 
         SystemProperties systemProperties = flatMessage.message().systemProperties();
         messageExt.setBornTimestamp(systemProperties.bornTimestamp());
