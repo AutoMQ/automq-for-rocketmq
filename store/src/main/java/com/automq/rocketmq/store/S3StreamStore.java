@@ -65,20 +65,6 @@ public class S3StreamStore implements StreamStore {
         StreamManager streamManager = new S3StreamManager(metadataService);
         ObjectManager objectManager = new S3ObjectManager(metadataService);
 
-        S3Operator defaultOperator = new DefaultS3Operator(streamConfig.s3Endpoint(), streamConfig.s3Region(), streamConfig.s3Bucket(),
-            streamConfig.s3ForcePathStyle(), streamConfig.s3AccessKey(), streamConfig.s3SecretKey());
-
-        WriteAheadLog writeAheadLog = BlockWALService.builder(s3Config.s3WALPath(), s3Config.s3WALCapacity()).config(s3Config).build();
-        S3BlockCache blockCache = new DefaultS3BlockCache(s3Config.s3BlockCacheSize(), objectManager, defaultOperator);
-
-        // Build the s3 storage
-        this.storage = new S3Storage(s3Config, writeAheadLog, streamManager, objectManager, blockCache, defaultOperator);
-
-        // Build the compaction manager
-        S3Operator compactionOperator = new DefaultS3Operator(streamConfig.s3Endpoint(), streamConfig.s3Region(), streamConfig.s3Bucket(),
-            streamConfig.s3ForcePathStyle(), streamConfig.s3AccessKey(), streamConfig.s3SecretKey());
-        this.compactionManager = new CompactionManager(s3Config, objectManager, streamManager, compactionOperator);
-
         AsyncNetworkBandwidthLimiter networkInboundLimiter = null;
         AsyncNetworkBandwidthLimiter networkOutboundLimiter = null;
 
@@ -96,6 +82,20 @@ public class S3StreamStore implements StreamStore {
                 s3Config.networkBaselineBandwidth()
             );
         }
+
+        S3Operator defaultOperator = new DefaultS3Operator(streamConfig.s3Endpoint(), streamConfig.s3Region(), streamConfig.s3Bucket(),
+            streamConfig.s3ForcePathStyle(), streamConfig.s3AccessKey(), streamConfig.s3SecretKey(), networkInboundLimiter, networkOutboundLimiter, true);
+
+        WriteAheadLog writeAheadLog = BlockWALService.builder(s3Config.s3WALPath(), s3Config.s3WALCapacity()).config(s3Config).build();
+        S3BlockCache blockCache = new DefaultS3BlockCache(s3Config.s3BlockCacheSize(), objectManager, defaultOperator);
+
+        // Build the s3 storage
+        this.storage = new S3Storage(s3Config, writeAheadLog, streamManager, objectManager, blockCache, defaultOperator);
+
+        // Build the compaction manager
+        S3Operator compactionOperator = new DefaultS3Operator(streamConfig.s3Endpoint(), streamConfig.s3Region(), streamConfig.s3Bucket(),
+            streamConfig.s3ForcePathStyle(), streamConfig.s3AccessKey(), streamConfig.s3SecretKey(), networkInboundLimiter, networkOutboundLimiter, false);
+        this.compactionManager = new CompactionManager(s3Config, objectManager, streamManager, compactionOperator);
 
         this.streamClient = new S3StreamClient(streamManager, storage, objectManager, defaultOperator, s3Config, networkInboundLimiter, networkOutboundLimiter);
         this.storeWorkingThreadPool = ThreadPoolMonitor.createAndMonitor(
