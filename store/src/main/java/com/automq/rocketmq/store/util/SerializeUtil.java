@@ -18,6 +18,8 @@
 package com.automq.rocketmq.store.util;
 
 import com.automq.rocketmq.store.api.MessageStateMachine;
+import com.automq.rocketmq.store.exception.StoreErrorCode;
+import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.generated.CheckPoint;
 import com.automq.rocketmq.store.model.generated.OperationLogItem;
 import com.automq.rocketmq.store.model.generated.ReceiptHandle;
@@ -135,8 +137,8 @@ public class SerializeUtil {
         return builder.sizedByteArray();
     }
 
-    public static Operation decodeOperation(ByteBuffer buffer,
-        MessageStateMachine stateMachine, long operationStreamId, long snapshotStreamId) {
+    public static Operation decodeOperation(ByteBuffer buffer, MessageStateMachine stateMachine, long operationStreamId,
+        long snapshotStreamId) throws StoreException {
         OperationLogItem operationLogItem = OperationLogItem.getRootAsOperationLogItem(buffer);
 
         switch (operationLogItem.operationType()) {
@@ -168,7 +170,7 @@ public class SerializeUtil {
                     resetConsumeOffsetOperation.operationTimestamp());
             }
             default ->
-                throw new IllegalStateException("Unexpected operation type: " + operationLogItem.operationType());
+                throw new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "Unexpected operation type: " + operationLogItem.operationType());
         }
     }
 
