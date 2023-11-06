@@ -164,8 +164,8 @@ public class SerializeUtil {
             case com.automq.rocketmq.store.model.generated.Operation.ResetConsumeOffsetOperation -> {
                 com.automq.rocketmq.store.model.generated.ResetConsumeOffsetOperation resetConsumeOffsetOperation = (com.automq.rocketmq.store.model.generated.ResetConsumeOffsetOperation) operationLogItem.operation(new com.automq.rocketmq.store.model.generated.ResetConsumeOffsetOperation());
                 return new ResetConsumeOffsetOperation(resetConsumeOffsetOperation.topicId(), resetConsumeOffsetOperation.queueId(),
-                    operationStreamId, snapshotStreamId, stateMachine,
-                    resetConsumeOffsetOperation.operationTimestamp(), resetConsumeOffsetOperation.consumerGroupId(), resetConsumeOffsetOperation.offset());
+                    operationStreamId, snapshotStreamId, stateMachine, resetConsumeOffsetOperation.consumerGroupId(), resetConsumeOffsetOperation.offset(),
+                    resetConsumeOffsetOperation.operationTimestamp());
             }
             default ->
                 throw new IllegalStateException("Unexpected operation type: " + operationLogItem.operationType());

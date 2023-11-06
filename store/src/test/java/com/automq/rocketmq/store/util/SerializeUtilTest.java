@@ -23,6 +23,7 @@ import com.automq.rocketmq.store.model.operation.AckOperation.AckOperationType;
 import com.automq.rocketmq.store.model.operation.ChangeInvisibleDurationOperation;
 import com.automq.rocketmq.store.model.operation.OperationSnapshot;
 import com.automq.rocketmq.store.model.operation.PopOperation.PopOperationType;
+import com.automq.rocketmq.store.model.operation.ResetConsumeOffsetOperation;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.concurrent.ConcurrentSkipListMap;
@@ -140,6 +141,16 @@ public class SerializeUtilTest {
         byte[] bytes = SerializeUtil.encodeChangeInvisibleDurationOperation(changeInvisibleDurationOperation);
         com.automq.rocketmq.store.model.operation.Operation decodedOperation = SerializeUtil.decodeOperation(ByteBuffer.wrap(bytes), null, OPERATION_STREAM_ID, SNAPSHOT_STREAM_ID);
         assertEquals(changeInvisibleDurationOperation, decodedOperation);
+    }
+
+    @Test
+    void encodeResetConsumerOffset() {
+        ResetConsumeOffsetOperation resetConsumeOffsetOperation = new ResetConsumeOffsetOperation(
+            TOPIC_ID, QUEUE_ID, OPERATION_STREAM_ID, SNAPSHOT_STREAM_ID, null, CONSUMER_GROUP_ID, 0, OPERATION_TIMESTAMP
+        );
+        byte[] bytes = SerializeUtil.encodeResetConsumeOffsetOperation(resetConsumeOffsetOperation);
+        com.automq.rocketmq.store.model.operation.Operation decodedOperation = SerializeUtil.decodeOperation(ByteBuffer.wrap(bytes), null, OPERATION_STREAM_ID, SNAPSHOT_STREAM_ID);
+        assertEquals(resetConsumeOffsetOperation, decodedOperation);
     }
 
     @Test
