@@ -40,6 +40,11 @@ public class DataStoreFacade implements DataStore {
     }
 
     @Override
+    public CompletableFuture<Boolean> trimStream(long streamId, long offset) {
+        return null;
+    }
+
+    @Override
     public CompletableFuture<List<Long>> batchDeleteS3Objects(List<Long> objectIds) {
         return s3ObjectOperator.delete(objectIds);
     }
