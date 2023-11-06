@@ -143,9 +143,15 @@ public class SuspendRequestService extends ServiceThread implements StartAndShut
                             completed.set(true);
                             return true;
                         }
-                        inflight.set(false);
                         return false;
-                    });
+                    })
+                    .exceptionally(ex -> {
+                        LOGGER.error("Error while fetching messages for suspended request.", ex);
+                        future.completeExceptionally(ex);
+                        completed.set(true);
+                        return true;
+                    })
+                    .whenComplete((result, ex) -> inflight.set(false));
             }
             return CompletableFuture.completedFuture(false);
         }
@@ -171,6 +177,7 @@ public class SuspendRequestService extends ServiceThread implements StartAndShut
                                 suspendRequestCount.decrementAndGet();
                             }
                         }));
+                break;
             }
         }
     }

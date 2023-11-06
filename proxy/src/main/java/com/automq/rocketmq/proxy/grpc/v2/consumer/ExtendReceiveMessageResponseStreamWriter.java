@@ -52,6 +52,7 @@ public class ExtendReceiveMessageResponseStreamWriter extends ReceiveMessageResp
                 } else {
                     recordRpcLatency(ctx, Code.OK);
                 }
+                break;
             case POLLING_FULL:
                 recordRpcLatency(ctx, Code.TOO_MANY_REQUESTS);
                 break;
