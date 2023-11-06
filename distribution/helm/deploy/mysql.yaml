@@ -21,7 +21,8 @@ image:
 
 auth:
   rootPassword: "passward"
-  database: "metadata"
+  createDatabase: true
+  database: metadata
 
 service:
   type: LoadBalancer
