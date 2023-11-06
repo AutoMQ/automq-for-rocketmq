@@ -23,8 +23,8 @@ import com.automq.stream.s3.metadata.S3ObjectType;
 import com.automq.stream.s3.metadata.StreamMetadata;
 import com.automq.stream.s3.metadata.StreamOffsetRange;
 import com.automq.stream.s3.objects.CommitStreamObjectRequest;
-import com.automq.stream.s3.objects.CommitSSTObjectRequest;
-import com.automq.stream.s3.objects.CommitSSTObjectResponse;
+import com.automq.stream.s3.objects.CommitSortedStreamTableObjectRequest;
+import com.automq.stream.s3.objects.CommitSortedStreamTableObjectResponse;
 import com.automq.stream.s3.objects.ObjectManager;
 import com.automq.stream.s3.objects.ObjectStreamRange;
 import com.automq.stream.s3.objects.StreamObject;
@@ -52,7 +52,7 @@ public class MemoryMetadataManager implements StreamManager, ObjectManager {
     }
 
     @Override
-    public synchronized CompletableFuture<CommitSSTObjectResponse> commitSSTObject(CommitSSTObjectRequest request) {
+    public synchronized CompletableFuture<CommitSortedStreamTableObjectResponse> commitSortedStreamTableObject(CommitSortedStreamTableObjectRequest request) {
         long dataTimeInMs = System.currentTimeMillis();
         if (!request.getCompactedObjectIds().isEmpty()) {
             for (long id : request.getCompactedObjectIds()) {
@@ -77,7 +77,7 @@ public class MemoryMetadataManager implements StreamManager, ObjectManager {
             );
         }
         request.getCompactedObjectIds().forEach(sstObjects::remove);
-        return CompletableFuture.completedFuture(new CommitSSTObjectResponse());
+        return CompletableFuture.completedFuture(new CommitSortedStreamTableObjectResponse());
     }
 
     @Override

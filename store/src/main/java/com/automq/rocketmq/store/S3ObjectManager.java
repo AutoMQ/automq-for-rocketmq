@@ -27,8 +27,8 @@ import com.automq.stream.s3.metadata.S3ObjectType;
 import com.automq.stream.s3.metadata.S3StreamConstant;
 import com.automq.stream.s3.metadata.StreamOffsetRange;
 import com.automq.stream.s3.objects.CommitStreamObjectRequest;
-import com.automq.stream.s3.objects.CommitSSTObjectRequest;
-import com.automq.stream.s3.objects.CommitSSTObjectResponse;
+import com.automq.stream.s3.objects.CommitSortedStreamTableObjectRequest;
+import com.automq.stream.s3.objects.CommitSortedStreamTableObjectResponse;
 import com.automq.stream.s3.objects.ObjectManager;
 import com.automq.stream.s3.objects.ObjectStreamRange;
 import java.util.ArrayList;
@@ -62,7 +62,7 @@ public class S3ObjectManager implements ObjectManager {
     }
 
     @Override
-    public CompletableFuture<CommitSSTObjectResponse> commitSSTObject(CommitSSTObjectRequest request) {
+    public CompletableFuture<CommitSortedStreamTableObjectResponse> commitSortedStreamTableObject(CommitSortedStreamTableObjectRequest request) {
         // Build S3WALObject
         S3WALObject.Builder builder = S3WALObject.newBuilder();
         builder.setObjectId(request.getObjectId());
@@ -100,7 +100,7 @@ public class S3ObjectManager implements ObjectManager {
             walObject, streamObjects, request.getCompactedObjectIds());
 
         // Build compacted objects
-        return metaService.commitWalObject(walObject, streamObjects, request.getCompactedObjectIds()).thenApply(resp -> new CommitSSTObjectResponse());
+        return metaService.commitWalObject(walObject, streamObjects, request.getCompactedObjectIds()).thenApply(resp -> new CommitSortedStreamTableObjectResponse());
     }
 
     @Override

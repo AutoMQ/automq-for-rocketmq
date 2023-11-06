@@ -19,8 +19,8 @@ package com.automq.stream.s3;
 
 import com.automq.stream.s3.model.StreamRecordBatch;
 import com.automq.stream.s3.objects.CommitStreamObjectRequest;
-import com.automq.stream.s3.objects.CommitSSTObjectRequest;
-import com.automq.stream.s3.objects.CommitSSTObjectResponse;
+import com.automq.stream.s3.objects.CommitSortedStreamTableObjectRequest;
+import com.automq.stream.s3.objects.CommitSortedStreamTableObjectResponse;
 import com.automq.stream.s3.objects.ObjectManager;
 import com.automq.stream.s3.objects.StreamObject;
 import com.automq.stream.s3.operator.MemoryS3Operator;
@@ -172,12 +172,12 @@ class StreamObjectsCompactionTaskTest {
     List<S3ObjectMetadata> prepareRawStreamObjects(long startObjectId, long streamId,
                                                    List<List<Long>> objectsDetails) throws ExecutionException, InterruptedException {
         AtomicLong objectIdAlloc = new AtomicLong(startObjectId);
-        Stack<CommitSSTObjectRequest> commitSSTObjectRequests = new Stack<>();
+        Stack<CommitSortedStreamTableObjectRequest> commitSortedStreamTableObjectRequests = new Stack<>();
         Mockito.doAnswer(invocation -> CompletableFuture.completedFuture(objectIdAlloc.getAndIncrement())).when(objectManager)
                 .prepareObject(anyInt(), anyLong());
-        when(objectManager.commitSSTObject(ArgumentMatchers.any())).thenAnswer(invocation -> {
-            commitSSTObjectRequests.push(invocation.getArgument(0));
-            return CompletableFuture.completedFuture(new CommitSSTObjectResponse());
+        when(objectManager.commitSortedStreamTableObject(ArgumentMatchers.any())).thenAnswer(invocation -> {
+            commitSortedStreamTableObjectRequests.push(invocation.getArgument(0));
+            return CompletableFuture.completedFuture(new CommitSortedStreamTableObjectResponse());
         });
 
         List<S3ObjectMetadata> metadataList = new ArrayList<>();
@@ -200,7 +200,7 @@ class StreamObjectsCompactionTaskTest {
             deltaWALUploadTask.upload().get();
             deltaWALUploadTask.commit().get();
 
-            CommitSSTObjectRequest request = commitSSTObjectRequests.pop();
+            CommitSortedStreamTableObjectRequest request = commitSortedStreamTableObjectRequests.pop();
             assertEquals(startObjectId + i * 2L, request.getObjectId());
 
             assertEquals(1, request.getStreamObjects().size());

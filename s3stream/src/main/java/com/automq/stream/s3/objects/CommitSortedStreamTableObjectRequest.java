@@ -21,7 +21,7 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
-public class CommitSSTObjectRequest {
+public class CommitSortedStreamTableObjectRequest {
 
     /**
      * The object id of the SST object.

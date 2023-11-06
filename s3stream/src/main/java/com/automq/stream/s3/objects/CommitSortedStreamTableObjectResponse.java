@@ -20,5 +20,5 @@ package com.automq.stream.s3.objects;
 /**
  * Commit SST object response.
  */
-public class CommitSSTObjectResponse {
+public class CommitSortedStreamTableObjectResponse {
 }

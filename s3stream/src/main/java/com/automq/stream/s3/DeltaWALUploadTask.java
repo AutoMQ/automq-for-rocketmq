@@ -18,7 +18,7 @@
 package com.automq.stream.s3;
 
 import com.automq.stream.s3.model.StreamRecordBatch;
-import com.automq.stream.s3.objects.CommitSSTObjectRequest;
+import com.automq.stream.s3.objects.CommitSortedStreamTableObjectRequest;
 import com.automq.stream.s3.objects.ObjectManager;
 import com.automq.stream.s3.objects.ObjectStreamRange;
 import com.automq.stream.s3.objects.StreamObject;
@@ -52,8 +52,8 @@ public class DeltaWALUploadTask {
     final boolean forceSplit;
     private final boolean s3ObjectLogEnable;
     private final CompletableFuture<Long> prepareCf = new CompletableFuture<>();
-    private volatile CommitSSTObjectRequest commitSSTObjectRequest;
-    private final CompletableFuture<CommitSSTObjectRequest> uploadCf = new CompletableFuture<>();
+    private volatile CommitSortedStreamTableObjectRequest commitSortedStreamTableObjectRequest;
+    private final CompletableFuture<CommitSortedStreamTableObjectRequest> uploadCf = new CompletableFuture<>();
     private final ExecutorService executor;
 
     public DeltaWALUploadTask(Config config, Map<Long, List<StreamRecordBatch>> streamRecordsMap, ObjectManager objectManager, S3Operator s3Operator,
@@ -102,7 +102,7 @@ public class DeltaWALUploadTask {
         return prepareCf;
     }
 
-    public CompletableFuture<CommitSSTObjectRequest> upload() {
+    public CompletableFuture<CommitSortedStreamTableObjectRequest> upload() {
         prepareCf.thenAcceptAsync(objectId -> FutureUtil.exec(() -> upload0(objectId), uploadCf, LOGGER, "upload"), executor);
         return uploadCf;
     }
@@ -110,7 +110,7 @@ public class DeltaWALUploadTask {
     private void upload0(long objectId) {
         List<Long> streamIds = new ArrayList<>(streamRecordsMap.keySet());
         Collections.sort(streamIds);
-        CommitSSTObjectRequest request = new CommitSSTObjectRequest();
+        CommitSortedStreamTableObjectRequest request = new CommitSortedStreamTableObjectRequest();
 
         ObjectWriter sstObject;
         if (forceSplit) {
@@ -144,7 +144,7 @@ public class DeltaWALUploadTask {
         List<CompletableFuture<?>> allCf = new LinkedList<>(streamObjectCfList);
         allCf.add(sstObjectCf);
         CompletableFuture.allOf(allCf.toArray(new CompletableFuture[0])).thenAccept(nil -> {
-            commitSSTObjectRequest = request;
+            commitSortedStreamTableObjectRequest = request;
             uploadCf.complete(request);
         }).exceptionally(ex -> {
             uploadCf.completeExceptionally(ex);
@@ -153,10 +153,10 @@ public class DeltaWALUploadTask {
     }
 
     public CompletableFuture<Void> commit() {
-        return uploadCf.thenCompose(request -> objectManager.commitSSTObject(request).thenApply(resp -> {
-            LOGGER.info("Upload delta WAL {}, cost {}ms", commitSSTObjectRequest, System.currentTimeMillis() - startTimestamp);
+        return uploadCf.thenCompose(request -> objectManager.commitSortedStreamTableObject(request).thenApply(resp -> {
+            LOGGER.info("Upload delta WAL {}, cost {}ms", commitSortedStreamTableObjectRequest, System.currentTimeMillis() - startTimestamp);
             if (s3ObjectLogEnable) {
-                s3ObjectLogger.trace("{}", commitSSTObjectRequest);
+                s3ObjectLogger.trace("{}", commitSortedStreamTableObjectRequest);
             }
             return null;
         }));

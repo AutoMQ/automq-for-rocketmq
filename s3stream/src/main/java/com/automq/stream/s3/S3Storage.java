@@ -71,8 +71,8 @@ public class S3Storage implements Storage {
      * WAL out of order callback sequencer. Single thread mainWriteExecutor will ensure the memory safety.
      */
     private final WALCallbackSequencer callbackSequencer = new WALCallbackSequencer();
-    private final Queue<WALObjectUploadTaskContext> walPrepareQueue = new LinkedList<>();
-    private final Queue<WALObjectUploadTaskContext> walCommitQueue = new LinkedList<>();
+    private final Queue<DeltaWALUploadTaskContext> walPrepareQueue = new LinkedList<>();
+    private final Queue<DeltaWALUploadTaskContext> walCommitQueue = new LinkedList<>();
     private final List<CompletableFuture<Void>> inflightWALUploadTasks = new CopyOnWriteArrayList<>();
 
     private final ScheduledExecutorService mainWriteExecutor = Threads.newSingleThreadScheduledExecutor(
@@ -418,7 +418,7 @@ public class S3Storage implements Storage {
 
     private void uploadDeltaWAL0(LogCache.LogCacheBlock logCacheBlock, CompletableFuture<Void> cf) {
         DeltaWALUploadTask deltaWALUploadTask = DeltaWALUploadTask.of(config, logCacheBlock.records(), objectManager, s3Operator, uploadWALExecutor);
-        WALObjectUploadTaskContext context = new WALObjectUploadTaskContext();
+        DeltaWALUploadTaskContext context = new DeltaWALUploadTaskContext();
         context.task = deltaWALUploadTask;
         context.cache = logCacheBlock;
         context.cf = cf;
@@ -432,10 +432,10 @@ public class S3Storage implements Storage {
         prepareDeltaWALUpload(context);
     }
 
-    private void prepareDeltaWALUpload(WALObjectUploadTaskContext context) {
+    private void prepareDeltaWALUpload(DeltaWALUploadTaskContext context) {
         context.task.prepare().thenAcceptAsync(nil -> {
             // 1. poll out current task and trigger upload.
-            WALObjectUploadTaskContext peek = walPrepareQueue.poll();
+            DeltaWALUploadTaskContext peek = walPrepareQueue.poll();
             Objects.requireNonNull(peek).task.upload();
             // 2. add task to commit queue.
             boolean walObjectCommitQueueEmpty = walCommitQueue.isEmpty();
@@ -444,14 +444,14 @@ public class S3Storage implements Storage {
                 commitDeltaWALUpload(peek);
             }
             // 3. trigger next task to prepare.
-            WALObjectUploadTaskContext next = walPrepareQueue.peek();
+            DeltaWALUploadTaskContext next = walPrepareQueue.peek();
             if (next != null) {
                 prepareDeltaWALUpload(next);
             }
         }, backgroundExecutor);
     }
 
-    private void commitDeltaWALUpload(WALObjectUploadTaskContext context) {
+    private void commitDeltaWALUpload(DeltaWALUploadTaskContext context) {
         context.task.commit().thenAcceptAsync(nil -> {
             // 1. poll out current task
             walCommitQueue.poll();
@@ -464,7 +464,7 @@ public class S3Storage implements Storage {
             context.cf.complete(null);
 
             // 2. trigger next task to commit.
-            WALObjectUploadTaskContext next = walCommitQueue.peek();
+            DeltaWALUploadTaskContext next = walCommitQueue.peek();
             if (next != null) {
                 commitDeltaWALUpload(next);
             }
@@ -574,7 +574,7 @@ public class S3Storage implements Storage {
         }
     }
 
-    static class WALObjectUploadTaskContext {
+    static class DeltaWALUploadTaskContext {
         DeltaWALUploadTask task;
         LogCache.LogCacheBlock cache;
         CompletableFuture<Void> cf;

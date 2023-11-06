@@ -37,12 +37,12 @@ public interface ObjectManager {
     CompletableFuture<Long> prepareObject(int count, long ttl);
 
     /**
-     * Commit SST object.
+     * Commit sorted stream table object.
      *
-     * @param request {@link CommitSSTObjectRequest}
-     * @return {@link CommitSSTObjectResponse}
+     * @param request {@link CommitSortedStreamTableObjectRequest}
+     * @return {@link CommitSortedStreamTableObjectResponse}
      */
-    CompletableFuture<CommitSSTObjectResponse> commitSSTObject(CommitSSTObjectRequest request);
+    CompletableFuture<CommitSortedStreamTableObjectResponse> commitSortedStreamTableObject(CommitSortedStreamTableObjectRequest request);
 
     /**
      * Commit stream object. When the source object has no reference, then delete it.
@@ -70,7 +70,7 @@ public interface ObjectManager {
     CompletableFuture<List<S3ObjectMetadata>> getObjects(long streamId, long startOffset, long endOffset, int limit);
 
     /**
-     * Get current server SST objects.
+     * Get current server sorted stream table objects.
      * When server is starting, server need server SST objects to recover.
      */
     CompletableFuture<List<S3ObjectMetadata>> getServerObjects();

@@ -25,7 +25,7 @@ import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.stream.s3.metadata.S3ObjectMetadata;
 import com.automq.stream.s3.metadata.S3ObjectType;
 import com.automq.stream.s3.objects.CommitStreamObjectRequest;
-import com.automq.stream.s3.objects.CommitSSTObjectRequest;
+import com.automq.stream.s3.objects.CommitSortedStreamTableObjectRequest;
 import com.automq.stream.s3.objects.ObjectStreamRange;
 import com.automq.stream.s3.objects.StreamObject;
 import java.util.ArrayList;
@@ -86,7 +86,7 @@ class S3ObjectManagerTest {
     void commitWALObject() {
         when(metadataService.commitWalObject(any(), any(), any())).thenReturn(CompletableFuture.completedFuture(null));
         // Build a CommitWALObjectRequest for testing
-        CommitSSTObjectRequest walObjectRequest = new CommitSSTObjectRequest();
+        CommitSortedStreamTableObjectRequest walObjectRequest = new CommitSortedStreamTableObjectRequest();
         walObjectRequest.setObjectId(100L);
         walObjectRequest.setOrderId(200L);
         walObjectRequest.setObjectSize(300L);
@@ -103,7 +103,7 @@ class S3ObjectManagerTest {
         streamObject.setEndOffset(2000);
         walObjectRequest.setStreamObjects(Collections.singletonList(streamObject));
 
-        objectManager.commitSSTObject(walObjectRequest);
+        objectManager.commitSortedStreamTableObject(walObjectRequest);
         verify(metadataService).commitWalObject(walObjectCaptor.capture(), streamObjectsCaptor.capture(), eq(compactedObjectIds));
 
         S3WALObject walObject = walObjectCaptor.getValue();
