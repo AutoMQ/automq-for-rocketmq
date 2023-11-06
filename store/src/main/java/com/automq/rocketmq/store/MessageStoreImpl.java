@@ -81,8 +81,7 @@ public class MessageStoreImpl implements MessageStore {
         this.s3ObjectOperator = s3ObjectOperator;
     }
 
-    @Override
-    public LogicQueueManager getTopicQueueManager() {
+    public LogicQueueManager topicQueueManager() {
         return logicQueueManager;
     }
 
@@ -93,8 +92,7 @@ public class MessageStoreImpl implements MessageStore {
     /**
      * @return {@link S3ObjectOperator} instance
      */
-    @Override
-    public S3ObjectOperator getS3ObjectOperator() {
+    public S3ObjectOperator s3ObjectOperator() {
         return s3ObjectOperator;
     }
 

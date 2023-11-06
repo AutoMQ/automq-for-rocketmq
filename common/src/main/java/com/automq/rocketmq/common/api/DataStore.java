@@ -29,9 +29,8 @@ public interface DataStore {
      *
      * @param streamId ID of the stream to trim
      * @param offset   Minimum offset of the stream after trim operation
-     * @return True if successful; failure future otherwise.
      */
-    CompletableFuture<Boolean> trimStream(long streamId, long offset);
+    CompletableFuture<Void> trimStream(long streamId, long offset);
 
     /**
      * Delete a list of S3 objects by object id.

@@ -20,9 +20,7 @@ package com.automq.rocketmq.proxy.mock;
 import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.store.api.LogicQueue;
-import com.automq.rocketmq.store.api.LogicQueueManager;
 import com.automq.rocketmq.store.api.MessageStore;
-import com.automq.rocketmq.store.api.S3ObjectOperator;
 import com.automq.rocketmq.store.model.message.AckResult;
 import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
 import com.automq.rocketmq.store.model.message.ClearRetryMessagesResult;
@@ -40,7 +38,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
-import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.tuple.Pair;
 
 public class MockMessageStore implements MessageStore {
@@ -63,16 +60,6 @@ public class MockMessageStore implements MessageStore {
     @Override
     public void shutdown() {
 
-    }
-
-    @Override
-    public LogicQueueManager getTopicQueueManager() {
-        throw new NotImplementedException();
-    }
-
-    @Override
-    public S3ObjectOperator getS3ObjectOperator() {
-        throw new NotImplementedException();
     }
 
     @Override

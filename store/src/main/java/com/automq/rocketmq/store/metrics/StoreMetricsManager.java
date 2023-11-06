@@ -98,7 +98,7 @@ public class StoreMetricsManager extends ServiceThread implements MetricsManager
             waitForRunning(config.periodicExporterIntervalInMills());
 
             StreamStore streamStore = messageStore.streamStore();
-            DefaultLogicQueueManager manager = (DefaultLogicQueueManager) messageStore.getTopicQueueManager();
+            DefaultLogicQueueManager manager = (DefaultLogicQueueManager) messageStore.topicQueueManager();
             Set<LagRecord> newLagRecordSet = Sets.newConcurrentHashSet();
             manager.logicQueueMap().forEach((topicQueueId, logicQueueFuture) -> {
                 if (!logicQueueFuture.isDone() || logicQueueFuture.isCompletedExceptionally()) {
@@ -148,7 +148,6 @@ public class StoreMetricsManager extends ServiceThread implements MetricsManager
 
     @Override
     public void initDynamicMetrics(Meter meter) {
-        StoreMetricsManager.attributesBuilderSupplier = attributesBuilderSupplier;
         consumerLagMessages = meter.gaugeBuilder(GAUGE_CONSUMER_LAG_MESSAGES)
             .setDescription("Consumer lag messages")
             .ofLongs()
