@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.metadata.s3;
+package com.automq.rocketmq.metadata.service;
 
 import apache.rocketmq.controller.v1.S3ObjectState;
 import apache.rocketmq.controller.v1.S3StreamObject;
@@ -25,8 +25,7 @@ import apache.rocketmq.controller.v1.StreamState;
 import apache.rocketmq.controller.v1.SubStream;
 import com.automq.rocketmq.common.config.ControllerConfig;
 import com.automq.rocketmq.common.system.StreamConstants;
-import com.automq.rocketmq.controller.ControllerClient;
-import com.automq.rocketmq.metadata.service.S3MetadataService;
+import com.automq.rocketmq.metadata.DatabaseTestBase;
 import com.automq.rocketmq.metadata.dao.Range;
 import com.automq.rocketmq.metadata.dao.S3Object;
 import com.automq.rocketmq.metadata.dao.S3WalObject;
@@ -36,7 +35,6 @@ import com.automq.rocketmq.metadata.mapper.S3ObjectMapper;
 import com.automq.rocketmq.metadata.mapper.S3StreamObjectMapper;
 import com.automq.rocketmq.metadata.mapper.S3WalObjectMapper;
 import com.automq.rocketmq.metadata.mapper.StreamMapper;
-import com.automq.rocketmq.metadata.service.DefaultS3MetadataService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.LongStream;
@@ -56,14 +54,11 @@ import java.util.concurrent.ExecutionException;
 
 public class DefaultS3MetadataServiceTest extends DatabaseTestBase {
 
-    ControllerClient client;
-
     ControllerConfig config;
 
     ExecutorService executorService;
 
     public DefaultS3MetadataServiceTest() {
-        this.client = Mockito.mock(ControllerClient.class);
         this.config = Mockito.mock(ControllerConfig.class);
         Mockito.when(config.nodeId()).thenReturn(1);
         this.executorService = Executors.newSingleThreadExecutor();

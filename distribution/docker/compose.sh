@@ -18,7 +18,7 @@
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 REPO_DIR=$(dirname "$(dirname "$SCRIPT_DIR")")
 cd "$SCRIPT_DIR" || exit 1
-cp "$REPO_DIR/controller/src/main/resources/ddl.sql" .
+cp "$REPO_DIR/metadata-jdbc/src/main/resources/ddl.sql" .
 
 OS_NAME=$(uname)
 if [ "$OS_NAME" == "Linux" ]
