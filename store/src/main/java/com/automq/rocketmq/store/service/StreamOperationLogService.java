@@ -89,7 +89,7 @@ public class StreamOperationLogService implements OperationLogService {
                         // TODO: operation may be null
                         replay(batchWithContext.baseOffset(), operation);
                     } catch (StoreException e) {
-                        LOGGER.error("Topic {}, queue: {}, operation stream offset: {}: replay operation failed when recover", stateMachine.topicId(), stateMachine.queueId(), batchWithContext.baseOffset(), e);
+                        LOGGER.error("Topic {}, queue: {}, operation stream id: {}, offset: {}: replay operation failed when recover", stateMachine.topicId(), stateMachine.queueId(), operationStreamId, batchWithContext.baseOffset(), e);
                         if (e.code() != StoreErrorCode.ILLEGAL_ARGUMENT) {
                             throw new CompletionException(e);
                         }
