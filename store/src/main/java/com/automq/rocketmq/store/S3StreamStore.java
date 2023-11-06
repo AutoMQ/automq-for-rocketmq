@@ -86,8 +86,8 @@ public class S3StreamStore implements StreamStore {
         S3Operator defaultOperator = new DefaultS3Operator(streamConfig.s3Endpoint(), streamConfig.s3Region(), streamConfig.s3Bucket(),
             streamConfig.s3ForcePathStyle(), streamConfig.s3AccessKey(), streamConfig.s3SecretKey(), networkInboundLimiter, networkOutboundLimiter, true);
 
-        WriteAheadLog writeAheadLog = BlockWALService.builder(s3Config.s3WALPath(), s3Config.s3WALCapacity()).config(s3Config).build();
-        S3BlockCache blockCache = new DefaultS3BlockCache(s3Config.s3BlockCacheSize(), objectManager, defaultOperator);
+        WriteAheadLog writeAheadLog = BlockWALService.builder(s3Config.walPath(), s3Config.walCapacity()).config(s3Config).build();
+        S3BlockCache blockCache = new DefaultS3BlockCache(s3Config.blockCacheSize(), objectManager, defaultOperator);
 
         // Build the s3 storage
         this.storage = new S3Storage(s3Config, writeAheadLog, streamManager, objectManager, blockCache, defaultOperator);
@@ -210,28 +210,28 @@ public class S3StreamStore implements StreamStore {
 
     private Config configFrom(S3StreamConfig streamConfig) {
         Config config = new Config();
-        config.s3Endpoint(streamConfig.s3Endpoint());
-        config.s3Region(streamConfig.s3Region());
-        config.s3Bucket(streamConfig.s3Bucket());
-        config.s3ForcePathStyle(streamConfig.s3ForcePathStyle());
-        config.s3WALPath(streamConfig.s3WALPath());
-        config.s3AccessKey(streamConfig.s3AccessKey());
-        config.s3SecretKey(streamConfig.s3SecretKey());
+        config.endpoint(streamConfig.s3Endpoint());
+        config.region(streamConfig.s3Region());
+        config.bucket(streamConfig.s3Bucket());
+        config.forcePathStyle(streamConfig.s3ForcePathStyle());
+        config.walPath(streamConfig.s3WALPath());
+        config.accessKey(streamConfig.s3AccessKey());
+        config.secretKey(streamConfig.s3SecretKey());
         config.networkBaselineBandwidth(streamConfig.networkBaselineBandwidth());
         config.refillPeriodMs(streamConfig.refillPeriodMs());
 
         // Compaction config
-        config.s3StreamObjectCompactionIntervalMinutes(streamConfig.streamObjectCompactionIntervalMinutes());
-        config.s3StreamObjectCompactionMaxSizeBytes(streamConfig.streamObjectCompactionMaxSizeBytes());
-        config.s3StreamObjectCompactionLivingTimeMinutes(streamConfig.streamObjectCompactionLivingTimeMinutes());
+        config.streamObjectCompactionIntervalMinutes(streamConfig.streamObjectCompactionIntervalMinutes());
+        config.streamObjectCompactionMaxSizeBytes(streamConfig.streamObjectCompactionMaxSizeBytes());
+        config.streamObjectCompactionLivingTimeMinutes(streamConfig.streamObjectCompactionLivingTimeMinutes());
 
-        config.s3WALObjectCompactionInterval(streamConfig.walObjectCompactionInterval());
-        config.s3WALObjectCompactionCacheSize(streamConfig.walObjectCompactionCacheSize());
-        config.s3WALObjectCompactionUploadConcurrency(streamConfig.walObjectCompactionUploadConcurrency());
-        config.s3WALObjectCompactionMaxObjectNum(streamConfig.walObjectCompactionMaxObjectNum());
-        config.s3WALObjectCompactionForceSplitPeriod(streamConfig.walObjectCompactionForceSplitPeriod());
-        config.s3WALObjectCompactionStreamSplitSize(streamConfig.walObjectCompactionStreamSplitSize());
-        config.s3StreamSplitSize(streamConfig.streamSplitSizeThreshold());
+        config.sstCompactionInterval(streamConfig.walObjectCompactionInterval());
+        config.sstCompactionCacheSize(streamConfig.walObjectCompactionCacheSize());
+        config.sstCompactionUploadConcurrency(streamConfig.walObjectCompactionUploadConcurrency());
+        config.sstCompactionMaxObjectNum(streamConfig.walObjectCompactionMaxObjectNum());
+        config.sstCompactionForceSplitPeriod(streamConfig.walObjectCompactionForceSplitPeriod());
+        config.sstCompactionStreamSplitSize(streamConfig.walObjectCompactionStreamSplitSize());
+        config.streamSplitSize(streamConfig.streamSplitSizeThreshold());
         return config;
     }
 }
