@@ -70,7 +70,7 @@ public class ReclaimS3ObjectTask extends ControllerTask {
                 );
 
                 if (!result.isEmpty()) {
-                    s3ObjectMapper.deleteByCriteria(S3ObjectCriteria.newBuilder().addAll(result).build());
+                    s3ObjectMapper.deleteByCriteria(S3ObjectCriteria.newBuilder().addObjectIds(result).build());
                     streamObjectMapper.batchDelete(result);
                 }
             }

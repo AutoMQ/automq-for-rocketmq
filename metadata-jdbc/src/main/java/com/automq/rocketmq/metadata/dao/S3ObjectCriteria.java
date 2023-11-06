@@ -42,7 +42,7 @@ public class S3ObjectCriteria {
             return this;
         }
 
-        public S3ObjectCriteriaBuilder addAll(Collection<Long> ids) {
+        public S3ObjectCriteriaBuilder addObjectIds(Collection<Long> ids) {
             if (null == criteria.ids) {
                 criteria.ids = new ArrayList<>();
             }

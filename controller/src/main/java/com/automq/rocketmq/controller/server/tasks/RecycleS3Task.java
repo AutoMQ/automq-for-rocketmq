@@ -18,6 +18,7 @@
 package com.automq.rocketmq.controller.server.tasks;
 
 import apache.rocketmq.controller.v1.Code;
+import apache.rocketmq.controller.v1.StreamState;
 import apache.rocketmq.controller.v1.TopicStatus;
 import com.automq.rocketmq.controller.MetadataStore;
 import com.automq.rocketmq.common.exception.ControllerException;
@@ -47,10 +48,6 @@ public class RecycleS3Task extends ControllerTask {
 
     @Override
     public void process() throws ControllerException {
-        if (!metadataStore.isLeader()) {
-            return;
-        }
-
         try (SqlSession session = metadataStore.openSession()) {
             TopicMapper topicMapper = session.getMapper(TopicMapper.class);
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
@@ -59,6 +56,7 @@ public class RecycleS3Task extends ControllerTask {
 
             List<Topic> topics = topicMapper.list(TopicStatus.TOPIC_STATUS_ACTIVE, null);
 
+            // Recyclable S3 Object IDs
             List<Long> recyclable = new ArrayList<>();
 
             for (Topic topic : topics) {
@@ -67,14 +65,23 @@ public class RecycleS3Task extends ControllerTask {
                 Date threshold = calendar.getTime();
                 StreamCriteria criteria = StreamCriteria.newBuilder()
                     .withTopicId(topic.getId())
+                    .withState(StreamState.OPEN)
+                    .withDstNodeId(metadataStore.config().nodeId())
                     .build();
                 List<Long> streamIds = streamMapper.byCriteria(criteria)
                     .stream()
                     .map(Stream::getId)
                     .toList();
 
+                if (streamIds.isEmpty()) {
+                    continue;
+                }
+
+                // Lookup and add recyclable S3 object IDs
                 List<S3StreamObject> list = streamObjectMapper.recyclable(streamIds, threshold);
                 recyclable.addAll(list.stream().mapToLong(S3StreamObject::getObjectId).boxed().toList());
+
+                // Determine offset to trim stream up to
                 final Map<Long, Long> trimTo = new HashMap<>();
                 list.forEach(so -> {
                     trimTo.computeIfAbsent(so.getStreamId(), streamId -> so.getEndOffset());
@@ -85,7 +92,15 @@ public class RecycleS3Task extends ControllerTask {
                         return prev;
                     });
                 });
-                trimTo.forEach(metadataStore::trimStream);
+
+                trimTo.forEach((streamId, offset) -> {
+                    try {
+                        metadataStore.getDataStore().trimStream(streamId, offset).join();
+                        LOGGER.debug("Trim stream[stream-id={}] to {}", streamId, offset);
+                    } catch (Throwable e) {
+                        LOGGER.warn("DataStore fails to trim stream[stream-id={}] to {}", streamId, offset, e);
+                    }
+                });
             }
 
             if (recyclable.isEmpty()) {
@@ -96,23 +111,26 @@ public class RecycleS3Task extends ControllerTask {
 
             HashSet<Long> expired = new HashSet<>(recyclable);
             result.forEach(expired::remove);
-            LOGGER.info("Recycle {} S3 objects: deleted: [{}], expired but not deleted: [{}]",
+            LOGGER.info("Recycled {} S3 objects: deleted=[{}], failed=[{}]",
                 result.size(), result.stream().map(String::valueOf).collect(Collectors.joining(", ")),
                 expired.stream().map(String::valueOf).collect(Collectors.joining(", "))
             );
 
-            int count = s3ObjectMapper.deleteByCriteria(S3ObjectCriteria.newBuilder().addAll(result).build());
+            int count = s3ObjectMapper.deleteByCriteria(S3ObjectCriteria.newBuilder().addObjectIds(result).build());
             if (count != result.size()) {
-                LOGGER.error("Failed to delete S3 objects, having object-id-list={} but deleting {} rows", result, count);
+                LOGGER.error("Failed to delete S3 objects, having object-id-list={} but affected only {} rows", result,
+                    count);
                 return;
             }
 
             count = streamObjectMapper.batchDelete(result);
             if (count != result.size()) {
-                LOGGER.error("Failed to delete S3 objects, having object-id-list={} but deleting {} rows", result, count);
+                LOGGER.error("Failed to delete S3 objects, having object-id-list={} but affected only {} rows", result,
+                    count);
                 return;
             }
 
+            // Commit transaction
             session.commit();
         } catch (Exception e) {
             LOGGER.error("Failed to recycle S3 Objects", e);

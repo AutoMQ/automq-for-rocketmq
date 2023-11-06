@@ -53,7 +53,7 @@ public class StreamManager {
                 objectIds.removeAll(deleted);
                 if (!deleted.isEmpty()) {
                     LOGGER.info("DataStore batch deleted S3 objects having object-id-list={}", deleted);
-                    s3ObjectMapper.deleteByCriteria(S3ObjectCriteria.newBuilder().addAll(deleted).build());
+                    s3ObjectMapper.deleteByCriteria(S3ObjectCriteria.newBuilder().addObjectIds(deleted).build());
                 }
             }
 
