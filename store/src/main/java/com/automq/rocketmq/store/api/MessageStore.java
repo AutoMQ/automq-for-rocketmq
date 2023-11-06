@@ -31,10 +31,6 @@ import java.util.concurrent.CompletableFuture;
 
 public interface MessageStore extends Lifecycle {
 
-    LogicQueueManager getTopicQueueManager();
-
-    S3ObjectOperator getS3ObjectOperator();
-
     /**
      * Pop message from specified topic and queue.
      *

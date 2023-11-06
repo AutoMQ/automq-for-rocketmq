@@ -20,16 +20,19 @@ package com.automq.rocketmq.store;
 import com.automq.rocketmq.common.api.DataStore;
 import com.automq.rocketmq.store.api.LogicQueueManager;
 import com.automq.rocketmq.store.api.S3ObjectOperator;
+import com.automq.rocketmq.store.api.StreamStore;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 public class DataStoreFacade implements DataStore {
 
+    private final StreamStore streamStore;
     private final S3ObjectOperator s3ObjectOperator;
-
     private final LogicQueueManager logicQueueManager;
 
-    public DataStoreFacade(S3ObjectOperator s3ObjectOperator, LogicQueueManager logicQueueManager) {
+    public DataStoreFacade(StreamStore streamStore, S3ObjectOperator s3ObjectOperator,
+        LogicQueueManager logicQueueManager) {
+        this.streamStore = streamStore;
         this.s3ObjectOperator = s3ObjectOperator;
         this.logicQueueManager = logicQueueManager;
     }
@@ -37,6 +40,11 @@ public class DataStoreFacade implements DataStore {
     @Override
     public CompletableFuture<Void> closeQueue(long topicId, int queueId) {
         return logicQueueManager.close(topicId, queueId);
+    }
+
+    @Override
+    public CompletableFuture<Void> trimStream(long streamId, long offset) {
+        return streamStore.trim(streamId, offset);
     }
 
     @Override
