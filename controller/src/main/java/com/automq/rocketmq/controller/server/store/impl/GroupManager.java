@@ -24,7 +24,7 @@ import apache.rocketmq.controller.v1.GroupStatus;
 import apache.rocketmq.controller.v1.GroupType;
 import apache.rocketmq.controller.v1.TopicStatus;
 import apache.rocketmq.controller.v1.UpdateGroupRequest;
-import com.automq.rocketmq.controller.exception.ControllerException;
+import com.automq.rocketmq.common.exception.ControllerException;
 import com.automq.rocketmq.controller.MetadataStore;
 import com.automq.rocketmq.controller.server.store.impl.cache.GroupCache;
 import com.automq.rocketmq.controller.server.store.impl.cache.Inflight;

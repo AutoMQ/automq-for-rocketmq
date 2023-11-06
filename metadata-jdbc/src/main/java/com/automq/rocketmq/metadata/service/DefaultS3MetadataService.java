@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.metadata.s3;
+package com.automq.rocketmq.metadata.service;
 
 import apache.rocketmq.controller.v1.Code;
 import apache.rocketmq.controller.v1.S3ObjectState;
@@ -25,10 +25,9 @@ import apache.rocketmq.controller.v1.StreamState;
 import apache.rocketmq.controller.v1.SubStream;
 import apache.rocketmq.controller.v1.SubStreams;
 import com.automq.rocketmq.common.config.ControllerConfig;
+import com.automq.rocketmq.common.exception.ControllerException;
 import com.automq.rocketmq.common.system.S3Constants;
 import com.automq.rocketmq.common.system.StreamConstants;
-import com.automq.rocketmq.controller.exception.ControllerException;
-import com.automq.rocketmq.metadata.api.S3MetadataService;
 import com.automq.rocketmq.metadata.dao.Range;
 import com.automq.rocketmq.metadata.dao.S3Object;
 import com.automq.rocketmq.metadata.dao.S3WalObject;
@@ -668,16 +667,19 @@ public class DefaultS3MetadataService implements S3MetadataService {
             }
             if (stream.getState() == StreamState.CLOSED) {
                 LOGGER.warn("Stream[{}]‘s state is CLOSED, can't trim", streamId);
-                return null;
+                future.completeExceptionally(new ControllerException(Code.ILLEGAL_STATE_VALUE, "Stream is closed"));
+                return future;
             }
             if (stream.getStartOffset() > newStartOffset) {
                 LOGGER.warn("Stream[{}]‘s start offset {} is larger than request new start offset {}",
                     streamId, stream.getStartOffset(), newStartOffset);
-                return null;
+                future.complete(null);
+                return future;
             }
             if (stream.getStartOffset() == newStartOffset) {
                 // regard it as redundant trim operation, just return success
-                return null;
+                future.complete(null);
+                return future;
             }
 
             // now the request is valid
@@ -712,6 +714,7 @@ public class DefaultS3MetadataService implements S3MetadataService {
                 range.setStartOffset(newStartOffset);
                 rangeMapper.update(range);
             });
+
             // remove stream object
             s3StreamObjectMapper.listByStreamId(streamId).forEach(streamObject -> {
                 long streamStartOffset = streamObject.getStartOffset();

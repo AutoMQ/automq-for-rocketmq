@@ -23,7 +23,7 @@ import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.MessageType;
 import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.common.config.GrpcClientConfig;
-import com.automq.rocketmq.controller.exception.ControllerException;
+import com.automq.rocketmq.common.exception.ControllerException;
 import com.automq.rocketmq.controller.client.GrpcControllerClient;
 import com.automq.rocketmq.controller.server.ControllerServiceImpl;
 import com.automq.rocketmq.metadata.dao.Node;

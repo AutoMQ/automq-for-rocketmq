@@ -31,7 +31,7 @@ import apache.rocketmq.controller.v1.UpdateGroupRequest;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.common.api.DataStore;
 import com.automq.rocketmq.common.config.ControllerConfig;
-import com.automq.rocketmq.controller.exception.ControllerException;
+import com.automq.rocketmq.common.exception.ControllerException;
 import com.automq.rocketmq.controller.server.store.BrokerNode;
 import com.automq.rocketmq.controller.server.store.Role;
 import com.automq.rocketmq.metadata.dao.Group;
@@ -213,4 +213,6 @@ public interface MetadataStore extends Closeable {
     CompletableFuture<List<StreamMetadata>> getStreams(List<Long> streamIds);
 
     TerminationStage fireClose();
+
+    void trimStream(long streamId, long offset);
 }

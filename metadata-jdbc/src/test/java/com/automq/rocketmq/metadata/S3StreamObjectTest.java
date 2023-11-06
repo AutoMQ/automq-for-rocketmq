@@ -191,7 +191,7 @@ public class S3StreamObjectTest extends DatabaseTestBase {
             Assertions.assertTrue(objects.get(0).getCommittedTimestamp().getTime() < threshold.getTimeInMillis());
             Assertions.assertEquals(111, objects.get(0).getStreamId());
 
-            List<Long> ids = s3StreamObjectMapper.recyclable(List.of(111L), threshold.getTime());
+            List<S3StreamObject> ids = s3StreamObjectMapper.recyclable(List.of(111L), threshold.getTime());
             Assertions.assertEquals(1, ids.size());
 
             threshold = Calendar.getInstance();

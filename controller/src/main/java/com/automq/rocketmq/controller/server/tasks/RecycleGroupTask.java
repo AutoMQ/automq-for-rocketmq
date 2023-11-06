@@ -18,7 +18,7 @@
 package com.automq.rocketmq.controller.server.tasks;
 
 import apache.rocketmq.controller.v1.GroupStatus;
-import com.automq.rocketmq.controller.exception.ControllerException;
+import com.automq.rocketmq.common.exception.ControllerException;
 import com.automq.rocketmq.controller.MetadataStore;
 import com.automq.rocketmq.metadata.mapper.GroupMapper;
 import java.util.Calendar;

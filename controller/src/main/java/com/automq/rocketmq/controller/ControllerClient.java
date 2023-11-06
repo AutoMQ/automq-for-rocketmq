@@ -38,7 +38,7 @@ import apache.rocketmq.controller.v1.Topic;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.UpdateGroupRequest;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
-import com.automq.rocketmq.controller.exception.ControllerException;
+import com.automq.rocketmq.common.exception.ControllerException;
 import com.automq.rocketmq.metadata.dao.Node;
 
 import io.grpc.stub.StreamObserver;

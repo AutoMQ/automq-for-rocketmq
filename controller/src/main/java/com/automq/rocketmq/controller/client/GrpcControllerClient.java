@@ -65,7 +65,7 @@ import apache.rocketmq.controller.v1.UpdateTopicReply;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.common.config.GrpcClientConfig;
 import com.automq.rocketmq.controller.ControllerClient;
-import com.automq.rocketmq.controller.exception.ControllerException;
+import com.automq.rocketmq.common.exception.ControllerException;
 import com.automq.rocketmq.metadata.dao.Node;
 import com.google.common.base.Strings;
 import com.google.common.util.concurrent.FutureCallback;
