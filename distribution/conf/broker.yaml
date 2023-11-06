@@ -11,7 +11,7 @@ s3Stream:
   s3ForcePathStyle: true
   s3AccessKey: "access-key"
   s3SecretKey: "secret-key"
-  networkBaselineBandwidth: 15
+  networkBaselineBandwidth: 5242880
   refillPeriodMs: 100
 db:
   url: "jdbc:mysql://mysql-server:3306/metadata"
