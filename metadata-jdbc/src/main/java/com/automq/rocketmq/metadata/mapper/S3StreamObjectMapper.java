@@ -49,5 +49,5 @@ public interface S3StreamObjectMapper {
 
     int batchDelete(@Param("objectIds") List<Long> objectIds);
 
-    List<Long> recyclable(@Param("streamIds") List<Long> streamIds, @Param("threshold") Date threshold);
+    List<S3StreamObject> recyclable(@Param("streamIds") List<Long> streamIds, @Param("threshold") Date threshold);
 }

@@ -25,7 +25,7 @@ import com.automq.rocketmq.common.config.ProxyConfig;
 import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.common.util.CommonUtil;
-import com.automq.rocketmq.controller.exception.ControllerException;
+import com.automq.rocketmq.common.exception.ControllerException;
 import com.automq.rocketmq.metadata.api.ProxyMetadataService;
 import com.automq.rocketmq.proxy.exception.ProxyException;
 import com.automq.rocketmq.proxy.metrics.ProxyMetricsManager;

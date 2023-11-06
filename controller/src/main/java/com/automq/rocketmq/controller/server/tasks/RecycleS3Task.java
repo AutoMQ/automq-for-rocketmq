@@ -20,8 +20,9 @@ package com.automq.rocketmq.controller.server.tasks;
 import apache.rocketmq.controller.v1.Code;
 import apache.rocketmq.controller.v1.TopicStatus;
 import com.automq.rocketmq.controller.MetadataStore;
-import com.automq.rocketmq.controller.exception.ControllerException;
+import com.automq.rocketmq.common.exception.ControllerException;
 import com.automq.rocketmq.metadata.dao.S3ObjectCriteria;
+import com.automq.rocketmq.metadata.dao.S3StreamObject;
 import com.automq.rocketmq.metadata.dao.Stream;
 import com.automq.rocketmq.metadata.dao.StreamCriteria;
 import com.automq.rocketmq.metadata.dao.Topic;
@@ -32,8 +33,10 @@ import com.automq.rocketmq.metadata.mapper.TopicMapper;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.ibatis.session.SqlSession;
 
@@ -69,7 +72,20 @@ public class RecycleS3Task extends ControllerTask {
                     .stream()
                     .map(Stream::getId)
                     .toList();
-                recyclable.addAll(streamObjectMapper.recyclable(streamIds, threshold));
+
+                List<S3StreamObject> list = streamObjectMapper.recyclable(streamIds, threshold);
+                recyclable.addAll(list.stream().mapToLong(S3StreamObject::getObjectId).boxed().toList());
+                final Map<Long, Long> trimTo = new HashMap<>();
+                list.forEach(so -> {
+                    trimTo.computeIfAbsent(so.getStreamId(), streamId -> so.getEndOffset());
+                    trimTo.computeIfPresent(so.getStreamId(), (streamId, prev) -> {
+                        if (prev < so.getEndOffset()) {
+                            return so.getEndOffset();
+                        }
+                        return prev;
+                    });
+                });
+                trimTo.forEach(metadataStore::trimStream);
             }
 
             if (recyclable.isEmpty()) {

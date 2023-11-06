@@ -29,7 +29,7 @@ import apache.rocketmq.controller.v1.StreamState;
 import apache.rocketmq.controller.v1.TopicStatus;
 import apache.rocketmq.controller.v1.MessageType;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
-import com.automq.rocketmq.controller.exception.ControllerException;
+import com.automq.rocketmq.common.exception.ControllerException;
 import com.automq.rocketmq.controller.ControllerClient;
 import com.automq.rocketmq.controller.store.DatabaseTestBase;
 import com.automq.rocketmq.controller.MetadataStore;

@@ -17,7 +17,7 @@
 
 package com.automq.rocketmq.controller.server.tasks;
 
-import com.automq.rocketmq.controller.exception.ControllerException;
+import com.automq.rocketmq.common.exception.ControllerException;
 import com.automq.rocketmq.controller.MetadataStore;
 
 public class HeartbeatTask extends ControllerTask {

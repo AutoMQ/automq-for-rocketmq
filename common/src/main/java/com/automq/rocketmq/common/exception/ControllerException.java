@@ -15,29 +15,22 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.exception;
+package com.automq.rocketmq.common.exception;
 
-import com.automq.rocketmq.common.exception.RocketMQRuntimeException;
-
-public class ControllerRuntimeException extends RocketMQRuntimeException {
-
-    public ControllerRuntimeException(int errorCode) {
-        super(errorCode);
-    }
-
-    public ControllerRuntimeException(int errorCode, String message) {
+public class ControllerException extends RocketMQException {
+    public ControllerException(int errorCode, String message) {
         super(errorCode, message);
     }
 
-    public ControllerRuntimeException(int errorCode, String message, Throwable cause) {
+    public ControllerException(int errorCode, String message, Throwable cause) {
         super(errorCode, message, cause);
     }
 
-    public ControllerRuntimeException(int errorCode, Throwable cause) {
+    public ControllerException(int errorCode, Throwable cause) {
         super(errorCode, cause);
     }
 
-    public ControllerRuntimeException(int errorCode, String message, Throwable cause, boolean enableSuppression,
+    public ControllerException(int errorCode, String message, Throwable cause, boolean enableSuppression,
         boolean writableStackTrace) {
         super(errorCode, message, cause, enableSuppression, writableStackTrace);
     }

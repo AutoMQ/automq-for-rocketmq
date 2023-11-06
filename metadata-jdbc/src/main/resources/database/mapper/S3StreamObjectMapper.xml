@@ -120,8 +120,8 @@
         </if>
     </select>
 
-    <select id="recyclable" resultType="long">
-        SELECT object_id
+    <select id="recyclable">
+        SELECT id, object_id, object_size, stream_id, start_offset, end_offset, base_data_timestamp, committed_timestamp
         FROM s3streamobject
         WHERE
         <foreach collection="streamIds" item="streamId" open="stream_id IN (" close=")" separator=",">
