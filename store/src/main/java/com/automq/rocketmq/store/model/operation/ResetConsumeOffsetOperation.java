@@ -18,6 +18,7 @@
 package com.automq.rocketmq.store.model.operation;
 
 import com.automq.rocketmq.store.api.MessageStateMachine;
+import java.util.Objects;
 
 public class ResetConsumeOffsetOperation extends Operation {
 
@@ -50,4 +51,18 @@ public class ResetConsumeOffsetOperation extends Operation {
         return offset;
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o)
+            return true;
+        if (o == null || getClass() != o.getClass())
+            return false;
+        ResetConsumeOffsetOperation operation = (ResetConsumeOffsetOperation) o;
+        return consumerGroupId == operation.consumerGroupId && topicId == operation.topicId && queueId == operation.queueId && offset == operation.offset() && operationTimestamp == operation.operationTimestamp;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(consumerGroupId, topicId, queueId, offset, operationTimestamp);
+    }
 }
