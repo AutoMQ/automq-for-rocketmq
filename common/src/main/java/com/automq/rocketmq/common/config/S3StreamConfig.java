@@ -40,6 +40,7 @@ public class S3StreamConfig {
     private long walObjectCompactionStreamSplitSize = 16 * 1024 * 1024;
     private int walObjectCompactionForceSplitPeriod = 120;
     private int walObjectCompactionMaxObjectNum = 500;
+    private int streamSplitSizeThreshold = 16777216;
 
     public String s3Endpoint() {
         return s3Endpoint;
@@ -111,5 +112,9 @@ public class S3StreamConfig {
 
     public int walObjectCompactionMaxObjectNum() {
         return walObjectCompactionMaxObjectNum;
+    }
+
+    public int streamSplitSizeThreshold() {
+        return streamSplitSizeThreshold;
     }
 }
