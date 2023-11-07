@@ -22,10 +22,10 @@ import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.SubscriptionMode;
 import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.common.config.ProxyConfig;
+import com.automq.rocketmq.common.exception.ControllerException;
 import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.common.util.CommonUtil;
-import com.automq.rocketmq.common.exception.ControllerException;
 import com.automq.rocketmq.metadata.api.ProxyMetadataService;
 import com.automq.rocketmq.proxy.exception.ProxyException;
 import com.automq.rocketmq.proxy.metrics.ProxyMetricsManager;
@@ -348,7 +348,7 @@ public class MessageServiceImpl implements MessageService {
             return popSpecifiedQueueUnsafe(consumerGroup, topic, queueId, filter, batchSize, fifo, invisibleDuration)
                 .orTimeout(timeoutMillis, TimeUnit.MILLISECONDS)
                 .whenComplete((v, throwable) -> {
-                    // TODO: log exception.
+                    LOGGER.error("Error while pop message from topic: {}, queue: {}, batch size: {}.", topic.getName(), queueId, batchSize, throwable);
                     // Release lock since complete or timeout.
                     lockService.release(topicId, queueId);
                 });
