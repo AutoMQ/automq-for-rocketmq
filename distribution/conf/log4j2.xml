@@ -57,7 +57,7 @@
         <Logger name="com.automq.stream" level="info" additivity="false">
             <AppenderRef ref="streamAppender"/>
         </Logger>
-        <Logger name="com.automq.rocketmq.metadata.mapper" level="trace" additivity="false">
+        <Logger name="com.automq.rocketmq.metadata.mapper" level="debug" additivity="false">
             <AppenderRef ref="mybatisAppender" />
         </Logger>
         <Root level="info">
