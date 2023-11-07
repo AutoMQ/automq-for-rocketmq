@@ -31,7 +31,7 @@ public class HikariCPDataSourceFactory extends PooledDataSourceFactory {
         synchronized (HikariCPDataSourceFactory.class) {
             if (null == dataSource) {
                 HikariConfig config = new HikariConfig(properties);
-                config.setMaximumPoolSize(10);
+                config.setMaximumPoolSize(20);
                 config.setAutoCommit(false);
                 dataSource = new HikariDataSource(config);
             }
