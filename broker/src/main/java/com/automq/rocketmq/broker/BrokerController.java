@@ -39,6 +39,12 @@ import com.automq.rocketmq.store.DataStoreFacade;
 import com.automq.rocketmq.store.MessageStoreBuilder;
 import com.automq.rocketmq.store.MessageStoreImpl;
 import com.automq.rocketmq.store.api.MessageStore;
+import io.pyroscope.http.Format;
+import io.pyroscope.javaagent.EventType;
+import io.pyroscope.javaagent.PyroscopeAgent;
+import io.pyroscope.javaagent.config.Config;
+import io.pyroscope.labels.Pyroscope;
+import java.util.Map;
 import org.apache.rocketmq.common.constant.LoggerName;
 import org.apache.rocketmq.common.thread.ThreadPoolMonitor;
 import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
@@ -78,7 +84,6 @@ public class BrokerController implements Lifecycle {
         DataStore dataStore = new DataStoreFacade(messageStore.streamStore(), messageStore.s3ObjectOperator(), messageStore.topicQueueManager());
         metadataStore.setDataStore(dataStore);
 
-
         serviceManager = new DefaultServiceManager(brokerConfig, proxyMetadataService, dlqService, messageStore);
         messagingProcessor = ExtendMessagingProcessor.createForS3RocketMQ(serviceManager);
 
@@ -88,6 +93,16 @@ public class BrokerController implements Lifecycle {
         remotingServer = new RemotingProtocolServer(messagingProcessor);
 
         metricsExporter = new MetricsExporter(brokerConfig, messageStore, messagingProcessor);
+
+        Pyroscope.setStaticLabels(Map.of("broker", brokerConfig.name()));
+        PyroscopeAgent.start(
+            new Config.Builder()
+                .setApplicationName("automq-for-rocketmq")
+                .setProfilingEvent(EventType.ITIMER)
+                .setFormat(Format.JFR)
+                .setServerAddress("http://10.129.193.87:4040")
+                .build()
+        );
     }
 
     @Override

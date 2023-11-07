@@ -180,6 +180,10 @@ public class FlatMessageUtil {
         // Re-consume times is the number of delivery attempts minus 1.
         messageExt.setReconsumeTimes(systemProperties.deliveryAttempts() - 1);
 
+        if (systemProperties.deliveryTimestamp() > 0) {
+            messageExt.setDeliverTimeMs(systemProperties.deliveryTimestamp());
+        }
+
         KeyValue.Vector propertiesVector = flatMessage.message().userPropertiesVector();
         for (int i = 0; i < propertiesVector.length(); i++) {
             KeyValue keyValue = propertiesVector.get(i);

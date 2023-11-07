@@ -192,7 +192,8 @@ public class SnapshotService implements Lifecycle, Runnable {
             .thenComposeAsync(appendResult -> {
                 // trim operation stream
                 return streamStore.trim(operationStreamId, snapshot.getSnapshotEndOffset() + 1);
-            }, backgroundExecutor).thenAcceptAsync(nil -> {
+            }, backgroundExecutor)
+            .thenAcceptAsync(nil -> {
                 // complete snapshot task
                 task.completeSuccess(snapshot.getSnapshotEndOffset() + 1);
             }, backgroundExecutor);
