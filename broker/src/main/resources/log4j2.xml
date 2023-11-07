@@ -60,7 +60,6 @@
         <Logger name="com.automq.rocketmq.metadata.mapper" level="trace" additivity="false">
             <AppenderRef ref="mybatisAppender" />
         </Logger>
-
         <Logger name="com.zaxxer.hikari" level="debug" additivity="false">
             <AppenderRef ref="mybatisAppender" />
         </Logger>
