@@ -752,43 +752,58 @@ public class LogicQueueTest {
             logicQueue.put(message);
         }
 
-        // 2. pop 2 messages
+        // 2. pop 3 messages
         PopResult popResult = logicQueue.popNormal(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 2, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
-        assertEquals(2, popResult.messageList().size());
-        assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
-        assertEquals(2, logicQueue.getConsumeOffset(CONSUMER_GROUP_ID));
+        assertEquals(3, popResult.messageList().size());
+        assertEquals(3, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
+        assertEquals(3, logicQueue.getConsumeOffset(CONSUMER_GROUP_ID));
         assertEquals(0, logicQueue.getAckOffset(CONSUMER_GROUP_ID));
         String receiptHandle0 = popResult.messageList().get(0).receiptHandle().get();
         String receiptHandle1 = popResult.messageList().get(1).receiptHandle().get();
+        String receiptHandle2 = popResult.messageList().get(2).receiptHandle().get();
 
-        // 3. reset offset to 1
-        ResetConsumeOffsetResult resetConsumeOffsetResult = logicQueue.resetConsumeOffset(CONSUMER_GROUP_ID, 1).join();
-        assertEquals(ResetConsumeOffsetResult.Status.SUCCESS, resetConsumeOffsetResult.status());
-        assertEquals(1, logicQueue.getAckOffset(CONSUMER_GROUP_ID));
-        assertEquals(1, logicQueue.getConsumeOffset(CONSUMER_GROUP_ID));
-
-        // 3. ack message-0 and message-1 but expected ack offset will not be advanced to 2
+        // 3. ack offset-0
         AckResult ackResult = logicQueue.ack(receiptHandle0).join();
         assertEquals(AckResult.Status.SUCCESS, ackResult.status());
-        ackResult = logicQueue.ack(receiptHandle1).join();
-        assertEquals(AckResult.Status.SUCCESS, ackResult.status());
-        assertEquals(0, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
-        assertEquals(1, logicQueue.getConsumeOffset(CONSUMER_GROUP_ID));
+        assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
+        assertEquals(3, logicQueue.getConsumeOffset(CONSUMER_GROUP_ID));
         assertEquals(1, logicQueue.getAckOffset(CONSUMER_GROUP_ID));
 
-        // 4. check ck
+        // 4. reset offset to 2
+        ResetConsumeOffsetResult resetConsumeOffsetResult = logicQueue.resetConsumeOffset(CONSUMER_GROUP_ID, 2).join();
+        assertEquals(ResetConsumeOffsetResult.Status.SUCCESS, resetConsumeOffsetResult.status());
+        assertEquals(2, logicQueue.getAckOffset(CONSUMER_GROUP_ID));
+        assertEquals(2, logicQueue.getConsumeOffset(CONSUMER_GROUP_ID));
+
+        // 5. ack message-1 and message-2 but expected ack offset will not be advanced to 3
+        ackResult = logicQueue.ack(receiptHandle1).join();
+        assertEquals(AckResult.Status.SUCCESS, ackResult.status());
+        ackResult = logicQueue.ack(receiptHandle2).join();
+        assertEquals(AckResult.Status.SUCCESS, ackResult.status());
+        assertEquals(0, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
+        assertEquals(2, logicQueue.getConsumeOffset(CONSUMER_GROUP_ID));
+        assertEquals(2, logicQueue.getAckOffset(CONSUMER_GROUP_ID));
+
+        // 6. check ck
         checkCkExist(receiptHandle0, false);
         checkCkExist(receiptHandle1, false);
 
-        // 5. pop 1 message
+        // 7. pop 1 message
         popResult = logicQueue.popNormal(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(1, popResult.messageList().size());
         assertEquals(1, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
-        assertEquals(2, logicQueue.getConsumeOffset(CONSUMER_GROUP_ID));
-        assertEquals(1, logicQueue.getAckOffset(CONSUMER_GROUP_ID));
-        assertEquals(1, popResult.messageList().get(0).offset());
+        assertEquals(3, logicQueue.getConsumeOffset(CONSUMER_GROUP_ID));
+        assertEquals(2, logicQueue.getAckOffset(CONSUMER_GROUP_ID));
+        assertEquals(2, popResult.messageList().get(0).offset());
+
+        // 8. ack message
+        ackResult = logicQueue.ack(popResult.messageList().get(0).receiptHandle().get()).join();
+        assertEquals(AckResult.Status.SUCCESS, ackResult.status());
+        assertEquals(0, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
+        assertEquals(3, logicQueue.getConsumeOffset(CONSUMER_GROUP_ID));
+        assertEquals(3, logicQueue.getAckOffset(CONSUMER_GROUP_ID));
     }
 
     private void checkCkExist(String receiptHandle, boolean expectExist) {
