@@ -150,7 +150,6 @@ public class CompactionManager {
     private void compact(List<StreamMetadata> streamMetadataList, List<S3ObjectMetadata> objectMetadataList) {
         logger.info("Get {} SST objects from metadata", objectMetadataList.size());
         if (objectMetadataList.isEmpty()) {
-            logger.info("No SST objects to compact");
             return;
         }
         Map<Boolean, List<S3ObjectMetadata>> objectMetadataFilterMap = convertS3Objects(objectMetadataList);
@@ -205,6 +204,9 @@ public class CompactionManager {
     }
 
     private void compactObjects(List<StreamMetadata> streamMetadataList, List<S3ObjectMetadata> objectsToCompact) {
+        if (objectsToCompact.isEmpty()) {
+            return;
+        }
         // sort by S3 object data time in descending order
         objectsToCompact.sort((o1, o2) -> Long.compare(o2.dataTimeInMs(), o1.dataTimeInMs()));
         if (maxObjectNumToCompact < objectsToCompact.size()) {
