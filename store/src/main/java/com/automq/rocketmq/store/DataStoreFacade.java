@@ -21,10 +21,16 @@ import com.automq.rocketmq.common.api.DataStore;
 import com.automq.rocketmq.store.api.LogicQueueManager;
 import com.automq.rocketmq.store.api.S3ObjectOperator;
 import com.automq.rocketmq.store.api.StreamStore;
+import com.google.common.base.Stopwatch;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class DataStoreFacade implements DataStore {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(DataStoreFacade.class);
 
     private final StreamStore streamStore;
     private final S3ObjectOperator s3ObjectOperator;
@@ -49,6 +55,11 @@ public class DataStoreFacade implements DataStore {
 
     @Override
     public CompletableFuture<List<Long>> batchDeleteS3Objects(List<Long> objectIds) {
-        return s3ObjectOperator.delete(objectIds);
+        Stopwatch stopwatch = Stopwatch.createStarted();
+        CompletableFuture<List<Long>> future = s3ObjectOperator.delete(objectIds);
+        return future.thenApply(list -> {
+            LOGGER.info("batchDeleteS3Objects costs {}ms", stopwatch.elapsed(TimeUnit.MILLISECONDS));
+            return list;
+        });
     }
 }
