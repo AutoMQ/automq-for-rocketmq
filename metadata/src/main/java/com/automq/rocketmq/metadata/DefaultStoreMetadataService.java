@@ -46,52 +46,102 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
 
     @Override
     public CompletableFuture<StreamMetadata> dataStreamOf(long topicId, int queueId) {
-        return metadataStore.getStream(topicId, queueId, null, StreamRole.STREAM_ROLE_DATA);
+        AtomicBoolean loop = new AtomicBoolean(true);
+        return Futures.loop(loop::get, () -> metadataStore.getStream(topicId, queueId, null, StreamRole.STREAM_ROLE_DATA)
+            .thenApply(res -> {
+                loop.set(false);
+                return res;
+            }), MoreExecutors.directExecutor());
     }
 
     @Override
     public CompletableFuture<StreamMetadata> operationStreamOf(long topicId, int queueId) {
-        return metadataStore.getStream(topicId, queueId, null, StreamRole.STREAM_ROLE_OPS);
+        AtomicBoolean loop = new AtomicBoolean(true);
+        return Futures.loop(loop::get, () -> metadataStore.getStream(topicId, queueId, null, StreamRole.STREAM_ROLE_OPS)
+            .thenApply(res -> {
+                loop.set(false);
+                return res;
+            }), MoreExecutors.directExecutor());
     }
 
     @Override
     public CompletableFuture<StreamMetadata> snapshotStreamOf(long topicId, int queueId) {
-        return metadataStore.getStream(topicId, queueId, null, StreamRole.STREAM_ROLE_SNAPSHOT);
+        AtomicBoolean loop = new AtomicBoolean(true);
+        return Futures.loop(loop::get, () -> metadataStore.getStream(topicId, queueId, null, StreamRole.STREAM_ROLE_SNAPSHOT)
+            .thenApply(res -> {
+                loop.set(false);
+                return res;
+            }), MoreExecutors.directExecutor());
     }
 
     @Override
     public CompletableFuture<StreamMetadata> retryStreamOf(long consumerGroupId, long topicId, int queueId) {
-        return metadataStore.getStream(topicId, queueId, consumerGroupId, StreamRole.STREAM_ROLE_RETRY);
+        AtomicBoolean loop = new AtomicBoolean(true);
+        return Futures.loop(loop::get, () -> metadataStore.getStream(topicId, queueId, consumerGroupId, StreamRole.STREAM_ROLE_RETRY)
+            .thenApply(res -> {
+                loop.set(false);
+                return res;
+            }), MoreExecutors.directExecutor());
     }
 
     @Override
     public CompletableFuture<Integer> maxDeliveryAttemptsOf(long consumerGroupId) {
-        return metadataStore.describeGroup(consumerGroupId, null).thenApply((ConsumerGroup::getMaxDeliveryAttempt));
+        AtomicBoolean loop = new AtomicBoolean(true);
+        return Futures.loop(loop::get, () -> metadataStore.describeGroup(consumerGroupId, null).thenApply((ConsumerGroup::getMaxDeliveryAttempt))
+            .thenApply(res -> {
+                loop.set(false);
+                return res;
+            }), MoreExecutors.directExecutor());
     }
 
     @Override
     public CompletableFuture<Void> trimStream(long streamId, long streamEpoch, long newStartOffset) {
-        return s3MetadataService.trimStream(streamId, streamEpoch, newStartOffset);
+        AtomicBoolean loop = new AtomicBoolean(true);
+        return Futures.loop(loop::get, () -> s3MetadataService.trimStream(streamId, streamEpoch, newStartOffset)
+            .thenApply(res -> {
+                loop.set(false);
+                return res;
+            }), MoreExecutors.directExecutor());
     }
 
     @Override
     public CompletableFuture<StreamMetadata> openStream(long streamId, long streamEpoch) {
-        return metadataStore.openStream(streamId, streamEpoch, metadataStore.config().nodeId());
+        AtomicBoolean loop = new AtomicBoolean(true);
+        return Futures.loop(loop::get, () -> metadataStore.openStream(streamId, streamEpoch, metadataStore.config().nodeId())
+            .thenApply(res -> {
+                loop.set(false);
+                return res;
+            }), MoreExecutors.directExecutor());
     }
 
     @Override
     public CompletableFuture<Void> closeStream(long streamId, long streamEpoch) {
-        return metadataStore.closeStream(streamId, streamEpoch, metadataStore.config().nodeId());
+        AtomicBoolean loop = new AtomicBoolean(true);
+        return Futures.loop(loop::get, () -> metadataStore.closeStream(streamId, streamEpoch, metadataStore.config().nodeId())
+            .thenApply(res -> {
+                loop.set(false);
+                return res;
+            }), MoreExecutors.directExecutor());
     }
 
     @Override
     public CompletableFuture<List<StreamMetadata>> listOpenStreams() {
-        return metadataStore.listOpenStreams(metadataStore.config().nodeId());
+        AtomicBoolean loop = new AtomicBoolean(true);
+        return Futures.loop(loop::get, () -> metadataStore.listOpenStreams(metadataStore.config().nodeId())
+            .thenApply(res -> {
+                loop.set(false);
+                return res;
+            }), MoreExecutors.directExecutor());
     }
 
     @Override
     public CompletableFuture<Long> prepareS3Objects(int count, int ttlInMinutes) {
-        return s3MetadataService.prepareS3Objects(count, ttlInMinutes);
+        AtomicBoolean loop = new AtomicBoolean(true);
+        return Futures.loop(loop::get, () -> s3MetadataService.prepareS3Objects(count, ttlInMinutes)
+            .thenApply(res -> {
+                loop.set(false);
+                return res;
+            }), MoreExecutors.directExecutor());
     }
 
     @Override
@@ -124,25 +174,45 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
 
     @Override
     public CompletableFuture<List<S3WALObject>> listWALObjects() {
-        return s3MetadataService.listWALObjects();
+        AtomicBoolean loop = new AtomicBoolean(true);
+        return Futures.loop(loop::get, () -> s3MetadataService.listWALObjects()
+            .thenApply(res -> {
+                loop.set(false);
+                return res;
+            }), MoreExecutors.directExecutor());
     }
 
     @Override
     public CompletableFuture<List<S3WALObject>> listWALObjects(long streamId, long startOffset, long endOffset,
         int limit) {
-        return s3MetadataService.listWALObjects(streamId, startOffset, endOffset, limit);
+        AtomicBoolean loop = new AtomicBoolean(true);
+        return Futures.loop(loop::get, () -> s3MetadataService.listWALObjects(streamId, startOffset, endOffset, limit)
+            .thenApply(res -> {
+                loop.set(false);
+                return res;
+            }), MoreExecutors.directExecutor());
     }
 
     @Override
     public CompletableFuture<List<S3StreamObject>> listStreamObjects(long streamId, long startOffset, long endOffset,
         int limit) {
-        return s3MetadataService.listStreamObjects(streamId, startOffset, endOffset, limit);
+        AtomicBoolean loop = new AtomicBoolean(true);
+        return Futures.loop(loop::get, () -> s3MetadataService.listStreamObjects(streamId, startOffset, endOffset, limit)
+            .thenApply(res -> {
+                loop.set(false);
+                return res;
+            }), MoreExecutors.directExecutor());
     }
 
     @Override
     public CompletableFuture<Pair<List<S3StreamObject>, List<S3WALObject>>> listObjects(long streamId, long startOffset,
         long endOffset, int limit) {
-        return s3MetadataService.listObjects(streamId, startOffset, endOffset, limit);
+        AtomicBoolean loop = new AtomicBoolean(true);
+        return Futures.loop(loop::get, () -> s3MetadataService.listObjects(streamId, startOffset, endOffset, limit)
+            .thenApply(res -> {
+                loop.set(false);
+                return res;
+            }), MoreExecutors.directExecutor());
     }
 
     @Override
@@ -160,6 +230,12 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
         if (streamIds == null || streamIds.isEmpty()) {
             return CompletableFuture.completedFuture(List.of());
         }
-        return metadataStore.getStreams(streamIds);
+
+        AtomicBoolean loop = new AtomicBoolean(true);
+        return Futures.loop(loop::get, () -> metadataStore.getStreams(streamIds)
+            .thenApply(res -> {
+                loop.set(false);
+                return res;
+            }), MoreExecutors.directExecutor());
     }
 }
