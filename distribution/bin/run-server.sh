@@ -108,4 +108,4 @@ JAVA_OPT="${JAVA_OPT} -cp ${CLASSPATH}"
 # https://logging.apache.org/log4j/2.x/manual/configuration.html#automatic-configuration
 JAVA_OPT="${JAVA_OPT} -Dlog4j.configurationFile=file:${BASE_DIR}/conf/log4j2.xml"
 
-"$JAVA" "${JAVA_OPT}" "$@"
+"$JAVA" ${JAVA_OPT} $@
