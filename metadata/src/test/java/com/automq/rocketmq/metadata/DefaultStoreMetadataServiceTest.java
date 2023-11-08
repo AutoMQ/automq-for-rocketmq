@@ -18,12 +18,14 @@
 package com.automq.rocketmq.metadata;
 
 import apache.rocketmq.controller.v1.Code;
+import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.StreamRole;
 import com.automq.rocketmq.common.config.ControllerConfig;
 import com.automq.rocketmq.common.exception.ControllerException;
 import com.automq.rocketmq.controller.MetadataStore;
+import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.metadata.service.S3MetadataService;
 import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
@@ -57,7 +59,8 @@ class DefaultStoreMetadataServiceTest {
         int nodeId = 100;
         when(metadataStore.config()).thenReturn(config);
         when(config.nodeId()).thenReturn(nodeId);
-
+        when(s3MetadataService.commitWalObject(ArgumentMatchers.any(), ArgumentMatchers.anyList(), ArgumentMatchers.anyList()))
+            .thenReturn(CompletableFuture.completedFuture(null));
         service.commitWalObject(walObject, new ArrayList<>(), new ArrayList<>());
         // Verify the arguments passed to metadataStore.commitWalObject().
         S3WALObject newWal = S3WALObject.newBuilder(walObject).setBrokerId(nodeId).build();
@@ -71,7 +74,7 @@ class DefaultStoreMetadataServiceTest {
             .setStreamId(1L).build();
         future.complete(metadata);
         when(metadataStore.getStream(ArgumentMatchers.anyLong(), ArgumentMatchers.anyInt(),
-                ArgumentMatchers.nullable(Long.class), ArgumentMatchers.eq(StreamRole.STREAM_ROLE_DATA)))
+            ArgumentMatchers.nullable(Long.class), ArgumentMatchers.eq(StreamRole.STREAM_ROLE_DATA)))
             .thenReturn(future);
 
         DefaultStoreMetadataService service = new DefaultStoreMetadataService(metadataStore, s3MetadataService);
@@ -83,7 +86,7 @@ class DefaultStoreMetadataServiceTest {
         CompletableFuture<StreamMetadata> future = new CompletableFuture<>();
         future.completeExceptionally(new ControllerException(Code.NOT_FOUND_VALUE, "not found"));
         when(metadataStore.getStream(ArgumentMatchers.anyLong(), ArgumentMatchers.anyInt(),
-                ArgumentMatchers.nullable(Long.class), ArgumentMatchers.eq(StreamRole.STREAM_ROLE_DATA)))
+            ArgumentMatchers.nullable(Long.class), ArgumentMatchers.eq(StreamRole.STREAM_ROLE_DATA)))
             .thenReturn(future);
         DefaultStoreMetadataService service = new DefaultStoreMetadataService(metadataStore, s3MetadataService);
         CompletableFuture<StreamMetadata> streamCf = service.dataStreamOf(1L, 2);
@@ -99,7 +102,7 @@ class DefaultStoreMetadataServiceTest {
             .setStreamId(1L).build();
         future.complete(metadata);
         when(metadataStore.getStream(ArgumentMatchers.anyLong(), ArgumentMatchers.anyInt(),
-                ArgumentMatchers.nullable(Long.class), ArgumentMatchers.eq(StreamRole.STREAM_ROLE_OPS)))
+            ArgumentMatchers.nullable(Long.class), ArgumentMatchers.eq(StreamRole.STREAM_ROLE_OPS)))
             .thenReturn(future);
         DefaultStoreMetadataService service = new DefaultStoreMetadataService(metadataStore, s3MetadataService);
         Assertions.assertEquals(1L, service.operationStreamOf(1L, 2).join().getStreamId());
@@ -110,7 +113,7 @@ class DefaultStoreMetadataServiceTest {
         CompletableFuture<StreamMetadata> future = new CompletableFuture<>();
         future.completeExceptionally(new ControllerException(Code.NOT_FOUND_VALUE, "not found"));
         when(metadataStore.getStream(ArgumentMatchers.anyLong(), ArgumentMatchers.anyInt(),
-                ArgumentMatchers.nullable(Long.class), ArgumentMatchers.eq(StreamRole.STREAM_ROLE_OPS)))
+            ArgumentMatchers.nullable(Long.class), ArgumentMatchers.eq(StreamRole.STREAM_ROLE_OPS)))
             .thenReturn(future);
         DefaultStoreMetadataService service = new DefaultStoreMetadataService(metadataStore, s3MetadataService);
         CompletableFuture<StreamMetadata> streamCf = service.operationStreamOf(1L, 2);
@@ -126,7 +129,7 @@ class DefaultStoreMetadataServiceTest {
             .setStreamId(1L).build();
         future.complete(metadata);
         when(metadataStore.getStream(ArgumentMatchers.anyLong(), ArgumentMatchers.anyInt(),
-                ArgumentMatchers.nullable(Long.class), ArgumentMatchers.eq(StreamRole.STREAM_ROLE_RETRY)))
+            ArgumentMatchers.nullable(Long.class), ArgumentMatchers.eq(StreamRole.STREAM_ROLE_RETRY)))
             .thenReturn(future);
         DefaultStoreMetadataService service = new DefaultStoreMetadataService(metadataStore, s3MetadataService);
         Assertions.assertEquals(1L, service.retryStreamOf(3L, 1L, 2).join().getStreamId());
@@ -137,7 +140,7 @@ class DefaultStoreMetadataServiceTest {
         CompletableFuture<StreamMetadata> future = new CompletableFuture<>();
         future.completeExceptionally(new ControllerException(Code.NOT_FOUND_VALUE, "not found"));
         when(metadataStore.getStream(ArgumentMatchers.anyLong(), ArgumentMatchers.anyInt(),
-                ArgumentMatchers.nullable(Long.class), ArgumentMatchers.eq(StreamRole.STREAM_ROLE_RETRY)))
+            ArgumentMatchers.nullable(Long.class), ArgumentMatchers.eq(StreamRole.STREAM_ROLE_RETRY)))
             .thenReturn(future);
         DefaultStoreMetadataService service = new DefaultStoreMetadataService(metadataStore, s3MetadataService);
 
@@ -145,6 +148,30 @@ class DefaultStoreMetadataServiceTest {
         // Assert exception thrown
         ControllerException exception = (ControllerException) Assertions.assertThrows(ExecutionException.class, streamCf::get).getCause();
         Assertions.assertEquals(Code.NOT_FOUND_VALUE, exception.getErrorCode());
+    }
+
+    @Test
+    public void testRetryableCommitWalObject() {
+        when(metadataStore.config()).thenReturn(config);
+        when(config.nodeId()).thenReturn(1);
+        S3MetadataService metadataService = Mockito.mock(S3MetadataService.class);
+        Mockito.when(metadataService.commitWalObject(ArgumentMatchers.any(), ArgumentMatchers.anyList(), ArgumentMatchers.anyList()))
+            .thenReturn(CompletableFuture.failedFuture(new ControllerException(Code.MOCK_FAILURE_VALUE, "Mocked Failure")))
+            .thenReturn(CompletableFuture.completedFuture(null));
+        StoreMetadataService svc = new DefaultStoreMetadataService(metadataStore, metadataService);
+        Assertions.assertDoesNotThrow(() -> svc.commitWalObject(S3WALObject.newBuilder().build(),
+            new ArrayList<>(), new ArrayList<>()).join());
+    }
+
+    @Test
+    public void testRetryableCommitStreamObject() {
+        S3MetadataService metadataService = Mockito.mock(S3MetadataService.class);
+        Mockito.when(metadataService.commitStreamObject(ArgumentMatchers.any(), ArgumentMatchers.anyList()))
+            .thenReturn(CompletableFuture.failedFuture(new ControllerException(Code.MOCK_FAILURE_VALUE, "Mocked Failure")))
+            .thenReturn(CompletableFuture.completedFuture(null));
+        StoreMetadataService svc = new DefaultStoreMetadataService(metadataStore, metadataService);
+        Assertions.assertDoesNotThrow(() -> svc.commitStreamObject(S3StreamObject.newBuilder().build(),
+            new ArrayList<>()).join());
     }
 
 }

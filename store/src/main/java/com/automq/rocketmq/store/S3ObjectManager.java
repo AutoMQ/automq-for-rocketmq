@@ -100,7 +100,8 @@ public class S3ObjectManager implements ObjectManager {
             walObject, streamObjects, request.getCompactedObjectIds());
 
         // Build compacted objects
-        return metaService.commitWalObject(walObject, streamObjects, request.getCompactedObjectIds()).thenApply(resp -> new CommitSSTObjectResponse());
+        return metaService.commitWalObject(walObject, streamObjects, request.getCompactedObjectIds())
+            .thenApply(resp -> new CommitSSTObjectResponse());
     }
 
     @Override
