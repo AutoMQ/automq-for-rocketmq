@@ -26,9 +26,11 @@ import com.automq.rocketmq.common.config.ControllerConfig;
 import com.automq.rocketmq.controller.MetadataStore;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.metadata.service.S3MetadataService;
+import com.google.common.util.concurrent.MoreExecutors;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.lang3.tuple.Pair;
 
 public class DefaultStoreMetadataService implements StoreMetadataService {
@@ -98,12 +100,26 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
         // The underlying storage layer does not know the current node id when constructing the WAL object.
         // So we should fill it here.
         S3WALObject newWal = S3WALObject.newBuilder(walObject).setBrokerId(metadataStore.config().nodeId()).build();
-        return s3MetadataService.commitWalObject(newWal, streamObjects, compactedObjects);
+        AtomicBoolean loop = new AtomicBoolean(true);
+        return Futures.loop(loop::get,
+            () -> s3MetadataService.commitWalObject(newWal, streamObjects, compactedObjects)
+                .thenApply(res -> {
+                    loop.set(false);
+                    return res;
+                }),
+            MoreExecutors.directExecutor());
     }
 
     @Override
     public CompletableFuture<Void> commitStreamObject(S3StreamObject streamObject, List<Long> compactedObjects) {
-        return s3MetadataService.commitStreamObject(streamObject, compactedObjects);
+        AtomicBoolean loop = new AtomicBoolean(true);
+        return Futures.loop(loop::get,
+            () -> s3MetadataService.commitStreamObject(streamObject, compactedObjects)
+                .thenApply(res -> {
+                    loop.set(false);
+                    return res;
+                }),
+            MoreExecutors.directExecutor());
     }
 
     @Override
