@@ -17,7 +17,10 @@
 
 package com.automq.rocketmq.metadata;
 
+import apache.rocketmq.controller.v1.Code;
+import com.automq.rocketmq.common.exception.ControllerException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
@@ -27,17 +30,19 @@ public class Loop<T> implements Runnable {
     private static final Logger LOGGER = LoggerFactory.getLogger(Loop.class);
 
     final Supplier<Boolean> condition;
+
     final Supplier<CompletableFuture<T>> loopBody;
 
     /**
-     * A CompletableFuture that will be completed, whether normally or exceptionally, when the loop completes.
+     * A CompletableFuture that will be completed when the loop completes.
      */
-    final CompletableFuture<Void> result;
-
+    final CompletableFuture<T> result;
 
     final Executor executor;
 
-    public Loop(Supplier<Boolean> condition, Supplier<CompletableFuture<T>> loopBody, CompletableFuture<Void> result,
+    private boolean terminated;
+
+    public Loop(Supplier<Boolean> condition, Supplier<CompletableFuture<T>> loopBody, CompletableFuture<T> result,
         Executor executor) {
         this.condition = condition;
         this.loopBody = loopBody;
@@ -51,14 +56,31 @@ public class Loop<T> implements Runnable {
     }
 
     void execute() {
+        if (terminated) {
+            LOGGER.debug("Loop has terminated");
+            return;
+        }
+
         if (this.condition.get()) {
             this.loopBody.get()
                 .exceptionally(e -> {
+                    if (e.getCause() instanceof ControllerException ex) {
+                        if (ex.getErrorCode() != Code.INTERNAL_VALUE && ex.getErrorCode() != Code.MOCK_FAILURE_VALUE) {
+                            terminated = true;
+                            result.completeExceptionally(e);
+                            throw new CompletionException(e);
+                        }
+                    }
+
                     LOGGER.error("Unexpected exception raised", e);
                     return null;
+                }).thenApply(t -> {
+                    if (null != result && !result.isDone() && !result.isCancelled()) {
+                        result.complete(t);
+                    }
+                    return t;
                 }).thenRunAsync(this, executor);
         } else {
-            result.complete(null);
             LOGGER.debug("Loop completed");
         }
     }

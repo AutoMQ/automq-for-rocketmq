@@ -32,10 +32,10 @@ public class Futures {
      * @return A CompletableFuture that, when completed, indicates the loop terminated without any exception. If
      * either the loopBody or condition throw/return Exceptions, these will be set as the result of this returned Future.
      */
-    public static CompletableFuture<Void> loop(Supplier<Boolean> condition, Supplier<CompletableFuture<Void>> loopBody,
+    public static <T> CompletableFuture<T> loop(Supplier<Boolean> condition, Supplier<CompletableFuture<T>> loopBody,
         Executor executor) {
-        CompletableFuture<Void> result = new CompletableFuture<>();
-        Loop<Void> loop = new Loop<>(condition, loopBody, result, executor);
+        CompletableFuture<T> result = new CompletableFuture<>();
+        Loop<T> loop = new Loop<>(condition, loopBody, result, executor);
         executor.execute(loop);
         return result;
     }
