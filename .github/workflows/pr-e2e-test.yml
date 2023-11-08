@@ -182,6 +182,11 @@ jobs:
       matrix:
         version: ${{ fromJSON(needs.list-version.outputs.version-json) }}
     steps:
+      - name: Delay
+        env:
+          DELAY_SECONDS: 30
+        run: |
+          sleep $DELAY_SECONDS
       - uses: actions/checkout@v3
         with:
           submodules: true
