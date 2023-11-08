@@ -24,17 +24,33 @@ import apache.rocketmq.v2.Status;
 import com.automq.rocketmq.proxy.metrics.ProxyMetricsManager;
 import com.automq.rocketmq.proxy.model.ProxyContextExt;
 import io.grpc.stub.StreamObserver;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.context.Scope;
 import org.apache.rocketmq.client.consumer.PopResult;
+import org.apache.rocketmq.proxy.common.ContextVariable;
 import org.apache.rocketmq.proxy.common.ProxyContext;
 import org.apache.rocketmq.proxy.grpc.v2.common.ResponseBuilder;
 import org.apache.rocketmq.proxy.grpc.v2.consumer.ReceiveMessageResponseStreamWriter;
 import org.apache.rocketmq.proxy.processor.MessagingProcessor;
 
 public class ExtendReceiveMessageResponseStreamWriter extends ReceiveMessageResponseStreamWriter {
-    public ExtendReceiveMessageResponseStreamWriter(
-        MessagingProcessor messagingProcessor,
+    private final Span span;
+    private final Scope scope;
+
+    public ExtendReceiveMessageResponseStreamWriter(ProxyContextExt ctx, MessagingProcessor messagingProcessor,
         StreamObserver<ReceiveMessageResponse> observer) {
         super(messagingProcessor, observer);
+        Tracer tracer = ctx.getTracer();
+        span = tracer.spanBuilder("ReceiveMessage")
+            .setNoParent()
+            .setSpanKind(SpanKind.SERVER)
+            .setAttribute(ContextVariable.PROTOCOL_TYPE, ctx.getProtocolType())
+            .setAttribute(ContextVariable.ACTION, ctx.getAction())
+            .setAttribute(ContextVariable.CLIENT_ID, ctx.getClientID())
+            .startSpan();
+        scope = span.makeCurrent();
     }
 
     private void recordRpcLatency(ProxyContext ctx, Code code) {
@@ -75,5 +91,15 @@ public class ExtendReceiveMessageResponseStreamWriter extends ReceiveMessageResp
         super.writeAndComplete(ctx, request, throwable);
         Status status = ResponseBuilder.getInstance().buildStatus(throwable);
         recordRpcLatency(ctx, status.getCode());
+        if (throwable != null) {
+            span.recordException(throwable);
+        }
+    }
+
+    @Override
+    protected void onComplete() {
+        super.onComplete();
+        scope.close();
+        span.end();
     }
 }

@@ -43,6 +43,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
 import org.slf4j.Logger;
@@ -140,24 +141,26 @@ public class ReviveService {
                         return pullFuture.thenApply(result -> Triple.of(queue, result, operationType));
                     }, backgroundExecutor);
 
-            CompletableFuture<Triple<LogicQueue, FlatMessageExt, Pair<PopOperation.PopOperationType, Integer>>> checkFuture =
-                fetchMessageFuture.thenCombineAsync(metadataService.maxDeliveryAttemptsOf(consumerGroupId), (pair, maxDeliveryAttempts) -> {
-                    LogicQueue logicQueue = pair.getLeft();
-                    PullResult pullResult = pair.getMiddle();
-                    PopOperation.PopOperationType operationType = pair.getRight();
+            AtomicReference<Integer> maxDeliveryAttemptsRef = new AtomicReference<>();
+            CompletableFuture<Triple<LogicQueue, FlatMessageExt, PopOperation.PopOperationType>> checkFuture =
+                fetchMessageFuture.thenCombineAsync(metadataService.maxDeliveryAttemptsOf(consumerGroupId), (triple, maxDeliveryAttempts) -> {
+                    LogicQueue logicQueue = triple.getLeft();
+                    PullResult pullResult = triple.getMiddle();
+                    PopOperation.PopOperationType operationType = triple.getRight();
                     if (pullResult.messageList().size() != 1) {
                         throw new CompletionException(new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "Revive message not found"));
                     }
                     // Build the retry message and append it to retry stream or dead letter stream.
                     FlatMessageExt messageExt = pullResult.messageList().get(0);
-                    return Triple.of(logicQueue, messageExt, Pair.of(operationType, maxDeliveryAttempts));
+                    maxDeliveryAttemptsRef.set(maxDeliveryAttempts);
+                    return Triple.of(logicQueue, messageExt, operationType);
                 }, backgroundExecutor);
 
             CompletableFuture<Pair<Boolean, LogicQueue>> resendFuture = checkFuture.thenCompose(triple -> {
                 LogicQueue logicQueue = triple.getLeft();
                 FlatMessageExt messageExt = triple.getMiddle();
-                int maxDeliveryAttempts = triple.getRight().getRight();
-                PopOperation.PopOperationType operationType = triple.getRight().getLeft();
+                PopOperation.PopOperationType operationType = triple.getRight();
+                int maxDeliveryAttempts = maxDeliveryAttemptsRef.get();
 
                 if (operationType == PopOperation.PopOperationType.POP_ORDER) {
                     int consumeTimes = logicQueue.getConsumeTimes(consumerGroupId, messageExt.offset());

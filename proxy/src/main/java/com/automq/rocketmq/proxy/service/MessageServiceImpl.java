@@ -39,6 +39,7 @@ import com.automq.rocketmq.store.model.message.PutResult;
 import com.automq.rocketmq.store.model.message.ResetConsumeOffsetResult;
 import com.automq.rocketmq.store.model.message.SQLFilter;
 import com.automq.rocketmq.store.model.message.TagFilter;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -296,7 +297,9 @@ public class MessageServiceImpl implements MessageService {
         }
     }
 
-    private CompletableFuture<InnerPopResult> popSpecifiedQueueUnsafe(ConsumerGroup consumerGroup, Topic topic,
+    @WithSpan
+    private CompletableFuture<InnerPopResult> popSpecifiedQueueUnsafe(ProxyContext context, ConsumerGroup consumerGroup,
+        Topic topic,
         int queueId, Filter filter, int batchSize, boolean fifo, long invisibleDuration) {
         List<FlatMessageExt> messageList = new ArrayList<>();
         long consumerGroupId = consumerGroup.getGroupId();
@@ -340,15 +343,20 @@ public class MessageServiceImpl implements MessageService {
         });
     }
 
-    private CompletableFuture<InnerPopResult> popSpecifiedQueue(ConsumerGroup consumerGroup, String clientId,
+    @WithSpan
+    private CompletableFuture<InnerPopResult> popSpecifiedQueue(ProxyContext context, ConsumerGroup consumerGroup,
+        String clientId,
         Topic topic, int queueId, Filter filter, int batchSize, boolean fifo, long invisibleDuration,
         long timeoutMillis) {
         long topicId = topic.getTopicId();
         if (lockService.tryLock(topicId, queueId, clientId, fifo, false)) {
-            return popSpecifiedQueueUnsafe(consumerGroup, topic, queueId, filter, batchSize, fifo, invisibleDuration)
+            return popSpecifiedQueueUnsafe(context, consumerGroup, topic, queueId, filter, batchSize, fifo, invisibleDuration)
                 .orTimeout(timeoutMillis, TimeUnit.MILLISECONDS)
                 .whenComplete((v, throwable) -> {
-                    LOGGER.error("Error while pop message from topic: {}, queue: {}, batch size: {}.", topic.getName(), queueId, batchSize, throwable);
+                    if (throwable != null) {
+                        LOGGER.error("Error while pop message from topic: {}, queue: {}, batch size: {}.", topic.getName(), queueId, batchSize, throwable);
+                    }
+
                     // Release lock since complete or timeout.
                     lockService.release(topicId, queueId);
                 });
@@ -357,6 +365,7 @@ public class MessageServiceImpl implements MessageService {
     }
 
     @Override
+    @WithSpan
     public CompletableFuture<PopResult> popMessage(ProxyContext ctx, AddressableMessageQueue messageQueue,
         PopMessageRequestHeader requestHeader, long timeoutMillis) {
         CompletableFuture<Topic> topicFuture = topicOf(requestHeader.getTopic());
@@ -394,7 +403,7 @@ public class MessageServiceImpl implements MessageService {
             topicReference.set(topic);
             consumerGroupReference.set(group);
             return null;
-        }).thenCompose(nil -> popSpecifiedQueue(consumerGroupReference.get(), clientId, topicReference.get(), virtualQueue.physicalQueueId(), filter,
+        }).thenCompose(nil -> popSpecifiedQueue(ctx, consumerGroupReference.get(), clientId, topicReference.get(), virtualQueue.physicalQueueId(), filter,
             requestHeader.getMaxMsgNums(), requestHeader.isOrder(), requestHeader.getInvisibleTime(), timeoutMillis));
 
         return popMessageFuture.thenCompose(result -> {
@@ -405,7 +414,7 @@ public class MessageServiceImpl implements MessageService {
                 } else {
                     return suspendRequestService.suspendRequest(ctx, requestHeader.getTopic(), virtualQueue.physicalQueueId(), filter, timeoutMillis,
                             // Function to pop message later.
-                            timeout -> popSpecifiedQueue(consumerGroupReference.get(), clientId, topicReference.get(), virtualQueue.physicalQueueId(), filter,
+                            timeout -> popSpecifiedQueue(ctx, consumerGroupReference.get(), clientId, topicReference.get(), virtualQueue.physicalQueueId(), filter,
                                 requestHeader.getMaxMsgNums(), requestHeader.isOrder(), requestHeader.getInvisibleTime(), timeout))
                         .thenApply(suspendResult -> {
                             if (suspendResult.isEmpty() || suspendResult.get().messageList().isEmpty()) {

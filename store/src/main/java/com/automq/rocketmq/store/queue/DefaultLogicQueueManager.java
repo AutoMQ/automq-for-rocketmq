@@ -34,6 +34,7 @@ import com.automq.rocketmq.store.service.TimerService;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.service.api.OperationLogService;
 import com.automq.stream.utils.FutureUtil;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -90,6 +91,7 @@ public class DefaultLogicQueueManager implements LogicQueueManager {
     }
 
     @Override
+    @WithSpan
     public CompletableFuture<LogicQueue> getOrCreate(long topicId, int queueId) {
         Optional<Integer> ownerNode = metadataService.ownerNode(topicId, queueId);
         if (ownerNode.isEmpty()) {

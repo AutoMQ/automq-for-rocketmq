@@ -42,6 +42,7 @@ import com.automq.rocketmq.store.service.SnapshotService;
 import com.automq.rocketmq.store.service.TimerService;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.util.FlatMessageUtil;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -129,6 +130,7 @@ public class MessageStoreImpl implements MessageStore {
     }
 
     @Override
+    @WithSpan
     public CompletableFuture<PopResult> pop(long consumerGroupId, long topicId, int queueId, Filter filter,
         int batchSize, boolean fifo, boolean retry, long invisibleDuration) {
         if (fifo && retry) {

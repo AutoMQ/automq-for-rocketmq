@@ -18,12 +18,24 @@
 package com.automq.rocketmq.proxy.model;
 
 import com.google.common.base.Stopwatch;
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.api.trace.TracerProvider;
 import org.apache.rocketmq.proxy.common.ProxyContext;
 
 public class ProxyContextExt extends ProxyContext {
     private final Stopwatch stopwatch = Stopwatch.createStarted();
     public static final long DEFAULT_TIMEOUT_MILLIS = 3000;
     private boolean suspended;
+
+    private final Tracer tracer;
+
+    private ProxyContextExt() {
+        super();
+
+        TracerProvider tracerProvider = GlobalOpenTelemetry.getTracerProvider();
+        tracer = tracerProvider.get("automq-for-rocketmq");
+    }
 
     public static ProxyContextExt create() {
         return new ProxyContextExt();
@@ -50,5 +62,9 @@ public class ProxyContextExt extends ProxyContext {
     @Override
     public Long getRemainingMs() {
         return super.getRemainingMs() == null ? DEFAULT_TIMEOUT_MILLIS : super.getRemainingMs();
+    }
+
+    public Tracer getTracer() {
+        return tracer;
     }
 }
