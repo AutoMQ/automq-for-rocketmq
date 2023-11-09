@@ -18,6 +18,7 @@
 package com.automq.rocketmq.store.mock;
 
 import com.automq.rocketmq.store.api.MessageStateMachine;
+import com.automq.rocketmq.store.model.StoreContext;
 import com.automq.rocketmq.store.model.operation.AckOperation;
 import com.automq.rocketmq.store.model.operation.ChangeInvisibleDurationOperation;
 import com.automq.rocketmq.store.model.operation.PopOperation;
@@ -33,7 +34,7 @@ public class MockOperationLogService implements OperationLogService {
     AtomicBoolean recoverFailed = new AtomicBoolean(false);
 
     @Override
-    public CompletableFuture<LogResult> logPopOperation(PopOperation operation) {
+    public CompletableFuture<LogResult> logPopOperation(StoreContext context, PopOperation operation) {
         return null;
     }
 

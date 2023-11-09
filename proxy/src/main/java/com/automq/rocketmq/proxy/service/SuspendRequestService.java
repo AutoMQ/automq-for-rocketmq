@@ -193,8 +193,7 @@ public class SuspendRequestService extends ServiceThread implements StartAndShut
     @WithSpan(kind = SpanKind.SERVER)
     public <T extends GetMessageResult> CompletableFuture<Optional<T>> suspendRequest(ProxyContextExt context,
         @SpanAttribute String topic, @SpanAttribute int queueId, @SpanAttribute Filter filter,
-        @SpanAttribute long timeRemaining,
-        Function<Long/*timeout*/, CompletableFuture<T>> supplier) {
+        @SpanAttribute long timeRemaining, Function<Long/*timeout*/, CompletableFuture<T>> supplier) {
         context.setSuspended(true);
 
         // TODO: make max size configurable.

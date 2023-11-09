@@ -289,7 +289,7 @@ public class StreamLogicQueue extends LogicQueue {
                 PopOperation popOperation = new PopOperation(topicId, queueId, operationStreamId, snapshotStreamId,
                     stateMachine, consumerGroupId, messageExt.offset(), count, invisibleDuration, operationTimestamp,
                     false, operationType);
-                appendOpCfs.add(operationLogService.logPopOperation(popOperation)
+                appendOpCfs.add(operationLogService.logPopOperation(context, popOperation)
                     .thenApply(logResult -> {
                         long operationId = logResult.getOperationOffset();
                         messageExt.setReceiptHandle(SerializeUtil.encodeReceiptHandle(consumerGroupId, topicId, queueId, operationId));
@@ -305,7 +305,7 @@ public class StreamLogicQueue extends LogicQueue {
                 PopOperation popOperation = new PopOperation(topicId, queueId, operationStreamId, snapshotStreamId,
                     stateMachine, consumerGroupId, fetchResult.endOffset - 1, count, invisibleDuration,
                     operationTimestamp, true, operationType);
-                appendOpCfs.add(operationLogService.logPopOperation(popOperation));
+                appendOpCfs.add(operationLogService.logPopOperation(context, popOperation));
             }
             return CompletableFuture.allOf(appendOpCfs.toArray(new CompletableFuture[0]))
                 .thenApply(nil -> fetchResult);

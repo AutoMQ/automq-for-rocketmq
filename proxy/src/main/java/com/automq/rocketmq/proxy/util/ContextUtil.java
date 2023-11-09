@@ -19,18 +19,13 @@ package com.automq.rocketmq.proxy.util;
 
 import com.automq.rocketmq.proxy.model.ProxyContextExt;
 import com.automq.rocketmq.store.model.StoreContext;
-import io.opentelemetry.api.trace.Span;
-import java.util.Optional;
 import org.apache.rocketmq.proxy.common.ProxyContext;
 
 public class ContextUtil {
     public static StoreContext buildStoreContext(ProxyContext context, String topic, String consumerGroup) {
         if (context instanceof ProxyContextExt contextExt) {
             StoreContext storeContext = new StoreContext(topic, consumerGroup, contextExt.tracer().orElse(null));
-            Optional<Span> root = contextExt.span();
-            if (root.isPresent() && root.get().isRecording()) {
-                storeContext.attachSpan(root.get());
-            }
+            storeContext.shareSpanStack(contextExt.spanStack());
             return storeContext;
         }
         return new StoreContext(topic, consumerGroup, null);

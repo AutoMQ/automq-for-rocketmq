@@ -411,8 +411,11 @@ public class MessageServiceImpl implements MessageService {
             topicReference.set(topic);
             consumerGroupReference.set(group);
             return null;
-        }).thenCompose(nil -> popSpecifiedQueue(ctx, consumerGroupReference.get(), clientId, topicReference.get(), virtualQueue.physicalQueueId(), filter,
-            requestHeader.getMaxMsgNums(), requestHeader.isOrder(), requestHeader.getInvisibleTime(), timeoutMillis));
+        }).thenCompose(nil -> {
+            long timeout = timeoutMillis - config.networkRTTMills();
+            return popSpecifiedQueue(ctx, consumerGroupReference.get(), clientId, topicReference.get(), virtualQueue.physicalQueueId(), filter,
+                requestHeader.getMaxMsgNums(), requestHeader.isOrder(), requestHeader.getInvisibleTime(), timeout);
+        });
 
         return popMessageFuture.thenCompose(result -> {
             if (result.messageList.isEmpty()) {

@@ -21,6 +21,7 @@ import com.automq.rocketmq.common.trace.TraceContext;
 import com.google.common.base.Stopwatch;
 import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.api.trace.TracerProvider;
 import java.util.Optional;
@@ -71,6 +72,10 @@ public class ProxyContextExt extends ProxyContext implements TraceContext {
         return super.getRemainingMs() == null ? DEFAULT_TIMEOUT_MILLIS : super.getRemainingMs();
     }
 
+    public BlockingDeque<Span> spanStack() {
+        return spanStack;
+    }
+
     @Override
     public Optional<Tracer> tracer() {
         return Optional.of(tracer);
@@ -87,7 +92,14 @@ public class ProxyContextExt extends ProxyContext implements TraceContext {
     }
 
     @Override
-    public void detachSpan() {
-        spanStack.pop();
+    public void detachSpan(Span span) {
+        Span currentSpan = spanStack.pop();
+
+        while (currentSpan != span) {
+            currentSpan.setStatus(StatusCode.ERROR, "Span is not closed properly");
+            currentSpan.end();
+            currentSpan = spanStack.pop();
+        }
+        currentSpan.end();
     }
 }

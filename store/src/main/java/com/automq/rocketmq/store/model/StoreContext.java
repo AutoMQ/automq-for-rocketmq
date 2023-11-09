@@ -19,6 +19,7 @@ package com.automq.rocketmq.store.model;
 
 import com.automq.rocketmq.common.trace.TraceContext;
 import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
 import java.util.Optional;
 import java.util.concurrent.BlockingDeque;
@@ -30,12 +31,16 @@ public class StoreContext implements TraceContext {
     private final String topic;
     private final String consumerGroup;
     private final Tracer tracer;
-    private final BlockingDeque<Span> spanStack = new LinkedBlockingDeque<>();
+    private BlockingDeque<Span> spanStack = new LinkedBlockingDeque<>();
 
     public StoreContext(String topic, String consumerGroup, Tracer tracer) {
         this.topic = topic;
         this.consumerGroup = consumerGroup;
         this.tracer = tracer;
+    }
+
+    public void shareSpanStack(BlockingDeque<Span> spanStack) {
+        this.spanStack = spanStack;
     }
 
     @Override
@@ -54,7 +59,14 @@ public class StoreContext implements TraceContext {
     }
 
     @Override
-    public void detachSpan() {
-        spanStack.pop();
+    public void detachSpan(Span span) {
+        Span currentSpan = spanStack.pop();
+
+        while (currentSpan != span) {
+            currentSpan.setStatus(StatusCode.ERROR, "Span is not closed properly");
+            currentSpan.end();
+            currentSpan = spanStack.pop();
+        }
+        currentSpan.end();
     }
 }

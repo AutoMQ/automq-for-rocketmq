@@ -54,6 +54,8 @@ public class ProxyConfig extends BaseConfig {
     private int grpcMaxInboundMessageSize = 130 * 1024 * 1024;
     private long grpcClientIdleTimeMills = Duration.ofSeconds(120).toMillis();
 
+    private long networkRTTMills = Duration.ofMillis(10).toMillis();
+
     public String name() {
         return name;
     }
@@ -136,5 +138,9 @@ public class ProxyConfig extends BaseConfig {
 
     public void setRemotingListenPort(int remotingListenPort) {
         this.remotingListenPort = remotingListenPort;
+    }
+
+    public long networkRTTMills() {
+        return networkRTTMills;
     }
 }

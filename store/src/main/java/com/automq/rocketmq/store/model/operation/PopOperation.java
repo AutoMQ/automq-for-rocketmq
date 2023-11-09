@@ -111,4 +111,15 @@ public class PopOperation extends Operation {
         }
     }
 
+    @Override
+    public String toString() {
+        return "PopOperation{" +
+            "consumerGroupId=" + consumerGroupId +
+            ", offset=" + offset +
+            ", count=" + count +
+            ", invisibleDuration=" + invisibleDuration +
+            ", endMark=" + endMark +
+            ", popOperationType=" + popOperationType +
+            '}';
+    }
 }

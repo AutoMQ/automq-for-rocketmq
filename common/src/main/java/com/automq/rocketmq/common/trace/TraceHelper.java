@@ -77,8 +77,7 @@ public class TraceHelper {
         } catch (Throwable t) {
             span.recordException(t);
             span.setStatus(StatusCode.ERROR, t.getMessage());
-            span.end();
-            context.detachSpan();
+            context.detachSpan(span);
             throw t;
         }
     }
@@ -93,8 +92,7 @@ public class TraceHelper {
             } else {
                 span.setStatus(StatusCode.OK);
             }
-            span.end();
-            context.detachSpan();
+            context.detachSpan(span);
         });
     }
 
@@ -102,8 +100,7 @@ public class TraceHelper {
         ProceedingJoinPoint joinPoint) throws Throwable {
         Object result = joinPoint.proceed();
         span.setStatus(StatusCode.OK);
-        span.end();
-        context.detachSpan();
+        context.detachSpan(span);
         return result;
     }
 }
