@@ -26,9 +26,9 @@ import com.automq.stream.s3.metadata.S3ObjectMetadata;
 import com.automq.stream.s3.metadata.S3ObjectType;
 import com.automq.stream.s3.metadata.S3StreamConstant;
 import com.automq.stream.s3.metadata.StreamOffsetRange;
-import com.automq.stream.s3.objects.CommitStreamObjectRequest;
-import com.automq.stream.s3.objects.CommitSSTObjectRequest;
-import com.automq.stream.s3.objects.CommitSSTObjectResponse;
+import com.automq.stream.s3.objects.CompactStreamObjectRequest;
+import com.automq.stream.s3.objects.CommitStreamSetObjectRequest;
+import com.automq.stream.s3.objects.CommitStreamSetObjectResponse;
 import com.automq.stream.s3.objects.ObjectManager;
 import com.automq.stream.s3.objects.ObjectStreamRange;
 import java.util.ArrayList;
@@ -62,7 +62,7 @@ public class S3ObjectManager implements ObjectManager {
     }
 
     @Override
-    public CompletableFuture<CommitSSTObjectResponse> commitSSTObject(CommitSSTObjectRequest request) {
+    public CompletableFuture<CommitStreamSetObjectResponse> commitStreamSetObject(CommitStreamSetObjectRequest request) {
         // Build S3WALObject
         S3WALObject.Builder builder = S3WALObject.newBuilder();
         builder.setObjectId(request.getObjectId());
@@ -101,11 +101,11 @@ public class S3ObjectManager implements ObjectManager {
 
         // Build compacted objects
         return metaService.commitWalObject(walObject, streamObjects, request.getCompactedObjectIds())
-            .thenApply(resp -> new CommitSSTObjectResponse());
+            .thenApply(resp -> new CommitStreamSetObjectResponse());
     }
 
     @Override
-    public CompletableFuture<Void> commitStreamObject(CommitStreamObjectRequest request) {
+    public CompletableFuture<Void> compactStreamObject(CompactStreamObjectRequest request) {
         // Build S3StreamObject
         S3StreamObject.Builder builder = S3StreamObject.newBuilder();
         builder.setStreamId(request.getStreamId());
@@ -228,7 +228,7 @@ public class S3ObjectManager implements ObjectManager {
         List<StreamOffsetRange> offsetRanges = object.getSubStreams().getSubStreamsMap().values()
             .stream()
             .map(subStream -> new StreamOffsetRange(subStream.getStreamId(), subStream.getStartOffset(), subStream.getEndOffset())).toList();
-        return new S3ObjectMetadata(object.getObjectId(), S3ObjectType.SST, offsetRanges, object.getBaseDataTimestamp(),
+        return new S3ObjectMetadata(object.getObjectId(), S3ObjectType.STREAM_SET, offsetRanges, object.getBaseDataTimestamp(),
             object.getCommittedTimestamp(), object.getObjectSize(), object.getSequenceId());
     }
 }
