@@ -60,13 +60,14 @@ public class StoreContext implements TraceContext {
 
     @Override
     public void detachSpan(Span span) {
-        Span currentSpan = spanStack.pop();
-
-        while (currentSpan != span) {
-            currentSpan.setStatus(StatusCode.ERROR, "Span is not closed properly");
-            currentSpan.end();
-            currentSpan = spanStack.pop();
+        while (!spanStack.isEmpty()) {
+            Span currentSpan = spanStack.pop();
+            if (currentSpan == span) {
+                currentSpan.end();
+            } else {
+                currentSpan.setStatus(StatusCode.ERROR, "Span is not closed properly");
+                currentSpan.end();
+            }
         }
-        currentSpan.end();
     }
 }
