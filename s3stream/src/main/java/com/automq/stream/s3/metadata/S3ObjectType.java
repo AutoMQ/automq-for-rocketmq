@@ -21,7 +21,7 @@ public enum S3ObjectType {
     /**
      * Sorted stream table object
      */
-    SST,
+    STREAM_SET,
 
     /**
      * STREAM object

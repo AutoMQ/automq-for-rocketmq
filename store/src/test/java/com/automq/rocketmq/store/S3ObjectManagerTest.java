@@ -24,8 +24,8 @@ import apache.rocketmq.controller.v1.SubStreams;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.stream.s3.metadata.S3ObjectMetadata;
 import com.automq.stream.s3.metadata.S3ObjectType;
-import com.automq.stream.s3.objects.CommitStreamObjectRequest;
-import com.automq.stream.s3.objects.CommitSSTObjectRequest;
+import com.automq.stream.s3.objects.CompactStreamObjectRequest;
+import com.automq.stream.s3.objects.CommitStreamSetObjectRequest;
 import com.automq.stream.s3.objects.ObjectStreamRange;
 import com.automq.stream.s3.objects.StreamObject;
 import java.util.ArrayList;
@@ -86,7 +86,7 @@ class S3ObjectManagerTest {
     void commitWALObject() {
         when(metadataService.commitWalObject(any(), any(), any())).thenReturn(CompletableFuture.completedFuture(null));
         // Build a CommitWALObjectRequest for testing
-        CommitSSTObjectRequest walObjectRequest = new CommitSSTObjectRequest();
+        CommitStreamSetObjectRequest walObjectRequest = new CommitStreamSetObjectRequest();
         walObjectRequest.setObjectId(100L);
         walObjectRequest.setOrderId(200L);
         walObjectRequest.setObjectSize(300L);
@@ -103,7 +103,7 @@ class S3ObjectManagerTest {
         streamObject.setEndOffset(2000);
         walObjectRequest.setStreamObjects(Collections.singletonList(streamObject));
 
-        objectManager.commitSSTObject(walObjectRequest);
+        objectManager.commitStreamSetObject(walObjectRequest);
         verify(metadataService).commitWalObject(walObjectCaptor.capture(), streamObjectsCaptor.capture(), eq(compactedObjectIds));
 
         S3WALObject walObject = walObjectCaptor.getValue();
@@ -126,10 +126,10 @@ class S3ObjectManagerTest {
 
     @Test
     void commitStreamObject() {
-        CommitStreamObjectRequest request = new CommitStreamObjectRequest(1L, 1000, 2000, 100, 1000, List.of(10L));
+        CompactStreamObjectRequest request = new CompactStreamObjectRequest(1L, 1000, 2000, 100, 1000, List.of(10L));
         when(metadataService.commitStreamObject(any(), any())).thenReturn(CompletableFuture.completedFuture(null));
 
-        objectManager.commitStreamObject(request);
+        objectManager.compactStreamObject(request);
 
         verify(metadataService).commitStreamObject(streamObjectCaptor.capture(), eq(List.of(10L)));
 
@@ -267,9 +267,9 @@ class S3ObjectManagerTest {
             S3ObjectMetadata obj3 = objects.get(2);
             assertEquals(2, obj3.objectId());
 
-            assertEquals(S3ObjectType.SST, obj1.getType());
+            assertEquals(S3ObjectType.STREAM_SET, obj1.getType());
             assertEquals(S3ObjectType.STREAM, obj2.getType());
-            assertEquals(S3ObjectType.SST, obj3.getType());
+            assertEquals(S3ObjectType.STREAM_SET, obj3.getType());
 
             assertEquals(100, obj1.startOffset());
             assertEquals(3, obj1.getOffsetRanges().size());

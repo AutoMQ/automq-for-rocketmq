@@ -229,12 +229,12 @@ public class S3StreamStore implements StreamStore {
         config.streamObjectCompactionMaxSizeBytes(streamConfig.streamObjectCompactionMaxSizeBytes());
         config.streamObjectCompactionLivingTimeMinutes(streamConfig.streamObjectCompactionLivingTimeMinutes());
 
-        config.sstCompactionInterval(streamConfig.walObjectCompactionInterval());
-        config.sstCompactionCacheSize(streamConfig.walObjectCompactionCacheSize());
-        config.sstCompactionUploadConcurrency(streamConfig.walObjectCompactionUploadConcurrency());
-        config.sstCompactionMaxObjectNum(streamConfig.walObjectCompactionMaxObjectNum());
-        config.sstCompactionForceSplitPeriod(streamConfig.walObjectCompactionForceSplitPeriod());
-        config.sstCompactionStreamSplitSize(streamConfig.walObjectCompactionStreamSplitSize());
+        config.streamSetObjectCompactionInterval(streamConfig.walObjectCompactionInterval());
+        config.streamSetObjectCompactionCacheSize(streamConfig.walObjectCompactionCacheSize());
+        config.streamSetObjectCompactionUploadConcurrency(streamConfig.walObjectCompactionUploadConcurrency());
+        config.streamSetObjectCompactionMaxObjectNum(streamConfig.walObjectCompactionMaxObjectNum());
+        config.streamSetObjectCompactionForceSplitPeriod(streamConfig.walObjectCompactionForceSplitPeriod());
+        config.streamSetObjectCompactionStreamSplitSize(streamConfig.walObjectCompactionStreamSplitSize());
         config.streamSplitSize(streamConfig.streamSplitSizeThreshold());
         return config;
     }
