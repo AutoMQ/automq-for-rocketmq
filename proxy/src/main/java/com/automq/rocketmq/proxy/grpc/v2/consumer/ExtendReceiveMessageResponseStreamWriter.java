@@ -26,8 +26,8 @@ import com.automq.rocketmq.proxy.model.ProxyContextExt;
 import io.grpc.stub.StreamObserver;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
-import io.opentelemetry.context.Scope;
 import org.apache.rocketmq.client.consumer.PopResult;
 import org.apache.rocketmq.proxy.common.ContextVariable;
 import org.apache.rocketmq.proxy.common.ProxyContext;
@@ -36,21 +36,20 @@ import org.apache.rocketmq.proxy.grpc.v2.consumer.ReceiveMessageResponseStreamWr
 import org.apache.rocketmq.proxy.processor.MessagingProcessor;
 
 public class ExtendReceiveMessageResponseStreamWriter extends ReceiveMessageResponseStreamWriter {
-    private final Span span;
-    private final Scope scope;
+    private final Span rootSpan;
 
     public ExtendReceiveMessageResponseStreamWriter(ProxyContextExt ctx, MessagingProcessor messagingProcessor,
         StreamObserver<ReceiveMessageResponse> observer) {
         super(messagingProcessor, observer);
-        Tracer tracer = ctx.getTracer();
-        span = tracer.spanBuilder("ReceiveMessage")
+        Tracer tracer = ctx.tracer().get();
+        rootSpan = tracer.spanBuilder("ReceiveMessage")
             .setNoParent()
             .setSpanKind(SpanKind.SERVER)
             .setAttribute(ContextVariable.PROTOCOL_TYPE, ctx.getProtocolType())
             .setAttribute(ContextVariable.ACTION, ctx.getAction())
             .setAttribute(ContextVariable.CLIENT_ID, ctx.getClientID())
             .startSpan();
-        scope = span.makeCurrent();
+        ctx.attachSpan(rootSpan);
     }
 
     private void recordRpcLatency(ProxyContext ctx, Code code) {
@@ -84,6 +83,7 @@ public class ExtendReceiveMessageResponseStreamWriter extends ReceiveMessageResp
     public void writeAndComplete(ProxyContext ctx, Code code, String message) {
         super.writeAndComplete(ctx, code, message);
         recordRpcLatency(ctx, code);
+        rootSpan.setStatus(StatusCode.OK);
     }
 
     @Override
@@ -92,14 +92,16 @@ public class ExtendReceiveMessageResponseStreamWriter extends ReceiveMessageResp
         Status status = ResponseBuilder.getInstance().buildStatus(throwable);
         recordRpcLatency(ctx, status.getCode());
         if (throwable != null) {
-            span.recordException(throwable);
+            rootSpan.recordException(throwable);
+            rootSpan.setStatus(StatusCode.ERROR);
+        } else {
+            rootSpan.setStatus(StatusCode.OK);
         }
     }
 
     @Override
     protected void onComplete() {
         super.onComplete();
-        scope.close();
-        span.end();
+        rootSpan.end();
     }
 }

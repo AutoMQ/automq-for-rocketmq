@@ -28,6 +28,7 @@ import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.mock.MockStoreMetadataService;
 import com.automq.rocketmq.store.mock.MockStreamStore;
+import com.automq.rocketmq.store.model.StoreContext;
 import com.automq.rocketmq.store.model.generated.CheckPoint;
 import com.automq.rocketmq.store.model.generated.ReceiptHandle;
 import com.automq.rocketmq.store.model.message.AckResult;
@@ -111,7 +112,7 @@ public class LogicQueueTest {
         FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
         logicQueue.put(message);
 
-        PopResult popResult = logicQueue.popNormal(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
+        PopResult popResult = logicQueue.popNormal(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertFalse(popResult.messageList().isEmpty());
         assertEquals(popResult.messageList().size(), logicQueue.getInflightStats(CONSUMER_GROUP_ID));
@@ -132,7 +133,7 @@ public class LogicQueueTest {
         }
 
         // 2. pop 2 messages
-        PopResult popResult = logicQueue.popNormal(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 2, 100).join();
+        PopResult popResult = logicQueue.popNormal(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 2, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(2, popResult.messageList().size());
         assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
@@ -151,7 +152,7 @@ public class LogicQueueTest {
         }
 
         // pop 4 messages
-        popResult = logicQueue.popNormal(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 4, 100).join();
+        popResult = logicQueue.popNormal(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 4, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(3, popResult.messageList().size());
         assertEquals(5, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
@@ -179,7 +180,7 @@ public class LogicQueueTest {
         }
 
         // 2. pop 2 messages
-        PopResult popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 2, 100).join();
+        PopResult popResult = logicQueue.popFifo(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 2, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(2, popResult.messageList().size());
         assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
@@ -198,7 +199,7 @@ public class LogicQueueTest {
         }
 
         // pop 4 messages
-        popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 4, 100).join();
+        popResult = logicQueue.popFifo(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 4, 100).join();
         assertEquals(PopResult.Status.LOCKED, popResult.status());
         assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
         assertEquals(2, stateMachine.consumeOffset(CONSUMER_GROUP_ID));
@@ -216,21 +217,21 @@ public class LogicQueueTest {
         }
 
         // 2. group0 pop 2 messages
-        PopResult popResult = logicQueue.popNormal(group0, Filter.DEFAULT_FILTER, 2, 100).join();
+        PopResult popResult = logicQueue.popNormal(StoreContext.EMPTY, group0, Filter.DEFAULT_FILTER, 2, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(2, popResult.messageList().size());
         assertEquals(2, logicQueue.getInflightStats(group0));
         assertEquals(2, stateMachine.consumeOffset(group0));
 
         // 3. group1 pop 4 messages
-        popResult = logicQueue.popNormal(group1, Filter.DEFAULT_FILTER, 4, 100).join();
+        popResult = logicQueue.popNormal(StoreContext.EMPTY, group1, Filter.DEFAULT_FILTER, 4, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(4, popResult.messageList().size());
         assertEquals(4, logicQueue.getInflightStats(group1));
         assertEquals(4, stateMachine.consumeOffset(group1));
 
         // 4. group0 pop 4 messages
-        popResult = logicQueue.popNormal(group0, Filter.DEFAULT_FILTER, 4, 100).join();
+        popResult = logicQueue.popNormal(StoreContext.EMPTY, group0, Filter.DEFAULT_FILTER, 4, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(3, popResult.messageList().size());
         assertEquals(5, logicQueue.getInflightStats(group0));
@@ -249,21 +250,21 @@ public class LogicQueueTest {
         }
 
         // 2. group0 pop 2 messages
-        PopResult popResult = logicQueue.popFifo(group0, Filter.DEFAULT_FILTER, 2, 100).join();
+        PopResult popResult = logicQueue.popFifo(StoreContext.EMPTY, group0, Filter.DEFAULT_FILTER, 2, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(2, popResult.messageList().size());
         assertEquals(2, logicQueue.getInflightStats(group0));
         assertEquals(2, stateMachine.consumeOffset(group0));
 
         // 3. group1 pop 4 messages
-        popResult = logicQueue.popFifo(group1, Filter.DEFAULT_FILTER, 4, 100).join();
+        popResult = logicQueue.popFifo(StoreContext.EMPTY, group1, Filter.DEFAULT_FILTER, 4, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(4, popResult.messageList().size());
         assertEquals(4, logicQueue.getInflightStats(group1));
         assertEquals(4, stateMachine.consumeOffset(group1));
 
         // 4. group0 pop 4 messages
-        popResult = logicQueue.popFifo(group0, Filter.DEFAULT_FILTER, 4, 100).join();
+        popResult = logicQueue.popFifo(StoreContext.EMPTY, group0, Filter.DEFAULT_FILTER, 4, 100).join();
         assertEquals(PopResult.Status.LOCKED, popResult.status());
     }
 
@@ -277,7 +278,7 @@ public class LogicQueueTest {
         }
 
         // 2. pop 2 messages
-        PopResult popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 2, 100).join();
+        PopResult popResult = logicQueue.popFifo(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 2, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(2, popResult.messageList().size());
         assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
@@ -286,7 +287,7 @@ public class LogicQueueTest {
         String receiptHandle1 = popResult.messageList().get(1).receiptHandle().get();
 
         // 3. pop 1 message
-        popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
+        popResult = logicQueue.popFifo(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
         assertEquals(PopResult.Status.LOCKED, popResult.status());
 
         // 3. ack 1 message
@@ -302,7 +303,7 @@ public class LogicQueueTest {
         assertNull(bytes);
 
         // 5. pop 1 message
-        popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
+        popResult = logicQueue.popFifo(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
         assertEquals(PopResult.Status.LOCKED, popResult.status());
 
         // 6. ack 1 message
@@ -313,7 +314,7 @@ public class LogicQueueTest {
         assertEquals(2, stateMachine.ackOffset(CONSUMER_GROUP_ID));
 
         // 7. pop 1 message
-        popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
+        popResult = logicQueue.popFifo(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(1, popResult.messageList().size());
         assertEquals(1, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
@@ -331,7 +332,7 @@ public class LogicQueueTest {
         }
 
         // 2. pop 2 messages
-        PopResult popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 2, 100).join();
+        PopResult popResult = logicQueue.popFifo(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 2, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(2, popResult.messageList().size());
         assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
@@ -340,7 +341,7 @@ public class LogicQueueTest {
         String receiptHandle1 = popResult.messageList().get(1).receiptHandle().get();
 
         // 3. pop 1 message
-        popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
+        popResult = logicQueue.popFifo(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
         assertEquals(PopResult.Status.LOCKED, popResult.status());
 
         // 3. ack 1 message
@@ -356,7 +357,7 @@ public class LogicQueueTest {
         assertNull(bytes);
 
         // 5. pop 1 message
-        popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
+        popResult = logicQueue.popFifo(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
         assertEquals(PopResult.Status.LOCKED, popResult.status());
 
         // 6. ack 1 message with timeout
@@ -367,7 +368,7 @@ public class LogicQueueTest {
         assertEquals(1, stateMachine.ackOffset(CONSUMER_GROUP_ID));
 
         // 7. pop 1 message
-        popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
+        popResult = logicQueue.popFifo(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(1, popResult.messageList().size());
         assertEquals(1, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
@@ -384,7 +385,7 @@ public class LogicQueueTest {
         }
 
         // 2. pop 2 messages
-        PopResult popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 2, 100).join();
+        PopResult popResult = logicQueue.popFifo(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 2, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(2, popResult.messageList().size());
         assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
@@ -393,7 +394,7 @@ public class LogicQueueTest {
         String receiptHandle1 = popResult.messageList().get(1).receiptHandle().get();
 
         // 3. pop 1 message
-        popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
+        popResult = logicQueue.popFifo(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
         assertEquals(PopResult.Status.LOCKED, popResult.status());
 
         // 3. ack offset_1
@@ -409,7 +410,7 @@ public class LogicQueueTest {
         assertNull(bytes);
 
         // 5. pop 1 message
-        popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
+        popResult = logicQueue.popFifo(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
         assertEquals(PopResult.Status.LOCKED, popResult.status());
 
         // 6. ack offset_0
@@ -420,7 +421,7 @@ public class LogicQueueTest {
         assertEquals(2, stateMachine.ackOffset(CONSUMER_GROUP_ID));
 
         // 7. pop 1 message
-        popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
+        popResult = logicQueue.popFifo(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(1, popResult.messageList().size());
         assertEquals(1, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
@@ -454,7 +455,7 @@ public class LogicQueueTest {
         }
 
         // 4. pop 6 messages with tagA
-        PopResult popResult = logicQueue.popNormal(CONSUMER_GROUP_ID, new TagFilter("TagA"), 6, 100).join();
+        PopResult popResult = logicQueue.popNormal(StoreContext.EMPTY, CONSUMER_GROUP_ID, new TagFilter("TagA"), 6, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(6, popResult.messageList().size());
         popResult.messageList().forEach(messageExt -> assertEquals("TagA", messageExt.message().tag()));
@@ -462,7 +463,7 @@ public class LogicQueueTest {
         assertEquals(8, stateMachine.consumeOffset(CONSUMER_GROUP_ID));
 
         // 5. pop 3 messages with tagB
-        popResult = logicQueue.popNormal(CONSUMER_GROUP_ID, new TagFilter("TagB"), 3, 100).join();
+        popResult = logicQueue.popNormal(StoreContext.EMPTY, CONSUMER_GROUP_ID, new TagFilter("TagB"), 3, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(2, popResult.messageList().size());
         popResult.messageList().forEach(messageExt -> assertEquals("TagB", messageExt.message().tag()));
@@ -495,7 +496,7 @@ public class LogicQueueTest {
         }
 
         // 1. pop fifo with TagB
-        PopResult popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, new TagFilter("TagB"), 7, 100).join();
+        PopResult popResult = logicQueue.popFifo(StoreContext.EMPTY, CONSUMER_GROUP_ID, new TagFilter("TagB"), 7, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         List<FlatMessageExt> popMessageList = popResult.messageList();
         assertEquals(2, popMessageList.size());
@@ -508,7 +509,7 @@ public class LogicQueueTest {
         logicQueue.put(message);
 
         // 2. pop fifo again
-        popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, new TagFilter("TagB"), 1, 100).join();
+        popResult = logicQueue.popFifo(StoreContext.EMPTY, CONSUMER_GROUP_ID, new TagFilter("TagB"), 1, 100).join();
         assertEquals(PopResult.Status.LOCKED, popResult.status());
 
         // 3. ack second message in result
@@ -517,7 +518,7 @@ public class LogicQueueTest {
         assertEquals(0, stateMachine.ackOffset(CONSUMER_GROUP_ID));
 
         // 4. pop fifo again
-        popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, new TagFilter("TagB"), 1, 100).join();
+        popResult = logicQueue.popFifo(StoreContext.EMPTY, CONSUMER_GROUP_ID, new TagFilter("TagB"), 1, 100).join();
         assertEquals(PopResult.Status.LOCKED, popResult.status());
 
         // 5. ack first message in result
@@ -526,7 +527,7 @@ public class LogicQueueTest {
         assertEquals(9, stateMachine.ackOffset(CONSUMER_GROUP_ID));
 
         // 6. pop fifo again
-        popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, new TagFilter("TagB"), 1, 100).join();
+        popResult = logicQueue.popFifo(StoreContext.EMPTY, CONSUMER_GROUP_ID, new TagFilter("TagB"), 1, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(1, popResult.messageList().size());
         assertEquals(1, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
@@ -541,7 +542,7 @@ public class LogicQueueTest {
 
         // 2. pop message
         long popStartTimestamp = System.currentTimeMillis();
-        PopResult popResult = logicQueue.popNormal(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
+        PopResult popResult = logicQueue.popNormal(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
         long popEndTimestamp = System.currentTimeMillis();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertFalse(popResult.messageList().isEmpty());
@@ -586,7 +587,7 @@ public class LogicQueueTest {
         assertEquals(5, streamStore.nextOffset(retryStream.getStreamId()));
 
         // 2. pop 2 messages
-        PopResult popResult = logicQueue.popRetry(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 2, 100).join();
+        PopResult popResult = logicQueue.popRetry(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 2, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(2, popResult.messageList().size());
         assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
@@ -598,7 +599,7 @@ public class LogicQueueTest {
         String receiptHandle1 = popResult.messageList().get(1).receiptHandle().get();
 
         // 3. pop 1 message
-        popResult = logicQueue.popRetry(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
+        popResult = logicQueue.popRetry(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(1, popResult.messageList().size());
         assertEquals(3, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
@@ -656,7 +657,7 @@ public class LogicQueueTest {
         }
 
         // 2. pop 2 messages
-        PopResult popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 2, 100).join();
+        PopResult popResult = logicQueue.popFifo(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 2, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(2, popResult.messageList().size());
         assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
@@ -699,7 +700,7 @@ public class LogicQueueTest {
         }
 
         // 2. pop 2 messages
-        PopResult popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 2, 100).join();
+        PopResult popResult = logicQueue.popFifo(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 2, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(2, popResult.messageList().size());
         assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
@@ -752,7 +753,7 @@ public class LogicQueueTest {
         }
 
         // 2. pop 2 messages
-        PopResult popResult = logicQueue.popNormal(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 2, 100).join();
+        PopResult popResult = logicQueue.popNormal(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 2, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(2, popResult.messageList().size());
         assertEquals(2, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
@@ -781,7 +782,7 @@ public class LogicQueueTest {
         checkCkExist(receiptHandle1, false);
 
         // 5. pop 1 message
-        popResult = logicQueue.popNormal(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
+        popResult = logicQueue.popNormal(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(1, popResult.messageList().size());
         assertEquals(1, logicQueue.getInflightStats(CONSUMER_GROUP_ID));

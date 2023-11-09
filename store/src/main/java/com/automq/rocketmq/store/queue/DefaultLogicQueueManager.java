@@ -27,6 +27,7 @@ import com.automq.rocketmq.store.api.MessageStateMachine;
 import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.rocketmq.store.exception.StoreErrorCode;
 import com.automq.rocketmq.store.exception.StoreException;
+import com.automq.rocketmq.store.model.StoreContext;
 import com.automq.rocketmq.store.model.message.TopicQueueId;
 import com.automq.rocketmq.store.service.InflightService;
 import com.automq.rocketmq.store.service.StreamReclaimService;
@@ -34,6 +35,8 @@ import com.automq.rocketmq.store.service.TimerService;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.service.api.OperationLogService;
 import com.automq.stream.utils.FutureUtil;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.instrumentation.annotations.SpanAttribute;
 import io.opentelemetry.instrumentation.annotations.WithSpan;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -91,8 +94,9 @@ public class DefaultLogicQueueManager implements LogicQueueManager {
     }
 
     @Override
-    @WithSpan
-    public CompletableFuture<LogicQueue> getOrCreate(long topicId, int queueId) {
+    @WithSpan(kind = SpanKind.SERVER)
+    public CompletableFuture<LogicQueue> getOrCreate(StoreContext context, @SpanAttribute long topicId,
+        @SpanAttribute int queueId) {
         Optional<Integer> ownerNode = metadataService.ownerNode(topicId, queueId);
         if (ownerNode.isEmpty()) {
             return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.QUEUE_NOT_FOUND, "This node does not own the requested queue"));
@@ -107,6 +111,7 @@ public class DefaultLogicQueueManager implements LogicQueueManager {
         CompletableFuture<LogicQueue> future = logicQueueMap.get(key);
 
         if (future != null) {
+            context.span().ifPresent(span -> span.setAttribute("needCreate", false));
             return future;
         }
 
@@ -114,10 +119,12 @@ public class DefaultLogicQueueManager implements LogicQueueManager {
         synchronized (this) {
             future = logicQueueMap.get(key);
             if (future != null) {
+                context.span().ifPresent(span -> span.setAttribute("needCreate", false));
                 return future;
             }
 
             // Create and open the topic queue.
+            context.span().ifPresent(span -> span.setAttribute("needCreate", true));
             future = createAndOpen(topicId, queueId);
             logicQueueMap.put(key, future);
             future.exceptionally(ex -> {

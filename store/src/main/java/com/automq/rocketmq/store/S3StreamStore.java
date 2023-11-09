@@ -21,6 +21,7 @@ import com.automq.rocketmq.common.config.S3StreamConfig;
 import com.automq.rocketmq.common.config.StoreConfig;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.store.api.StreamStore;
+import com.automq.rocketmq.store.model.StoreContext;
 import com.automq.stream.api.AppendResult;
 import com.automq.stream.api.FetchResult;
 import com.automq.stream.api.OpenStreamOptions;
@@ -41,6 +42,7 @@ import com.automq.stream.s3.operator.S3Operator;
 import com.automq.stream.s3.streams.StreamManager;
 import com.automq.stream.s3.wal.BlockWALService;
 import com.automq.stream.s3.wal.WriteAheadLog;
+import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.instrumentation.annotations.SpanAttribute;
 import io.opentelemetry.instrumentation.annotations.WithSpan;
 import java.util.List;
@@ -111,8 +113,9 @@ public class S3StreamStore implements StreamStore {
     }
 
     @Override
-    @WithSpan
-    public CompletableFuture<FetchResult> fetch(@SpanAttribute long streamId, @SpanAttribute long startOffset,
+    @WithSpan(kind = SpanKind.SERVER)
+    public CompletableFuture<FetchResult> fetch(StoreContext context, @SpanAttribute long streamId,
+        @SpanAttribute long startOffset,
         @SpanAttribute int maxCount) {
         Optional<Stream> stream = streamClient.getStream(streamId);
         if (stream.isEmpty()) {

@@ -15,65 +15,32 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.proxy.model;
+package com.automq.rocketmq.store.model;
 
 import com.automq.rocketmq.common.trace.TraceContext;
-import com.google.common.base.Stopwatch;
-import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.Tracer;
-import io.opentelemetry.api.trace.TracerProvider;
 import java.util.Optional;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.LinkedBlockingDeque;
-import org.apache.rocketmq.proxy.common.ProxyContext;
 
-public class ProxyContextExt extends ProxyContext implements TraceContext {
-    private final Stopwatch stopwatch = Stopwatch.createStarted();
-    public static final long DEFAULT_TIMEOUT_MILLIS = 3000;
-    private boolean suspended;
+public class StoreContext implements TraceContext {
+    public static final StoreContext EMPTY = new StoreContext("", "", null);
 
+    private final String topic;
+    private final String consumerGroup;
     private final Tracer tracer;
-
     private final BlockingDeque<Span> spanStack = new LinkedBlockingDeque<>();
 
-    private ProxyContextExt() {
-        super();
-
-        TracerProvider tracerProvider = GlobalOpenTelemetry.getTracerProvider();
-        tracer = tracerProvider.get("automq-for-rocketmq");
-    }
-
-    public static ProxyContextExt create() {
-        return new ProxyContextExt();
-    }
-
-    public static ProxyContextExt create(ProxyContext context) {
-        ProxyContextExt contextExt = new ProxyContextExt();
-        contextExt.getValue().putAll(context.getValue());
-        return contextExt;
-    }
-
-    public boolean suspended() {
-        return suspended;
-    }
-
-    public void setSuspended(boolean suspended) {
-        this.suspended = suspended;
-    }
-
-    public long getElapsedTimeNanos() {
-        return stopwatch.elapsed().toNanos();
-    }
-
-    @Override
-    public Long getRemainingMs() {
-        return super.getRemainingMs() == null ? DEFAULT_TIMEOUT_MILLIS : super.getRemainingMs();
+    public StoreContext(String topic, String consumerGroup, Tracer tracer) {
+        this.topic = topic;
+        this.consumerGroup = consumerGroup;
+        this.tracer = tracer;
     }
 
     @Override
     public Optional<Tracer> tracer() {
-        return Optional.of(tracer);
+        return Optional.ofNullable(tracer);
     }
 
     @Override

@@ -26,6 +26,7 @@ import com.automq.rocketmq.store.api.MessageStateMachine;
 import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.rocketmq.store.exception.StoreErrorCode;
 import com.automq.rocketmq.store.exception.StoreException;
+import com.automq.rocketmq.store.model.StoreContext;
 import com.automq.rocketmq.store.model.generated.ReceiptHandle;
 import com.automq.rocketmq.store.model.message.AckResult;
 import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
@@ -44,6 +45,7 @@ import com.automq.rocketmq.store.service.StreamReclaimService;
 import com.automq.rocketmq.store.service.api.OperationLogService;
 import com.automq.rocketmq.store.util.SerializeUtil;
 import com.automq.stream.utils.FutureUtil;
+import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.instrumentation.annotations.SpanAttribute;
 import io.opentelemetry.instrumentation.annotations.WithSpan;
 import java.util.ArrayList;
@@ -237,20 +239,20 @@ public class StreamLogicQueue extends LogicQueue {
     }
 
     @Override
-    public CompletableFuture<PopResult> popNormal(long consumerGroup, Filter filter, int batchSize,
-        long invisibleDuration) {
+    public CompletableFuture<PopResult> popNormal(StoreContext context, long consumerGroup, Filter filter,
+        int batchSize, long invisibleDuration) {
         // start from consume offset
         if (state.get() != State.OPENED) {
             return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.QUEUE_NOT_OPENED, "Topic queue not opened"));
         }
         long offset = stateMachine.consumeOffset(consumerGroup);
-        return pop(consumerGroup, dataStreamId, offset, PopOperation.PopOperationType.POP_NORMAL, filter, batchSize, invisibleDuration);
+        return pop(context, consumerGroup, dataStreamId, offset, PopOperation.PopOperationType.POP_NORMAL, filter, batchSize, invisibleDuration);
     }
 
-    @WithSpan
-    private CompletableFuture<PopResult> pop(@SpanAttribute() long consumerGroupId, @SpanAttribute() long streamId,
-        @SpanAttribute() long startOffset,
-        @SpanAttribute() PopOperation.PopOperationType operationType, Filter filter,
+    @WithSpan(kind = SpanKind.SERVER)
+    private CompletableFuture<PopResult> pop(StoreContext context, @SpanAttribute long consumerGroupId,
+        @SpanAttribute long streamId, @SpanAttribute long startOffset,
+        @SpanAttribute PopOperation.PopOperationType operationType, @SpanAttribute Filter filter,
         int batchSize, long invisibleDuration) {
         // Check offset
         long confirmOffset = streamStore.confirmOffset(streamId);
@@ -272,7 +274,7 @@ public class StreamLogicQueue extends LogicQueue {
         FilterFetchResult fetchResult = new FilterFetchResult(startOffset);
         long operationTimestamp = System.currentTimeMillis();
         // fetch messages
-        CompletableFuture<FilterFetchResult> fetchCf = fetchAndFilterMessages(streamId, startOffset, batchSize,
+        CompletableFuture<FilterFetchResult> fetchCf = fetchAndFilterMessages(context, streamId, startOffset, batchSize,
             fetchBatchSize, filter, fetchResult, 0, 0, operationTimestamp);
         // log op
         CompletableFuture<FilterFetchResult> fetchAndLogOpCf = fetchCf.thenCompose(filterFetchResult -> {
@@ -323,7 +325,7 @@ public class StreamLogicQueue extends LogicQueue {
     }
 
     @Override
-    public CompletableFuture<PopResult> popFifo(long consumerGroup, Filter filter, int batchSize,
+    public CompletableFuture<PopResult> popFifo(StoreContext context, long consumerGroup, Filter filter, int batchSize,
         long invisibleDuration) {
         if (state.get() != State.OPENED) {
             return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.QUEUE_NOT_OPENED, "Topic queue not opened"));
@@ -335,7 +337,7 @@ public class StreamLogicQueue extends LogicQueue {
             if (isLocked) {
                 return CompletableFuture.completedFuture(new PopResult(PopResult.Status.LOCKED, 0, Collections.emptyList(), 0));
             } else {
-                return pop(consumerGroup, dataStreamId, offset, PopOperation.PopOperationType.POP_ORDER, filter, batchSize, invisibleDuration);
+                return pop(context, consumerGroup, dataStreamId, offset, PopOperation.PopOperationType.POP_ORDER, filter, batchSize, invisibleDuration);
             }
         } catch (StoreException e) {
             return CompletableFuture.completedFuture(new PopResult(PopResult.Status.ERROR, 0, Collections.emptyList(), 0));
@@ -343,18 +345,20 @@ public class StreamLogicQueue extends LogicQueue {
     }
 
     @Override
-    public CompletableFuture<PopResult> popRetry(long consumerGroupId, Filter filter, int batchSize,
+    public CompletableFuture<PopResult> popRetry(StoreContext context, long consumerGroupId, Filter filter,
+        int batchSize,
         long invisibleDuration) {
         if (state.get() != State.OPENED) {
             return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.QUEUE_NOT_OPENED, "Topic queue not opened"));
         }
         long offset = stateMachine.retryConsumeOffset(consumerGroupId);
         CompletableFuture<Long> retryStreamIdFuture = retryStreamId(consumerGroupId);
-        return retryStreamIdFuture.thenCompose(retryStreamId -> pop(consumerGroupId, retryStreamId, offset, PopOperation.PopOperationType.POP_RETRY, filter, batchSize, invisibleDuration));
+        return retryStreamIdFuture.thenCompose(retryStreamId -> pop(context, consumerGroupId, retryStreamId, offset, PopOperation.PopOperationType.POP_RETRY, filter, batchSize, invisibleDuration));
     }
 
-    @WithSpan
-    private CompletableFuture<List<FlatMessageExt>> fetchMessages(long streamId, long offset, int batchSize) {
+    @WithSpan(kind = SpanKind.SERVER)
+    private CompletableFuture<List<FlatMessageExt>> fetchMessages(StoreContext context, @SpanAttribute long streamId,
+        @SpanAttribute long offset, @SpanAttribute int batchSize) {
         long startOffset = streamStore.startOffset(streamId);
         if (offset < startOffset) {
             offset = startOffset;
@@ -369,10 +373,10 @@ public class StreamLogicQueue extends LogicQueue {
             batchSize = (int) (confirmOffset - offset);
         }
 
-        return streamStore.fetch(streamId, offset, batchSize)
+        return streamStore.fetch(context, streamId, offset, batchSize)
             .thenApply(fetchResult -> {
                 // TODO: Assume message count is always 1 in each batch for now.
-                return fetchResult.recordBatchList()
+                List<FlatMessageExt> resultList = fetchResult.recordBatchList()
                     .stream()
                     .map(batch -> {
                         FlatMessage message = FlatMessage.getRootAsFlatMessage(batch.rawPayload());
@@ -383,16 +387,21 @@ public class StreamLogicQueue extends LogicQueue {
                             .build();
                     })
                     .toList();
+
+                context.span().ifPresent(span -> span.setAttribute("messageCount", resultList.size()));
+
+                return resultList;
             });
     }
 
     // Fetch and filter messages until exceeding the limit.
-    @WithSpan
-    private CompletableFuture<FilterFetchResult> fetchAndFilterMessages(long streamId,
-        long offset, int batchSize, int fetchBatchSize, Filter filter, FilterFetchResult result,
+    @WithSpan(kind = SpanKind.SERVER)
+    private CompletableFuture<FilterFetchResult> fetchAndFilterMessages(StoreContext context,
+        @SpanAttribute long streamId, @SpanAttribute long offset, @SpanAttribute int batchSize,
+        @SpanAttribute int fetchBatchSize, @SpanAttribute Filter filter, FilterFetchResult result,
         int fetchCount, long fetchBytes, long operationTimestamp) {
         // Fetch more messages.
-        return fetchMessages(streamId, offset, fetchBatchSize)
+        return fetchMessages(context, streamId, offset, fetchBatchSize)
             .thenCompose(fetchResult -> {
                 // Add filter result to message list.
                 List<FlatMessageExt> matchedMessageList = filter.doFilter(fetchResult);
@@ -418,9 +427,15 @@ public class StreamLogicQueue extends LogicQueue {
                     newFetchBytes < config.maxFetchBytes() &&
                     System.currentTimeMillis() - operationTimestamp < config.maxFetchTimeMillis();
 
+                context.span().ifPresent(span -> {
+                    span.setAttribute("needToFetch", needToFetch);
+                    span.setAttribute("hasMoreMessages", hasMoreMessages);
+                    span.setAttribute("messageCount", result.size());
+                });
+
                 if (needToFetch && hasMoreMessages && notExceedLimit) {
-                    return fetchAndFilterMessages(streamId, offset + fetchResult.size(), batchSize, fetchBatchSize, filter,
-                        result, newFetchCount, newFetchBytes, operationTimestamp);
+                    return fetchAndFilterMessages(context, streamId, offset + fetchResult.size(),
+                        batchSize, fetchBatchSize, filter, result, newFetchCount, newFetchBytes, operationTimestamp);
                 } else {
                     return CompletableFuture.completedFuture(result);
                 }
@@ -545,7 +560,7 @@ public class StreamLogicQueue extends LogicQueue {
         }
         FilterFetchResult fetchResult = new FilterFetchResult(startOffset);
         long operationTimestamp = System.currentTimeMillis();
-        CompletableFuture<FilterFetchResult> fetchCf = fetchAndFilterMessages(streamId, startOffset, batchSize,
+        CompletableFuture<FilterFetchResult> fetchCf = fetchAndFilterMessages(StoreContext.EMPTY, streamId, startOffset, batchSize,
             fetchBatchSize, filter, fetchResult, 0, 0, operationTimestamp);
         return fetchCf.thenApply(filterFetchResult -> {
             List<FlatMessageExt> messageExtList = filterFetchResult.messageList;

@@ -19,6 +19,7 @@ package com.automq.rocketmq.store.api;
 
 import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.common.util.Lifecycle;
+import com.automq.rocketmq.store.model.StoreContext;
 import com.automq.rocketmq.store.model.message.AckResult;
 import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
 import com.automq.rocketmq.store.model.message.ClearRetryMessagesResult;
@@ -34,6 +35,7 @@ public interface MessageStore extends Lifecycle {
     /**
      * Pop message from specified topic and queue.
      *
+     * @param context           propagate context to store
      * @param consumerGroupId   consumer group id that launches this query
      * @param topicId           topic id to pop message from
      * @param queueId           queue id to pop message from
@@ -43,8 +45,8 @@ public interface MessageStore extends Lifecycle {
      * @param invisibleDuration the duration for the next time this batch of messages will be visible, in milliseconds
      * @return pop result, see {@link PopResult}
      */
-    CompletableFuture<PopResult> pop(long consumerGroupId, long topicId, int queueId, Filter filter,
-        int batchSize, boolean fifo, boolean retry, long invisibleDuration);
+    CompletableFuture<PopResult> pop(StoreContext context, long consumerGroupId, long topicId, int queueId,
+        Filter filter, int batchSize, boolean fifo, boolean retry, long invisibleDuration);
 
     /**
      * Pull message from specified topic and queue.
@@ -128,7 +130,8 @@ public interface MessageStore extends Lifecycle {
      * @param offset          new consume offset
      * @return reset result, see {@link ResetConsumeOffsetResult}
      */
-    CompletableFuture<ResetConsumeOffsetResult> resetConsumeOffset(long consumerGroupId, long topicId, int queueId, long offset);
+    CompletableFuture<ResetConsumeOffsetResult> resetConsumeOffset(long consumerGroupId, long topicId, int queueId,
+        long offset);
 
     /**
      * Clear all retry messages of specified consumer group, topic and queue.

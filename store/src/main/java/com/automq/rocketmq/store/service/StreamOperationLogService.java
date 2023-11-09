@@ -22,6 +22,7 @@ import com.automq.rocketmq.store.api.MessageStateMachine;
 import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.rocketmq.store.exception.StoreErrorCode;
 import com.automq.rocketmq.store.exception.StoreException;
+import com.automq.rocketmq.store.model.StoreContext;
 import com.automq.rocketmq.store.model.operation.AckOperation;
 import com.automq.rocketmq.store.model.operation.ChangeInvisibleDurationOperation;
 import com.automq.rocketmq.store.model.operation.Operation;
@@ -68,7 +69,7 @@ public class StreamOperationLogService implements OperationLogService {
             // no snapshot
             snapshotFetch = CompletableFuture.completedFuture(startOffset);
         } else {
-            snapshotFetch = streamStore.fetch(snapshotStreamId, snapEndOffset - 1, 1)
+            snapshotFetch = streamStore.fetch(StoreContext.EMPTY, snapshotStreamId, snapEndOffset - 1, 1)
                 .thenApply(result -> SerializeUtil.decodeOperationSnapshot(result.recordBatchList().get(0).rawPayload()))
                 .thenApply(snapshot -> {
                     stateMachine.loadSnapshot(snapshot);
@@ -77,7 +78,7 @@ public class StreamOperationLogService implements OperationLogService {
         }
         // 2. get all operations
         // TODO: batch fetch, fetch all at once may cause some problems
-        return snapshotFetch.thenCompose(offset -> streamStore.fetch(operationStreamId, offset, (int) (endOffset - offset))
+        return snapshotFetch.thenCompose(offset -> streamStore.fetch(StoreContext.EMPTY, operationStreamId, offset, (int) (endOffset - offset))
             .thenAccept(result -> {
                 // load operations
                 for (RecordBatchWithContext batchWithContext : result.recordBatchList()) {

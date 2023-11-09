@@ -18,6 +18,7 @@
 package com.automq.rocketmq.store.api;
 
 import com.automq.rocketmq.common.util.Lifecycle;
+import com.automq.rocketmq.store.model.StoreContext;
 import com.automq.stream.api.AppendResult;
 import com.automq.stream.api.FetchResult;
 import com.automq.stream.api.RecordBatch;
@@ -46,7 +47,7 @@ public interface StreamStore extends Lifecycle {
      * @param maxCount    the max return count of the fetch.
      * @return the future of fetch result.
      */
-    CompletableFuture<FetchResult> fetch(long streamId, long startOffset, int maxCount);
+    CompletableFuture<FetchResult> fetch(StoreContext context, long streamId, long startOffset, int maxCount);
 
     /**
      * Append record batch to stream store.

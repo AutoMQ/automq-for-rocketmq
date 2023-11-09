@@ -30,6 +30,7 @@ import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.mock.MockStoreMetadataService;
 import com.automq.rocketmq.store.mock.MockStreamStore;
+import com.automq.rocketmq.store.model.StoreContext;
 import com.automq.rocketmq.store.model.generated.ReceiptHandle;
 import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PopResult;
@@ -80,7 +81,7 @@ class ReviveServiceTest {
         logicQueue = new StreamLogicQueue(new StoreConfig(), TOPIC_ID, QUEUE_ID,
             metadataService, stateMachine, streamStore, operationLogService, inflightService, streamReclaimService);
         LogicQueueManager manager = Mockito.mock(LogicQueueManager.class);
-        Mockito.doAnswer(ink -> CompletableFuture.completedFuture(logicQueue)).when(manager).getOrCreate(TOPIC_ID, QUEUE_ID);
+        Mockito.doAnswer(ink -> CompletableFuture.completedFuture(logicQueue)).when(manager).getOrCreate(Mockito.any(), Mockito.eq(TOPIC_ID), Mockito.eq(QUEUE_ID));
         deadLetterSender = Mockito.mock(DeadLetterSender.class);
         reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, kvService, timerService, metadataService, inflightService,
             manager, deadLetterSender);
@@ -109,7 +110,7 @@ class ReviveServiceTest {
         logicQueue.put(message).join();
         // pop message
         int invisibleDuration = 100;
-        PopResult popResult = logicQueue.popNormal(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
+        PopResult popResult = logicQueue.popNormal(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
         assertEquals(1, popResult.messageList().size());
         // check ck exist
         assertTrue(popResult.messageList().get(0).receiptHandle().isPresent());
@@ -133,7 +134,7 @@ class ReviveServiceTest {
 
         // pop retry
         long reviveTimestamp1 = System.currentTimeMillis() + invisibleDuration;
-        PopResult retryPopResult = logicQueue.popRetry(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
+        PopResult retryPopResult = logicQueue.popRetry(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
         assertEquals(1, retryPopResult.messageList().size());
         FlatMessageExt msg = retryPopResult.messageList().get(0);
         assertEquals(2, msg.deliveryAttempts());
@@ -149,7 +150,7 @@ class ReviveServiceTest {
         // check if this message has been sent to DLQ
         Mockito.verify(deadLetterSender, Mockito.times(1))
             .send(Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
-        PopResult popResult1 = logicQueue.popRetry(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
+        PopResult popResult1 = logicQueue.popRetry(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
         assertEquals(0, popResult1.messageList().size());
     }
 
@@ -172,7 +173,7 @@ class ReviveServiceTest {
         }
         // pop message
         int invisibleDuration = 100;
-        PopResult popResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
+        PopResult popResult = logicQueue.popFifo(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
         assertEquals(1, popResult.messageList().size());
         // check ck exist
         assertTrue(popResult.messageList().get(0).receiptHandle().isPresent());
@@ -192,7 +193,7 @@ class ReviveServiceTest {
 
         // pop again
         long reviveTimestamp1 = System.currentTimeMillis() + invisibleDuration;
-        PopResult retryPopResult = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
+        PopResult retryPopResult = logicQueue.popFifo(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
         assertEquals(1, retryPopResult.messageList().size());
         FlatMessageExt msg = retryPopResult.messageList().get(0);
         assertEquals(2, msg.deliveryAttempts());
@@ -213,7 +214,7 @@ class ReviveServiceTest {
         assertEquals(1, logicQueue.getAckOffset(CONSUMER_GROUP_ID));
 
         // pop again
-        PopResult retryPopResult1 = logicQueue.popFifo(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
+        PopResult retryPopResult1 = logicQueue.popFifo(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
         assertEquals(1, retryPopResult1.messageList().size());
         FlatMessageExt msg1 = retryPopResult1.messageList().get(0);
         assertEquals(1, msg1.deliveryAttempts());
@@ -237,7 +238,7 @@ class ReviveServiceTest {
         logicQueue.put(message).join();
         // pop message
         int invisibleDuration = 100;
-        PopResult popResult = logicQueue.popNormal(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
+        PopResult popResult = logicQueue.popNormal(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
         assertEquals(1, popResult.messageList().size());
         // check ck exist
         assertTrue(popResult.messageList().get(0).receiptHandle().isPresent());
@@ -263,7 +264,7 @@ class ReviveServiceTest {
 
         // pop retry
         long deliveryTimestamp = System.currentTimeMillis() + invisibleDuration;
-        PopResult retryPopResult = logicQueue.popRetry(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
+        PopResult retryPopResult = logicQueue.popRetry(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
         assertEquals(1, retryPopResult.messageList().size());
         FlatMessageExt msg = retryPopResult.messageList().get(0);
         assertEquals(2, msg.deliveryAttempts());

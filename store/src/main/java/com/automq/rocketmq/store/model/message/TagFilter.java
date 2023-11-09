@@ -73,4 +73,11 @@ public class TagFilter implements Filter {
     public boolean doFilter(String tag) {
         return tagSet.contains(tag);
     }
+
+    @Override
+    public String toString() {
+        return "TagFilter{" +
+            "expression='" + expression + '\'' +
+            '}';
+    }
 }
