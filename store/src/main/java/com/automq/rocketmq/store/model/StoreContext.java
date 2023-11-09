@@ -64,6 +64,7 @@ public class StoreContext implements TraceContext {
             Span currentSpan = spanStack.pop();
             if (currentSpan == span) {
                 currentSpan.end();
+                break;
             } else {
                 currentSpan.setStatus(StatusCode.ERROR, "Span is not closed properly");
                 currentSpan.end();
