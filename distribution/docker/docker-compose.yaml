@@ -15,7 +15,7 @@ services:
     command: server --console-address ":9001" /data
     # use a static ip
     networks:
-      kos_net:
+      rocketmq_net:
         ipv4_address: 11.6.0.2
 
   # create needed buckets
@@ -39,7 +39,7 @@ services:
       minio:
         condition: service_started
     networks:
-      - kos_net
+      - rocketmq_net
 
   broker-1:
     image: "automq-for-rocketmq:0.0.1"
@@ -62,7 +62,7 @@ services:
         condition: service_completed_successfully
     # use a static ip
     networks:
-      kos_net:
+      rocketmq_net:
         ipv4_address: 11.6.0.3
   broker-2:
     image: "automq-for-rocketmq:0.0.1"
@@ -85,7 +85,7 @@ services:
         condition: service_completed_successfully
     # use a static ip
     networks:
-      kos_net:
+      rocketmq_net:
         ipv4_address: 11.6.0.4
   mysql-server:
     image: "mysql:8.1"
@@ -107,15 +107,15 @@ services:
       retries: 10
     # use a static ip
     networks:
-      kos_net:
+      rocketmq_net:
         ipv4_address: 11.6.0.5
 volumes:
   s3_data:
     driver: local
 
 networks:
-  kos_net:
-    name: kos_net
+  rocketmq_net:
+    name: rocketmq_net
     driver: bridge
     ipam:
       driver: default
