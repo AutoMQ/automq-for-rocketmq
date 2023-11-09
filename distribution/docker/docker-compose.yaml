@@ -1,36 +1,97 @@
-version: "3"
+version: "3.8"
 services:
+  minio:
+    image: minio/minio
+    container_name: minio.local
+    hostname: minio.local
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - s3_data:/data
+    environment:
+      MINIO_ROOT_USER: access-key
+      MINIO_ROOT_PASSWORD: secret-key
+    command: server --console-address ":9001" /data
+    # use a static ip
+    networks:
+      rocketmq_net:
+        ipv4_address: 11.6.0.2
+
+  # create needed buckets
+  aws-cli:
+    container_name: "${AWS_CLI_DOCKER_NAME-aws-cli}"
+    hostname: "${AWS_CLI_DOCKER_NAME-aws-cli}"
+    image: amazon/aws-cli:2.13.29
+    environment:
+      - AWS_ACCESS_KEY_ID=access-key
+      - AWS_SECRET_ACCESS_KEY=secret-key
+      - AWS_DEFAULT_REGION=us-east-1
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        BUCKET_EXISTS=$(aws s3api create-bucket --bucket bucket-name --endpoint=http://11.6.0.2:9000 2>&1 || true);
+        if [ ! -z "$BUCKET_EXISTS"]; then 
+          aws s3api create-bucket --bucket bucket-name --endpoint=http://11.6.0.2:9000
+        fi
+    depends_on:
+      minio:
+        condition: service_started
+    networks:
+      - rocketmq_net
+
   broker-1:
     image: "automq-for-rocketmq:0.0.1"
     # https://docs.docker.com/compose/compose-file/05-services/#entrypoint
     environment:
       - ROCKETMQ_NODE_NAME=broker-1
       - ROCKETMQ_NODE_BIND_ADDRESS=0.0.0.0:8081
-      - ROCKETMQ_NODE_ADVERTISE_ADDRESS=192.168.123.147:8081
+      - ROCKETMQ_NODE_ADVERTISE_ADDRESS=${EXTERNAL_IP}:8081
     ports:
       - "8081:8081"
       - "8082:8082"
+      - "9555:9555"
     # https://docs.docker.com/compose/compose-file/05-services/#depends_on
     depends_on:
       mysql-server:
         condition: service_healthy
+      minio:
+        condition: service_started
+      aws-cli:
+        condition: service_completed_successfully
+    # use a static ip
+    networks:
+      rocketmq_net:
+        ipv4_address: 11.6.0.3
   broker-2:
     image: "automq-for-rocketmq:0.0.1"
     # https://docs.docker.com/compose/compose-file/05-services/#entrypoint
     environment:
       - ROCKETMQ_NODE_NAME=broker-2
       - ROCKETMQ_NODE_BIND_ADDRESS=0.0.0.0:8181
-      - ROCKETMQ_NODE_ADVERTISE_ADDRESS=192.168.123.147:8181
+      - ROCKETMQ_NODE_ADVERTISE_ADDRESS=${EXTERNAL_IP}:8181
     ports:
       - "8181:8181"
       - "8182:8182"
+      - "9556:9555"
     # https://docs.docker.com/compose/compose-file/05-services/#depends_on
     depends_on:
       mysql-server:
         condition: service_healthy
+      minio:
+        condition: service_started
+      aws-cli:
+        condition: service_completed_successfully
+    # use a static ip
+    networks:
+      rocketmq_net:
+        ipv4_address: 11.6.0.4
   mysql-server:
     image: "mysql:8.1"
     command: --default-authentication-plugin=caching_sha2_password
+    container_name: mysql-server
+    hostname: mysql-server
     environment:
       - MYSQL_ROOT_PASSWORD=password
       - MYSQL_DATABASE=metadata
@@ -44,3 +105,20 @@ services:
       test: "mysql --user=root --password=password metadata -e 'select * from metadata.lease'"
       timeout: 20s
       retries: 10
+    # use a static ip
+    networks:
+      rocketmq_net:
+        ipv4_address: 11.6.0.5
+volumes:
+  s3_data:
+    driver: local
+
+networks:
+  rocketmq_net:
+    name: rocketmq_net
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: "11.6.0.0/16"
+          gateway: "11.6.0.1"
