@@ -59,16 +59,18 @@ public class StoreContext implements TraceContext {
     }
 
     @Override
-    public void detachSpan(Span span) {
+    public void detachSpan() {
+        if (!spanStack.isEmpty()) {
+            spanStack.pop();
+        }
+    }
+
+    @Override
+    public void detachAllSpan() {
         while (!spanStack.isEmpty()) {
-            Span currentSpan = spanStack.pop();
-            if (currentSpan == span) {
-                currentSpan.end();
-                break;
-            } else {
-                currentSpan.setStatus(StatusCode.ERROR, "Span is not closed properly");
-                currentSpan.end();
-            }
+            Span span = spanStack.pop();
+            span.setStatus(StatusCode.ERROR, "Span is closed due to timeout");
+            span.end();
         }
     }
 }

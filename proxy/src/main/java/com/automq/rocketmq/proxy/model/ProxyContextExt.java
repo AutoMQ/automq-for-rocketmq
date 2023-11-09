@@ -92,15 +92,19 @@ public class ProxyContextExt extends ProxyContext implements TraceContext {
     }
 
     @Override
-    public void detachSpan(Span span) {
+    public void detachSpan() {
+        if (!spanStack.isEmpty()) {
+            Span span = spanStack.pop();
+            span.end();
+        }
+    }
+
+    @Override
+    public void detachAllSpan() {
         while (!spanStack.isEmpty()) {
-            Span currentSpan = spanStack.pop();
-            if (currentSpan == span) {
-                currentSpan.end();
-            } else {
-                currentSpan.setStatus(StatusCode.ERROR, "Span is not closed properly");
-                currentSpan.end();
-            }
+            Span span = spanStack.pop();
+            span.setStatus(StatusCode.ERROR, "Span is closed due to timeout");
+            span.end();
         }
     }
 }

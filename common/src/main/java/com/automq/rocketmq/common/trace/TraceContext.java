@@ -52,8 +52,11 @@ public interface TraceContext {
 
     /**
      * Remove the current span from the context.
-     *
-     * @param span the span to detach
      */
-    void detachSpan(Span span);
+    void detachSpan();
+
+    /**
+     * Remove the current span from the context.
+     */
+    void detachAllSpan();
 }

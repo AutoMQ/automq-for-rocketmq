@@ -27,6 +27,9 @@ import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.reflect.MethodSignature;
 
@@ -77,7 +80,7 @@ public class TraceHelper {
         } catch (Throwable t) {
             span.recordException(t);
             span.setStatus(StatusCode.ERROR, t.getMessage());
-            context.detachSpan(span);
+            context.detachSpan();
             throw t;
         }
     }
@@ -87,12 +90,28 @@ public class TraceHelper {
         CompletableFuture<?> future = (CompletableFuture<?>) joinPoint.proceed();
         return future.whenComplete((r, t) -> {
             if (t != null) {
-                span.recordException(t);
-                span.setStatus(StatusCode.ERROR, t.getMessage());
+                Throwable throwable = t;
+                if (throwable instanceof CompletionException || throwable instanceof ExecutionException) {
+                    if (throwable.getCause() != null) {
+                        throwable = throwable.getCause();
+                    }
+                }
+
+                if (throwable instanceof TimeoutException) {
+                    context.detachAllSpan();
+                    span.recordException(throwable);
+                    span.setStatus(StatusCode.ERROR, throwable.getMessage());
+                } else {
+                    span.recordException(throwable);
+                    span.setStatus(StatusCode.ERROR, throwable.getMessage());
+                    span.end();
+                    context.detachSpan();
+                }
             } else {
                 span.setStatus(StatusCode.OK);
             }
-            context.detachSpan(span);
+            span.end();
+            context.detachSpan();
         });
     }
 
@@ -100,7 +119,8 @@ public class TraceHelper {
         ProceedingJoinPoint joinPoint) throws Throwable {
         Object result = joinPoint.proceed();
         span.setStatus(StatusCode.OK);
-        context.detachSpan(span);
+        span.end();
+        context.detachSpan();
         return result;
     }
 }
