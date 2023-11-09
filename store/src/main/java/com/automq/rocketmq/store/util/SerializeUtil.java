@@ -29,14 +29,20 @@ import com.automq.rocketmq.store.model.operation.Operation;
 import com.automq.rocketmq.store.model.operation.OperationSnapshot;
 import com.automq.rocketmq.store.model.operation.PopOperation;
 import com.automq.rocketmq.store.model.operation.ResetConsumeOffsetOperation;
+import com.automq.stream.s3.wal.util.WALUtil;
 import com.google.flatbuffers.FlatBufferBuilder;
+import io.netty.buffer.Unpooled;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.concurrent.ConcurrentSkipListMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class SerializeUtil {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(SerializeUtil.class);
 
     // <topicId><queueId>
     public static byte[] buildCheckPointQueuePrefix(long topicId, int queueId) {
@@ -134,11 +140,15 @@ public class SerializeUtil {
         );
         int root = OperationLogItem.createOperationLogItem(builder, com.automq.rocketmq.store.model.generated.Operation.PopOperation, operation);
         builder.finish(root);
-        return builder.sizedByteArray();
+        return prependChecksum(builder.sizedByteArray());
     }
 
     public static Operation decodeOperation(ByteBuffer buffer, MessageStateMachine stateMachine, long operationStreamId,
         long snapshotStreamId) throws StoreException {
+        if (!verifyAndStripChecksum(buffer)) {
+            throw new StoreException(StoreErrorCode.DATA_CORRUPTED, "Data of encoded operation is corrupted");
+        }
+
         OperationLogItem operationLogItem = OperationLogItem.getRootAsOperationLogItem(buffer);
 
         switch (operationLogItem.operationType()) {
@@ -206,10 +216,14 @@ public class SerializeUtil {
         int checkPointVectorOffset = com.automq.rocketmq.store.model.generated.OperationSnapshot.createCheckPointsVector(builder, checkPointOffsets);
         int root = com.automq.rocketmq.store.model.generated.OperationSnapshot.createOperationSnapshot(builder, snapshot.getSnapshotEndOffset(), checkPointVectorOffset, consumerGroupMetadataVectorOffset);
         builder.finish(root);
-        return builder.sizedByteArray();
+        return prependChecksum(builder.sizedByteArray());
     }
 
     public static OperationSnapshot decodeOperationSnapshot(ByteBuffer buffer) {
+        if (!verifyAndStripChecksum(buffer)) {
+            throw new RuntimeException(new StoreException(StoreErrorCode.DATA_CORRUPTED, "Operation Snapshot is corrupted"));
+        }
+
         com.automq.rocketmq.store.model.generated.OperationSnapshot snapshot = com.automq.rocketmq.store.model.generated.OperationSnapshot.getRootAsOperationSnapshot(buffer);
         List<OperationSnapshot.ConsumerGroupMetadataSnapshot> consumerGroupMetadataList = new ArrayList<>(snapshot.consumerGroupMetadatasLength());
         for (int i = 0; i < snapshot.consumerGroupMetadatasLength(); i++) {
@@ -246,7 +260,7 @@ public class SerializeUtil {
         int operation = com.automq.rocketmq.store.model.generated.AckOperation.createAckOperation(builder, receiptHandleId, operationTimestamp, (short) ackOperation.ackOperationType().ordinal());
         int root = OperationLogItem.createOperationLogItem(builder, com.automq.rocketmq.store.model.generated.Operation.AckOperation, operation);
         builder.finish(root);
-        return builder.sizedByteArray();
+        return prependChecksum(builder.sizedByteArray());
     }
 
     public static byte[] encodeChangeInvisibleDurationOperation(ChangeInvisibleDurationOperation durationOperation) {
@@ -255,7 +269,7 @@ public class SerializeUtil {
         int operation = com.automq.rocketmq.store.model.generated.ChangeInvisibleDurationOperation.createChangeInvisibleDurationOperation(builder, receiptHandleId, durationOperation.invisibleDuration(), durationOperation.operationTimestamp());
         int root = OperationLogItem.createOperationLogItem(builder, com.automq.rocketmq.store.model.generated.Operation.ChangeInvisibleDurationOperation, operation);
         builder.finish(root);
-        return builder.sizedByteArray();
+        return prependChecksum(builder.sizedByteArray());
     }
 
     public static byte[] encodeResetConsumeOffsetOperation(ResetConsumeOffsetOperation resetConsumeOffsetOperation) {
@@ -263,6 +277,30 @@ public class SerializeUtil {
         int operation = com.automq.rocketmq.store.model.generated.ResetConsumeOffsetOperation.createResetConsumeOffsetOperation(builder, resetConsumeOffsetOperation.consumerGroupId(), resetConsumeOffsetOperation.topicId(), resetConsumeOffsetOperation.queueId(), resetConsumeOffsetOperation.offset(), resetConsumeOffsetOperation.operationTimestamp());
         int root = OperationLogItem.createOperationLogItem(builder, com.automq.rocketmq.store.model.generated.Operation.ResetConsumeOffsetOperation, operation);
         builder.finish(root);
-        return builder.sizedByteArray();
+        return prependChecksum(builder.sizedByteArray());
+    }
+
+    public static byte[] prependChecksum(byte[] data) {
+        int crc32 = WALUtil.crc32(Unpooled.wrappedBuffer(data));
+        ByteBuffer buffer = ByteBuffer.allocate(4 + data.length);
+        buffer.putInt(crc32);
+        buffer.put(data);
+        buffer.flip();
+        return buffer.array();
+    }
+
+    public static boolean verifyAndStripChecksum(ByteBuffer buffer) {
+        if (buffer.remaining() < 4) {
+            return false;
+        }
+
+        int crc = buffer.getInt();
+        buffer.mark();
+        int actual = WALUtil.crc32(Unpooled.wrappedBuffer(buffer));
+        buffer.reset();
+        if (crc != actual) {
+            LOGGER.error("Data corrupted. CRC32 checksum failed");
+        }
+        return crc == actual;
     }
 }

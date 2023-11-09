@@ -27,4 +27,5 @@ public enum StoreErrorCode {
     QUEUE_NOT_FOUND,
     QUEUE_OPENING,
     INNER_ERROR,
+    DATA_CORRUPTED,
 }
