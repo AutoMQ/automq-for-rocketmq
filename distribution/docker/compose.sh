@@ -27,5 +27,6 @@ then
 elif [ "$OS_NAME" == "Darwin" ]; then
   IP=$(ipconfig getifaddr en0)
 fi
-sed -i "s/192.168.123.147/$IP/g" "$SCRIPT_DIR/docker-compose.yaml"
+export EXTERNAL_IP="$IP"
+
 docker compose up
