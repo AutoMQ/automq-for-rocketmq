@@ -15,17 +15,22 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.store.exception;
+package com.automq.rocketmq.store.queue;
 
-public enum StoreErrorCode {
-    FILE_SYSTEM_PERMISSION,
-    KV_SERVICE_IS_NOT_RUNNING,
-    ILLEGAL_ARGUMENT,
-    KV_ENGINE_ERROR,
-    QUEUE_NOT_OPENED,
-    QUEUE_FENCED,
-    QUEUE_NOT_FOUND,
-    QUEUE_OPENING,
-    INNER_ERROR,
-    DATA_CORRUPTED,
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+
+public class AckCommitterTest {
+
+    @Test
+    public void testGetAckBitmapBuffer() throws IOException {
+        DefaultLogicQueueStateMachine.AckCommitter ackCommitter = new DefaultLogicQueueStateMachine.AckCommitter(100,
+            System.out::println);
+        ackCommitter.commitAck(102);
+        ByteBuffer buffer = ackCommitter.getAckBitmapBuffer();
+        Assertions.assertEquals(0, buffer.position());
+        Assertions.assertTrue(buffer.limit() > 0);
+    }
 }

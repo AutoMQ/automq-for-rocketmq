@@ -673,6 +673,8 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
             int length = bitmap.serializedSizeInBytes();
             ByteBuffer buffer = ByteBuffer.allocate(length);
             bitmap.serialize(buffer);
+            // Flip buffer to prepare read
+            buffer.flip();
             return buffer;
         }
     }
