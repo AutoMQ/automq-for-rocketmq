@@ -19,6 +19,7 @@ package com.automq.rocketmq.proxy.grpc.activity;
 
 import apache.rocketmq.v2.ReceiveMessageResponse;
 import com.automq.rocketmq.proxy.grpc.v2.consumer.ExtendReceiveMessageResponseStreamWriter;
+import com.automq.rocketmq.proxy.model.ProxyContextExt;
 import io.grpc.stub.StreamObserver;
 import org.apache.rocketmq.proxy.common.ProxyContext;
 import org.apache.rocketmq.proxy.grpc.v2.channel.GrpcChannelManager;
@@ -39,6 +40,6 @@ public class ExtendReceiveMessageActivity extends ReceiveMessageActivity {
     @Override
     protected ReceiveMessageResponseStreamWriter createWriter(ProxyContext ctx,
         StreamObserver<ReceiveMessageResponse> responseObserver) {
-        return new ExtendReceiveMessageResponseStreamWriter(this.messagingProcessor, responseObserver);
+        return new ExtendReceiveMessageResponseStreamWriter((ProxyContextExt) ctx, messagingProcessor, responseObserver);
     }
 }

@@ -20,6 +20,7 @@ package com.automq.rocketmq.proxy.service;
 import com.automq.rocketmq.common.ServiceThread;
 import com.automq.rocketmq.proxy.model.ProxyContextExt;
 import com.automq.rocketmq.store.model.message.Filter;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -182,6 +183,7 @@ public class SuspendRequestService extends ServiceThread implements StartAndShut
         }
     }
 
+    @WithSpan
     public <T extends GetMessageResult> CompletableFuture<Optional<T>> suspendRequest(ProxyContext context,
         String topic, int queueId, Filter filter, long timeRemaining,
         Function<Long/*timeout*/, CompletableFuture<T>> supplier) {

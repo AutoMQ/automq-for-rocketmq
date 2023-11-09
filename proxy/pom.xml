@@ -56,6 +56,10 @@
                     <groupId>io.github.aliyunmq</groupId>
                     <artifactId>rocketmq-shaded-slf4j-api-bridge</artifactId>
                 </exclusion>
+                <exclusion>
+                    <groupId>io.opentelemetry</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
             </exclusions>
         </dependency>
         <dependency>

@@ -44,6 +44,8 @@ import com.automq.rocketmq.store.service.StreamReclaimService;
 import com.automq.rocketmq.store.service.api.OperationLogService;
 import com.automq.rocketmq.store.util.SerializeUtil;
 import com.automq.stream.utils.FutureUtil;
+import io.opentelemetry.instrumentation.annotations.SpanAttribute;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -245,8 +247,10 @@ public class StreamLogicQueue extends LogicQueue {
         return pop(consumerGroup, dataStreamId, offset, PopOperation.PopOperationType.POP_NORMAL, filter, batchSize, invisibleDuration);
     }
 
-    private CompletableFuture<PopResult> pop(long consumerGroupId, long streamId, long startOffset,
-        PopOperation.PopOperationType operationType, Filter filter,
+    @WithSpan
+    private CompletableFuture<PopResult> pop(@SpanAttribute() long consumerGroupId, @SpanAttribute() long streamId,
+        @SpanAttribute() long startOffset,
+        @SpanAttribute() PopOperation.PopOperationType operationType, Filter filter,
         int batchSize, long invisibleDuration) {
         // Check offset
         long confirmOffset = streamStore.confirmOffset(streamId);
@@ -349,6 +353,7 @@ public class StreamLogicQueue extends LogicQueue {
         return retryStreamIdFuture.thenCompose(retryStreamId -> pop(consumerGroupId, retryStreamId, offset, PopOperation.PopOperationType.POP_RETRY, filter, batchSize, invisibleDuration));
     }
 
+    @WithSpan
     private CompletableFuture<List<FlatMessageExt>> fetchMessages(long streamId, long offset, int batchSize) {
         long startOffset = streamStore.startOffset(streamId);
         if (offset < startOffset) {
@@ -382,6 +387,7 @@ public class StreamLogicQueue extends LogicQueue {
     }
 
     // Fetch and filter messages until exceeding the limit.
+    @WithSpan
     private CompletableFuture<FilterFetchResult> fetchAndFilterMessages(long streamId,
         long offset, int batchSize, int fetchBatchSize, Filter filter, FilterFetchResult result,
         int fetchCount, long fetchBytes, long operationTimestamp) {

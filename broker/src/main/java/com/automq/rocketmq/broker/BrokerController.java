@@ -87,11 +87,7 @@ public class BrokerController implements Lifecycle {
         serviceManager = new DefaultServiceManager(brokerConfig, proxyMetadataService, dlqService, messageStore);
         messagingProcessor = ExtendMessagingProcessor.createForS3RocketMQ(serviceManager);
 
-        // TODO: Split controller to a separate port
-        ControllerServiceImpl controllerService = MetadataStoreBuilder.build(metadataStore);
-        grpcServer = new GrpcProtocolServer(brokerConfig.proxy(), messagingProcessor, controllerService);
-        remotingServer = new RemotingProtocolServer(messagingProcessor);
-
+        // Init the metrics exporter before accept requests.
         metricsExporter = new MetricsExporter(brokerConfig, messageStore, messagingProcessor);
 
         Pyroscope.setStaticLabels(Map.of("broker", brokerConfig.name()));
@@ -103,6 +99,11 @@ public class BrokerController implements Lifecycle {
                 .setServerAddress("http://10.129.193.87:4040")
                 .build()
         );
+
+        // TODO: Split controller to a separate port
+        ControllerServiceImpl controllerService = MetadataStoreBuilder.build(metadataStore);
+        grpcServer = new GrpcProtocolServer(brokerConfig.proxy(), messagingProcessor, controllerService);
+        remotingServer = new RemotingProtocolServer(messagingProcessor);
     }
 
     @Override

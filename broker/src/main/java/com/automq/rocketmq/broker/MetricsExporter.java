@@ -27,12 +27,17 @@ import com.automq.rocketmq.store.metrics.StoreMetricsManager;
 import com.automq.rocketmq.store.metrics.StreamMetricsManager;
 import com.automq.stream.s3.metrics.S3StreamMetricsRegistry;
 import com.google.common.base.Splitter;
+import io.opentelemetry.api.baggage.propagation.W3CBaggagePropagator;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.common.AttributesBuilder;
 import io.opentelemetry.api.metrics.Meter;
+import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
+import io.opentelemetry.context.propagation.ContextPropagators;
+import io.opentelemetry.context.propagation.TextMapPropagator;
 import io.opentelemetry.exporter.logging.LoggingMetricExporter;
 import io.opentelemetry.exporter.otlp.metrics.OtlpGrpcMetricExporter;
 import io.opentelemetry.exporter.otlp.metrics.OtlpGrpcMetricExporterBuilder;
+import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
 import io.opentelemetry.exporter.prometheus.PrometheusHttpServer;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.metrics.InstrumentSelector;
@@ -43,9 +48,13 @@ import io.opentelemetry.sdk.metrics.View;
 import io.opentelemetry.sdk.metrics.data.AggregationTemporality;
 import io.opentelemetry.sdk.metrics.export.PeriodicMetricReader;
 import io.opentelemetry.sdk.resources.Resource;
+import io.opentelemetry.sdk.trace.SdkTracerProvider;
+import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import org.apache.commons.lang3.StringUtils;
@@ -60,6 +69,9 @@ import static com.automq.rocketmq.broker.MetricsConstant.AGGREGATION_DELTA;
 import static com.automq.rocketmq.broker.MetricsConstant.LABEL_AGGREGATION;
 import static com.automq.rocketmq.broker.MetricsConstant.LABEL_INSTANCE_ID;
 import static com.automq.rocketmq.broker.MetricsConstant.LABEL_NODE_NAME;
+import static io.opentelemetry.semconv.ResourceAttributes.SERVICE_INSTANCE_ID;
+import static io.opentelemetry.semconv.ResourceAttributes.SERVICE_NAME;
+import static io.opentelemetry.semconv.ResourceAttributes.SERVICE_VERSION;
 
 public class MetricsExporter implements Lifecycle {
     private static final Logger LOGGER = LoggerFactory.getLogger(MetricsExporter.class);
@@ -72,6 +84,7 @@ public class MetricsExporter implements Lifecycle {
     private PrometheusHttpServer prometheusHttpServer;
     private LoggingMetricExporter loggingMetricExporter;
     private Meter brokerMeter;
+    private OpenTelemetrySdk openTelemetrySdk;
 
     private final ProxyMetricsManager proxyMetricsManager;
     private final StoreMetricsManager storeMetricsManager;
@@ -148,8 +161,27 @@ public class MetricsExporter implements Lifecycle {
         LABEL_MAP.put(LABEL_NODE_NAME, brokerConfig.name());
         LABEL_MAP.put(LABEL_INSTANCE_ID, brokerConfig.instanceId());
 
+        Properties gitProperties;
+        try {
+            ClassLoader classLoader = getClass().getClassLoader();
+            InputStream inputStream = classLoader.getResourceAsStream("git.properties");
+            gitProperties = new Properties();
+            gitProperties.load(inputStream);
+        } catch (Exception e) {
+            LOGGER.warn("read project version failed", e);
+            throw new RuntimeException(e);
+        }
+
+        AttributesBuilder builder = Attributes.builder();
+        builder.put(SERVICE_NAME, brokerConfig.name());
+        builder.put(SERVICE_VERSION, (String) gitProperties.get("git.build.version"));
+        builder.put("git.hash", (String) gitProperties.get("git.commit.id.describe"));
+        builder.put(SERVICE_INSTANCE_ID, brokerConfig.instanceId());
+
+        Resource resource = Resource.create(builder.build());
+
         SdkMeterProviderBuilder providerBuilder = SdkMeterProvider.builder()
-            .setResource(Resource.empty());
+            .setResource(resource);
 
         if (metricsExporterType == MetricsExporterType.OTLP_GRPC) {
             String endpoint = metricsConfig.grpcExporterTarget();
@@ -212,15 +244,30 @@ public class MetricsExporter implements Lifecycle {
 
         registerMetricsView(providerBuilder);
 
-        brokerMeter = OpenTelemetrySdk.builder()
+        OtlpGrpcSpanExporter spanExporter = OtlpGrpcSpanExporter.builder()
+            .setEndpoint("http://10.129.1.252:4317")
+            .setTimeout(metricsConfig.grpcExporterTimeOutInMills(), TimeUnit.MILLISECONDS)
+            .build();
+
+        BatchSpanProcessor spanProcessor = BatchSpanProcessor.builder(spanExporter)
+            .build();
+
+        SdkTracerProvider sdkTracerProvider = SdkTracerProvider.builder()
+            .addSpanProcessor(spanProcessor)
+            .setResource(resource)
+            .build();
+
+        openTelemetrySdk = OpenTelemetrySdk.builder()
+            .setTracerProvider(sdkTracerProvider)
+            .setPropagators(ContextPropagators.create(TextMapPropagator.composite(W3CTraceContextPropagator.getInstance(), W3CBaggagePropagator.getInstance())))
             .setMeterProvider(providerBuilder.build())
-            .build()
-            .getMeter("rocketmq-meter");
+            .buildAndRegisterGlobal();
+
+        brokerMeter = openTelemetrySdk.getMeter("automq-for-rocketmq");
 
         initAttributesBuilder();
         initStaticMetrics();
     }
-
 
     private void initAttributesBuilder() {
         streamMetricsManager.initAttributesBuilder(MetricsExporter::newAttributesBuilder);
@@ -279,6 +326,7 @@ public class MetricsExporter implements Lifecycle {
             loggingMetricExporter.shutdown();
         }
         storeMetricsManager.shutdown();
+        openTelemetrySdk.shutdown();
     }
 }
 
