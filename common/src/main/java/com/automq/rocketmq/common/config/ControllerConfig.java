@@ -80,4 +80,7 @@ public interface ControllerConfig extends GrpcClientConfig {
 
     void flagGoingAway();
 
+    default boolean dumpHeapOnError() {
+        return true;
+    }
 }

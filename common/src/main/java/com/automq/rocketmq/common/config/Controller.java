@@ -34,6 +34,11 @@ public class Controller {
 
     private int workloadTolerance = 2;
 
+    /**
+     * Flag whether system should dump heap on fatal error.
+     */
+    private boolean dumpHeapOnError = false;
+
     public long getRecycleS3IntervalInSecs() {
         return recycleS3IntervalInSecs;
     }
@@ -96,5 +101,13 @@ public class Controller {
 
     public void setWorkloadTolerance(int workloadTolerance) {
         this.workloadTolerance = workloadTolerance;
+    }
+
+    public boolean isDumpHeapOnError() {
+        return dumpHeapOnError;
+    }
+
+    public void setDumpHeapOnError(boolean dumpHeapOnError) {
+        this.dumpHeapOnError = dumpHeapOnError;
     }
 }

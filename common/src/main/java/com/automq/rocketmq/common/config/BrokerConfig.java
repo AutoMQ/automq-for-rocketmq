@@ -288,4 +288,9 @@ public class BrokerConfig implements ControllerConfig {
     public int workloadTolerance() {
         return controller.getWorkloadTolerance();
     }
+
+    @Override
+    public boolean dumpHeapOnError() {
+        return controller.isDumpHeapOnError();
+    }
 }

@@ -41,7 +41,10 @@ import com.automq.rocketmq.metadata.mapper.StreamMapper;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.TextFormat;
 import com.google.protobuf.util.JsonFormat;
+import com.sun.management.HotSpotDiagnosticMXBean;
+import java.io.File;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Comparator;
@@ -110,6 +113,17 @@ public class DefaultS3MetadataService implements S3MetadataService {
         return future;
     }
 
+    private void dumpHeap() {
+        try {
+            HotSpotDiagnosticMXBean mxBean = ManagementFactory.newPlatformMXBeanProxy(ManagementFactory.getPlatformMBeanServer(),
+                "com.sun.management:type=HotSpotDiagnostic", HotSpotDiagnosticMXBean.class);
+            String userHome = System.getProperty("user.home");
+            mxBean.dumpHeap(userHome + File.separator + "heap.hprof", true);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public CompletableFuture<Void> commitWalObject(S3WALObject walObject,
         List<S3StreamObject> streamObjects, List<Long> compactedObjects) {
         if (Objects.isNull(walObject)) {
@@ -130,6 +144,9 @@ public class DefaultS3MetadataService implements S3MetadataService {
             if (item.getStreamId() <= 0) {
                 LOGGER.error("Yuck, S3StreamObject is having invalid stream-id: {}",
                     TextFormat.printer().printToString(item));
+                if (nodeConfig.dumpHeapOnError()) {
+                    dumpHeap();
+                }
             }
         }
 
@@ -552,6 +569,13 @@ public class DefaultS3MetadataService implements S3MetadataService {
             long streamId = entry.getKey();
             Pair<Long, Long> segment = entry.getValue();
             Stream stream = streamMapper.getByStreamId(streamId);
+            if (null == stream) {
+                if (nodeConfig.dumpHeapOnError()) {
+                    dumpHeap();
+                }
+                continue;
+            }
+
             if (stream.getState() != StreamState.OPEN) {
                 LOGGER.warn("Stream[stream-id={}] state is not OPEN", streamId);
             }

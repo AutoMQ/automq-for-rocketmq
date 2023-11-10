@@ -55,9 +55,22 @@ public class Loop<T> implements Runnable {
         execute();
     }
 
+    boolean completed() {
+        if (null == result) {
+            return true;
+        }
+
+        return result.isDone() || result.isCancelled();
+    }
+
     void execute() {
         if (terminated) {
             LOGGER.debug("Loop has terminated");
+            return;
+        }
+
+        if (completed()) {
+            LOGGER.debug("Loop has completed");
             return;
         }
 
@@ -71,11 +84,10 @@ public class Loop<T> implements Runnable {
                             throw new CompletionException(e);
                         }
                     }
-
                     LOGGER.error("Unexpected exception raised", e);
                     return null;
                 }).thenApply(t -> {
-                    if (null != result && !result.isDone() && !result.isCancelled()) {
+                    if (!completed()) {
                         result.complete(t);
                     }
                     return t;
