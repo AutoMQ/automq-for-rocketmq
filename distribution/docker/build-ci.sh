@@ -30,33 +30,34 @@ getLatestReleaseVersion() {
 }
 
 docker_build() {
-  echo "info: start build"
   docker build --no-cache -f Dockerfile-ci -t ${ROCKETMQ_REPO}:${ROCKETMQ_VERSION} --build-arg version=${ROCKETMQ_VERSION} . --progress=plain
-  echo "info: build success"
 }
 
 if [[ -z $ROCKETMQ_REPO ]]; then
   ROCKETMQ_REPO="automq-for-rocketmq"
-  echo "info: ROCKETMQ_REPO is empty, use default repo: $ROCKETMQ_REPO"
+  echo "ROCKETMQ_REPO is empty, use default repo: $ROCKETMQ_REPO"
 fi
 echo "info: ROCKETMQ_REPO: $ROCKETMQ_REPO"
 if [[ -z $ROCKETMQ_VERSION ]]; then
   ROCKETMQ_VERSION=$(`echo getLatestReleaseVersion`)
-  echo "info: ROCKETMQ_VERSION is empty, use latest version: $ROCKETMQ_VERSION"
+  echo "ROCKETMQ_VERSION is empty, use latest version: $ROCKETMQ_VERSION"
 fi
 
 echo "start docker build automq-for-rocketmq version: $ROCKETMQ_VERSION"
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 REPO_DIR=$(dirname "$(dirname "$SCRIPT_DIR")")
 cd "$SCRIPT_DIR" || exit 1
-echo "info: SCRIPT_DIR: $SCRIPT_DIR"
-echo "info: REPO_DIR: $REPO_DIR"
 pwd
-if [ ! -d "rocketmq" ]
-then
-  cp "$REPO_DIR/distribution/target/automq-for-rocketmq.zip" .
-  unzip ./automq-for-rocketmq.zip
-  mv automq-for-rocketmq rocketmq
+if [ ! -d "rocketmq" ]; then
+  zip_file="$REPO_DIR/distribution/target/automq-for-rocketmq.zip"
+  if [ -f "$zip_file" ]; then
+    cp "$zip_file" .
+    unzip -q ./automq-for-rocketmq.zip
+    mv automq-for-rocketmq rocketmq
+  else
+    echo "Please 'mvn package' to package automq-for-rocketmq.zip first"
+    exit 1
+  fi
 fi
 
 docker_build
