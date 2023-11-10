@@ -113,13 +113,12 @@ public class DefaultS3MetadataService implements S3MetadataService {
         return future;
     }
 
-    private  void dumpHeap() {
+    private void dumpHeap() {
         try {
             HotSpotDiagnosticMXBean mxBean = ManagementFactory.newPlatformMXBeanProxy(ManagementFactory.getPlatformMBeanServer(),
                 "com.sun.management:type=HotSpotDiagnostic", HotSpotDiagnosticMXBean.class);
             String userHome = System.getProperty("user.home");
             mxBean.dumpHeap(userHome + File.separator + "heap.hprof", true);
-            System.exit(1);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -145,7 +144,9 @@ public class DefaultS3MetadataService implements S3MetadataService {
             if (item.getStreamId() <= 0) {
                 LOGGER.error("Yuck, S3StreamObject is having invalid stream-id: {}",
                     TextFormat.printer().printToString(item));
-                dumpHeap();
+                if (nodeConfig.dumpHeapOnError()) {
+                    dumpHeap();
+                }
             }
         }
 
@@ -569,7 +570,9 @@ public class DefaultS3MetadataService implements S3MetadataService {
             Pair<Long, Long> segment = entry.getValue();
             Stream stream = streamMapper.getByStreamId(streamId);
             if (null == stream) {
-                dumpHeap();
+                if (nodeConfig.dumpHeapOnError()) {
+                    dumpHeap();
+                }
                 continue;
             }
 
