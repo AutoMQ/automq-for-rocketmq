@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
@@ -15,11 +15,48 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+ROCKETMQ_REPO=$1
+ROCKETMQ_VERSION=$2
+GITHUB_REPOSITORY='https://github.com/AutoMQ/automq-for-rocketmq.git '
 
-ROCKETMQ_VERSION=$1
-ROCKETMQ_REPO=$2
+getLatestReleaseVersion() {
+  full_node_version=`git ls-remote --tags $GITHUB_REPOSITORY | awk -F '/' 'END{print $3}'`
+  commit_version=`git rev-parse --short HEAD`
+  if [[ -n $full_node_version ]]; then
+   echo $full_node_version-$commit_version
+  else
+   echo "latest"-$commit_version
+  fi
+}
 
-cp -r ../../rocketmq ./
+docker_build() {
+  echo "info: start build"
+  docker build --no-cache -f Dockerfile-ci -t ${ROCKETMQ_REPO}:${ROCKETMQ_VERSION} --build-arg version=${ROCKETMQ_VERSION} . --progress=plain
+  echo "info: build success"
+}
 
+if [[ -z $ROCKETMQ_REPO ]]; then
+  ROCKETMQ_REPO="automq-for-rocketmq"
+  echo "info: ROCKETMQ_REPO is empty, use default repo: $ROCKETMQ_REPO"
+fi
+echo "info: ROCKETMQ_REPO: $ROCKETMQ_REPO"
+if [[ -z $ROCKETMQ_VERSION ]]; then
+  ROCKETMQ_VERSION=$(`echo getLatestReleaseVersion`)
+  echo "info: ROCKETMQ_VERSION is empty, use latest version: $ROCKETMQ_VERSION"
+fi
 
-docker build --no-cache -f Dockerfile -t ${ROCKETMQ_REPO}:${ROCKETMQ_VERSION} --build-arg version=${ROCKETMQ_VERSION} . --progress=plain
+echo "start docker build automq-for-rocketmq version: $ROCKETMQ_VERSION"
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+REPO_DIR=$(dirname "$(dirname "$SCRIPT_DIR")")
+cd "$SCRIPT_DIR" || exit 1
+echo "info: SCRIPT_DIR: $SCRIPT_DIR"
+echo "info: REPO_DIR: $REPO_DIR"
+pwd
+if [ ! -d "rocketmq" ]
+then
+  cp "$REPO_DIR/distribution/target/automq-for-rocketmq.zip" .
+  unzip ./automq-for-rocketmq.zip
+  mv automq-for-rocketmq rocketmq
+fi
+
+docker_build

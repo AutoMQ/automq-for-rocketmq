@@ -14,11 +14,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+NAMESPACE=$1
 
-helm uninstall s3-localstack
-helm uninstall mysql
-helm uninstall automq-for-rocketmq
+if [[ -z $NAMESPACE ]]; then
+  NAMESPACE="default"
+  echo "info: NAMESPACE is empty, use default namespace: $NAMESPACE"
+fi
 
-kubectl delete -f deploy/init-db-configmap.yaml
-rm deploy/init-db-configmap.yaml
-rm deploy/ddl.sql
+helm uninstall s3-localstack --namespace $NAMESPACE
+helm uninstall mysql --namespace $NAMESPACE
+helm uninstall automq-for-rocketmq --namespace $NAMESPACE
+
+kubectl delete cm mysql-initdb-config --namespace $NAMESPACE
