@@ -135,11 +135,6 @@ jobs:
           submodules: true
       - name: Install flatc
         run: sudo bash install_flatc.sh
-      - uses: actions/setup-java@v3
-        with:
-          distribution: "temurin"
-          java-version: "17"
-          cache: "maven"
       - name: Build rocketmq dependency
         run: |
           mvn clean install -U -DskipTests
@@ -192,11 +187,6 @@ jobs:
           submodules: true
       - name: Install flatc
         run: sudo bash install_flatc.sh
-      - uses: actions/setup-java@v3
-        with:
-          distribution: "temurin"
-          java-version: "17"
-          cache: "maven"
       - name: Build rocketmq dependency
         run: |
           mvn clean install -U -DskipTests
