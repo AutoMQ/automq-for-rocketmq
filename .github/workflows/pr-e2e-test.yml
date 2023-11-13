@@ -142,7 +142,7 @@ jobs:
         if: always()
         with:
           repository: AutoMQ/rocketmq-e2e
-          ref: master
+          ref: fix_remote_server
           path: rocketmq-e2e
           token: ${{ secrets.PAT_E2E }}
       - name: e2e test
@@ -194,7 +194,7 @@ jobs:
         if: always()
         with:
           repository: AutoMQ/rocketmq-e2e
-          ref: master
+          ref: fix_remote_server
           path: rocketmq-e2e
           token: ${{ secrets.PAT_E2E }}
       - name: e2e test
