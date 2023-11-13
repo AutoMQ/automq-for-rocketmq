@@ -529,7 +529,7 @@ class BlockWALServiceTest {
                 new RecoverFromDisasterParam(
                         WALUtil.BLOCK_SIZE + 1,
                         100L,
-                        0L,
+                        -1L,
                         0L,
                         0L,
                         50L,
@@ -545,9 +545,9 @@ class BlockWALServiceTest {
                         10L,
                         50L,
                         Arrays.asList(0L, 2L, 4L),
-                        Arrays.asList(0L, 2L, 4L),
+                        Arrays.asList(2L, 4L),
                         WALUtil.BLOCK_SIZE
-                ).toArguments("trimmed at zero (not trimmed)"),
+                ).toArguments("trimmed at zero"),
                 new RecoverFromDisasterParam(
                         WALUtil.BLOCK_SIZE + 1,
                         100L,
@@ -630,7 +630,7 @@ class BlockWALServiceTest {
                 new RecoverFromDisasterParam(
                         42,
                         8192L,
-                        0L,
+                        -1L,
                         0L,
                         0L,
                         8192L,

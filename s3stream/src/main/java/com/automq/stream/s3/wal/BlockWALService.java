@@ -487,14 +487,11 @@ public class BlockWALService implements WriteAheadLog {
         checkReadyToServe();
 
         long trimmedOffset = walHeaderCoreData.getTrimOffset();
-        return recover(trimmedOffset);
-    }
-
-    /**
-     * Recover from the given offset.
-     */
-    private Iterator<RecoverResult> recover(long startOffset) {
-        return new RecoverIterator(startOffset);
+        long recoverStartOffset = trimmedOffset;
+        if (recoverStartOffset < 0) {
+            recoverStartOffset = 0;
+        }
+        return new RecoverIterator(recoverStartOffset, trimmedOffset);
     }
 
     @Override
@@ -545,7 +542,7 @@ public class BlockWALService implements WriteAheadLog {
     }
 
     static class WALHeaderCoreData {
-        private final AtomicLong trimOffset2 = new AtomicLong(0);
+        private final AtomicLong trimOffset2 = new AtomicLong(-1);
         private final AtomicLong flushedTrimOffset = new AtomicLong(0);
         private final AtomicLong slidingWindowStartOffset5 = new AtomicLong(0);
         private final AtomicLong slidingWindowNextWriteOffset4 = new AtomicLong(0);
@@ -830,15 +827,12 @@ public class BlockWALService implements WriteAheadLog {
 
     class RecoverIterator implements Iterator<RecoverResult> {
         private long nextRecoverOffset;
-        private long skipRecordAtOffset = -1;
+        private final long skipRecordAtOffset;
         private RecoverResult next;
 
-        public RecoverIterator(long nextRecoverOffset) {
+        public RecoverIterator(long nextRecoverOffset, long skipRecordAtOffset) {
             this.nextRecoverOffset = nextRecoverOffset;
-            // Corner case: if nextRecoverOffset is not 0, it means the WAL has been trimmed, so we need to skip the first record.
-            if (nextRecoverOffset != 0) {
-                this.skipRecordAtOffset = nextRecoverOffset;
-            }
+            this.skipRecordAtOffset = skipRecordAtOffset;
         }
 
         @Override
