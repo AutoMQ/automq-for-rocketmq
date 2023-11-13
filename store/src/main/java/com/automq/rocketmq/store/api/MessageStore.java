@@ -142,4 +142,6 @@ public interface MessageStore extends Lifecycle {
      * @return clear result, see {@link ClearRetryMessagesResult}
      */
     CompletableFuture<ClearRetryMessagesResult> clearRetryMessages(long consumerGroupId, long topicId, int queueId);
+
+    void registerMessageArriveListener(MessageArriveListener listener);
 }

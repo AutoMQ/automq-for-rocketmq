@@ -83,7 +83,7 @@ class ReviveServiceTest {
         LogicQueueManager manager = Mockito.mock(LogicQueueManager.class);
         Mockito.doAnswer(ink -> CompletableFuture.completedFuture(logicQueue)).when(manager).getOrCreate(Mockito.any(), Mockito.eq(TOPIC_ID), Mockito.eq(QUEUE_ID));
         deadLetterSender = Mockito.mock(DeadLetterSender.class);
-        reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, kvService, timerService, metadataService, inflightService,
+        reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, kvService, timerService, metadataService, new MessageArriveNotifyService(),
             manager, deadLetterSender);
         logicQueue.open().join();
     }

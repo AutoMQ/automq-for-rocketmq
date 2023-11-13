@@ -22,6 +22,7 @@ import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.store.api.DeadLetterSender;
 import com.automq.rocketmq.store.api.LogicQueue;
 import com.automq.rocketmq.store.api.LogicQueueManager;
+import com.automq.rocketmq.store.api.MessageArriveListener;
 import com.automq.rocketmq.store.exception.StoreErrorCode;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.StoreContext;
@@ -55,6 +56,7 @@ public class ReviveService {
     private final String checkPointNamespace;
     private final KVService kvService;
     private final StoreMetadataService metadataService;
+    private final MessageArriveNotifyService messageArriveNotifyService;
     private final LogicQueueManager logicQueueManager;
     // Indicate the timestamp that the revive service has reached.
     private volatile long reviveTimestamp = 0;
@@ -64,11 +66,13 @@ public class ReviveService {
     private final DeadLetterSender deadLetterSender;
 
     public ReviveService(String checkPointNamespace, KVService kvService, TimerService timerService,
-        StoreMetadataService metadataService, InflightService inflightService, LogicQueueManager logicQueueManager,
+        StoreMetadataService metadataService, MessageArriveNotifyService messageArriveNotifyService,
+        LogicQueueManager logicQueueManager,
         DeadLetterSender deadLetterSender) throws StoreException {
         this.checkPointNamespace = checkPointNamespace;
         this.kvService = kvService;
         this.metadataService = metadataService;
+        this.messageArriveNotifyService = messageArriveNotifyService;
         this.logicQueueManager = logicQueueManager;
         this.inflightRevive = new ConcurrentHashMap<>();
         this.deadLetterSender = deadLetterSender;
@@ -181,6 +185,8 @@ public class ReviveService {
                 messageExt.setOriginalQueueOffset(messageExt.originalOffset());
                 messageExt.setDeliveryAttempts(messageExt.deliveryAttempts() + 1);
                 return logicQueue.putRetry(consumerGroupId, messageExt.message())
+                    .thenCompose(result -> metadataService.topicOf(topicId)
+                        .thenAccept(topic -> messageArriveNotifyService.notify(MessageArriveListener.MessageSource.RETRY_MESSAGE, topic, queueId, result.offset(), messageExt.message().tag())))
                     .thenApply(nil -> Pair.of(false, logicQueue));
             });
 

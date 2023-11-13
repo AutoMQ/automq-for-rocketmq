@@ -17,9 +17,11 @@
 
 package com.automq.rocketmq.store.mock;
 
+import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
+import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.common.config.BrokerConfig;
 import com.automq.rocketmq.common.config.ControllerConfig;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
@@ -153,5 +155,25 @@ public class MockStoreMetadataService implements StoreMetadataService {
     @Override
     public CompletableFuture<List<StreamMetadata>> getStreams(List<Long> streamIds) {
         return null;
+    }
+
+    @Override
+    public CompletableFuture<Topic> topicOf(String topicName) {
+        return CompletableFuture.completedFuture(Topic.newBuilder().setName(topicName).setTopicId(1).build());
+    }
+
+    @Override
+    public CompletableFuture<Topic> topicOf(long topicId) {
+        return CompletableFuture.completedFuture(Topic.newBuilder().setName("topic").setTopicId(topicId).build());
+    }
+
+    @Override
+    public CompletableFuture<ConsumerGroup> consumerGroupOf(String groupName) {
+        return CompletableFuture.completedFuture(ConsumerGroup.newBuilder().setName(groupName).setGroupId(1).build());
+    }
+
+    @Override
+    public CompletableFuture<ConsumerGroup> consumerGroupOf(long consumerGroupId) {
+        return CompletableFuture.completedFuture(ConsumerGroup.newBuilder().setName("group").setGroupId(consumerGroupId).build());
     }
 }

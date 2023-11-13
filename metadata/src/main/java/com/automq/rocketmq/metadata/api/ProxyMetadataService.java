@@ -17,32 +17,15 @@
 
 package com.automq.rocketmq.metadata.api;
 
-import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.Topic;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-public interface ProxyMetadataService {
+public interface ProxyMetadataService extends ResourceMetadataService {
 
     CompletableFuture<Topic> createTopic(CreateTopicRequest request);
-
-    /**
-     * Query the topic metadata of a given topic name.
-     *
-     * @param topicName topic name
-     * @return {@link CompletableFuture} of {@link Topic}
-     */
-    CompletableFuture<Topic> topicOf(String topicName);
-
-    /**
-     * Query the topic metadata of a given topic id.
-     *
-     * @param topicId topic id
-     * @return {@link CompletableFuture} of {@link Topic}
-     */
-    CompletableFuture<Topic> topicOf(long topicId);
 
     /**
      * List all the queue assignments for a given topic that assigned to the current server.
@@ -58,22 +41,6 @@ public interface ProxyMetadataService {
      * @return {@link CompletableFuture} of {@link String}
      */
     CompletableFuture<String> addressOf(int nodeId);
-
-    /**
-     * Query the consumer group metadata of a given group name
-     *
-     * @param groupName group name
-     * @return {@link CompletableFuture} of {@link ConsumerGroup}
-     */
-    CompletableFuture<ConsumerGroup> consumerGroupOf(String groupName);
-
-    /**
-     * Query the consumer group metadata of a given group id
-     *
-     * @param consumerGroupId consumer group id
-     * @return {@link CompletableFuture} of {@link ConsumerGroup}
-     */
-    CompletableFuture<ConsumerGroup> consumerGroupOf(long consumerGroupId);
 
     /**
      * Query the consumer offset of a given consumer group, topic and queue.

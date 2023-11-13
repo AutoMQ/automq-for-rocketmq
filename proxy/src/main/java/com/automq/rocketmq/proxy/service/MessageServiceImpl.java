@@ -174,9 +174,6 @@ public class MessageServiceImpl implements MessageService {
         });
 
         return putFuture.thenApply(putResult -> {
-            // Wakeup the suspended pop request if there is any message arrival.
-            suspendRequestService.notifyMessageArrival(requestHeader.getTopic(), virtualQueue.physicalQueueId(), message.getTags());
-
             ProxyMetricsManager.recordIncomingMessages(requestHeader.getTopic(), getMessageType(requestHeader), 1, message.getBody().length);
 
             SendResult result = new SendResult();
@@ -421,7 +418,9 @@ public class MessageServiceImpl implements MessageService {
             if (result.messageList.isEmpty()) {
                 if (result.restMessageCount > 0) {
                     // This means there are messages in the queue but not match the filter. So we should prevent long polling.
-                    return CompletableFuture.completedFuture(new PopResult(PopStatus.NO_NEW_MSG, Collections.emptyList()));
+                    PopResult popResult = new PopResult(PopStatus.NO_NEW_MSG, Collections.emptyList());
+                    popResult.setRestNum(result.restMessageCount);
+                    return CompletableFuture.completedFuture(popResult);
                 } else {
                     return suspendRequestService.suspendRequest((ProxyContextExt) ctx, requestHeader.getTopic(), virtualQueue.physicalQueueId(), filter, timeoutMillis,
                             // Function to pop message later.
@@ -431,11 +430,15 @@ public class MessageServiceImpl implements MessageService {
                             if (suspendResult.isEmpty() || suspendResult.get().messageList().isEmpty()) {
                                 return new PopResult(PopStatus.POLLING_NOT_FOUND, Collections.emptyList());
                             }
-                            return new PopResult(PopStatus.FOUND, FlatMessageUtil.convertTo(suspendResult.get().messageList(), requestHeader.getTopic(), requestHeader.getInvisibleTime(), config.hostName(), config.grpcListenPort()));
+                            PopResult popResult = new PopResult(PopStatus.FOUND, FlatMessageUtil.convertTo(suspendResult.get().messageList(), requestHeader.getTopic(), requestHeader.getInvisibleTime(), config.hostName(), config.grpcListenPort()));
+                            popResult.setRestNum(suspendResult.get().restMessageCount());
+                            return popResult;
                         });
                 }
             }
-            return CompletableFuture.completedFuture(new PopResult(PopStatus.FOUND, FlatMessageUtil.convertTo(result.messageList, requestHeader.getTopic(), requestHeader.getInvisibleTime(), config.hostName(), config.grpcListenPort())));
+            PopResult popResult = new PopResult(PopStatus.FOUND, FlatMessageUtil.convertTo(result.messageList, requestHeader.getTopic(), requestHeader.getInvisibleTime(), config.hostName(), config.grpcListenPort()));
+            popResult.setRestNum(result.restMessageCount);
+            return CompletableFuture.completedFuture(popResult);
         }).thenApply(result -> {
             ((ProxyContextExt) ctx).span().ifPresent(span -> {
                 span.setAttribute("result.status", result.getPopStatus().name());
