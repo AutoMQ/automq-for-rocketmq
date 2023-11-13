@@ -41,6 +41,11 @@ public interface Filter {
         public boolean doFilter(String tag) {
             return true;
         }
+
+        @Override
+        public String toString() {
+            return "DEFAULT_FILTER";
+        }
     };
 
     FilterType type();

@@ -26,6 +26,7 @@ import com.automq.rocketmq.store.api.MessageStore;
 import com.automq.rocketmq.store.api.S3ObjectOperator;
 import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.rocketmq.store.exception.StoreException;
+import com.automq.rocketmq.store.model.StoreContext;
 import com.automq.rocketmq.store.model.generated.ReceiptHandle;
 import com.automq.rocketmq.store.model.generated.TimerHandlerType;
 import com.automq.rocketmq.store.model.message.AckResult;
@@ -42,6 +43,8 @@ import com.automq.rocketmq.store.service.SnapshotService;
 import com.automq.rocketmq.store.service.TimerService;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.util.FlatMessageUtil;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.instrumentation.annotations.SpanAttribute;
 import io.opentelemetry.instrumentation.annotations.WithSpan;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -130,28 +133,37 @@ public class MessageStoreImpl implements MessageStore {
     }
 
     @Override
-    @WithSpan
-    public CompletableFuture<PopResult> pop(long consumerGroupId, long topicId, int queueId, Filter filter,
-        int batchSize, boolean fifo, boolean retry, long invisibleDuration) {
+    @WithSpan(kind = SpanKind.SERVER)
+    public CompletableFuture<PopResult> pop(StoreContext context, @SpanAttribute long consumerGroupId,
+        @SpanAttribute long topicId, @SpanAttribute int queueId, Filter filter,
+        int batchSize, @SpanAttribute boolean fifo, @SpanAttribute boolean retry,
+        @SpanAttribute long invisibleDuration) {
         if (fifo && retry) {
             return CompletableFuture.failedFuture(new RuntimeException("Fifo and retry cannot be true at the same time"));
         }
-        return logicQueueManager.getOrCreate(topicId, queueId)
+        return logicQueueManager.getOrCreate(context, topicId, queueId)
             .thenCompose(topicQueue -> {
                 if (fifo) {
-                    return topicQueue.popFifo(consumerGroupId, filter, batchSize, invisibleDuration);
+                    return topicQueue.popFifo(context, consumerGroupId, filter, batchSize, invisibleDuration);
                 }
                 if (retry) {
-                    return topicQueue.popRetry(consumerGroupId, filter, batchSize, invisibleDuration);
+                    return topicQueue.popRetry(context, consumerGroupId, filter, batchSize, invisibleDuration);
                 }
-                return topicQueue.popNormal(consumerGroupId, filter, batchSize, invisibleDuration);
+                return topicQueue.popNormal(context, consumerGroupId, filter, batchSize, invisibleDuration);
+            }).thenApply(result -> {
+                context.span().ifPresent(span -> {
+                    span.setAttribute("result.status", result.status().name());
+                    span.setAttribute("result.messageCount", result.messageList().size());
+                    span.setAttribute("result.restMessageCount", result.restMessageCount());
+                });
+                return result;
             });
     }
 
     @Override
     public CompletableFuture<PullResult> pull(long consumerGroupId, long topicId, int queueId, Filter filter,
         long offset, int batchSize, boolean retry) {
-        return logicQueueManager.getOrCreate(topicId, queueId)
+        return logicQueueManager.getOrCreate(StoreContext.EMPTY, topicId, queueId)
             .thenCompose(topicQueue -> {
                 if (retry) {
                     return topicQueue.pullRetry(consumerGroupId, filter, offset, batchSize);
@@ -172,7 +184,7 @@ public class MessageStoreImpl implements MessageStore {
             }
         }
 
-        return logicQueueManager.getOrCreate(message.topicId(), message.queueId())
+        return logicQueueManager.getOrCreate(StoreContext.EMPTY, message.topicId(), message.queueId())
             .thenCompose(topicQueue -> topicQueue.put(message));
     }
 
@@ -181,7 +193,7 @@ public class MessageStoreImpl implements MessageStore {
         // Write ack operation to operation log.
         // Operation id should be monotonically increasing for each queue
         ReceiptHandle handle = decodeReceiptHandle(receiptHandle);
-        return logicQueueManager.getOrCreate(handle.topicId(), handle.queueId())
+        return logicQueueManager.getOrCreate(StoreContext.EMPTY, handle.topicId(), handle.queueId())
             .thenCompose(topicQueue -> topicQueue.ack(receiptHandle));
     }
 
@@ -191,7 +203,7 @@ public class MessageStoreImpl implements MessageStore {
         // Write change invisible duration operation to operation log.
         // Operation id should be monotonically increasing for each queue
         ReceiptHandle handle = decodeReceiptHandle(receiptHandle);
-        return logicQueueManager.getOrCreate(handle.topicId(), handle.queueId())
+        return logicQueueManager.getOrCreate(StoreContext.EMPTY, handle.topicId(), handle.queueId())
             .thenCompose(topicQueue -> topicQueue.changeInvisibleDuration(receiptHandle, invisibleDuration));
     }
 
@@ -203,26 +215,26 @@ public class MessageStoreImpl implements MessageStore {
     @Override
     public CompletableFuture<Integer> getInflightStats(long consumerGroupId, long topicId, int queueId) {
         // Get check point count of specified consumer, topic and queue.
-        return logicQueueManager.getOrCreate(topicId, queueId)
+        return logicQueueManager.getOrCreate(StoreContext.EMPTY, topicId, queueId)
             .thenApply(topicQueue -> topicQueue.getInflightStats(consumerGroupId));
     }
 
     @Override
     public CompletableFuture<LogicQueue.QueueOffsetRange> getOffsetRange(long topicId, int queueId) {
-        return logicQueueManager.getOrCreate(topicId, queueId)
+        return logicQueueManager.getOrCreate(StoreContext.EMPTY, topicId, queueId)
             .thenCompose(LogicQueue::getOffsetRange);
     }
 
     @Override
     public CompletableFuture<Long> getConsumeOffset(long consumerGroupId, long topicId, int queueId) {
-        return logicQueueManager.getOrCreate(topicId, queueId)
+        return logicQueueManager.getOrCreate(StoreContext.EMPTY, topicId, queueId)
             .thenApply(topicQueue -> topicQueue.getConsumeOffset(consumerGroupId));
     }
 
     @Override
     public CompletableFuture<ResetConsumeOffsetResult> resetConsumeOffset(long consumerGroupId, long topicId,
         int queueId, long offset) {
-        return logicQueueManager.getOrCreate(topicId, queueId)
+        return logicQueueManager.getOrCreate(StoreContext.EMPTY, topicId, queueId)
             .thenCompose(topicQueue -> topicQueue.resetConsumeOffset(consumerGroupId, offset));
     }
 

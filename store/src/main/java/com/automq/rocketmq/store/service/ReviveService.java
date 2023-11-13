@@ -24,6 +24,7 @@ import com.automq.rocketmq.store.api.LogicQueue;
 import com.automq.rocketmq.store.api.LogicQueueManager;
 import com.automq.rocketmq.store.exception.StoreErrorCode;
 import com.automq.rocketmq.store.exception.StoreException;
+import com.automq.rocketmq.store.model.StoreContext;
 import com.automq.rocketmq.store.model.generated.CheckPoint;
 import com.automq.rocketmq.store.model.generated.ReceiptHandle;
 import com.automq.rocketmq.store.model.generated.TimerHandlerType;
@@ -103,7 +104,7 @@ public class ReviveService {
             reviveTimestamp = deliveryTimestamp;
 
             CompletableFuture<Triple<LogicQueue, PullResult, PopOperation.PopOperationType>> fetchMessageFuture =
-                future.thenCompose(nil -> logicQueueManager.getOrCreate(topicId, queueId))
+                future.thenCompose(nil -> logicQueueManager.getOrCreate(StoreContext.EMPTY, topicId, queueId))
                     .thenComposeAsync(queue -> {
                         // TODO: prevent adding ck into kv when queue is not opened
 //                        LogicQueue.State queueState = queue.getState();

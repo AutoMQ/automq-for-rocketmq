@@ -18,6 +18,7 @@
 package com.automq.rocketmq.store.mock;
 
 import com.automq.rocketmq.store.api.StreamStore;
+import com.automq.rocketmq.store.model.StoreContext;
 import com.automq.stream.api.AppendResult;
 import com.automq.stream.api.FetchResult;
 import com.automq.stream.api.RecordBatch;
@@ -38,7 +39,7 @@ public class MockStreamStore implements StreamStore {
     }
 
     @Override
-    public CompletableFuture<FetchResult> fetch(long streamId, long startOffset, int maxCount) {
+    public CompletableFuture<FetchResult> fetch(StoreContext context, long streamId, long startOffset, int maxCount) {
         if (!openedStreams.containsKey(streamId)) {
             throw new IllegalStateException("Stream " + streamId + " is not opened.");
         }

@@ -29,16 +29,21 @@ import com.automq.rocketmq.common.util.CommonUtil;
 import com.automq.rocketmq.metadata.api.ProxyMetadataService;
 import com.automq.rocketmq.proxy.exception.ProxyException;
 import com.automq.rocketmq.proxy.metrics.ProxyMetricsManager;
+import com.automq.rocketmq.proxy.model.ProxyContextExt;
 import com.automq.rocketmq.proxy.model.VirtualQueue;
+import com.automq.rocketmq.proxy.util.ContextUtil;
 import com.automq.rocketmq.proxy.util.FlatMessageUtil;
 import com.automq.rocketmq.proxy.util.ReceiptHandleUtil;
 import com.automq.rocketmq.store.api.DeadLetterSender;
 import com.automq.rocketmq.store.api.MessageStore;
+import com.automq.rocketmq.store.model.StoreContext;
 import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PutResult;
 import com.automq.rocketmq.store.model.message.ResetConsumeOffsetResult;
 import com.automq.rocketmq.store.model.message.SQLFilter;
 import com.automq.rocketmq.store.model.message.TagFilter;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.instrumentation.annotations.SpanAttribute;
 import io.opentelemetry.instrumentation.annotations.WithSpan;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -297,18 +302,19 @@ public class MessageServiceImpl implements MessageService {
         }
     }
 
-    @WithSpan
-    private CompletableFuture<InnerPopResult> popSpecifiedQueueUnsafe(ProxyContext context, ConsumerGroup consumerGroup,
-        Topic topic,
-        int queueId, Filter filter, int batchSize, boolean fifo, long invisibleDuration) {
+    @WithSpan(kind = SpanKind.SERVER)
+    private CompletableFuture<InnerPopResult> popSpecifiedQueueUnsafe(ProxyContext context,
+        ConsumerGroup consumerGroup, Topic topic, int queueId, Filter filter, int batchSize, boolean fifo,
+        long invisibleDuration) {
         List<FlatMessageExt> messageList = new ArrayList<>();
         long consumerGroupId = consumerGroup.getGroupId();
         long topicId = topic.getTopicId();
+        StoreContext storeContext = ContextUtil.buildStoreContext(context, topic.getName(), consumerGroup.getName());
 
         // Decide whether to pop the retry-messages first
         boolean retryPriority = !fifo && CommonUtil.applyPercentage(config.retryPriorityPercentage());
 
-        CompletableFuture<InnerPopResult> popFuture = store.pop(consumerGroupId, topicId, queueId, filter, batchSize, fifo, retryPriority, invisibleDuration)
+        CompletableFuture<InnerPopResult> popFuture = store.pop(storeContext, consumerGroupId, topicId, queueId, filter, batchSize, fifo, retryPriority, invisibleDuration)
             .thenApply(firstResult -> {
                 List<FlatMessageExt> resultList = firstResult.messageList();
                 messageList.addAll(resultList);
@@ -327,7 +333,7 @@ public class MessageServiceImpl implements MessageService {
         return popFuture.thenCompose(firstPopResult -> {
             int firstPopMessageCount = firstPopResult.messageList.size();
             if (firstPopMessageCount < batchSize) {
-                return store.pop(consumerGroupId, topicId, queueId, filter, batchSize - firstPopMessageCount, false, !retryPriority, invisibleDuration)
+                return store.pop(storeContext, consumerGroupId, topicId, queueId, filter, batchSize - firstPopMessageCount, false, !retryPriority, invisibleDuration)
                     .thenApply(secondResult -> {
                         List<FlatMessageExt> secondPopMessageList = secondResult.messageList();
                         messageList.addAll(secondPopMessageList);
@@ -343,11 +349,12 @@ public class MessageServiceImpl implements MessageService {
         });
     }
 
-    @WithSpan
-    private CompletableFuture<InnerPopResult> popSpecifiedQueue(ProxyContext context, ConsumerGroup consumerGroup,
-        String clientId,
-        Topic topic, int queueId, Filter filter, int batchSize, boolean fifo, long invisibleDuration,
-        long timeoutMillis) {
+    @WithSpan(kind = SpanKind.SERVER)
+    private CompletableFuture<InnerPopResult> popSpecifiedQueue(ProxyContext context,
+        @SpanAttribute ConsumerGroup consumerGroup,
+        @SpanAttribute String clientId, @SpanAttribute Topic topic, @SpanAttribute int queueId,
+        @SpanAttribute Filter filter, @SpanAttribute int batchSize, @SpanAttribute boolean fifo,
+        @SpanAttribute long invisibleDuration, @SpanAttribute long timeoutMillis) {
         long topicId = topic.getTopicId();
         if (lockService.tryLock(topicId, queueId, clientId, fifo, false)) {
             return popSpecifiedQueueUnsafe(context, consumerGroup, topic, queueId, filter, batchSize, fifo, invisibleDuration)
@@ -365,9 +372,10 @@ public class MessageServiceImpl implements MessageService {
     }
 
     @Override
-    @WithSpan
-    public CompletableFuture<PopResult> popMessage(ProxyContext ctx, AddressableMessageQueue messageQueue,
-        PopMessageRequestHeader requestHeader, long timeoutMillis) {
+    @WithSpan(kind = SpanKind.SERVER)
+    public CompletableFuture<PopResult> popMessage(ProxyContext ctx,
+        @SpanAttribute AddressableMessageQueue messageQueue,
+        @SpanAttribute PopMessageRequestHeader requestHeader, @SpanAttribute long timeoutMillis) {
         CompletableFuture<Topic> topicFuture = topicOf(requestHeader.getTopic());
         CompletableFuture<ConsumerGroup> groupFuture = consumerGroupOf(requestHeader.getConsumerGroup());
 
@@ -403,8 +411,11 @@ public class MessageServiceImpl implements MessageService {
             topicReference.set(topic);
             consumerGroupReference.set(group);
             return null;
-        }).thenCompose(nil -> popSpecifiedQueue(ctx, consumerGroupReference.get(), clientId, topicReference.get(), virtualQueue.physicalQueueId(), filter,
-            requestHeader.getMaxMsgNums(), requestHeader.isOrder(), requestHeader.getInvisibleTime(), timeoutMillis));
+        }).thenCompose(nil -> {
+            long timeout = timeoutMillis - config.networkRTTMills();
+            return popSpecifiedQueue(ctx, consumerGroupReference.get(), clientId, topicReference.get(), virtualQueue.physicalQueueId(), filter,
+                requestHeader.getMaxMsgNums(), requestHeader.isOrder(), requestHeader.getInvisibleTime(), timeout);
+        });
 
         return popMessageFuture.thenCompose(result -> {
             if (result.messageList.isEmpty()) {
@@ -412,7 +423,7 @@ public class MessageServiceImpl implements MessageService {
                     // This means there are messages in the queue but not match the filter. So we should prevent long polling.
                     return CompletableFuture.completedFuture(new PopResult(PopStatus.NO_NEW_MSG, Collections.emptyList()));
                 } else {
-                    return suspendRequestService.suspendRequest(ctx, requestHeader.getTopic(), virtualQueue.physicalQueueId(), filter, timeoutMillis,
+                    return suspendRequestService.suspendRequest((ProxyContextExt) ctx, requestHeader.getTopic(), virtualQueue.physicalQueueId(), filter, timeoutMillis,
                             // Function to pop message later.
                             timeout -> popSpecifiedQueue(ctx, consumerGroupReference.get(), clientId, topicReference.get(), virtualQueue.physicalQueueId(), filter,
                                 requestHeader.getMaxMsgNums(), requestHeader.isOrder(), requestHeader.getInvisibleTime(), timeout))
@@ -425,6 +436,13 @@ public class MessageServiceImpl implements MessageService {
                 }
             }
             return CompletableFuture.completedFuture(new PopResult(PopStatus.FOUND, FlatMessageUtil.convertTo(result.messageList, requestHeader.getTopic(), requestHeader.getInvisibleTime(), config.hostName(), config.grpcListenPort())));
+        }).thenApply(result -> {
+            ((ProxyContextExt) ctx).span().ifPresent(span -> {
+                span.setAttribute("result.status", result.getPopStatus().name());
+                span.setAttribute("result.messageCount", result.getMsgFoundList().size());
+                span.setAttribute("result.restMessageCount", result.getRestNum());
+            });
+            return result;
         });
     }
 
@@ -611,7 +629,7 @@ public class MessageServiceImpl implements MessageService {
                         // This means there are messages in the queue but not match the filter. So we should prevent long polling.
                         return CompletableFuture.completedFuture(new PullResult(PullStatus.NO_MATCHED_MSG, result.nextBeginOffset(), result.minOffset(), result.maxOffset(), Collections.emptyList()));
                     } else {
-                        return suspendRequestService.suspendRequest(ctx, requestHeader.getTopic(), virtualQueue.physicalQueueId(), filter, timeoutMillis,
+                        return suspendRequestService.suspendRequest((ProxyContextExt) ctx, requestHeader.getTopic(), virtualQueue.physicalQueueId(), filter, timeoutMillis,
                                 // Function to pull message later.
                                 timeout -> store.pull(consumerGroupReference.get().getGroupId(), topicReference.get().getTopicId(), virtualQueue.physicalQueueId(), filter,
                                         requestHeader.getQueueOffset(), requestHeader.getMaxMsgNums(), false)

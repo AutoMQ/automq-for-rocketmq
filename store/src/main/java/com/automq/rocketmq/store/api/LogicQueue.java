@@ -18,6 +18,7 @@
 package com.automq.rocketmq.store.api;
 
 import com.automq.rocketmq.common.model.generated.FlatMessage;
+import com.automq.rocketmq.store.model.StoreContext;
 import com.automq.rocketmq.store.model.message.AckResult;
 import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
 import com.automq.rocketmq.store.model.message.Filter;
@@ -52,13 +53,13 @@ public abstract class LogicQueue {
 
     public abstract CompletableFuture<PutResult> putRetry(long consumerGroupId, FlatMessage flatMessage);
 
-    public abstract CompletableFuture<PopResult> popNormal(long consumerGroup, Filter filter,
+    public abstract CompletableFuture<PopResult> popNormal(StoreContext context, long consumerGroup, Filter filter,
         int batchSize, long invisibleDuration);
 
-    public abstract CompletableFuture<PopResult> popFifo(long consumerGroup, Filter filter,
+    public abstract CompletableFuture<PopResult> popFifo(StoreContext context, long consumerGroup, Filter filter,
         int batchSize, long invisibleDuration);
 
-    public abstract CompletableFuture<PopResult> popRetry(long consumerGroup, Filter filter,
+    public abstract CompletableFuture<PopResult> popRetry(StoreContext context, long consumerGroup, Filter filter,
         int batchSize, long invisibleDuration);
 
     public abstract CompletableFuture<AckResult> ack(String receiptHandle);

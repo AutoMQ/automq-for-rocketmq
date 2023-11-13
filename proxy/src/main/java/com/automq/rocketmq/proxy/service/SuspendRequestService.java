@@ -20,6 +20,8 @@ package com.automq.rocketmq.proxy.service;
 import com.automq.rocketmq.common.ServiceThread;
 import com.automq.rocketmq.proxy.model.ProxyContextExt;
 import com.automq.rocketmq.store.model.message.Filter;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.instrumentation.annotations.SpanAttribute;
 import io.opentelemetry.instrumentation.annotations.WithSpan;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -35,7 +37,6 @@ import javax.annotation.Nonnull;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.rocketmq.common.thread.ThreadPoolMonitor;
 import org.apache.rocketmq.common.utils.StartAndShutdown;
-import org.apache.rocketmq.proxy.common.ProxyContext;
 import org.apache.rocketmq.proxy.config.ConfigurationManager;
 import org.apache.rocketmq.proxy.config.ProxyConfig;
 import org.slf4j.Logger;
@@ -82,6 +83,7 @@ public class SuspendRequestService extends ServiceThread implements StartAndShut
     }
 
     static class SuspendRequestTask<T extends GetMessageResult> implements Comparable<SuspendRequestTask<T>> {
+        private final ProxyContextExt context;
         private final long bornTime;
         private final long timeLimit;
         private final Filter filter;
@@ -90,8 +92,9 @@ public class SuspendRequestService extends ServiceThread implements StartAndShut
         private final AtomicBoolean inflight = new AtomicBoolean(false);
         private final AtomicBoolean completed = new AtomicBoolean(false);
 
-        public SuspendRequestTask(long timeLimit, Filter filter,
+        public SuspendRequestTask(ProxyContextExt context, long timeLimit, Filter filter,
             Function<Long, CompletableFuture<T>> supplier) {
+            this.context = context;
             this.bornTime = System.currentTimeMillis();
             this.timeLimit = timeLimit;
             this.filter = filter;
@@ -117,6 +120,7 @@ public class SuspendRequestService extends ServiceThread implements StartAndShut
         public boolean completeTimeout() {
             if (inflight.compareAndSet(false, true)) {
                 completed.set(true);
+                context.span().ifPresent(span -> span.setAttribute("result", "expired"));
                 future.complete(Optional.empty());
                 inflight.set(false);
                 return true;
@@ -131,6 +135,7 @@ public class SuspendRequestService extends ServiceThread implements StartAndShut
 
             if (inflight.compareAndSet(false, true)) {
                 if (isExpired()) {
+                    context.span().ifPresent(span -> span.setAttribute("result", "expired"));
                     future.complete(Optional.empty());
                     completed.set(true);
                     inflight.set(false);
@@ -140,6 +145,7 @@ public class SuspendRequestService extends ServiceThread implements StartAndShut
                 return supplier.apply(timeRemaining())
                     .thenApply(result -> {
                         if (result.needWriteResponse()) {
+                            context.span().ifPresent(span -> span.setAttribute("result", "found"));
                             future.complete(Optional.of(result));
                             completed.set(true);
                             return true;
@@ -148,6 +154,7 @@ public class SuspendRequestService extends ServiceThread implements StartAndShut
                     })
                     .exceptionally(ex -> {
                         LOGGER.error("Error while fetching messages for suspended request.", ex);
+                        context.span().ifPresent(span -> span.setAttribute("result", "error"));
                         future.completeExceptionally(ex);
                         completed.set(true);
                         return true;
@@ -183,11 +190,11 @@ public class SuspendRequestService extends ServiceThread implements StartAndShut
         }
     }
 
-    @WithSpan
-    public <T extends GetMessageResult> CompletableFuture<Optional<T>> suspendRequest(ProxyContext context,
-        String topic, int queueId, Filter filter, long timeRemaining,
-        Function<Long/*timeout*/, CompletableFuture<T>> supplier) {
-        ((ProxyContextExt) context).setSuspended(true);
+    @WithSpan(kind = SpanKind.SERVER)
+    public <T extends GetMessageResult> CompletableFuture<Optional<T>> suspendRequest(ProxyContextExt context,
+        @SpanAttribute String topic, @SpanAttribute int queueId, @SpanAttribute Filter filter,
+        @SpanAttribute long timeRemaining, Function<Long/*timeout*/, CompletableFuture<T>> supplier) {
+        context.setSuspended(true);
 
         // TODO: make max size configurable.
         if (suspendRequestCount.get() > 1000) {
@@ -205,7 +212,7 @@ public class SuspendRequestService extends ServiceThread implements StartAndShut
 
         timeRemaining = Math.min(timeRemaining, config.getGrpcClientConsumerMaxLongPollingTimeoutMillis());
 
-        SuspendRequestTask<T> task = new SuspendRequestTask<>(timeRemaining, filter, supplier);
+        SuspendRequestTask<T> task = new SuspendRequestTask<>(context, timeRemaining, filter, supplier);
         ConcurrentSkipListSet<SuspendRequestTask<?>> taskList = suspendPopRequestMap.computeIfAbsent(Pair.of(topic, queueId), k -> new ConcurrentSkipListSet<>());
         taskList.add(task);
         suspendRequestCount.incrementAndGet();

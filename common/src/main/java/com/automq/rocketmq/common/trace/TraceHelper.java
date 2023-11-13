@@ -1,0 +1,126 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.automq.rocketmq.common.trace;
+
+import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.context.Context;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
+import java.lang.reflect.Method;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
+import org.aspectj.lang.ProceedingJoinPoint;
+import org.aspectj.lang.reflect.MethodSignature;
+
+public class TraceHelper {
+    private static final SpanAttributesExtractor EXTRACTOR = SpanAttributesExtractor.create();
+
+    public static Object doTrace(ProceedingJoinPoint joinPoint, TraceContext context,
+        WithSpan withSpan) throws Throwable {
+        return doTrace(joinPoint, context, withSpan, Map.of());
+    }
+
+    public static Object doTrace(ProceedingJoinPoint joinPoint, TraceContext context, WithSpan withSpan,
+        Map<String, String> attributeMap) throws Throwable {
+        MethodSignature signature = (MethodSignature) joinPoint.getSignature();
+        Method method = signature.getMethod();
+        Object[] args = joinPoint.getArgs();
+
+        Optional<Tracer> tracer = context.tracer();
+        if (tracer.isEmpty()) {
+            return joinPoint.proceed();
+        }
+
+        Context spanContext = Context.current();
+        Optional<Span> parentSpan = context.span();
+        if (parentSpan.isPresent() && parentSpan.get().isRecording()) {
+            spanContext = spanContext.with(parentSpan.get());
+        }
+
+        String className = method.getDeclaringClass().getSimpleName();
+        String spanName = withSpan.value().isEmpty() ? className + "::" + method.getName() : withSpan.value();
+
+        Span span = tracer.get().spanBuilder(spanName)
+            .setParent(spanContext)
+            .setSpanKind(withSpan.kind())
+            .startSpan();
+        context.attachSpan(span);
+
+        Attributes attributes = EXTRACTOR.extract(method, signature.getParameterNames(), args);
+        span.setAllAttributes(attributes);
+        attributeMap.forEach(span::setAttribute);
+
+        try {
+            if (method.getReturnType() == CompletableFuture.class) {
+                return doTraceWhenReturnCompletableFuture(context, span, joinPoint);
+            } else {
+                return doTraceWhenReturnObject(context, span, joinPoint);
+            }
+        } catch (Throwable t) {
+            span.recordException(t);
+            span.setStatus(StatusCode.ERROR, t.getMessage());
+            context.detachSpan();
+            throw t;
+        }
+    }
+
+    private static CompletableFuture<?> doTraceWhenReturnCompletableFuture(TraceContext context, Span span,
+        ProceedingJoinPoint joinPoint) throws Throwable {
+        CompletableFuture<?> future = (CompletableFuture<?>) joinPoint.proceed();
+        return future.whenComplete((r, t) -> {
+            if (t != null) {
+                Throwable throwable = t;
+                if (throwable instanceof CompletionException || throwable instanceof ExecutionException) {
+                    if (throwable.getCause() != null) {
+                        throwable = throwable.getCause();
+                    }
+                }
+
+                if (throwable instanceof TimeoutException) {
+                    context.detachAllSpan();
+                    span.recordException(throwable);
+                    span.setStatus(StatusCode.ERROR, throwable.getMessage());
+                } else {
+                    span.recordException(throwable);
+                    span.setStatus(StatusCode.ERROR, throwable.getMessage());
+                    span.end();
+                    context.detachSpan();
+                }
+            } else {
+                span.setStatus(StatusCode.OK);
+            }
+            span.end();
+            context.detachSpan();
+        });
+    }
+
+    private static Object doTraceWhenReturnObject(TraceContext context, Span span,
+        ProceedingJoinPoint joinPoint) throws Throwable {
+        Object result = joinPoint.proceed();
+        span.setStatus(StatusCode.OK);
+        span.end();
+        context.detachSpan();
+        return result;
+    }
+}

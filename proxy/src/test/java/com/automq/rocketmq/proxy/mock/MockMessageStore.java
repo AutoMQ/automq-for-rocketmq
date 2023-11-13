@@ -21,6 +21,7 @@ import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.store.api.LogicQueue;
 import com.automq.rocketmq.store.api.MessageStore;
+import com.automq.rocketmq.store.model.StoreContext;
 import com.automq.rocketmq.store.model.message.AckResult;
 import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
 import com.automq.rocketmq.store.model.message.ClearRetryMessagesResult;
@@ -63,7 +64,8 @@ public class MockMessageStore implements MessageStore {
     }
 
     @Override
-    public CompletableFuture<PopResult> pop(long consumerGroupId, long topicId, int queueId, Filter filter,
+    public CompletableFuture<PopResult> pop(StoreContext context, long consumerGroupId, long topicId, int queueId,
+        Filter filter,
         int batchSize, boolean fifo, boolean retry, long invisibleDuration) {
         if (retry) {
             return CompletableFuture.completedFuture(new PopResult(PopResult.Status.END_OF_QUEUE, 0L, new ArrayList<>(), 0));

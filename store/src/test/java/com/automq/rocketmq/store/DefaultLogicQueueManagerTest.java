@@ -25,6 +25,7 @@ import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.mock.MockOperationLogService;
 import com.automq.rocketmq.store.mock.MockStoreMetadataService;
 import com.automq.rocketmq.store.mock.MockStreamStore;
+import com.automq.rocketmq.store.model.StoreContext;
 import com.automq.rocketmq.store.queue.DefaultLogicQueueManager;
 import com.automq.rocketmq.store.service.InflightService;
 import com.automq.rocketmq.store.service.RocksDBKVService;
@@ -72,12 +73,12 @@ class DefaultLogicQueueManagerTest {
     @Test
     void getOrCreate() {
         // Create new TopicQueue
-        CompletableFuture<LogicQueue> future = topicQueueManager.getOrCreate(TOPIC_ID, QUEUE_ID);
+        CompletableFuture<LogicQueue> future = topicQueueManager.getOrCreate(StoreContext.EMPTY, TOPIC_ID, QUEUE_ID);
         assertEquals(topicQueueManager.size(), 1);
         assertTrue(future.isDone());
 
         // Get existing TopicQueue
-        future = topicQueueManager.getOrCreate(TOPIC_ID, QUEUE_ID);
+        future = topicQueueManager.getOrCreate(StoreContext.EMPTY, TOPIC_ID, QUEUE_ID);
         assertEquals(topicQueueManager.size(), 1);
         assertTrue(future.isDone());
         LogicQueue logicQueue = future.join();
@@ -93,7 +94,7 @@ class DefaultLogicQueueManagerTest {
     void getOrCreate_exception() {
         operationLogService.setRecoverFailed(true);
 
-        CompletableFuture<LogicQueue> future = topicQueueManager.getOrCreate(TOPIC_ID, QUEUE_ID);
+        CompletableFuture<LogicQueue> future = topicQueueManager.getOrCreate(StoreContext.EMPTY, TOPIC_ID, QUEUE_ID);
         assertTrue(future.isDone());
         assertEquals(topicQueueManager.size(), 0);
     }
