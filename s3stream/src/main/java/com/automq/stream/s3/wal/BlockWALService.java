@@ -494,14 +494,7 @@ public class BlockWALService implements WriteAheadLog {
      * Recover from the given offset.
      */
     private Iterator<RecoverResult> recover(long startOffset) {
-        long recoverStartOffset = WALUtil.alignSmallByBlockSize(startOffset);
-        RecoverIterator iterator;
-        if (startOffset == 0) {
-            iterator = new RecoverIterator(recoverStartOffset);
-        } else {
-            iterator = new RecoverIterator(recoverStartOffset, startOffset);
-        }
-        return iterator;
+        return new RecoverIterator(startOffset);
     }
 
     @Override
@@ -842,11 +835,10 @@ public class BlockWALService implements WriteAheadLog {
 
         public RecoverIterator(long nextRecoverOffset) {
             this.nextRecoverOffset = nextRecoverOffset;
-        }
-
-        public RecoverIterator(long nextRecoverOffset, long skipRecordAtOffset) {
-            this.nextRecoverOffset = nextRecoverOffset;
-            this.skipRecordAtOffset = skipRecordAtOffset;
+            // Corner case: if nextRecoverOffset is not 0, it means the WAL has been trimmed, so we need to skip the first record.
+            if (nextRecoverOffset != 0) {
+                this.skipRecordAtOffset = nextRecoverOffset;
+            }
         }
 
         @Override
