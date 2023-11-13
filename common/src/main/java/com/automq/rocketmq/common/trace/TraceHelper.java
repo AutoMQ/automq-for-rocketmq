@@ -19,6 +19,7 @@ package com.automq.rocketmq.common.trace;
 
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Context;
@@ -35,6 +36,57 @@ import org.aspectj.lang.reflect.MethodSignature;
 
 public class TraceHelper {
     private static final SpanAttributesExtractor EXTRACTOR = SpanAttributesExtractor.create();
+
+    public static Optional<Span> createAndStartSpan(TraceContext context, String name, SpanKind kind) {
+        Optional<Tracer> tracer = context.tracer();
+        if (tracer.isEmpty()) {
+            return Optional.empty();
+        }
+
+        Context spanContext = Context.current();
+        Optional<Span> parentSpan = context.span();
+        if (parentSpan.isPresent() && parentSpan.get().isRecording()) {
+            spanContext = spanContext.with(parentSpan.get());
+        }
+
+        Span span = tracer.get().spanBuilder(name)
+            .setParent(spanContext)
+            .setSpanKind(kind)
+            .startSpan();
+        context.attachSpan(span);
+
+        return Optional.of(span);
+    }
+
+    public static void endSpan(TraceContext context, Span span) {
+        span.setStatus(StatusCode.OK);
+        span.end();
+        context.detachSpan();
+    }
+
+    public static void endSpan(TraceContext context, Span span, Throwable throwable) {
+        if (throwable == null) {
+            endSpan(context, span);
+            return;
+        }
+
+        if (throwable instanceof CompletionException || throwable instanceof ExecutionException) {
+            if (throwable.getCause() != null) {
+                throwable = throwable.getCause();
+            }
+        }
+
+        if (throwable instanceof TimeoutException) {
+            context.detachAllSpan();
+            span.recordException(throwable);
+            span.setStatus(StatusCode.ERROR, throwable.getMessage());
+        } else {
+            span.recordException(throwable);
+            span.setStatus(StatusCode.ERROR, throwable.getMessage());
+            span.end();
+            context.detachSpan();
+        }
+    }
 
     public static Object doTrace(ProceedingJoinPoint joinPoint, TraceContext context,
         WithSpan withSpan) throws Throwable {
@@ -88,39 +140,13 @@ public class TraceHelper {
     private static CompletableFuture<?> doTraceWhenReturnCompletableFuture(TraceContext context, Span span,
         ProceedingJoinPoint joinPoint) throws Throwable {
         CompletableFuture<?> future = (CompletableFuture<?>) joinPoint.proceed();
-        return future.whenComplete((r, t) -> {
-            if (t != null) {
-                Throwable throwable = t;
-                if (throwable instanceof CompletionException || throwable instanceof ExecutionException) {
-                    if (throwable.getCause() != null) {
-                        throwable = throwable.getCause();
-                    }
-                }
-
-                if (throwable instanceof TimeoutException) {
-                    context.detachAllSpan();
-                    span.recordException(throwable);
-                    span.setStatus(StatusCode.ERROR, throwable.getMessage());
-                } else {
-                    span.recordException(throwable);
-                    span.setStatus(StatusCode.ERROR, throwable.getMessage());
-                    span.end();
-                    context.detachSpan();
-                }
-            } else {
-                span.setStatus(StatusCode.OK);
-            }
-            span.end();
-            context.detachSpan();
-        });
+        return future.whenComplete((r, t) -> endSpan(context, span, t));
     }
 
     private static Object doTraceWhenReturnObject(TraceContext context, Span span,
         ProceedingJoinPoint joinPoint) throws Throwable {
         Object result = joinPoint.proceed();
-        span.setStatus(StatusCode.OK);
-        span.end();
-        context.detachSpan();
+        endSpan(context, span);
         return result;
     }
 }

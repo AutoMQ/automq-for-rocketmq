@@ -84,6 +84,7 @@ public class ExtendReceiveMessageResponseStreamWriter extends ReceiveMessageResp
         super.writeAndComplete(ctx, code, message);
         recordRpcLatency(ctx, code);
         rootSpan.setStatus(StatusCode.OK);
+        rootSpan.setAttribute("code", code.name().toLowerCase());
     }
 
     @Override
@@ -97,6 +98,7 @@ public class ExtendReceiveMessageResponseStreamWriter extends ReceiveMessageResp
         } else {
             rootSpan.setStatus(StatusCode.OK);
         }
+        rootSpan.setAttribute("code", status.getCode().name().toLowerCase());
     }
 
     @Override

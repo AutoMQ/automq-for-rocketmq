@@ -20,6 +20,7 @@ package com.automq.rocketmq.store.queue;
 import com.automq.rocketmq.common.config.StoreConfig;
 import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.model.generated.FlatMessage;
+import com.automq.rocketmq.common.trace.TraceHelper;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.store.api.LogicQueue;
 import com.automq.rocketmq.store.api.MessageStateMachine;
@@ -45,12 +46,14 @@ import com.automq.rocketmq.store.service.StreamReclaimService;
 import com.automq.rocketmq.store.service.api.OperationLogService;
 import com.automq.rocketmq.store.util.SerializeUtil;
 import com.automq.stream.utils.FutureUtil;
+import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.instrumentation.annotations.SpanAttribute;
 import io.opentelemetry.instrumentation.annotations.WithSpan;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -277,7 +280,11 @@ public class StreamLogicQueue extends LogicQueue {
         CompletableFuture<FilterFetchResult> fetchCf = fetchAndFilterMessages(context, streamId, startOffset, batchSize,
             fetchBatchSize, filter, fetchResult, 0, 0, operationTimestamp);
         // log op
+        AtomicReference<Span> spanRef = new AtomicReference<>();
         CompletableFuture<FilterFetchResult> fetchAndLogOpCf = fetchCf.thenCompose(filterFetchResult -> {
+            Optional<Span> spanOptional = TraceHelper.createAndStartSpan(context, "logPopOperation", SpanKind.SERVER);
+            spanOptional.ifPresent(spanRef::set);
+
             List<FlatMessageExt> messageExtList = filterFetchResult.messageList;
             // write pop operation to operation log
             long preOffset = filterFetchResult.startOffset - 1;
@@ -289,7 +296,7 @@ public class StreamLogicQueue extends LogicQueue {
                 PopOperation popOperation = new PopOperation(topicId, queueId, operationStreamId, snapshotStreamId,
                     stateMachine, consumerGroupId, messageExt.offset(), count, invisibleDuration, operationTimestamp,
                     false, operationType);
-                appendOpCfs.add(operationLogService.logPopOperation(context, popOperation)
+                appendOpCfs.add(operationLogService.logPopOperation(popOperation)
                     .thenApply(logResult -> {
                         long operationId = logResult.getOperationOffset();
                         messageExt.setReceiptHandle(SerializeUtil.encodeReceiptHandle(consumerGroupId, topicId, queueId, operationId));
@@ -305,9 +312,16 @@ public class StreamLogicQueue extends LogicQueue {
                 PopOperation popOperation = new PopOperation(topicId, queueId, operationStreamId, snapshotStreamId,
                     stateMachine, consumerGroupId, fetchResult.endOffset - 1, count, invisibleDuration,
                     operationTimestamp, true, operationType);
-                appendOpCfs.add(operationLogService.logPopOperation(context, popOperation));
+                appendOpCfs.add(operationLogService.logPopOperation(popOperation));
             }
             return CompletableFuture.allOf(appendOpCfs.toArray(new CompletableFuture[0]))
+                .whenComplete((nil, throwable) -> {
+                    Span span = spanRef.get();
+                    if (span != null) {
+                        span.setAttribute("operationCount", appendOpCfs.size());
+                        TraceHelper.endSpan(context, span, throwable);
+                    }
+                })
                 .thenApply(nil -> fetchResult);
         });
 

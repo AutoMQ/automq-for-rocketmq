@@ -19,6 +19,8 @@ package com.automq.rocketmq.broker;
 
 import com.automq.rocketmq.common.api.DataStore;
 import com.automq.rocketmq.common.config.BrokerConfig;
+import com.automq.rocketmq.common.config.ProfilerConfig;
+import com.automq.rocketmq.common.config.TraceConfig;
 import com.automq.rocketmq.common.util.Lifecycle;
 import com.automq.rocketmq.controller.MetadataStore;
 import com.automq.rocketmq.controller.server.ControllerServiceImpl;
@@ -39,18 +41,36 @@ import com.automq.rocketmq.store.DataStoreFacade;
 import com.automq.rocketmq.store.MessageStoreBuilder;
 import com.automq.rocketmq.store.MessageStoreImpl;
 import com.automq.rocketmq.store.api.MessageStore;
+import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.api.common.AttributesBuilder;
+import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
+import io.opentelemetry.sdk.resources.Resource;
+import io.opentelemetry.sdk.trace.SdkTracerProvider;
+import io.opentelemetry.sdk.trace.SpanProcessor;
+import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
+import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
 import io.pyroscope.http.Format;
 import io.pyroscope.javaagent.EventType;
 import io.pyroscope.javaagent.PyroscopeAgent;
 import io.pyroscope.javaagent.config.Config;
 import io.pyroscope.labels.Pyroscope;
+import java.io.InputStream;
 import java.util.Map;
+import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 import org.apache.rocketmq.common.constant.LoggerName;
 import org.apache.rocketmq.common.thread.ThreadPoolMonitor;
+import org.apache.rocketmq.logging.org.slf4j.Logger;
 import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
 import org.apache.rocketmq.proxy.service.ServiceManager;
 
+import static io.opentelemetry.semconv.ResourceAttributes.SERVICE_INSTANCE_ID;
+import static io.opentelemetry.semconv.ResourceAttributes.SERVICE_NAME;
+import static io.opentelemetry.semconv.ResourceAttributes.SERVICE_VERSION;
+
 public class BrokerController implements Lifecycle {
+    private static final Logger LOGGER = LoggerFactory.getLogger(MetricsExporter.class);
+
     private final BrokerConfig brokerConfig;
     private final ServiceManager serviceManager;
     private final GrpcProtocolServer grpcServer;
@@ -87,18 +107,69 @@ public class BrokerController implements Lifecycle {
         serviceManager = new DefaultServiceManager(brokerConfig, proxyMetadataService, dlqService, messageStore);
         messagingProcessor = ExtendMessagingProcessor.createForS3RocketMQ(serviceManager);
 
-        // Init the metrics exporter before accept requests.
-        metricsExporter = new MetricsExporter(brokerConfig, messageStore, messagingProcessor);
+        // Build resource.
+        Properties gitProperties;
+        try {
+            ClassLoader classLoader = getClass().getClassLoader();
+            InputStream inputStream = classLoader.getResourceAsStream("git.properties");
+            gitProperties = new Properties();
+            gitProperties.load(inputStream);
+        } catch (Exception e) {
+            LOGGER.warn("read project version failed", e);
+            throw new RuntimeException(e);
+        }
 
-        Pyroscope.setStaticLabels(Map.of("broker", brokerConfig.name()));
-        PyroscopeAgent.start(
-            new Config.Builder()
-                .setApplicationName("automq-for-rocketmq")
-                .setProfilingEvent(EventType.ITIMER)
-                .setFormat(Format.JFR)
-                .setServerAddress("http://10.129.193.87:4040")
-                .build()
-        );
+        AttributesBuilder builder = Attributes.builder();
+        builder.put(SERVICE_NAME, brokerConfig.name());
+        builder.put(SERVICE_VERSION, (String) gitProperties.get("git.build.version"));
+        builder.put("git.hash", (String) gitProperties.get("git.commit.id.describe"));
+        builder.put(SERVICE_INSTANCE_ID, brokerConfig.instanceId());
+
+        Resource resource = Resource.create(builder.build());
+
+        // Build trace provider.
+        TraceConfig traceConfig = brokerConfig.trace();
+        SdkTracerProvider sdkTracerProvider = null;
+        if (traceConfig.enabled()) {
+            OtlpGrpcSpanExporter spanExporter = OtlpGrpcSpanExporter.builder()
+                .setEndpoint(traceConfig.grpcExporterTarget())
+                .setTimeout(traceConfig.grpcExporterTimeOutInMills(), TimeUnit.MILLISECONDS)
+                .build();
+
+            SpanProcessor spanProcessor;
+            if (traceConfig.batchSize() == 0) {
+                spanProcessor = SimpleSpanProcessor.create(spanExporter);
+            } else {
+                spanProcessor = BatchSpanProcessor.builder(spanExporter)
+                    .setExporterTimeout(traceConfig.grpcExporterTimeOutInMills(), TimeUnit.MILLISECONDS)
+                    .setScheduleDelay(traceConfig.periodicExporterIntervalInMills(), TimeUnit.MILLISECONDS)
+                    .setMaxExportBatchSize(traceConfig.batchSize())
+                    .setMaxQueueSize(traceConfig.maxCachedSize())
+                    .build();
+            }
+
+            sdkTracerProvider = SdkTracerProvider.builder()
+                .addSpanProcessor(spanProcessor)
+                .setResource(resource)
+                .build();
+        }
+
+        // Init the metrics exporter before accept requests.
+        metricsExporter = new MetricsExporter(brokerConfig, messageStore, messagingProcessor, resource, sdkTracerProvider);
+
+        // Init the profiler agent.
+        ProfilerConfig profilerConfig = brokerConfig.profiler();
+        if (profilerConfig.enabled()) {
+            Pyroscope.setStaticLabels(Map.of("broker", brokerConfig.name()));
+            PyroscopeAgent.start(
+                new Config.Builder()
+                    .setApplicationName("automq-for-rocketmq")
+                    .setProfilingEvent(EventType.ITIMER)
+                    .setFormat(Format.JFR)
+                    .setServerAddress(profilerConfig.serverAddress())
+                    .build()
+            );
+        }
 
         // TODO: Split controller to a separate port
         ControllerServiceImpl controllerService = MetadataStoreBuilder.build(metadataStore);

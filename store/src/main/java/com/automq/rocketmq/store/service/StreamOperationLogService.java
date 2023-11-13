@@ -34,8 +34,6 @@ import com.automq.rocketmq.store.util.SerializeUtil;
 import com.automq.stream.api.AppendResult;
 import com.automq.stream.api.RecordBatchWithContext;
 import com.automq.stream.utils.FutureUtil;
-import io.opentelemetry.instrumentation.annotations.SpanAttribute;
-import io.opentelemetry.instrumentation.annotations.WithSpan;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -90,7 +88,7 @@ public class StreamOperationLogService implements OperationLogService {
                             operationStreamId, snapshotStreamId);
 
                         // TODO: operation may be null
-                        replay(StoreContext.EMPTY, batchWithContext.baseOffset(), operation);
+                        replay(batchWithContext.baseOffset(), operation);
                     } catch (StoreException e) {
                         LOGGER.error("Topic {}, queue: {}, operation stream id: {}, offset: {}: replay operation failed when recover", stateMachine.topicId(), stateMachine.queueId(), operationStreamId, batchWithContext.baseOffset(), e);
                         if (e.code() != StoreErrorCode.ILLEGAL_ARGUMENT) {
@@ -102,13 +100,12 @@ public class StreamOperationLogService implements OperationLogService {
     }
 
     @Override
-    @WithSpan
-    public CompletableFuture<LogResult> logPopOperation(StoreContext context, @SpanAttribute PopOperation operation) {
+    public CompletableFuture<LogResult> logPopOperation(PopOperation operation) {
         return streamStore.append(operation.operationStreamId(),
                 new SingleRecord(ByteBuffer.wrap(SerializeUtil.encodePopOperation(operation))))
             .thenApply(result -> {
                 try {
-                    return doReplay(context, result, operation);
+                    return doReplay(result, operation);
                 } catch (StoreException e) {
                     LOGGER.error("Topic {}, queue: {}: Replay pop operation: {} failed", operation.topicId(), operation.queueId(), operation, e);
                     throw new CompletionException(e);
@@ -122,7 +119,7 @@ public class StreamOperationLogService implements OperationLogService {
                 new SingleRecord(ByteBuffer.wrap(SerializeUtil.encodeAckOperation(operation))))
             .thenApply(result -> {
                 try {
-                    return doReplay(StoreContext.EMPTY, result, operation);
+                    return doReplay(result, operation);
                 } catch (StoreException e) {
                     LOGGER.error("Topic {}, queue: {}: Replay ack operation: {} failed", operation.topicId(), operation.queueId(), operation, e);
                     throw new CompletionException(e);
@@ -137,7 +134,7 @@ public class StreamOperationLogService implements OperationLogService {
                 new SingleRecord(ByteBuffer.wrap(SerializeUtil.encodeChangeInvisibleDurationOperation(operation))))
             .thenApply(result -> {
                 try {
-                    return doReplay(StoreContext.EMPTY, result, operation);
+                    return doReplay(result, operation);
                 } catch (StoreException e) {
                     LOGGER.error("Topic {}, queue: {}: Replay change invisible duration operation: {} failed", operation.topicId(), operation.queueId(), operation, e);
                     throw new CompletionException(e);
@@ -151,7 +148,7 @@ public class StreamOperationLogService implements OperationLogService {
                 new SingleRecord(ByteBuffer.wrap(SerializeUtil.encodeResetConsumeOffsetOperation(operation))))
             .thenApply(result -> {
                 try {
-                    return doReplay(StoreContext.EMPTY, result, operation);
+                    return doReplay(result, operation);
                 } catch (StoreException e) {
                     LOGGER.error("Topic {}, queue: {}: Replay reset consume offset operation: {} failed", operation.topicId(), operation.queueId(), operation, e);
                     throw new CompletionException(e);
@@ -182,11 +179,9 @@ public class StreamOperationLogService implements OperationLogService {
         }
     }
 
-    @WithSpan
-    private LogResult doReplay(StoreContext context, AppendResult appendResult,
-        Operation operation) throws StoreException {
+    private LogResult doReplay(AppendResult appendResult, Operation operation) throws StoreException {
         long operationOffset = appendResult.baseOffset();
-        LogResult logResult = replay(context, operationOffset, operation);
+        LogResult logResult = replay(operationOffset, operation);
         MessageStateMachine stateMachine = operation.stateMachine();
         SnapshotService.SnapshotStatus snapshotStatus = snapshotService.getSnapshotStatus(stateMachine.topicId(), stateMachine.queueId());
         if (operationOffset - snapshotStatus.operationStartOffset().get() + 1 >= storeConfig.operationSnapshotInterval()) {
@@ -195,9 +190,7 @@ public class StreamOperationLogService implements OperationLogService {
         return logResult;
     }
 
-    @WithSpan
-    private LogResult replay(StoreContext context, @SpanAttribute long operationOffset,
-        Operation operation) throws StoreException {
+    private LogResult replay(long operationOffset, Operation operation) throws StoreException {
         LogResult logResult = new LogResult(operationOffset);
         switch (operation.operationType()) {
             case POP -> {
@@ -212,7 +205,6 @@ public class StreamOperationLogService implements OperationLogService {
             default -> throw new IllegalStateException("Unexpected value: " + operation.operationType());
         }
 
-        context.span().ifPresent(span -> span.setAttribute("result", logResult.toString()));
         return logResult;
     }
 }
