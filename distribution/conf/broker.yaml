@@ -13,7 +13,6 @@ s3Stream:
   s3SecretKey: "secret-key"
   networkBaselineBandwidth: 5242880
   refillPeriodMs: 100
-  s3Namespace: "S3_ROCKETMQ"
 store:
   kvPath: "/tmp/s3rocketmq/kvstore"
 db:
