@@ -143,5 +143,10 @@ public interface MessageStore extends Lifecycle {
      */
     CompletableFuture<ClearRetryMessagesResult> clearRetryMessages(long consumerGroupId, long topicId, int queueId);
 
+    /**
+     * Register a listener to be notified when a message arrives.
+     *
+     * @param listener message arrive listener
+     */
     void registerMessageArriveListener(MessageArriveListener listener);
 }
