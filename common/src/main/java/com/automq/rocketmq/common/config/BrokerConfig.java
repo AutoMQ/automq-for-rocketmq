@@ -24,6 +24,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import org.apache.rocketmq.common.utils.NetworkUtil;
 
+@SuppressWarnings({"FieldMayBeFinal", "FieldCanBeLocal"})
 public class BrokerConfig implements ControllerConfig {
     /**
      * Node ID
@@ -60,6 +61,8 @@ public class BrokerConfig implements ControllerConfig {
     private String innerSecretKey;
 
     private final MetricsConfig metrics;
+    private final TraceConfig trace;
+    private final ProfilerConfig profiler;
     private final ProxyConfig proxy;
     private final StoreConfig store;
     private final S3StreamConfig s3Stream;
@@ -72,6 +75,8 @@ public class BrokerConfig implements ControllerConfig {
 
     public BrokerConfig() {
         this.metrics = new MetricsConfig();
+        this.trace = new TraceConfig();
+        this.profiler = new ProfilerConfig();
         this.proxy = new ProxyConfig();
         this.store = new StoreConfig();
         this.s3Stream = new S3StreamConfig();
@@ -181,6 +186,14 @@ public class BrokerConfig implements ControllerConfig {
 
     public MetricsConfig metrics() {
         return metrics;
+    }
+
+    public TraceConfig trace() {
+        return trace;
+    }
+
+    public ProfilerConfig profiler() {
+        return profiler;
     }
 
     public ProxyConfig proxy() {

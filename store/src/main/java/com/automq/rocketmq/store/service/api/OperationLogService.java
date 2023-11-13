@@ -18,7 +18,6 @@
 package com.automq.rocketmq.store.service.api;
 
 import com.automq.rocketmq.store.api.MessageStateMachine;
-import com.automq.rocketmq.store.model.StoreContext;
 import com.automq.rocketmq.store.model.operation.AckOperation;
 import com.automq.rocketmq.store.model.operation.ChangeInvisibleDurationOperation;
 import com.automq.rocketmq.store.model.operation.PopOperation;
@@ -30,7 +29,7 @@ public interface OperationLogService {
      * Log pop operation to WAL.
      * Each queue has its own operation log.
      */
-    CompletableFuture<LogResult> logPopOperation(StoreContext context, PopOperation operation);
+    CompletableFuture<LogResult> logPopOperation(PopOperation operation);
 
     /**
      * Log ack operation to WAL.
