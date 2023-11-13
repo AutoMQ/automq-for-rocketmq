@@ -20,11 +20,14 @@ limitations under the License.
 {{- $name := include "rocketmq-broker.fullname" . }}
 {{- $clusterName := include "rocketmq-broker.clusterName" . }}
 {{- $brokerNamePrefix := include "rocketmq-broker.brokerNamePrefix" . }}
-{{- $config := .Values.broker.config }}
-{{- $s3stream := .Values.broker.s3stream }}
+{{- $config := .Values.broker.conf.name }}
+{{- $s3stream := .Values.broker.conf.s3Stream }}
 {{- $bindAddress := .Values.broker.service }}
-{{- $innerKey := .Values.broker.inner }}
-{{- $db := .Values.broker.db }}
+{{- $innerKey := .Values.broker.conf.inner }}
+{{- $db := .Values.broker.conf.db }}
+{{- $controller := .Values.broker.conf.controller }}
+{{- $metrics := .Values.broker.conf.metrics }}
+{{- $store := .Values.broker.conf.store }}
 {{- $replicaCount := .Values.broker.replicaCount | int }}
 {{- range $index := until $replicaCount }}
   {{ $clusterName }}-{{ $name }}-{{ $index }}: |
@@ -45,16 +48,21 @@ limitations under the License.
       url: {{ $db.url }}
       userName: {{ $db.userName }}
       password: {{ $db.password }}
+    store:
+      kvPath: {{ $store.kvPath }}
+    controller:
+      recycleS3IntervalInSecs: {{ $controller.recycleS3IntervalInSecs }}
+      dumpHeapOnError: {{ $controller.dumpHeapOnError }}
     metrics:
-      exporterType: "OTLP_GRPC"
-      grpcExporterTarget: "http://10.129.63.127:4317"
-      grpcExporterHeader: ""
-      grpcExporterTimeOutInMills: 31000
-      periodicExporterIntervalInMills: 30000
-      promExporterPort: 5557
-      promExporterHost: "localhost"
-      labels: ""
-      exportInDelta: false
+      exporterType: {{ $metrics.exporterType }}
+      grpcExporterTarget: {{ $metrics.grpcExporterTarget }}
+      grpcExporterHeader: {{ $metrics.grpcExporterHeader }}
+      grpcExporterTimeOutInMills: {{ $metrics.grpcExporterTimeOutInMills }}
+      periodicExporterIntervalInMills: {{ $metrics.periodicExporterIntervalInMills }}
+      promExporterPort: {{ $metrics.promExporterPort }}
+      promExporterHost: {{ $metrics.promExporterHost }}
+      labels: {{ $metrics.labels }}
+      exportInDelta: {{ $metrics.exportInDelta }}
 {{ $config | indent 4 }}
 {{- end }}
 {{- end }}
