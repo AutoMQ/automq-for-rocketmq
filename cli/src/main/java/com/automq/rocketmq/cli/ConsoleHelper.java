@@ -143,11 +143,14 @@ public class ConsoleHelper {
     public static void printStream(StreamMetadata stream, List<Range> list) {
         AsciiTable streamTable = new AsciiTable();
         streamTable.addRule();
-        streamTable.addRow(null, null, null, null, "STREAM");
+        AT_Row row = streamTable.addRow(null, null, null, null, "STREAM");
+        alignCentral(row);
         streamTable.addRule();
-        streamTable.addRow("STREAM ID", "EPOCH", "STATE", "START OFFSET", "END OFFSET");
+        row = streamTable.addRow("STREAM ID", "EPOCH", "STATE", "START OFFSET", "END OFFSET");
+        alignCentral(row);
         streamTable.addRule();
-        streamTable.addRow(stream.getStreamId(), stream.getEpoch(), stream.getState(), stream.getStartOffset(), stream.getEndOffset());
+        row = streamTable.addRow(stream.getStreamId(), stream.getEpoch(), stream.getState(), stream.getStartOffset(), stream.getEndOffset());
+        alignCentral(row);
         streamTable.addRule();
         String render = streamTable.render();
         System.out.println(render);
@@ -155,13 +158,16 @@ public class ConsoleHelper {
         if (list.isEmpty()) {
             AsciiTable rangeTable = new AsciiTable();
             rangeTable.addRule();
-            rangeTable.addRow(null, null, null, null, "RANGES");
+            row = rangeTable.addRow(null, null, null, null, "RANGES");
+            alignCentral(row);
             rangeTable.addRule();
-            rangeTable.addRow("RANGE ID", "EPOCH", "START OFFSET", "END OFFSET", "NODE");
+            row = rangeTable.addRow("RANGE ID", "EPOCH", "START OFFSET", "END OFFSET", "NODE");
+            alignCentral(row);
             rangeTable.addRule();
 
             list.forEach(r -> {
-                rangeTable.addRow(r.getRangeId(), r.getEpoch(), r.getStartOffset(), r.getEndOffset(), r.getBrokerId());
+                AT_Row rowOfRange = rangeTable.addRow(r.getRangeId(), r.getEpoch(), r.getStartOffset(), r.getEndOffset(), r.getBrokerId());
+                alignCentral(rowOfRange);
                 rangeTable.addRule();
             });
         }
