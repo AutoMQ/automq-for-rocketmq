@@ -31,6 +31,7 @@ import picocli.CommandLine;
         UpdateTopic.class,
         DeleteTopic.class,
         ListTopic.class,
+        DescribeStream.class,
         CreateGroup.class,
         DescribeGroup.class,
         UpdateGroup.class,

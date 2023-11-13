@@ -35,6 +35,8 @@ import apache.rocketmq.controller.v1.DescribeClusterReply;
 import apache.rocketmq.controller.v1.DescribeClusterRequest;
 import apache.rocketmq.controller.v1.DescribeGroupReply;
 import apache.rocketmq.controller.v1.DescribeGroupRequest;
+import apache.rocketmq.controller.v1.DescribeStreamReply;
+import apache.rocketmq.controller.v1.DescribeStreamRequest;
 import apache.rocketmq.controller.v1.DescribeTopicReply;
 import apache.rocketmq.controller.v1.DescribeTopicRequest;
 import apache.rocketmq.controller.v1.HeartbeatReply;
@@ -725,6 +727,29 @@ public class GrpcControllerClient implements ControllerClient {
         Futures.addCallback(stub.listOpenStreams(request), new FutureCallback<>() {
             @Override
             public void onSuccess(ListOpenStreamsReply result) {
+                future.complete(result);
+            }
+
+            @Override
+            public void onFailure(@Nonnull Throwable t) {
+                future.completeExceptionally(t);
+            }
+        }, MoreExecutors.directExecutor());
+        return future;
+    }
+
+    @Override
+    public CompletableFuture<DescribeStreamReply> describeStream(String target, DescribeStreamRequest request) {
+        ControllerServiceGrpc.ControllerServiceFutureStub stub;
+        try {
+            stub = getOrCreateStubForTarget(target);
+        } catch (ControllerException e) {
+            return CompletableFuture.failedFuture(e);
+        }
+        CompletableFuture<DescribeStreamReply> future = new CompletableFuture<>();
+        Futures.addCallback(stub.describeStream(request), new FutureCallback<>() {
+            @Override
+            public void onSuccess(DescribeStreamReply result) {
                 future.complete(result);
             }
 

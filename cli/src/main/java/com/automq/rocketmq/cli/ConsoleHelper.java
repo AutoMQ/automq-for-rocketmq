@@ -22,6 +22,8 @@ import apache.rocketmq.controller.v1.ClusterSummary;
 import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.Node;
 import apache.rocketmq.controller.v1.OngoingMessageQueueReassignment;
+import apache.rocketmq.controller.v1.Range;
+import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.Topic;
 import com.google.protobuf.Timestamp;
 import de.vandermeer.asciitable.AT_Cell;
@@ -135,6 +137,39 @@ public class ConsoleHelper {
                     reassignment.getQueue().getQueueId());
                 reassignmentTable.addRule();
             }
+        }
+    }
+
+    public static void printStream(StreamMetadata stream, List<Range> list) {
+        AsciiTable streamTable = new AsciiTable();
+        streamTable.addRule();
+        AT_Row row = streamTable.addRow(null, null, null, null, "STREAM");
+        alignCentral(row);
+        streamTable.addRule();
+        row = streamTable.addRow("STREAM ID", "EPOCH", "STATE", "START OFFSET", "END OFFSET");
+        alignCentral(row);
+        streamTable.addRule();
+        row = streamTable.addRow(stream.getStreamId(), stream.getEpoch(), stream.getState(), stream.getStartOffset(), stream.getEndOffset());
+        alignCentral(row);
+        streamTable.addRule();
+        String render = streamTable.render();
+        System.out.println(render);
+
+        if (list.isEmpty()) {
+            AsciiTable rangeTable = new AsciiTable();
+            rangeTable.addRule();
+            row = rangeTable.addRow(null, null, null, null, "RANGES");
+            alignCentral(row);
+            rangeTable.addRule();
+            row = rangeTable.addRow("RANGE ID", "EPOCH", "START OFFSET", "END OFFSET", "NODE");
+            alignCentral(row);
+            rangeTable.addRule();
+
+            list.forEach(r -> {
+                AT_Row rowOfRange = rangeTable.addRow(r.getRangeId(), r.getEpoch(), r.getStartOffset(), r.getEndOffset(), r.getBrokerId());
+                alignCentral(rowOfRange);
+                rangeTable.addRule();
+            });
         }
     }
 }
