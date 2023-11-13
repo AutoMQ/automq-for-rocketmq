@@ -36,6 +36,8 @@ import apache.rocketmq.controller.v1.DescribeClusterReply;
 import apache.rocketmq.controller.v1.DescribeClusterRequest;
 import apache.rocketmq.controller.v1.DescribeGroupReply;
 import apache.rocketmq.controller.v1.DescribeGroupRequest;
+import apache.rocketmq.controller.v1.DescribeStreamReply;
+import apache.rocketmq.controller.v1.DescribeStreamRequest;
 import apache.rocketmq.controller.v1.DescribeTopicReply;
 import apache.rocketmq.controller.v1.DescribeTopicRequest;
 import apache.rocketmq.controller.v1.HeartbeatReply;
@@ -616,5 +618,17 @@ public class ControllerServiceImpl extends ControllerServiceGrpc.ControllerServi
         Context context = Context.current();
         Runnable task = new TerminationStageTask(metadataStore, executorService, context, responseObserver);
         this.executorService.schedule(task, 1, TimeUnit.SECONDS);
+    }
+
+    @Override
+    public void describeStream(DescribeStreamRequest request, StreamObserver<DescribeStreamReply> responseObserver) {
+        metadataStore.describeStream(request).whenComplete((res, e) -> {
+            if (null != e) {
+                responseObserver.onError(e);
+                return;
+            }
+            responseObserver.onNext(res);
+            responseObserver.onCompleted();
+        });
     }
 }

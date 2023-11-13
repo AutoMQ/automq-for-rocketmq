@@ -26,11 +26,14 @@ import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.DescribeClusterRequest;
+import apache.rocketmq.controller.v1.DescribeStreamReply;
+import apache.rocketmq.controller.v1.DescribeStreamRequest;
 import apache.rocketmq.controller.v1.GroupStatus;
 import apache.rocketmq.controller.v1.ListOpenStreamsReply;
 import apache.rocketmq.controller.v1.ListOpenStreamsRequest;
 import apache.rocketmq.controller.v1.OpenStreamReply;
 import apache.rocketmq.controller.v1.OpenStreamRequest;
+import apache.rocketmq.controller.v1.Status;
 import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.StreamState;
@@ -77,6 +80,7 @@ import com.automq.rocketmq.controller.server.tasks.ScanTopicTask;
 import com.automq.rocketmq.controller.server.tasks.ScanYieldingQueueTask;
 import com.automq.rocketmq.controller.server.tasks.SchedulerTask;
 import com.google.common.base.Strings;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.protobuf.Timestamp;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -86,6 +90,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -96,6 +101,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.slf4j.Logger;
@@ -1100,6 +1106,49 @@ public class DefaultMetadataStore implements MetadataStore {
                 return buildStreamMetadata(streams, session);
             }
         }, asyncExecutorService);
+    }
+
+    @Override
+    public CompletableFuture<DescribeStreamReply> describeStream(DescribeStreamRequest request) {
+        return CompletableFuture.supplyAsync(() -> {
+            try (SqlSession session = openSession()) {
+                StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+                Stream stream = streamMapper.getByStreamId(request.getStreamId());
+                if (null != stream) {
+                    DescribeStreamReply.Builder builder = DescribeStreamReply.newBuilder()
+                        .setStatus(Status.newBuilder().setCode(Code.OK)
+                            .build());
+
+                    StreamMetadata.Builder streamBuilder = StreamMetadata.newBuilder()
+                        .setStreamId(stream.getId())
+                        .setStartOffset(stream.getStartOffset())
+                        .setEpoch(stream.getEpoch())
+                        .setState(stream.getState())
+                        .setRangeId(stream.getRangeId());
+                    RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
+                    List<Range> ranges = rangeMapper.list(null, stream.getId(), null);
+                    OptionalLong endOffset = ranges.stream().mapToLong(Range::getEndOffset).max();
+                    if (endOffset.isPresent()) {
+                        streamBuilder.setEndOffset(endOffset.getAsLong());
+                    }
+                    builder.setStream(streamBuilder);
+
+                    builder.addAllRanges(ranges.stream().map(r -> apache.rocketmq.controller.v1.Range.newBuilder()
+                        .setStreamId(r.getStreamId())
+                        .setStartOffset(r.getStartOffset())
+                        .setEndOffset(r.getEndOffset())
+                        .setBrokerId(r.getNodeId())
+                        .setEpoch(r.getEpoch())
+                        .build()).collect(Collectors.toList()));
+                    return builder.build();
+                } else {
+                    return DescribeStreamReply.newBuilder()
+                        .setStatus(Status.newBuilder().setCode(Code.NOT_FOUND)
+                            .setMessage(String.format("Stream[stream-id=%d] is not found", request.getStreamId())).build())
+                        .build();
+                }
+            }
+        }, MoreExecutors.directExecutor());
     }
 
     @Override

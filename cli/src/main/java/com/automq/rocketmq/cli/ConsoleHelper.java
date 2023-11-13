@@ -22,6 +22,8 @@ import apache.rocketmq.controller.v1.ClusterSummary;
 import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.Node;
 import apache.rocketmq.controller.v1.OngoingMessageQueueReassignment;
+import apache.rocketmq.controller.v1.Range;
+import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.Topic;
 import com.google.protobuf.Timestamp;
 import de.vandermeer.asciitable.AT_Cell;
@@ -135,6 +137,33 @@ public class ConsoleHelper {
                     reassignment.getQueue().getQueueId());
                 reassignmentTable.addRule();
             }
+        }
+    }
+
+    public static void printStream(StreamMetadata stream, List<Range> list) {
+        AsciiTable streamTable = new AsciiTable();
+        streamTable.addRule();
+        streamTable.addRow(null, null, null, null, "STREAM");
+        streamTable.addRule();
+        streamTable.addRow("STREAM ID", "EPOCH", "STATE", "START OFFSET", "END OFFSET");
+        streamTable.addRule();
+        streamTable.addRow(stream.getStreamId(), stream.getEpoch(), stream.getState(), stream.getStartOffset(), stream.getEndOffset());
+        streamTable.addRule();
+        String render = streamTable.render();
+        System.out.println(render);
+
+        if (list.isEmpty()) {
+            AsciiTable rangeTable = new AsciiTable();
+            rangeTable.addRule();
+            rangeTable.addRow(null, null, null, null, "RANGES");
+            rangeTable.addRule();
+            rangeTable.addRow("RANGE ID", "EPOCH", "START OFFSET", "END OFFSET", "NODE");
+            rangeTable.addRule();
+
+            list.forEach(r -> {
+                rangeTable.addRow(r.getRangeId(), r.getEpoch(), r.getStartOffset(), r.getEndOffset(), r.getBrokerId());
+                rangeTable.addRule();
+            });
         }
     }
 }

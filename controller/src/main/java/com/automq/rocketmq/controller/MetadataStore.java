@@ -23,6 +23,8 @@ import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.DescribeClusterRequest;
+import apache.rocketmq.controller.v1.DescribeStreamReply;
+import apache.rocketmq.controller.v1.DescribeStreamRequest;
 import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.TerminationStage;
@@ -211,6 +213,8 @@ public interface MetadataStore extends Closeable {
     Optional<Integer> ownerNode(long topicId, int queueId);
 
     CompletableFuture<List<StreamMetadata>> getStreams(List<Long> streamIds);
+
+    CompletableFuture<DescribeStreamReply> describeStream(DescribeStreamRequest request);
 
     TerminationStage fireClose();
 }
