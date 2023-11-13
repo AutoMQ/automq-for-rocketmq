@@ -26,7 +26,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import org.apache.commons.lang3.tuple.Pair;
 
-public interface StoreMetadataService {
+public interface StoreMetadataService extends ResourceMetadataService {
     /**
      * Get the data stream metadata of the specified message queue.
      *

@@ -22,6 +22,7 @@ import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.store.api.LogicQueue;
 import com.automq.rocketmq.store.api.LogicQueueManager;
+import com.automq.rocketmq.store.api.MessageArrivalListener;
 import com.automq.rocketmq.store.api.MessageStore;
 import com.automq.rocketmq.store.api.S3ObjectOperator;
 import com.automq.rocketmq.store.api.StreamStore;
@@ -38,6 +39,7 @@ import com.automq.rocketmq.store.model.message.PullResult;
 import com.automq.rocketmq.store.model.message.PutResult;
 import com.automq.rocketmq.store.model.message.ResetConsumeOffsetResult;
 import com.automq.rocketmq.store.service.InflightService;
+import com.automq.rocketmq.store.service.MessageArrivalNotificationService;
 import com.automq.rocketmq.store.service.ReviveService;
 import com.automq.rocketmq.store.service.SnapshotService;
 import com.automq.rocketmq.store.service.TimerService;
@@ -68,11 +70,13 @@ public class MessageStoreImpl implements MessageStore {
     private final SnapshotService snapshotService;
     private final LogicQueueManager logicQueueManager;
     private final S3ObjectOperator s3ObjectOperator;
+    private final MessageArrivalNotificationService messageArrivalNotificationService;
 
     public MessageStoreImpl(StoreConfig config, StreamStore streamStore,
         StoreMetadataService metadataService, KVService kvService, TimerService timerService,
         InflightService inflightService, SnapshotService snapshotService, LogicQueueManager logicQueueManager,
-        ReviveService reviveService, S3ObjectOperator s3ObjectOperator) {
+        ReviveService reviveService, S3ObjectOperator s3ObjectOperator,
+        MessageArrivalNotificationService messageArrivalNotificationService) {
         this.config = config;
         this.streamStore = streamStore;
         this.metadataService = metadataService;
@@ -83,6 +87,7 @@ public class MessageStoreImpl implements MessageStore {
         this.logicQueueManager = logicQueueManager;
         this.reviveService = reviveService;
         this.s3ObjectOperator = s3ObjectOperator;
+        this.messageArrivalNotificationService = messageArrivalNotificationService;
     }
 
     public LogicQueueManager topicQueueManager() {
@@ -185,7 +190,20 @@ public class MessageStoreImpl implements MessageStore {
         }
 
         return logicQueueManager.getOrCreate(StoreContext.EMPTY, message.topicId(), message.queueId())
-            .thenCompose(topicQueue -> topicQueue.put(message));
+            .thenCompose(topicQueue -> topicQueue.put(message))
+            .thenCompose(result ->
+                metadataService.topicOf(message.topicId())
+                    .thenAccept(topic -> {
+                        MessageArrivalListener.MessageSource source;
+                        if (deliveryTimestamp > 0) {
+                            source = MessageArrivalListener.MessageSource.DELAY_MESSAGE_DEQUEUE;
+                        } else {
+                            source = MessageArrivalListener.MessageSource.MESSAGE_PUT;
+                        }
+                        messageArrivalNotificationService.notify(source, topic, message.queueId(), result.offset(), message.tag());
+                    })
+                    .thenApply(v -> result)
+            );
     }
 
     @Override
@@ -242,5 +260,10 @@ public class MessageStoreImpl implements MessageStore {
     public CompletableFuture<ClearRetryMessagesResult> clearRetryMessages(long consumerGroupId, long topicId,
         int queueId) {
         throw new UnsupportedOperationException("Not implemented yet");
+    }
+
+    @Override
+    public void registerMessageArriveListener(MessageArrivalListener listener) {
+        messageArrivalNotificationService.registerMessageArriveListener(listener);
     }
 }

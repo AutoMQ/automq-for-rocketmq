@@ -22,6 +22,7 @@ import apache.rocketmq.controller.v1.S3StreamObject;
 import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.StreamRole;
+import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.common.config.ControllerConfig;
 import com.automq.rocketmq.controller.MetadataStore;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
@@ -42,6 +43,26 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
     public DefaultStoreMetadataService(MetadataStore metadataStore, S3MetadataService s3MetadataService) {
         this.metadataStore = metadataStore;
         this.s3MetadataService = s3MetadataService;
+    }
+
+    @Override
+    public CompletableFuture<Topic> topicOf(String topicName) {
+        return metadataStore.describeTopic(null, topicName);
+    }
+
+    @Override
+    public CompletableFuture<Topic> topicOf(long topicId) {
+        return metadataStore.describeTopic(topicId, null);
+    }
+
+    @Override
+    public CompletableFuture<ConsumerGroup> consumerGroupOf(String groupName) {
+        return metadataStore.describeGroup(null, groupName);
+    }
+
+    @Override
+    public CompletableFuture<ConsumerGroup> consumerGroupOf(long consumerGroupId) {
+        return metadataStore.describeGroup(consumerGroupId, null);
     }
 
     @Override

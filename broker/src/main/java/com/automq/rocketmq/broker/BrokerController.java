@@ -37,6 +37,7 @@ import com.automq.rocketmq.proxy.processor.ExtendMessagingProcessor;
 import com.automq.rocketmq.proxy.remoting.RemotingProtocolServer;
 import com.automq.rocketmq.proxy.service.DeadLetterService;
 import com.automq.rocketmq.proxy.service.DefaultServiceManager;
+import com.automq.rocketmq.proxy.service.SuspendRequestService;
 import com.automq.rocketmq.store.DataStoreFacade;
 import com.automq.rocketmq.store.MessageStoreBuilder;
 import com.automq.rocketmq.store.MessageStoreImpl;
@@ -99,6 +100,8 @@ public class BrokerController implements Lifecycle {
         dlqService = new DeadLetterService(brokerConfig, proxyMetadataService);
 
         MessageStoreImpl messageStore = MessageStoreBuilder.build(brokerConfig.store(), brokerConfig.s3Stream(), storeMetadataService, dlqService);
+        SuspendRequestService suspendRequestService = SuspendRequestService.getInstance();
+        messageStore.registerMessageArriveListener((source, topic, queueId, offset, tag) -> suspendRequestService.notifyMessageArrival(topic.getName(), queueId, tag));
         this.messageStore = messageStore;
 
         DataStore dataStore = new DataStoreFacade(messageStore.streamStore(), messageStore.s3ObjectOperator(), messageStore.topicQueueManager());
