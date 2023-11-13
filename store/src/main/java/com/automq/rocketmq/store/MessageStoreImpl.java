@@ -22,7 +22,7 @@ import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.store.api.LogicQueue;
 import com.automq.rocketmq.store.api.LogicQueueManager;
-import com.automq.rocketmq.store.api.MessageArriveListener;
+import com.automq.rocketmq.store.api.MessageArrivalListener;
 import com.automq.rocketmq.store.api.MessageStore;
 import com.automq.rocketmq.store.api.S3ObjectOperator;
 import com.automq.rocketmq.store.api.StreamStore;
@@ -39,7 +39,7 @@ import com.automq.rocketmq.store.model.message.PullResult;
 import com.automq.rocketmq.store.model.message.PutResult;
 import com.automq.rocketmq.store.model.message.ResetConsumeOffsetResult;
 import com.automq.rocketmq.store.service.InflightService;
-import com.automq.rocketmq.store.service.MessageArriveNotifyService;
+import com.automq.rocketmq.store.service.MessageArrivalNotificationService;
 import com.automq.rocketmq.store.service.ReviveService;
 import com.automq.rocketmq.store.service.SnapshotService;
 import com.automq.rocketmq.store.service.TimerService;
@@ -70,13 +70,13 @@ public class MessageStoreImpl implements MessageStore {
     private final SnapshotService snapshotService;
     private final LogicQueueManager logicQueueManager;
     private final S3ObjectOperator s3ObjectOperator;
-    private final MessageArriveNotifyService messageArriveNotifyService;
+    private final MessageArrivalNotificationService messageArrivalNotificationService;
 
     public MessageStoreImpl(StoreConfig config, StreamStore streamStore,
         StoreMetadataService metadataService, KVService kvService, TimerService timerService,
         InflightService inflightService, SnapshotService snapshotService, LogicQueueManager logicQueueManager,
         ReviveService reviveService, S3ObjectOperator s3ObjectOperator,
-        MessageArriveNotifyService messageArriveNotifyService) {
+        MessageArrivalNotificationService messageArrivalNotificationService) {
         this.config = config;
         this.streamStore = streamStore;
         this.metadataService = metadataService;
@@ -87,7 +87,7 @@ public class MessageStoreImpl implements MessageStore {
         this.logicQueueManager = logicQueueManager;
         this.reviveService = reviveService;
         this.s3ObjectOperator = s3ObjectOperator;
-        this.messageArriveNotifyService = messageArriveNotifyService;
+        this.messageArrivalNotificationService = messageArrivalNotificationService;
     }
 
     public LogicQueueManager topicQueueManager() {
@@ -194,13 +194,13 @@ public class MessageStoreImpl implements MessageStore {
             .thenCompose(result ->
                 metadataService.topicOf(message.topicId())
                     .thenAccept(topic -> {
-                        MessageArriveListener.MessageSource source;
+                        MessageArrivalListener.MessageSource source;
                         if (deliveryTimestamp > 0) {
-                            source = MessageArriveListener.MessageSource.DELAY_MESSAGE_DEQUEUE;
+                            source = MessageArrivalListener.MessageSource.DELAY_MESSAGE_DEQUEUE;
                         } else {
-                            source = MessageArriveListener.MessageSource.PUT;
+                            source = MessageArrivalListener.MessageSource.MESSAGE_PUT;
                         }
-                        messageArriveNotifyService.notify(source, topic, message.queueId(), result.offset(), message.tag());
+                        messageArrivalNotificationService.notify(source, topic, message.queueId(), result.offset(), message.tag());
                     })
                     .thenApply(v -> result)
             );
@@ -263,7 +263,7 @@ public class MessageStoreImpl implements MessageStore {
     }
 
     @Override
-    public void registerMessageArriveListener(MessageArriveListener listener) {
-        messageArriveNotifyService.registerMessageArriveListener(listener);
+    public void registerMessageArriveListener(MessageArrivalListener listener) {
+        messageArrivalNotificationService.registerMessageArriveListener(listener);
     }
 }

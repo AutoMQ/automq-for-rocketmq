@@ -20,7 +20,7 @@ package com.automq.rocketmq.proxy.mock;
 import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.store.api.LogicQueue;
-import com.automq.rocketmq.store.api.MessageArriveListener;
+import com.automq.rocketmq.store.api.MessageArrivalListener;
 import com.automq.rocketmq.store.api.MessageStore;
 import com.automq.rocketmq.store.model.StoreContext;
 import com.automq.rocketmq.store.model.message.AckResult;
@@ -185,6 +185,6 @@ public class MockMessageStore implements MessageStore {
     }
 
     @Override
-    public void registerMessageArriveListener(MessageArriveListener listener) {
+    public void registerMessageArriveListener(MessageArrivalListener listener) {
     }
 }

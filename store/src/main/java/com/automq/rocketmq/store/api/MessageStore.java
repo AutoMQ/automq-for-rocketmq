@@ -148,5 +148,5 @@ public interface MessageStore extends Lifecycle {
      *
      * @param listener message arrive listener
      */
-    void registerMessageArriveListener(MessageArriveListener listener);
+    void registerMessageArriveListener(MessageArrivalListener listener);
 }

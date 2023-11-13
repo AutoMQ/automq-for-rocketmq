@@ -20,12 +20,21 @@ package com.automq.rocketmq.store.api;
 import apache.rocketmq.controller.v1.Topic;
 
 @FunctionalInterface
-public interface MessageArriveListener {
+public interface MessageArrivalListener {
+    /**
+     * Notify message arrival.
+     *
+     * @param source  message source
+     * @param topic   topic
+     * @param queueId queue id
+     * @param offset  message offset
+     * @param tag     message tag
+     */
     void apply(MessageSource source, Topic topic, int queueId, long offset, String tag);
 
     enum MessageSource {
-        PUT,
-        RETRY_MESSAGE,
+        MESSAGE_PUT,
+        RETRY_MESSAGE_PUT,
         DELAY_MESSAGE_DEQUEUE,
         TRANSACTION_MESSAGE_COMMIT,
     }

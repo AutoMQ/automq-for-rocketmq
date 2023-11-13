@@ -18,18 +18,18 @@
 package com.automq.rocketmq.store.service;
 
 import apache.rocketmq.controller.v1.Topic;
-import com.automq.rocketmq.store.api.MessageArriveListener;
+import com.automq.rocketmq.store.api.MessageArrivalListener;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-public class MessageArriveNotifyService {
-    ConcurrentLinkedQueue<MessageArriveListener> listenerQueue = new ConcurrentLinkedQueue<>();
+public class MessageArrivalNotificationService {
+    ConcurrentLinkedQueue<MessageArrivalListener> listenerQueue = new ConcurrentLinkedQueue<>();
 
-    public void registerMessageArriveListener(MessageArriveListener listener) {
+    public void registerMessageArriveListener(MessageArrivalListener listener) {
         listenerQueue.add(listener);
     }
 
-    public void notify(MessageArriveListener.MessageSource source, Topic topic, int queueId, long offset, String tag) {
-        for (MessageArriveListener listener : listenerQueue) {
+    public void notify(MessageArrivalListener.MessageSource source, Topic topic, int queueId, long offset, String tag) {
+        for (MessageArrivalListener listener : listenerQueue) {
             listener.apply(source, topic, queueId, offset, tag);
         }
     }

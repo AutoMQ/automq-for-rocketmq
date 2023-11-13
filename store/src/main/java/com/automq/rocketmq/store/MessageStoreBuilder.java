@@ -27,7 +27,7 @@ import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.queue.DefaultLogicQueueManager;
 import com.automq.rocketmq.store.service.InflightService;
-import com.automq.rocketmq.store.service.MessageArriveNotifyService;
+import com.automq.rocketmq.store.service.MessageArrivalNotificationService;
 import com.automq.rocketmq.store.service.ReviveService;
 import com.automq.rocketmq.store.service.RocksDBKVService;
 import com.automq.rocketmq.store.service.SnapshotService;
@@ -57,15 +57,15 @@ public class MessageStoreBuilder {
         TimerService timerService = new TimerService("timer_tag_0", kvService);
         LogicQueueManager logicQueueManager = new DefaultLogicQueueManager(storeConfig, streamStore, kvService, timerService,
             metadataService, operationLogService, inflightService, streamReclaimService);
-        MessageArriveNotifyService messageArriveNotifyService = new MessageArriveNotifyService();
+        MessageArrivalNotificationService messageArrivalNotificationService = new MessageArrivalNotificationService();
         ReviveService reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, kvService, timerService,
-            metadataService, messageArriveNotifyService, logicQueueManager, deadLetterSender);
+            metadataService, messageArrivalNotificationService, logicQueueManager, deadLetterSender);
 
         // S3 object manager, such as trim expired messages, etc.
         S3Operator operator = new DefaultS3Operator(s3StreamConfig.s3Endpoint(), s3StreamConfig.s3Region(), s3StreamConfig.s3Bucket(),
             s3StreamConfig.s3ForcePathStyle(), s3StreamConfig.s3AccessKey(), s3StreamConfig.s3SecretKey());
         S3ObjectOperator objectOperator = new S3ObjectOperatorImpl(operator);
 
-        return new MessageStoreImpl(storeConfig, streamStore, metadataService, kvService, timerService, inflightService, snapshotService, logicQueueManager, reviveService, objectOperator, messageArriveNotifyService);
+        return new MessageStoreImpl(storeConfig, streamStore, metadataService, kvService, timerService, inflightService, snapshotService, logicQueueManager, reviveService, objectOperator, messageArrivalNotificationService);
     }
 }
