@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.common.config;
 
+@SuppressWarnings({"FieldMayBeFinal", "FieldCanBeLocal"})
 public class StoreConfig {
     private static final int PROCESSOR_NUMBER = Runtime.getRuntime().availableProcessors();
 

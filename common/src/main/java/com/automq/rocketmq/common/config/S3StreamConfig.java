@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.common.config;
 
+@SuppressWarnings({"FieldMayBeFinal", "FieldCanBeLocal"})
 public class S3StreamConfig {
     private String s3Endpoint;
     private String s3Region = "cn-hangzhou";
