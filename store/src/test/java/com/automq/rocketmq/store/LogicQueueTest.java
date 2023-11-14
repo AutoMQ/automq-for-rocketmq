@@ -206,7 +206,7 @@ public class LogicQueueTest {
     }
 
     @Test
-    void pop_normal_multi_group() throws StoreException {
+    void pop_normal_multi_group() {
         long group0 = 0;
         long group1 = 1;
 
@@ -430,7 +430,7 @@ public class LogicQueueTest {
     }
 
     @Test
-    void pop_with_filter() throws StoreException {
+    void pop_with_filter() {
         // 1. append 5 messages with tagA
         for (int i = 0; i < 5; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
@@ -576,7 +576,7 @@ public class LogicQueueTest {
     }
 
     @Test
-    void pop_retry() throws StoreException {
+    void pop_retry() {
         StreamMetadata retryStream = metadataService.retryStreamOf(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID).join();
         // 1. append 5 messages to retry queue
         for (int i = 0; i < 5; i++) {
@@ -745,7 +745,7 @@ public class LogicQueueTest {
     }
 
     @Test
-    void reset_consume_offset() throws Exception {
+    void reset_consume_offset() {
         // 1. append 5 messages
         for (int i = 0; i < 5; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
@@ -753,7 +753,7 @@ public class LogicQueueTest {
         }
 
         // 2. pop 3 messages
-        PopResult popResult = logicQueue.popNormal(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 2, 100).join();
+        PopResult popResult = logicQueue.popNormal(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 3, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
         assertEquals(3, popResult.messageList().size());
         assertEquals(3, logicQueue.getInflightStats(CONSUMER_GROUP_ID));
