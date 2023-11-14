@@ -17,7 +17,7 @@
 
 package com.automq.rocketmq.metadata;
 
-import apache.rocketmq.controller.v1.Code;
+import apache.rocketmq.common.v1.Code;
 import com.automq.rocketmq.common.exception.ControllerException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;

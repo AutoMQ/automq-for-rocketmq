@@ -17,7 +17,7 @@
 
 package com.automq.rocketmq.controller.server.tasks;
 
-import apache.rocketmq.controller.v1.Code;
+import apache.rocketmq.common.v1.Code;
 import apache.rocketmq.controller.v1.StreamState;
 import apache.rocketmq.controller.v1.TopicStatus;
 import com.automq.rocketmq.controller.MetadataStore;
