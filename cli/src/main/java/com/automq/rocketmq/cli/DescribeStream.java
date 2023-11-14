@@ -17,7 +17,7 @@
 
 package com.automq.rocketmq.cli;
 
-import apache.rocketmq.controller.v1.Code;
+import apache.rocketmq.common.v1.Code;
 import apache.rocketmq.controller.v1.DescribeStreamReply;
 import apache.rocketmq.controller.v1.DescribeStreamRequest;
 import com.automq.rocketmq.controller.ControllerClient;

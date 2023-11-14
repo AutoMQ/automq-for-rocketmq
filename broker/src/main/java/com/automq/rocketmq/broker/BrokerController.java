@@ -114,13 +114,12 @@ public class BrokerController implements Lifecycle {
         DataStore dataStore = new DataStoreFacade(messageStore.streamStore(), messageStore.s3ObjectOperator(), messageStore.topicQueueManager());
         metadataStore.setDataStore(dataStore);
 
-        serviceManager = new DefaultServiceManager(brokerConfig, proxyMetadataService, dlqService, messageStore);
         LockService lockService = new LockService(brokerConfig.proxy());
         MessageServiceImpl messageServiceImpl = new MessageServiceImpl(brokerConfig.proxy(), messageStore, proxyMetadataService, lockService, dlqService);
         this.messageService = messageServiceImpl;
         this.extendMessageService = messageServiceImpl;
-
         serviceManager = new DefaultServiceManager(brokerConfig, proxyMetadataService, dlqService, messageService, messageStore);
+
         messagingProcessor = ExtendMessagingProcessor.createForS3RocketMQ(serviceManager);
 
         // Build resource.
