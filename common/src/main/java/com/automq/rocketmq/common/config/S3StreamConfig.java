@@ -35,6 +35,10 @@ public class S3StreamConfig {
     private long streamObjectCompactionMaxSizeBytes = 10737418240L;
     private int streamObjectCompactionLivingTimeMinutes = 60;
 
+    // Cache
+    private int walCacheSize = 1024 * 1024 * 1024;
+    private int blockCacheSize = 1024 * 1024 * 1024;
+
     private int walObjectCompactionInterval = 20;
     private long walObjectCompactionCacheSize = 200 * 1024 * 1024;
     private int walObjectCompactionUploadConcurrency = 8;
@@ -93,6 +97,14 @@ public class S3StreamConfig {
 
     public int streamObjectCompactionLivingTimeMinutes() {
         return streamObjectCompactionLivingTimeMinutes;
+    }
+
+    public int walCacheSize() {
+        return walCacheSize;
+    }
+
+    public int blockCacheSize() {
+        return blockCacheSize;
     }
 
     public int walObjectCompactionInterval() {
