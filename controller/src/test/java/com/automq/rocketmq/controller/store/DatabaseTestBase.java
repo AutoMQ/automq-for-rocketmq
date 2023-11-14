@@ -84,7 +84,7 @@ public class DatabaseTestBase {
         return this.s3ObjectIdSequence.getAndIncrement();
     }
 
-    static MySQLContainer mySQLContainer = new MySQLContainer<>(DockerImageName.parse("mysql:8"))
+    protected static MySQLContainer mySQLContainer = new MySQLContainer<>(DockerImageName.parse("mysql:8"))
         .withDatabaseName("metadata")
         .withInitScript("ddl.sql")
         .withReuse(true);
