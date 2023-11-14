@@ -138,7 +138,7 @@ public class WriteBench implements AutoCloseable {
                 long now = System.nanoTime();
                 long elapsedNanos = now - lastAppendTimeNanos;
                 if (elapsedNanos >= intervalNanos) {
-                    lastAppendTimeNanos = now;
+                    lastAppendTimeNanos += intervalNanos;
                     break;
                 }
                 LockSupport.parkNanos((intervalNanos - elapsedNanos) >> 2);
