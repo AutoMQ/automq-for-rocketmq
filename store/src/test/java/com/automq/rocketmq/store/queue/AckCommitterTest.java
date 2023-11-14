@@ -20,6 +20,8 @@ package com.automq.rocketmq.store.queue;
 import java.nio.ByteBuffer;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.roaringbitmap.RoaringBitmap;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 public class AckCommitterTest {
 
@@ -28,8 +30,18 @@ public class AckCommitterTest {
         DefaultLogicQueueStateMachine.AckCommitter ackCommitter = new DefaultLogicQueueStateMachine.AckCommitter(100,
             System.out::println);
         ackCommitter.commitAck(102);
+        ackCommitter.commitAck(202);
+        ackCommitter.commitAck(302);
         ByteBuffer buffer = ackCommitter.getSerializedBuffer();
+
         Assertions.assertEquals(0, buffer.position());
         Assertions.assertTrue(buffer.limit() > 0);
+
+        Assertions.assertEquals(100, buffer.getLong());
+
+        RoaringBitmap bitmap = new RoaringBitmap(new ImmutableRoaringBitmap(buffer));
+        Assertions.assertTrue(bitmap.contains(2));
+        Assertions.assertTrue(bitmap.contains(102));
+        Assertions.assertTrue(bitmap.contains(202));
     }
 }

@@ -38,11 +38,10 @@ import com.automq.rocketmq.store.util.SerializeUtil;
 import com.automq.stream.utils.FutureUtil;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -67,9 +66,9 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
     private static final Logger LOGGER = LoggerFactory.getLogger(DefaultLogicQueueStateMachine.class);
     private final long topicId;
     private final int queueId;
-    private Map<Long/*consumerGroup*/, ConsumerGroupMetadata> consumerGroupMetadataMap;
-    private final Map<Long/*consumerGroup*/, AckCommitter> ackCommitterMap = new HashMap<>();
-    private final Map<Long/*consumerGroup*/, AckCommitter> retryAckCommitterMap = new HashMap<>();
+    private ConcurrentMap<Long/*consumerGroup*/, ConsumerGroupMetadata> consumerGroupMetadataMap;
+    private final ConcurrentMap<Long/*consumerGroup*/, AckCommitter> ackCommitterMap = new ConcurrentHashMap<>();
+    private final ConcurrentMap<Long/*consumerGroup*/, AckCommitter> retryAckCommitterMap = new ConcurrentHashMap<>();
     private long currentOperationOffset = -1;
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
     private final Lock reentrantLock = lock.readLock();
@@ -547,7 +546,7 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
     public void loadSnapshot(OperationSnapshot snapshot) {
         exclusiveLock.lock();
         try {
-            this.consumerGroupMetadataMap = snapshot.getConsumerGroupMetadataList().stream().collect(Collectors.toMap(
+            this.consumerGroupMetadataMap = snapshot.getConsumerGroupMetadataList().stream().collect(Collectors.toConcurrentMap(
                 ConsumerGroupMetadata::getConsumerGroupId, metadataSnapshot ->
                     new ConsumerGroupMetadata(metadataSnapshot.getConsumerGroupId(), metadataSnapshot.getConsumeOffset(), metadataSnapshot.getAckOffset(),
                         metadataSnapshot.getRetryConsumeOffset(), metadataSnapshot.getRetryAckOffset(), metadataSnapshot.getConsumeTimes(),
