@@ -21,6 +21,7 @@ import java.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@SuppressWarnings({"FieldMayBeFinal", "FieldCanBeLocal"})
 public class ProxyConfig extends BaseConfig {
     private static final Logger LOGGER = LoggerFactory.getLogger(ProxyConfig.class);
 

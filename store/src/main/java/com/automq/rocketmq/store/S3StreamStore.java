@@ -226,6 +226,12 @@ public class S3StreamStore implements StreamStore {
         config.networkBaselineBandwidth(streamConfig.networkBaselineBandwidth());
         config.refillPeriodMs(streamConfig.refillPeriodMs());
 
+        config.objectBlockSize(streamConfig.objectBlockSize());
+
+        // Cache
+        config.walCacheSize(streamConfig.walCacheSize());
+        config.blockCacheSize(streamConfig.blockCacheSize());
+
         // Compaction config
         config.streamObjectCompactionIntervalMinutes(streamConfig.streamObjectCompactionIntervalMinutes());
         config.streamObjectCompactionMaxSizeBytes(streamConfig.streamObjectCompactionMaxSizeBytes());
