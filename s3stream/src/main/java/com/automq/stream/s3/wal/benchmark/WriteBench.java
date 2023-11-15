@@ -46,6 +46,7 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 public class WriteBench implements AutoCloseable {
     private static final int LOG_INTERVAL_SECONDS = 1;
+    private static final int TRIM_INTERVAL_MILLIS = 100;
 
     private final WriteAheadLog log;
     private final TrimOffset trimOffset = new TrimOffset();
@@ -85,6 +86,7 @@ public class WriteBench implements AutoCloseable {
                 config.threads, ThreadUtils.createThreadFactory("append-thread-%d", false), null);
         AppendTaskConfig appendTaskConfig = new AppendTaskConfig(config);
         Stat stat = new Stat();
+        runTrimTask();
         for (int i = 0; i < config.threads; i++) {
             int index = i;
             executor.submit(() -> {
@@ -125,6 +127,19 @@ public class WriteBench implements AutoCloseable {
         }, LOG_INTERVAL_SECONDS, LOG_INTERVAL_SECONDS, TimeUnit.SECONDS);
     }
 
+    private void runTrimTask() {
+        ScheduledExecutorService trimExecutor = Threads.newSingleThreadScheduledExecutor(
+                ThreadUtils.createThreadFactory("trim-thread-%d", true), null);
+        trimExecutor.scheduleAtFixedRate(() -> {
+            try {
+                log.trim(trimOffset.get());
+            } catch (Exception e) {
+                System.err.printf("Trim task failed, %s\n", e.getMessage());
+                e.printStackTrace();
+            }
+        }, TRIM_INTERVAL_MILLIS, TRIM_INTERVAL_MILLIS, TimeUnit.MILLISECONDS);
+    }
+
     private void runAppendTask(int index, AppendTaskConfig config, Stat stat) throws Exception {
         System.out.printf("Append task %d started\n", index);
 
@@ -156,7 +171,7 @@ public class WriteBench implements AutoCloseable {
             try {
                 result = log.append(payload.retainedDuplicate());
             } catch (WriteAheadLog.OverCapacityException e) {
-                log.trim(trimOffset.get());
+                System.err.printf("Append task %d failed, retry it, %s\n", index, e.getMessage());
                 continue;
             }
             trimOffset.appended(result.recordOffset());
