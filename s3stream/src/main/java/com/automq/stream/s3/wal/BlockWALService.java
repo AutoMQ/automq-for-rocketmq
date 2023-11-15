@@ -441,6 +441,7 @@ public class BlockWALService implements WriteAheadLog {
         } finally {
             lock.unlock();
         }
+        slidingWindowService.tryWriteBlock();
 
         final AppendResult appendResult = new AppendResultImpl(expectedWriteOffset, appendResultFuture);
         appendResult.future().whenComplete((nil, ex) -> OperationMetricsStats.getHistogram(S3Operation.APPEND_STORAGE_WAL).update(timerUtil.elapsed()));

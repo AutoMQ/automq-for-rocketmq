@@ -53,6 +53,8 @@ import static com.automq.stream.s3.wal.WriteAheadLog.OverCapacityException;
  * When the asynchronous write is completed, the start offset of the sliding window will be updated.
  */
 public class SlidingWindowService {
+    private static final int WRITE_RATE_LIMIT_PER_SECOND = 3000;
+    private static final long MIN_WRITE_INTERVAL_NANOS = TimeUnit.SECONDS.toNanos(1) / WRITE_RATE_LIMIT_PER_SECOND;
     private static final Logger LOGGER = LoggerFactory.getLogger(SlidingWindowService.class.getSimpleName());
     private final int ioThreadNums;
     private final long upperLimit;
@@ -81,6 +83,11 @@ public class SlidingWindowService {
     private Block currentBlock;
 
     private ExecutorService ioExecutor;
+
+    /**
+     * The last time when a batch of blocks is written to the disk.
+     */
+    private long lastWriteTimeNanos = 0;
 
     public SlidingWindowService(WALChannel walChannel, int ioThreadNums, long upperLimit, long scaleUnit, long blockSoftLimit, WALHeaderFlusher flusher) {
         this.walChannel = walChannel;
@@ -111,7 +118,7 @@ public class SlidingWindowService {
                 ThreadUtils.createThreadFactory("block-wal-io-thread-%d", false), LOGGER);
         ScheduledExecutorService pollBlockScheduler = Threads.newSingleThreadScheduledExecutor(
                 ThreadUtils.createThreadFactory("wal-poll-block-thread-%d", false), LOGGER);
-        pollBlockScheduler.scheduleAtFixedRate(this::tryWriteBlock, 0, TimeUnit.SECONDS.toNanos(1) / 3000, TimeUnit.NANOSECONDS);
+        pollBlockScheduler.scheduleAtFixedRate(this::tryWriteBlock, 0, MIN_WRITE_INTERVAL_NANOS, TimeUnit.NANOSECONDS);
     }
 
     public boolean shutdown(long timeout, TimeUnit unit) {
@@ -133,13 +140,28 @@ public class SlidingWindowService {
     }
 
     /**
-     * Try to write a block. If the semaphore is not available, it will return immediately.
+     * Try to write a block. If it exceeds the rate limit, it will return immediately.
      */
     public void tryWriteBlock() {
+        if (!tryAcquireWriteRateLimit()) {
+            return;
+        }
         BlockBatch blocks = pollBlocks();
         if (blocks != null) {
             ioExecutor.submit(new WriteBlockProcessor(blocks));
         }
+    }
+
+    /**
+     * Try to acquire the write rate limit.
+     */
+    synchronized private boolean tryAcquireWriteRateLimit() {
+        long now = System.nanoTime();
+        if (now - lastWriteTimeNanos < MIN_WRITE_INTERVAL_NANOS) {
+            return false;
+        }
+        lastWriteTimeNanos = now;
+        return true;
     }
 
     public Lock getBlockLock() {
