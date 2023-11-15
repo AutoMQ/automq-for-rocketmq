@@ -263,7 +263,6 @@ public class GroupManager {
     public CompletableFuture<Collection<ConsumerGroup>> listGroups() {
         return CompletableFuture.supplyAsync(() -> {
             List<ConsumerGroup> groups = new ArrayList<>();
-
             try (SqlSession session = metadataStore.openSession()) {
                 GroupMapper mapper = session.getMapper(GroupMapper.class);
                 List<Group> list = mapper.byCriteria(GroupCriteria.newBuilder()
@@ -273,7 +272,6 @@ public class GroupManager {
                     groups.add(fromGroup(item));
                 }
             }
-
             return groups;
         });
     }

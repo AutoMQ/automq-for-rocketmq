@@ -17,10 +17,18 @@
 
 package com.automq.rocketmq.controller.store;
 
+import apache.rocketmq.controller.v1.AssignmentStatus;
+import apache.rocketmq.controller.v1.GroupStatus;
+import apache.rocketmq.controller.v1.GroupType;
 import apache.rocketmq.controller.v1.SubStream;
 import apache.rocketmq.controller.v1.SubStreams;
+import apache.rocketmq.controller.v1.SubscriptionMode;
 import com.automq.rocketmq.common.config.ControllerConfig;
+import com.automq.rocketmq.controller.ControllerClient;
+import com.automq.rocketmq.controller.MetadataStore;
+import com.automq.rocketmq.metadata.dao.Group;
 import com.automq.rocketmq.metadata.dao.Lease;
+import com.automq.rocketmq.metadata.dao.QueueAssignment;
 import com.automq.rocketmq.metadata.dao.S3ObjectCriteria;
 import com.automq.rocketmq.metadata.dao.S3WalObject;
 import com.automq.rocketmq.metadata.mapper.GroupMapper;
@@ -48,11 +56,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.ibatis.io.Resources;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.apache.ibatis.session.SqlSessionFactoryBuilder;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -71,6 +81,50 @@ public class DatabaseTestBase {
         config = Mockito.spy(new TestControllerConfig());
         Mockito.doReturn(1L).when(config).scanIntervalInSecs();
         Mockito.doReturn(2).when(config).leaseLifeSpanInSecs();
+    }
+
+    protected ControllerClient getControllerClient() {
+        ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
+        return controllerClient;
+    }
+
+    protected QueueAssignment createAssignment(long topicId, int queueId, int srcNode, int dstNode, AssignmentStatus status)
+        throws IOException {
+        try (SqlSession session = getSessionFactory().openSession()) {
+            QueueAssignmentMapper mapper = session.getMapper(QueueAssignmentMapper.class);
+            QueueAssignment assignment = new QueueAssignment();
+            assignment.setTopicId(topicId);
+            assignment.setQueueId(queueId);
+            assignment.setSrcNodeId(srcNode);
+            assignment.setDstNodeId(dstNode);
+            assignment.setStatus(status);
+            mapper.create(assignment);
+            session.commit();
+            return assignment;
+        }
+    }
+
+    protected Group createGroup(String name) throws IOException {
+        try (SqlSession session = getSessionFactory().openSession()) {
+            GroupMapper mapper = session.getMapper(GroupMapper.class);
+            Group group = new Group();
+            group.setName(name);
+            group.setGroupType(GroupType.GROUP_TYPE_STANDARD);
+            group.setSubMode(SubscriptionMode.SUB_MODE_POP);
+            group.setMaxDeliveryAttempt(2);
+            group.setDeadLetterTopicId(3L);
+            group.setStatus(GroupStatus.GROUP_STATUS_ACTIVE);
+            mapper.create(group);
+            session.commit();
+            return group;
+        }
+    }
+
+    protected void awaitElectedAsLeader(MetadataStore metadataStore) {
+        Awaitility.await()
+            .with()
+            .atMost(10, TimeUnit.SECONDS)
+            .pollInterval(100, TimeUnit.MILLISECONDS).until(metadataStore::isLeader);
     }
 
     protected long nextS3ObjectId() {
