@@ -15,8 +15,8 @@
 
 
 apiVersion: v2
-name: rocketmq-k8s-helm
-description: A Helm chart for Kubernetes
+name: automq-for-rocketmq
+description: A Helm chart for automq-for-rocketmq
 
 # A chart can be either an 'application' or a 'library' chart.
 #
