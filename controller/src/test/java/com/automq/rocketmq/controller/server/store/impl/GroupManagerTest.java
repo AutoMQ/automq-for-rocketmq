@@ -17,21 +17,15 @@
 
 package com.automq.rocketmq.controller.server.store.impl;
 
-import apache.rocketmq.controller.v1.AssignmentStatus;
 import apache.rocketmq.controller.v1.ConsumerGroup;
-import apache.rocketmq.controller.v1.DescribeStreamRequest;
-import apache.rocketmq.controller.v1.StreamMetadata;
-import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.UpdateGroupRequest;
 import com.automq.rocketmq.controller.ControllerClient;
 import com.automq.rocketmq.controller.MetadataStore;
 import com.automq.rocketmq.controller.server.store.DefaultMetadataStore;
 import com.automq.rocketmq.controller.server.store.ElectionService;
 import com.automq.rocketmq.controller.store.DatabaseTestBase;
-import com.automq.rocketmq.metadata.dao.Group;
 import java.io.IOException;
 import java.util.Collection;
-import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -40,7 +34,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 class GroupManagerTest extends DatabaseTestBase {
 

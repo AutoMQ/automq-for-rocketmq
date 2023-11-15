@@ -60,12 +60,18 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import org.apache.ibatis.session.SqlSession;
 import org.awaitility.Awaitility;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 class DefaultMetadataStoreTest extends DatabaseTestBase {
     ControllerClient client;
@@ -79,7 +85,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
             awaitElectedAsLeader(metadataStore);
-            Assertions.assertDoesNotThrow(() -> {
+            assertDoesNotThrow(() -> {
                 metadataStore.describeCluster(DescribeClusterRequest.newBuilder().build()).join();
             });
         }
@@ -90,9 +96,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
             awaitElectedAsLeader(metadataStore);
-            Assertions.assertDoesNotThrow(() -> {
-                metadataStore.registerCurrentNode(config.name(), config.advertiseAddress(), config.instanceId());
-            });
+            assertDoesNotThrow(() -> metadataStore.registerCurrentNode(config.name(), config.advertiseAddress(), config.instanceId()));
         }
     }
 
