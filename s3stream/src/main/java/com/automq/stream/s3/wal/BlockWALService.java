@@ -536,6 +536,7 @@ public class BlockWALService implements WriteAheadLog {
         private long slidingWindowUpperLimit = 512 << 20;
         private long slidingWindowScaleUnit = 4 << 20;
         private long blockSoftLimit = 1 << 18; // 256KiB
+        private int writeRateLimit = 3000;
         private int nodeId = NOOP_NODE_ID;
         private long epoch = NOOP_EPOCH;
         private boolean readOnly;
@@ -557,6 +558,7 @@ public class BlockWALService implements WriteAheadLog {
                     .slidingWindowScaleUnit(config.walWindowIncrement())
                     .slidingWindowUpperLimit(config.walWindowMax())
                     .blockSoftLimit(config.walBlockSoftLimit())
+                    .writeRateLimit(config.walWriteRateLimit())
                     .nodeId(config.nodeId())
                     .epoch(config.nodeEpoch());
         }
@@ -588,6 +590,11 @@ public class BlockWALService implements WriteAheadLog {
 
         public BlockWALServiceBuilder blockSoftLimit(long blockSoftLimit) {
             this.blockSoftLimit = blockSoftLimit;
+            return this;
+        }
+
+        public BlockWALServiceBuilder writeRateLimit(int writeRateLimit) {
+            this.writeRateLimit = writeRateLimit;
             return this;
         }
 
@@ -628,6 +635,7 @@ public class BlockWALService implements WriteAheadLog {
                     slidingWindowUpperLimit,
                     slidingWindowScaleUnit,
                     blockSoftLimit,
+                    writeRateLimit,
                     blockWALService.flusher()
             );
 
@@ -652,6 +660,7 @@ public class BlockWALService implements WriteAheadLog {
                     + ", slidingWindowUpperLimit=" + slidingWindowUpperLimit
                     + ", slidingWindowScaleUnit=" + slidingWindowScaleUnit
                     + ", blockSoftLimit=" + blockSoftLimit
+                    + ", writeRateLimit=" + writeRateLimit
                     + '}';
         }
     }

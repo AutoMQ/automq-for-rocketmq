@@ -53,13 +53,12 @@ import static com.automq.stream.s3.wal.WriteAheadLog.OverCapacityException;
  * When the asynchronous write is completed, the start offset of the sliding window will be updated.
  */
 public class SlidingWindowService {
-    private static final int WRITE_RATE_LIMIT_PER_SECOND = 3000;
-    private static final long MIN_WRITE_INTERVAL_NANOS = TimeUnit.SECONDS.toNanos(1) / WRITE_RATE_LIMIT_PER_SECOND;
     private static final Logger LOGGER = LoggerFactory.getLogger(SlidingWindowService.class.getSimpleName());
     private final int ioThreadNums;
     private final long upperLimit;
     private final long scaleUnit;
     private final long blockSoftLimit;
+    private final long minWriteIntervalNanos;
     private final WALChannel walChannel;
     private final WALHeaderFlusher walHeaderFlusher;
     private final WindowCoreData windowCoreData = new WindowCoreData();
@@ -89,12 +88,13 @@ public class SlidingWindowService {
      */
     private long lastWriteTimeNanos = 0;
 
-    public SlidingWindowService(WALChannel walChannel, int ioThreadNums, long upperLimit, long scaleUnit, long blockSoftLimit, WALHeaderFlusher flusher) {
+    public SlidingWindowService(WALChannel walChannel, int ioThreadNums, long upperLimit, long scaleUnit, long blockSoftLimit, int writeRateLimit, WALHeaderFlusher flusher) {
         this.walChannel = walChannel;
         this.ioThreadNums = ioThreadNums;
         this.upperLimit = upperLimit;
         this.scaleUnit = scaleUnit;
         this.blockSoftLimit = blockSoftLimit;
+        this.minWriteIntervalNanos = TimeUnit.SECONDS.toNanos(1) / writeRateLimit;
         this.walHeaderFlusher = flusher;
     }
 
@@ -118,7 +118,7 @@ public class SlidingWindowService {
                 ThreadUtils.createThreadFactory("block-wal-io-thread-%d", false), LOGGER);
         ScheduledExecutorService pollBlockScheduler = Threads.newSingleThreadScheduledExecutor(
                 ThreadUtils.createThreadFactory("wal-poll-block-thread-%d", false), LOGGER);
-        pollBlockScheduler.scheduleAtFixedRate(this::tryWriteBlock, 0, MIN_WRITE_INTERVAL_NANOS, TimeUnit.NANOSECONDS);
+        pollBlockScheduler.scheduleAtFixedRate(this::tryWriteBlock, 0, minWriteIntervalNanos, TimeUnit.NANOSECONDS);
     }
 
     public boolean shutdown(long timeout, TimeUnit unit) {
@@ -157,7 +157,7 @@ public class SlidingWindowService {
      */
     synchronized private boolean tryAcquireWriteRateLimit() {
         long now = System.nanoTime();
-        if (now - lastWriteTimeNanos < MIN_WRITE_INTERVAL_NANOS) {
+        if (now - lastWriteTimeNanos < minWriteIntervalNanos) {
             return false;
         }
         lastWriteTimeNanos = now;
