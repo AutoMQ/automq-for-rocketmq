@@ -37,6 +37,7 @@ import com.google.common.base.Strings;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -112,17 +113,17 @@ public class GroupManager {
                     future.complete(group.getId());
                 }
             } else {
-                try {
-                    metadataStore.controllerClient().createGroup(metadataStore.leaderAddress(), request).whenComplete((reply, e) -> {
-                        if (null != e) {
-                            future.completeExceptionally(e);
-                        } else {
-                            future.complete(reply.getGroupId());
-                        }
-                    });
-                } catch (ControllerException e) {
-                    future.completeExceptionally(e);
+                Optional<String> leaderAddress = metadataStore.electionService().leaderAddress();
+                if (leaderAddress.isEmpty()) {
+                    return CompletableFuture.failedFuture(new ControllerException(Code.NO_LEADER_VALUE, "No leader is elected yet"));
                 }
+                metadataStore.controllerClient().createGroup(leaderAddress.get(), request).whenComplete((reply, e) -> {
+                    if (null != e) {
+                        future.completeExceptionally(e);
+                    } else {
+                        future.complete(reply.getGroupId());
+                    }
+                });
             }
             break;
         }
@@ -317,12 +318,12 @@ public class GroupManager {
                         break;
                     }
                 } else {
-                    try {
-                        metadataStore.controllerClient().updateGroup(metadataStore.leaderAddress(), request).join();
-                        break;
-                    } catch (ControllerException e) {
-                        throw new CompletionException(e);
+                    Optional<String> leaderAddress = metadataStore.electionService().leaderAddress();
+                    if (leaderAddress.isEmpty()) {
+                        throw new CompletionException(new ControllerException(Code.NO_LEADER_VALUE, "No leader is elected yet"));
                     }
+                    metadataStore.controllerClient().updateGroup(leaderAddress.get(), request).join();
+                    break;
                 }
             }
 

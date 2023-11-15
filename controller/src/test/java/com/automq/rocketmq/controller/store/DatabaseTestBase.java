@@ -68,16 +68,9 @@ public class DatabaseTestBase {
 
     public DatabaseTestBase() {
         this.s3ObjectIdSequence = new AtomicLong(1);
-        config = Mockito.mock(ControllerConfig.class);
-        Mockito.when(config.nodeId()).thenReturn(1);
-        Mockito.when(config.scanIntervalInSecs()).thenReturn(1L);
-        Mockito.when(config.leaseLifeSpanInSecs()).thenReturn(2);
-        Mockito.when(config.deletedTopicLingersInSecs()).thenCallRealMethod();
-        Mockito.when(config.deletedGroupLingersInSecs()).thenCallRealMethod();
-        Mockito.when(config.balanceWorkloadIntervalInSecs()).thenCallRealMethod();
-        Mockito.when(config.recycleS3IntervalInSecs()).thenCallRealMethod();
-        Mockito.when(config.goingAway()).thenReturn(false);
-        Mockito.when(config.rpcTimeout()).thenCallRealMethod();
+        config = Mockito.spy(new TestControllerConfig());
+        Mockito.doReturn(1L).when(config).scanIntervalInSecs();
+        Mockito.doReturn(2).when(config).leaseLifeSpanInSecs();
     }
 
     protected long nextS3ObjectId() {

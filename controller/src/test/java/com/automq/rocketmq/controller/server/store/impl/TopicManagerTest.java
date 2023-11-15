@@ -20,9 +20,9 @@ package com.automq.rocketmq.controller.server.store.impl;
 import apache.rocketmq.controller.v1.AssignmentStatus;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
-import com.automq.rocketmq.common.exception.ControllerException;
 import com.automq.rocketmq.controller.ControllerClient;
 import com.automq.rocketmq.controller.MetadataStore;
+import com.automq.rocketmq.controller.server.store.ElectionService;
 import com.automq.rocketmq.metadata.dao.QueueAssignment;
 import java.util.List;
 import java.util.Optional;
@@ -36,23 +36,31 @@ import org.mockito.Mockito;
 class TopicManagerTest {
 
     @Test
-    public void testCreateTopic() throws ControllerException {
+    public void testCreateTopic() {
         MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
-        Mockito.when(metadataStore.leaderAddress()).thenReturn("localhost:1234");
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
         Mockito.when(controllerClient.createTopic(ArgumentMatchers.anyString(), ArgumentMatchers.any())).thenReturn(
             CompletableFuture.failedFuture(new CompletionException(new RuntimeException()))
         );
         Mockito.when(metadataStore.controllerClient()).thenReturn(controllerClient);
         Mockito.when(metadataStore.isLeader()).thenReturn(false);
+
+        ElectionService electionService = Mockito.mock(ElectionService.class);
+        Mockito.when(metadataStore.electionService()).thenReturn(electionService);
+
+        Mockito.when(electionService.leaderAddress()).thenReturn(Optional.of("localhost:1234"));
+
         TopicManager topicManager = new TopicManager(metadataStore);
         topicManager.createTopic(CreateTopicRequest.newBuilder().build());
     }
 
     @Test
-    public void testUpdateTopic_RemoteFailure() throws ControllerException {
+    public void testUpdateTopic_RemoteFailure() {
         MetadataStore metadataStore = Mockito.mock(MetadataStore.class);
-        Mockito.when(metadataStore.leaderAddress()).thenReturn("localhost:1234");
+        ElectionService electionService = Mockito.mock(ElectionService.class);
+        Mockito.when(metadataStore.electionService()).thenReturn(electionService);
+
+        Mockito.when(electionService.leaderAddress()).thenReturn(Optional.of("localhost:1234"));
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
         Mockito.when(controllerClient.updateTopic(ArgumentMatchers.anyString(), ArgumentMatchers.any())).thenReturn(
             CompletableFuture.failedFuture(new CompletionException(new RuntimeException()))

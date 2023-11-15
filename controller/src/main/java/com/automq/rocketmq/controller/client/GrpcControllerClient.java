@@ -197,8 +197,7 @@ public class GrpcControllerClient implements ControllerClient {
     }
 
     @Override
-    public CompletableFuture<Long> createTopic(String target, CreateTopicRequest request)
-        throws ControllerException {
+    public CompletableFuture<Long> createTopic(String target, CreateTopicRequest request) {
         ControllerServiceGrpc.ControllerServiceFutureStub stub;
         try {
             stub = getOrCreateStubForTarget(target);
