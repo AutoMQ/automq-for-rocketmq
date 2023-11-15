@@ -474,7 +474,7 @@ class BlockWALServiceTest {
 
         // TODO: make this beautiful
         long position = WALUtil.recordOffsetToPosition(logicOffset, walChannel.capacity() - WAL_HEADER_TOTAL_CAPACITY, WAL_HEADER_TOTAL_CAPACITY);
-        walChannel.write(record, position);
+        walChannel.writeAndFlush(record, position);
     }
 
     private void writeWALHeader(WALChannel walChannel, long trimOffset, long startOffset, long nextOffset, long maxLength) throws IOException {
@@ -485,7 +485,7 @@ class BlockWALServiceTest {
                 .setSlidingWindowNextWriteOffset(nextOffset)
                 .setSlidingWindowMaxLength(maxLength)
                 .marshal();
-        walChannel.write(header, 0);
+        walChannel.writeAndFlush(header, 0);
     }
 
     private static class RecoverFromDisasterParam {

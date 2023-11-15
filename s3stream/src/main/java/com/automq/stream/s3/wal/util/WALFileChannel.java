@@ -96,6 +96,10 @@ public class WALFileChannel implements WALChannel {
             mappedByteBuffer.put(pos, nioBuffer, nioBuffer.position(), nioBuffer.remaining());
             pos += nioBuffer.remaining();
         }
+    }
+
+    @Override
+    public void flush() {
         mappedByteBuffer.force();
     }
 

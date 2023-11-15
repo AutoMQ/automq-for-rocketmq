@@ -157,7 +157,7 @@ public class BlockWALService implements WriteAheadLog {
             walHeader.setLastWriteTimestamp(System.nanoTime());
             long trimOffset = walHeader.getTrimOffset();
             ByteBuf buf = walHeader.marshal();
-            this.walChannel.write(buf, position);
+            this.walChannel.writeAndFlush(buf, position);
             buf.release();
             walHeader.setFlushedTrimOffset(trimOffset);
             LOGGER.debug("WAL header flushed, position: {}, header: {}", position, walHeader);
