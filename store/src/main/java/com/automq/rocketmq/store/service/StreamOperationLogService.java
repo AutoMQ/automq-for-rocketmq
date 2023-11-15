@@ -76,6 +76,13 @@ public class StreamOperationLogService implements OperationLogService {
                     return snapshot.getSnapshotEndOffset() + 1;
                 });
         }
+
+        if (startOffset == endOffset) {
+            // no operation
+            return snapshotFetch.thenAccept(offset -> {
+            });
+        }
+
         // 2. get all operations
         // TODO: batch fetch, fetch all at once may cause some problems
         return snapshotFetch.thenCompose(offset -> streamStore.fetch(StoreContext.EMPTY, operationStreamId, offset, (int) (endOffset - offset))
