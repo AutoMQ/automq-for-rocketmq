@@ -79,6 +79,21 @@ public class WriteBench implements AutoCloseable {
         }
     }
 
+    private static void logIt(Config config, Stat stat) {
+        ScheduledExecutorService statExecutor = Threads.newSingleThreadScheduledExecutor(
+                ThreadUtils.createThreadFactory("stat-thread-%d", true), null);
+        statExecutor.scheduleAtFixedRate(() -> {
+            Stat.Result result = stat.reset();
+            if (0 != result.count()) {
+                System.out.printf("Append task | Append Rate %d msg/s %d KB/s | Avg Latency %.3f ms | Max Latency %.3f ms\n",
+                        TimeUnit.SECONDS.toNanos(1) * result.count() / result.elapsedTimeNanos(),
+                        TimeUnit.SECONDS.toNanos(1) * (result.count() * config.recordSizeBytes) / result.elapsedTimeNanos() / 1024,
+                        (double) result.costNanos() / TimeUnit.MILLISECONDS.toNanos(1) / result.count(),
+                        (double) result.maxCostNanos() / TimeUnit.MILLISECONDS.toNanos(1));
+            }
+        }, LOG_INTERVAL_SECONDS, LOG_INTERVAL_SECONDS, TimeUnit.SECONDS);
+    }
+
     private void run(Config config) {
         System.out.println("Starting benchmark");
 
@@ -110,21 +125,6 @@ public class WriteBench implements AutoCloseable {
         }
 
         System.out.println("Benchmark finished");
-    }
-
-    private static void logIt(Config config, Stat stat) {
-        ScheduledExecutorService statExecutor = Threads.newSingleThreadScheduledExecutor(
-                ThreadUtils.createThreadFactory("stat-thread-%d", true), null);
-        statExecutor.scheduleAtFixedRate(() -> {
-            Stat.Result result = stat.reset();
-            if (0 != result.count()) {
-                System.out.printf("Append task | Append Rate %d msg/s %d KB/s | Avg Latency %.3f ms | Max Latency %.3f ms\n",
-                        TimeUnit.SECONDS.toNanos(1) * result.count() / result.elapsedTimeNanos(),
-                        TimeUnit.SECONDS.toNanos(1) * (result.count() * config.recordSizeBytes) / result.elapsedTimeNanos() / 1024,
-                        (double) result.costNanos() / TimeUnit.MILLISECONDS.toNanos(1) / result.count(),
-                        (double) result.maxCostNanos() / TimeUnit.MILLISECONDS.toNanos(1));
-            }
-        }, LOG_INTERVAL_SECONDS, LOG_INTERVAL_SECONDS, TimeUnit.SECONDS);
     }
 
     private void runTrimTask() {

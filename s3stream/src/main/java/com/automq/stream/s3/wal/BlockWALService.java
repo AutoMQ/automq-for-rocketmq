@@ -698,8 +698,8 @@ public class BlockWALService implements WriteAheadLog {
     }
 
     class RecoverIterator implements Iterator<RecoverResult> {
-        private long nextRecoverOffset;
         private final long skipRecordAtOffset;
+        private long nextRecoverOffset;
         private RecoverResult next;
 
         public RecoverIterator(long nextRecoverOffset, long skipRecordAtOffset) {
