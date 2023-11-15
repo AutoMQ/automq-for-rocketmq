@@ -402,7 +402,10 @@ public class StreamLogicQueue extends LogicQueue {
                     })
                     .toList();
 
-                context.span().ifPresent(span -> span.setAttribute("messageCount", resultList.size()));
+                context.span().ifPresent(span -> {
+                    span.setAttribute("messageCount", resultList.size());
+                    span.setAttribute("cacheAccess", fetchResult.getCacheAccessType().name().toLowerCase());
+                });
 
                 return resultList;
             });
