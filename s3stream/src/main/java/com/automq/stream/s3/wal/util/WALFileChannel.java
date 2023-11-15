@@ -23,18 +23,23 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 
 public class WALFileChannel implements WALChannel {
     final String filePath;
-    final long fileCapacityWant;
+    long fileCapacityWant;
     long fileCapacityFact = 0;
     RandomAccessFile randomAccessFile;
     FileChannel fileChannel;
+    MappedByteBuffer mappedByteBuffer;
 
     public WALFileChannel(String filePath, long fileCapacityWant) {
         this.filePath = filePath;
         this.fileCapacityWant = fileCapacityWant;
+        if (this.fileCapacityWant > 1 << 30) {
+            this.fileCapacityWant = 1 << 30;
+        }
     }
 
     @Override
@@ -64,6 +69,7 @@ public class WALFileChannel implements WALChannel {
         }
 
         fileChannel = randomAccessFile.getChannel();
+        mappedByteBuffer = fileChannel.map(FileChannel.MapMode.READ_WRITE, 0, fileCapacityFact);
     }
 
     @Override
@@ -84,11 +90,12 @@ public class WALFileChannel implements WALChannel {
     public void write(ByteBuf src, long position) throws IOException {
         assert src.readableBytes() + position <= fileCapacityFact;
         ByteBuffer[] nioBuffers = src.nioBuffers();
+        int pos = (int) position;
         for (ByteBuffer nioBuffer : nioBuffers) {
-            int bytesWritten = write(nioBuffer, position);
-            position += bytesWritten;
+            mappedByteBuffer.put(pos, nioBuffer, nioBuffer.position(), nioBuffer.remaining());
+            pos += nioBuffer.remaining();
         }
-        fileChannel.force(false);
+        mappedByteBuffer.force();
     }
 
     @Override
@@ -97,18 +104,6 @@ public class WALFileChannel implements WALChannel {
         int bytesRead = read(nioBuffer, position);
         dst.writerIndex(dst.writerIndex() + bytesRead);
         return bytesRead;
-    }
-
-    private int write(ByteBuffer src, long position) throws IOException {
-        int bytesWritten = 0;
-        while (src.hasRemaining()) {
-            int written = fileChannel.write(src, position + bytesWritten);
-            if (written == -1) {
-                throw new IOException("write -1");
-            }
-            bytesWritten += written;
-        }
-        return bytesWritten;
     }
 
     private int read(ByteBuffer dst, long position) throws IOException {
