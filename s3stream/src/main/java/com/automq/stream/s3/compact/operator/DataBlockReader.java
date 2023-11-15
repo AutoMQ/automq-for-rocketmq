@@ -40,13 +40,13 @@ import java.util.concurrent.ScheduledExecutorService;
 //TODO: refactor to reduce duplicate code with ObjectWriter
 public class DataBlockReader {
     private static final Logger LOGGER = LoggerFactory.getLogger(DataBlockReader.class);
+    private static final ScheduledExecutorService BUCKET_CALLBACK_EXECUTOR = Threads.newSingleThreadScheduledExecutor(
+            ThreadUtils.createThreadFactory("s3-data-block-reader-bucket-cb-%d", true), LOGGER);
     private final S3ObjectMetadata metadata;
     private final String objectKey;
     private final S3Operator s3Operator;
     private final CompletableFuture<List<StreamDataBlock>> indexBlockCf = new CompletableFuture<>();
     private final Bucket throttleBucket;
-    private final ScheduledExecutorService bucketCbExecutor = Threads.newSingleThreadScheduledExecutor(
-            ThreadUtils.createThreadFactory("s3-data-block-reader-bucket-cb-%d", false), LOGGER);
 
     public DataBlockReader(S3ObjectMetadata metadata, S3Operator s3Operator) {
         this(metadata, s3Operator, null);
@@ -186,7 +186,7 @@ public class DataBlockReader {
         if (throttleBucket == null) {
             return s3Operator.rangeRead(objectKey, start, end, ThrottleStrategy.THROTTLE_2);
         } else {
-            return throttleBucket.asScheduler().consume(end - start + 1, bucketCbExecutor)
+            return throttleBucket.asScheduler().consume(end - start + 1, BUCKET_CALLBACK_EXECUTOR)
                     .thenCompose(v -> s3Operator.rangeRead(objectKey, start, end, ThrottleStrategy.THROTTLE_2));
         }
     }
