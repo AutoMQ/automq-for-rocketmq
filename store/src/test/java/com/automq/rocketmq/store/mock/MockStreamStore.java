@@ -48,7 +48,7 @@ public class MockStreamStore implements StreamStore {
     }
 
     @Override
-    public CompletableFuture<AppendResult> append(long streamId, RecordBatch recordBatch) {
+    public CompletableFuture<AppendResult> append(StoreContext context, long streamId, RecordBatch recordBatch) {
         if (!openedStreams.containsKey(streamId)) {
             throw new IllegalStateException("Stream " + streamId + " is not opened.");
         }

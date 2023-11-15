@@ -23,9 +23,11 @@ import com.automq.rocketmq.common.config.BrokerConfig;
 import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.model.generated.KeyValue;
 import com.automq.rocketmq.common.system.MessageConstants;
+import com.automq.rocketmq.common.trace.TraceContext;
 import com.automq.rocketmq.metadata.api.ProxyMetadataService;
 import com.automq.rocketmq.store.api.DeadLetterSender;
 import com.automq.stream.utils.ThreadUtils;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
@@ -76,7 +78,8 @@ public class DeadLetterService implements DeadLetterSender {
     }
 
     @Override
-    public CompletableFuture<Void> send(long consumerGroupId, FlatMessageExt flatMessageExt) {
+    @WithSpan
+    public CompletableFuture<Void> send(TraceContext context, long consumerGroupId, FlatMessageExt flatMessageExt) {
         CompletableFuture<Topic> dlqQueryCf = metadataService.consumerGroupOf(consumerGroupId)
             .thenComposeAsync(consumerGroup -> {
                 long deadLetterTopicId = consumerGroup.getDeadLetterTopicId();

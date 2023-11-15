@@ -69,7 +69,7 @@ public interface MessageStore extends Lifecycle {
      * @param flatMessage flat message to append
      * @return append result with an offset assigned to the message, see {@link PutResult}
      */
-    CompletableFuture<PutResult> put(FlatMessage flatMessage);
+    CompletableFuture<PutResult> put(StoreContext context, FlatMessage flatMessage);
 
     /**
      * Ack message.

@@ -110,7 +110,7 @@ public class LogicQueueTest {
     @Test
     void putWithPop() {
         FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
-        logicQueue.put(message);
+        logicQueue.put(StoreContext.EMPTY, message);
 
         PopResult popResult = logicQueue.popNormal(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, 100).join();
         assertEquals(PopResult.Status.FOUND, popResult.status());
@@ -129,7 +129,7 @@ public class LogicQueueTest {
         // 1. append 5 messages
         for (int i = 0; i < 5; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
-            logicQueue.put(message);
+            logicQueue.put(StoreContext.EMPTY, message);
         }
 
         // 2. pop 2 messages
@@ -176,7 +176,7 @@ public class LogicQueueTest {
         // 1. append 5 messages
         for (int i = 0; i < 5; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
-            logicQueue.put(message);
+            logicQueue.put(StoreContext.EMPTY, message);
         }
 
         // 2. pop 2 messages
@@ -213,7 +213,7 @@ public class LogicQueueTest {
         // 1. append 5 messages
         for (int i = 0; i < 5; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
-            logicQueue.put(message);
+            logicQueue.put(StoreContext.EMPTY, message);
         }
 
         // 2. group0 pop 2 messages
@@ -246,7 +246,7 @@ public class LogicQueueTest {
         // 1. append 5 messages
         for (int i = 0; i < 5; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
-            logicQueue.put(message);
+            logicQueue.put(StoreContext.EMPTY, message);
         }
 
         // 2. group0 pop 2 messages
@@ -274,7 +274,7 @@ public class LogicQueueTest {
         // 1. append 5 messages
         for (int i = 0; i < 5; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
-            logicQueue.put(message);
+            logicQueue.put(StoreContext.EMPTY, message);
         }
 
         // 2. pop 2 messages
@@ -328,7 +328,7 @@ public class LogicQueueTest {
         // 1. append 5 messages
         for (int i = 0; i < 5; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
-            logicQueue.put(message);
+            logicQueue.put(StoreContext.EMPTY, message);
         }
 
         // 2. pop 2 messages
@@ -381,7 +381,7 @@ public class LogicQueueTest {
         // 1. append 5 messages
         for (int i = 0; i < 5; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
-            logicQueue.put(message);
+            logicQueue.put(StoreContext.EMPTY, message);
         }
 
         // 2. pop 2 messages
@@ -434,24 +434,24 @@ public class LogicQueueTest {
         // 1. append 5 messages with tagA
         for (int i = 0; i < 5; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
-            logicQueue.put(message);
+            logicQueue.put(StoreContext.EMPTY, message);
         }
 
         // 2. append 2 messages with tagB
         for (int i = 0; i < 2; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagB"));
-            logicQueue.put(message);
+            logicQueue.put(StoreContext.EMPTY, message);
         }
         // 3. append 3 messages with tagA
         for (int i = 0; i < 3; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
-            logicQueue.put(message);
+            logicQueue.put(StoreContext.EMPTY, message);
         }
 
         // 4. append 2 messages with tagB
         for (int i = 0; i < 2; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagB"));
-            logicQueue.put(message);
+            logicQueue.put(StoreContext.EMPTY, message);
         }
 
         // 4. pop 6 messages with tagA
@@ -476,23 +476,23 @@ public class LogicQueueTest {
         // build 9 messages like this: A, A, B, A, A, A, B, A, A
         for (int i = 0; i < 2; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
-            logicQueue.put(message);
+            logicQueue.put(StoreContext.EMPTY, message);
         }
         for (int i = 0; i < 1; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagB"));
-            logicQueue.put(message);
+            logicQueue.put(StoreContext.EMPTY, message);
         }
         for (int i = 0; i < 3; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
-            logicQueue.put(message);
+            logicQueue.put(StoreContext.EMPTY, message);
         }
         for (int i = 0; i < 1; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagB"));
-            logicQueue.put(message);
+            logicQueue.put(StoreContext.EMPTY, message);
         }
         for (int i = 0; i < 2; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
-            logicQueue.put(message);
+            logicQueue.put(StoreContext.EMPTY, message);
         }
 
         // 1. pop fifo with TagB
@@ -506,7 +506,7 @@ public class LogicQueueTest {
 
         // 2. append 1 message with TagB
         FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagB"));
-        logicQueue.put(message);
+        logicQueue.put(StoreContext.EMPTY, message);
 
         // 2. pop fifo again
         popResult = logicQueue.popFifo(StoreContext.EMPTY, CONSUMER_GROUP_ID, new TagFilter("TagB"), 1, 100).join();
@@ -538,7 +538,7 @@ public class LogicQueueTest {
     void changeInvisibleDuration() throws StoreException {
         // 1. append message
         FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
-        logicQueue.put(message);
+        logicQueue.put(StoreContext.EMPTY, message);
 
         // 2. pop message
         long popStartTimestamp = System.currentTimeMillis();
@@ -581,7 +581,7 @@ public class LogicQueueTest {
         // 1. append 5 messages to retry queue
         for (int i = 0; i < 5; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
-            logicQueue.putRetry(CONSUMER_GROUP_ID, message);
+            logicQueue.putRetry(StoreContext.EMPTY, CONSUMER_GROUP_ID, message);
         }
         assertEquals(0, streamStore.startOffset(retryStream.getStreamId()));
         assertEquals(5, streamStore.nextOffset(retryStream.getStreamId()));
@@ -653,7 +653,7 @@ public class LogicQueueTest {
         // 1. append 5 messages
         for (int i = 0; i < 5; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
-            logicQueue.put(message);
+            logicQueue.put(StoreContext.EMPTY, message);
         }
 
         // 2. pop 2 messages
@@ -696,7 +696,7 @@ public class LogicQueueTest {
         // 1. append 5 messages
         for (int i = 0; i < 5; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
-            logicQueue.put(message);
+            logicQueue.put(StoreContext.EMPTY, message);
         }
 
         // 2. pop 2 messages
@@ -749,7 +749,7 @@ public class LogicQueueTest {
         // 1. append 5 messages
         for (int i = 0; i < 5; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
-            logicQueue.put(message);
+            logicQueue.put(StoreContext.EMPTY, message);
         }
 
         // 2. pop 3 messages

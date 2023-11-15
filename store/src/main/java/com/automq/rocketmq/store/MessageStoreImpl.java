@@ -112,7 +112,7 @@ public class MessageStoreImpl implements MessageStore {
         }
         clearStateMachineData();
         streamStore.start();
-        timerService.registerHandler(TimerHandlerType.TIMER_MESSAGE, timerTag -> put(FlatMessage.getRootAsFlatMessage(timerTag.payloadAsByteBuffer())));
+        timerService.registerHandler(TimerHandlerType.TIMER_MESSAGE, timerTag -> put(StoreContext.EMPTY, FlatMessage.getRootAsFlatMessage(timerTag.payloadAsByteBuffer())));
         timerService.start();
         snapshotService.start();
         logicQueueManager.start();
@@ -178,7 +178,7 @@ public class MessageStoreImpl implements MessageStore {
     }
 
     @Override
-    public CompletableFuture<PutResult> put(FlatMessage message) {
+    public CompletableFuture<PutResult> put(StoreContext context, FlatMessage message) {
         long deliveryTimestamp = message.systemProperties().deliveryTimestamp();
         if (deliveryTimestamp > 0 && deliveryTimestamp - System.currentTimeMillis() > 1000) {
             try {
@@ -189,8 +189,8 @@ public class MessageStoreImpl implements MessageStore {
             }
         }
 
-        return logicQueueManager.getOrCreate(StoreContext.EMPTY, message.topicId(), message.queueId())
-            .thenCompose(topicQueue -> topicQueue.put(message))
+        return logicQueueManager.getOrCreate(context, message.topicId(), message.queueId())
+            .thenCompose(topicQueue -> topicQueue.put(context, message))
             .thenCompose(result ->
                 metadataService.topicOf(message.topicId())
                     .thenAccept(topic -> {

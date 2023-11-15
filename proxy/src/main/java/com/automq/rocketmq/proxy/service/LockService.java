@@ -18,6 +18,8 @@
 package com.automq.rocketmq.proxy.service;
 
 import com.automq.rocketmq.common.config.ProxyConfig;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -38,6 +40,7 @@ public class LockService {
             .computeIfAbsent(queueId, v -> new Lock(topicId, queueId));
     }
 
+    @WithSpan(kind = SpanKind.SERVER)
     public boolean tryLock(long topicId, int queueId, String clientId, boolean preempt, boolean reentrant) {
         return tryLock(topicId, queueId, clientId, preempt, reentrant, config.lockExpireTime());
     }
@@ -55,6 +58,7 @@ public class LockService {
         return lock.tryLock(clientId, reentrant);
     }
 
+    @WithSpan(kind = SpanKind.SERVER)
     public void release(long topicId, int queueId) {
         getLock(topicId, queueId)
             .release();

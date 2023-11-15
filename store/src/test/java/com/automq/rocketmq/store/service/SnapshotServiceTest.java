@@ -21,6 +21,7 @@ import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.rocketmq.store.exception.StoreErrorCode;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.mock.MockStreamStore;
+import com.automq.rocketmq.store.model.StoreContext;
 import com.automq.rocketmq.store.model.operation.OperationSnapshot;
 import com.automq.rocketmq.store.model.stream.SingleRecord;
 import com.automq.rocketmq.store.service.api.KVService;
@@ -75,7 +76,7 @@ public class SnapshotServiceTest {
     public void test_take_snapshot() {
         // 1. append 100 operation records
         for (int i = 0; i < 100; i++) {
-            streamStore.append(OP_STREAM_ID, buildRecord());
+            streamStore.append(StoreContext.EMPTY, OP_STREAM_ID, buildRecord());
         }
 
         SnapshotService.SnapshotTask task = new SnapshotService.SnapshotTask(TOPIC_ID, QUEUE_ID, OP_STREAM_ID, SNAPSHOT_STREAM_ID,
@@ -99,7 +100,7 @@ public class SnapshotServiceTest {
     public void test_take_snapshot_fail() {
         // 1. append 100 operation records
         for (int i = 0; i < 100; i++) {
-            streamStore.append(OP_STREAM_ID, buildRecord());
+            streamStore.append(StoreContext.EMPTY, OP_STREAM_ID, buildRecord());
         }
 
         SnapshotService.SnapshotTask task = new SnapshotService.SnapshotTask(TOPIC_ID, QUEUE_ID, OP_STREAM_ID, SNAPSHOT_STREAM_ID,
@@ -126,7 +127,7 @@ public class SnapshotServiceTest {
     public void test_abort_task() throws Exception {
         // 1. append 100 operation records
         for (int i = 0; i < 100; i++) {
-            streamStore.append(OP_STREAM_ID, buildRecord());
+            streamStore.append(StoreContext.EMPTY, OP_STREAM_ID, buildRecord());
         }
         CountDownLatch latch = new CountDownLatch(1);
         CountDownLatch latch1 = new CountDownLatch(1);

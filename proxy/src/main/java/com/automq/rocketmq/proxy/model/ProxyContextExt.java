@@ -18,12 +18,11 @@
 package com.automq.rocketmq.proxy.model;
 
 import com.automq.rocketmq.common.trace.TraceContext;
+import com.automq.rocketmq.common.trace.TraceHelper;
 import com.google.common.base.Stopwatch;
-import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
-import io.opentelemetry.api.trace.TracerProvider;
 import java.util.Optional;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.LinkedBlockingDeque;
@@ -40,9 +39,7 @@ public class ProxyContextExt extends ProxyContext implements TraceContext {
 
     private ProxyContextExt() {
         super();
-
-        TracerProvider tracerProvider = GlobalOpenTelemetry.getTracerProvider();
-        tracer = tracerProvider.get("automq-for-rocketmq");
+        tracer = TraceHelper.getTracer();
     }
 
     public static ProxyContextExt create() {

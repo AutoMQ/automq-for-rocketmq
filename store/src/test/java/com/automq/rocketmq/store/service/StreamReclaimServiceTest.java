@@ -19,6 +19,7 @@ package com.automq.rocketmq.store.service;
 
 import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.rocketmq.store.mock.MockStreamStore;
+import com.automq.rocketmq.store.model.StoreContext;
 import com.automq.rocketmq.store.model.stream.SingleRecord;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
@@ -57,7 +58,7 @@ public class StreamReclaimServiceTest {
     public void trim_stream_normal() {
         // 1. append 100 records
         for (int i = 0; i < 100; i++) {
-            streamStore.append(STREAM_ID, buildRecord()).join();
+            streamStore.append(StoreContext.EMPTY, STREAM_ID, buildRecord()).join();
         }
         assertEquals(0, streamStore.startOffset(STREAM_ID));
         assertEquals(100, streamStore.nextOffset(STREAM_ID));
@@ -89,7 +90,7 @@ public class StreamReclaimServiceTest {
     public void trim_stream_fail() {
         // 1. append 10 records
         for (int i = 0; i < 10; i++) {
-            streamStore.append(STREAM_ID, buildRecord()).join();
+            streamStore.append(StoreContext.EMPTY, STREAM_ID, buildRecord()).join();
         }
         assertEquals(0, streamStore.startOffset(STREAM_ID));
         assertEquals(10, streamStore.nextOffset(STREAM_ID));

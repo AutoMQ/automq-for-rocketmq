@@ -135,8 +135,10 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
     }
 
     @Override
-    public CompletableFuture<List<SendResult>> sendMessage(ProxyContext ctx, AddressableMessageQueue messageQueue,
-        List<Message> msgList, SendMessageRequestHeader requestHeader, long timeoutMillis) {
+    @WithSpan(kind = SpanKind.SERVER)
+    public CompletableFuture<List<SendResult>> sendMessage(ProxyContext ctx,
+        @SpanAttribute AddressableMessageQueue messageQueue,
+        List<Message> msgList, @SpanAttribute SendMessageRequestHeader requestHeader, long timeoutMillis) {
         if (msgList.size() != 1) {
             throw new UnsupportedOperationException("Batch message is not supported");
         }
@@ -152,7 +154,8 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
                     topic.getTopicId(), virtualQueue.topicId());
                 return CompletableFuture.failedFuture(new ProxyException(apache.rocketmq.v2.Code.TOPIC_NOT_FOUND, "Topic resource does not exist."));
             }
-            FlatMessage flatMessage = FlatMessageUtil.convertTo(topic.getTopicId(), virtualQueue.physicalQueueId(), config.hostName(), message);
+            ProxyContextExt contextExt = (ProxyContextExt) ctx;
+            FlatMessage flatMessage = FlatMessageUtil.convertTo(contextExt, topic.getTopicId(), virtualQueue.physicalQueueId(), config.hostName(), message);
 
             if (requestHeader.getTopic().startsWith(MixAll.RETRY_GROUP_TOPIC_PREFIX)) {
                 flatMessage.systemProperties().mutateDeliveryAttempts(requestHeader.getReconsumeTimes() + 1);
@@ -162,15 +165,26 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
                         .message(flatMessage)
                         .offset(0)
                         .build();
+                    contextExt.span().ifPresent(span -> {
+                        span.setAttribute("deadLetter", true);
+                        span.setAttribute("group", groupName);
+                    });
                     return consumerGroupOf(groupName)
-                        .thenCompose(group -> deadLetterService.send(group.getGroupId(), flatMessageExt))
+                        .thenCompose(group -> deadLetterService.send(contextExt, group.getGroupId(), flatMessageExt))
                         .thenApply(ignore -> new PutResult(PutResult.Status.PUT_OK, 0));
                 } else {
-                    return store.put(flatMessage);
+                    String groupName = requestHeader.getTopic().replace(MixAll.RETRY_GROUP_TOPIC_PREFIX, "");
+                    contextExt.span().ifPresent(span -> {
+                        span.setAttribute("retry", true);
+                        span.setAttribute("group", groupName);
+                        span.setAttribute("reconsumeTimes", requestHeader.getReconsumeTimes());
+                        span.setAttribute("deliveryTimestamp", flatMessage.systemProperties().deliveryTimestamp());
+                    });
+                    return store.put(ContextUtil.buildStoreContext(ctx, topic.getName(), groupName), flatMessage);
                 }
             }
 
-            return store.put(flatMessage);
+            return store.put(ContextUtil.buildStoreContext(ctx, topic.getName(), ""), flatMessage);
         });
 
         return putFuture.thenApply(putResult -> {
@@ -229,7 +243,7 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
                     throw new ProxyException(apache.rocketmq.v2.Code.MESSAGE_NOT_FOUND, "Message not found from server.");
                 }).thenCompose(messageExt -> {
                     if (messageExt.deliveryAttempts() > group.getMaxDeliveryAttempt()) {
-                        return deadLetterService.send(group.getGroupId(), messageExt);
+                        return deadLetterService.send((ProxyContextExt) ctx, group.getGroupId(), messageExt);
                     }
 
                     // Message consume retry strategy
@@ -237,7 +251,7 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
                     // =0: broker control retry frequency
                     // >0: client control retry frequency
                     return switch (Integer.compare(delayLevel, 0)) {
-                        case -1 -> deadLetterService.send(group.getGroupId(), messageExt);
+                        case -1 -> deadLetterService.send((ProxyContextExt) ctx, group.getGroupId(), messageExt);
                         case 0 -> topicOf(MixAll.RETRY_GROUP_TOPIC_PREFIX + requestHeader.getGroup())
                             .thenCompose(retryTopic -> {
                                 // Keep the same logic as apache RocketMQ.
@@ -249,7 +263,7 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
                                 message.mutateTopicId(retryTopic.getTopicId());
 
                                 message.systemProperties().mutateDeliveryTimestamp(FlatMessageUtil.calculateDeliveryTimestamp(serverDelayLevel));
-                                return store.put(message)
+                                return store.put(StoreContext.EMPTY, message)
                                     .exceptionally(ex -> {
                                         LOGGER.error("Put messageExt to retry topic failed", ex);
                                         return null;
@@ -265,7 +279,7 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
                                 message.mutateTopicId(retryTopic.getTopicId());
 
                                 message.systemProperties().mutateDeliveryTimestamp(FlatMessageUtil.calculateDeliveryTimestamp(delayLevel));
-                                return store.put(message)
+                                return store.put(StoreContext.EMPTY, message)
                                     .exceptionally(ex -> {
                                         LOGGER.error("Put message to retry topic failed", ex);
                                         return null;
@@ -430,13 +444,13 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
                             if (suspendResult.isEmpty() || suspendResult.get().messageList().isEmpty()) {
                                 return new PopResult(PopStatus.POLLING_NOT_FOUND, Collections.emptyList());
                             }
-                            PopResult popResult = new PopResult(PopStatus.FOUND, FlatMessageUtil.convertTo(suspendResult.get().messageList(), requestHeader.getTopic(), requestHeader.getInvisibleTime(), config.hostName(), config.grpcListenPort()));
+                            PopResult popResult = new PopResult(PopStatus.FOUND, FlatMessageUtil.convertTo((ProxyContextExt) ctx, suspendResult.get().messageList(), requestHeader.getTopic(), requestHeader.getInvisibleTime(), config.hostName(), config.grpcListenPort()));
                             popResult.setRestNum(suspendResult.get().restMessageCount());
                             return popResult;
                         });
                 }
             }
-            PopResult popResult = new PopResult(PopStatus.FOUND, FlatMessageUtil.convertTo(result.messageList, requestHeader.getTopic(), requestHeader.getInvisibleTime(), config.hostName(), config.grpcListenPort()));
+            PopResult popResult = new PopResult(PopStatus.FOUND, FlatMessageUtil.convertTo((ProxyContextExt) ctx, result.messageList, requestHeader.getTopic(), requestHeader.getInvisibleTime(), config.hostName(), config.grpcListenPort()));
             popResult.setRestNum(result.restMessageCount);
             return CompletableFuture.completedFuture(popResult);
         }).thenApply(result -> {
@@ -459,6 +473,7 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
             rawHandle = ReceiptHandleUtil.decodeReceiptHandle(requestHeader.getExtraInfo());
         } catch (Exception e) {
             org.apache.rocketmq.client.consumer.AckResult result = new org.apache.rocketmq.client.consumer.AckResult();
+            result.setExtraInfo("");
             result.setStatus(AckStatus.NO_EXIST);
             return CompletableFuture.completedFuture(result);
         }
@@ -466,6 +481,7 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
         return store.changeInvisibleDuration(rawHandle, requestHeader.getInvisibleTime())
             .thenApply(changeInvisibleDurationResult -> {
                 org.apache.rocketmq.client.consumer.AckResult ackResult = new org.apache.rocketmq.client.consumer.AckResult();
+                ackResult.setExtraInfo(requestHeader.getExtraInfo());
                 switch (changeInvisibleDurationResult.status()) {
                     case SUCCESS -> ackResult.setStatus(AckStatus.OK);
                     case ERROR -> ackResult.setStatus(AckStatus.NO_EXIST);
@@ -652,13 +668,13 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
                                 }
                                 com.automq.rocketmq.store.model.message.PullResult suspendResult = resultWrapper.get().inner();
                                 return new PullResult(PullStatus.FOUND, suspendResult.nextBeginOffset(), suspendResult.minOffset(), suspendResult.maxOffset(),
-                                    FlatMessageUtil.convertTo(suspendResult.messageList(), requestHeader.getTopic(), 0, config.hostName(), config.remotingListenPort()));
+                                    FlatMessageUtil.convertTo(null, suspendResult.messageList(), requestHeader.getTopic(), 0, config.hostName(), config.remotingListenPort()));
                             });
                     }
                 }
                 return CompletableFuture.completedFuture(
                     new PullResult(PullStatus.FOUND, result.nextBeginOffset(), result.minOffset(), result.maxOffset(),
-                        FlatMessageUtil.convertTo(result.messageList(), requestHeader.getTopic(), 0, config.hostName(), config.remotingListenPort()))
+                        FlatMessageUtil.convertTo(null, result.messageList(), requestHeader.getTopic(), 0, config.hostName(), config.remotingListenPort()))
                 );
             });
     }

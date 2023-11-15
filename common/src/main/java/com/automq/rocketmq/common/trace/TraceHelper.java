@@ -17,11 +17,13 @@
 
 package com.automq.rocketmq.common.trace;
 
+import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.api.trace.TracerProvider;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.instrumentation.annotations.WithSpan;
 import java.lang.reflect.Method;
@@ -36,6 +38,11 @@ import org.aspectj.lang.reflect.MethodSignature;
 
 public class TraceHelper {
     private static final SpanAttributesExtractor EXTRACTOR = SpanAttributesExtractor.create();
+
+    public static Tracer getTracer() {
+        TracerProvider tracerProvider = GlobalOpenTelemetry.getTracerProvider();
+        return tracerProvider.get("automq-for-rocketmq");
+    }
 
     public static Optional<Span> createAndStartSpan(TraceContext context, String name, SpanKind kind) {
         Optional<Tracer> tracer = context.tracer();

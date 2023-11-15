@@ -18,6 +18,7 @@
 package com.automq.rocketmq.store.service;
 
 import com.automq.rocketmq.common.model.FlatMessageExt;
+import com.automq.rocketmq.common.trace.TraceHelper;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.store.api.DeadLetterSender;
 import com.automq.rocketmq.store.api.LogicQueue;
@@ -38,6 +39,9 @@ import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.util.SerializeUtil;
 import com.automq.stream.utils.FutureUtil;
 import com.automq.stream.utils.ThreadUtils;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.api.trace.Tracer;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -93,11 +97,24 @@ public class ReviveService {
 
         @Override
         public void run() {
+            Tracer tracer = TraceHelper.getTracer();
+            StoreContext context = new StoreContext("", "", tracer);
+            Span rootSpan = tracer.spanBuilder("ReviveTask")
+                .setNoParent()
+                .setSpanKind(SpanKind.INTERNAL)
+                .startSpan();
+            context.attachSpan(rootSpan);
+
             ReceiptHandle receiptHandle = ReceiptHandle.getRootAsReceiptHandle(payload);
             long consumerGroupId = receiptHandle.consumerGroupId();
             long topicId = receiptHandle.topicId();
             int queueId = receiptHandle.queueId();
             long operationId = receiptHandle.operationId();
+            context.span().ifPresent(s -> {
+                s.setAttribute("topicId", topicId);
+                s.setAttribute("queueId", queueId);
+                s.setAttribute("consumerGroupId", consumerGroupId);
+            });
 
             CompletableFuture<Void> future = CompletableFuture.completedFuture(null);
             CompletableFuture<Void> preFuture = inflightRevive.putIfAbsent(operationId, future);
@@ -136,6 +153,7 @@ public class ReviveService {
 
                         CheckPoint checkPoint = SerializeUtil.decodeCheckPoint(ByteBuffer.wrap(ckValue));
                         PopOperation.PopOperationType operationType = PopOperation.PopOperationType.valueOf(checkPoint.popOperationType());
+                        context.span().ifPresent(s -> s.setAttribute("operationType", operationType.name()));
 
                         CompletableFuture<PullResult> pullFuture;
                         if (operationType == PopOperation.PopOperationType.POP_RETRY) {
@@ -143,7 +161,12 @@ public class ReviveService {
                         } else {
                             pullFuture = queue.pullNormal(consumerGroupId, Filter.DEFAULT_FILTER, checkPoint.messageOffset(), 1);
                         }
-                        return pullFuture.thenApply(result -> Triple.of(queue, result, operationType));
+                        return pullFuture.thenApply(result -> {
+                            if (result.messageList().isEmpty()) {
+                                context.span().ifPresent(s -> s.addEvent("message not found"));
+                            }
+                            return Triple.of(queue, result, operationType);
+                        });
                     }, backgroundExecutor);
 
             AtomicReference<Integer> maxDeliveryAttemptsRef = new AtomicReference<>();
@@ -158,6 +181,7 @@ public class ReviveService {
                     // Build the retry message and append it to retry stream or dead letter stream.
                     FlatMessageExt messageExt = pullResult.messageList().get(0);
                     maxDeliveryAttemptsRef.set(maxDeliveryAttempts);
+                    context.span().ifPresent(s -> s.setAttribute("maxDeliveryAttempts", maxDeliveryAttempts));
                     return Triple.of(logicQueue, messageExt, operationType);
                 }, backgroundExecutor);
 
@@ -169,22 +193,27 @@ public class ReviveService {
 
                 if (operationType == PopOperation.PopOperationType.POP_ORDER) {
                     int consumeTimes = logicQueue.getConsumeTimes(consumerGroupId, messageExt.offset());
+                    context.span().ifPresent(s -> s.setAttribute("deliveryAttempts", consumeTimes));
+
                     if (consumeTimes >= maxDeliveryAttempts) {
                         messageExt.setDeliveryAttempts(consumeTimes);
                         // Send to dead letter topic specified in consumer group config.
-                        return deadLetterSender.send(consumerGroupId, messageExt)
+                        return deadLetterSender.send(context, consumerGroupId, messageExt)
                             .thenApply(nil -> Pair.of(true, logicQueue));
                     }
                     return CompletableFuture.completedFuture(Pair.of(false, logicQueue));
                 }
+
+                context.span().ifPresent(s -> s.setAttribute("deliveryAttempts", messageExt.deliveryAttempts()));
+
                 if (messageExt.deliveryAttempts() >= maxDeliveryAttempts) {
                     // Send to dead letter topic specified in consumer group config.
-                    return deadLetterSender.send(consumerGroupId, messageExt)
+                    return deadLetterSender.send(context, consumerGroupId, messageExt)
                         .thenApply(nil -> Pair.of(true, logicQueue));
                 }
                 messageExt.setOriginalQueueOffset(messageExt.originalOffset());
                 messageExt.setDeliveryAttempts(messageExt.deliveryAttempts() + 1);
-                return logicQueue.putRetry(consumerGroupId, messageExt.message())
+                return logicQueue.putRetry(context, consumerGroupId, messageExt.message())
                     .thenCompose(result -> metadataService.topicOf(topicId)
                         .thenAccept(topic -> messageArrivalNotificationService.notify(MessageArrivalListener.MessageSource.RETRY_MESSAGE_PUT, topic, queueId, result.offset(), messageExt.message().tag())))
                     .thenApply(nil -> Pair.of(false, logicQueue));
@@ -201,9 +230,11 @@ public class ReviveService {
                 return queue.ackTimeout(SerializeUtil.encodeReceiptHandle(receiptHandle));
             }, backgroundExecutor);
 
-            ackFuture.thenAcceptAsync(nil -> inflightRevive.remove(operationId), backgroundExecutor)
-                .exceptionally(e -> {
-                    inflightRevive.remove(operationId);
+            ackFuture.whenComplete((nil, e) -> {
+                inflightRevive.remove(operationId);
+                TraceHelper.endSpan(context, rootSpan, e);
+
+                if (e != null) {
                     Throwable cause = FutureUtil.cause(e);
                     if (cause instanceof StoreException storeException) {
                         switch (storeException.code()) {
@@ -217,11 +248,11 @@ public class ReviveService {
                                 LOGGER.error("{}: Failed to revive ck with operationId: {}", identity, operationId, storeException);
                                 break;
                         }
-                        return null;
+                        return;
                     }
                     LOGGER.error("{}: Failed to revive ck with operationId: {}", identity, operationId, cause);
-                    return null;
-                });
+                }
+            });
         }
     }
 

@@ -121,17 +121,34 @@ public class S3StreamStore implements StreamStore {
             throw new IllegalStateException("Stream " + streamId + " is not opened.");
         }
         return stream.get().fetch(startOffset, startOffset + maxCount, Integer.MAX_VALUE)
-            .thenApplyAsync(result -> result, storeWorkingThreadPool);
+            .thenApplyAsync(result -> {
+                context.span().ifPresent(span -> {
+                    span.setAttribute("messageCount", result.recordBatchList().size());
+                    span.setAttribute("cacheAccess", result.getCacheAccessType().name().toLowerCase());
+                });
+                return result;
+            }, storeWorkingThreadPool);
     }
 
     @Override
-    public CompletableFuture<AppendResult> append(long streamId, RecordBatch recordBatch) {
+    @WithSpan(kind = SpanKind.SERVER)
+    public CompletableFuture<AppendResult> append(StoreContext context, long streamId, RecordBatch recordBatch) {
         Optional<Stream> stream = streamClient.getStream(streamId);
         if (stream.isEmpty()) {
             throw new IllegalStateException("Stream " + streamId + " is not opened.");
         }
+
+        context.span().ifPresent(span -> {
+            span.setAttribute("streamId", streamId);
+            span.setAttribute("recordCount", recordBatch.count());
+            span.setAttribute("recordBytes", recordBatch.rawPayload().remaining());
+        });
+
         return stream.get().append(recordBatch)
-            .thenApplyAsync(result -> result, storeWorkingThreadPool);
+            .thenApplyAsync(result -> {
+                context.span().ifPresent(span -> span.setAttribute("offset", result.baseOffset()));
+                return result;
+            }, storeWorkingThreadPool);
     }
 
     @Override
