@@ -17,7 +17,10 @@
 
 package com.automq.rocketmq.controller.server.store.impl;
 
+import apache.rocketmq.controller.v1.AssignmentStatus;
+import apache.rocketmq.controller.v1.DescribeStreamRequest;
 import apache.rocketmq.controller.v1.S3ObjectState;
+import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.StreamState;
 import com.automq.rocketmq.common.api.DataStore;
@@ -25,6 +28,7 @@ import com.automq.rocketmq.controller.ControllerClient;
 import com.automq.rocketmq.controller.MetadataStore;
 import com.automq.rocketmq.controller.server.store.DefaultMetadataStore;
 import com.automq.rocketmq.controller.store.DatabaseTestBase;
+import com.automq.rocketmq.metadata.dao.Group;
 import com.automq.rocketmq.metadata.dao.S3Object;
 import com.automq.rocketmq.metadata.dao.S3StreamObject;
 import com.automq.rocketmq.metadata.dao.Stream;
@@ -34,6 +38,7 @@ import com.automq.rocketmq.metadata.mapper.StreamMapper;
 import java.io.IOException;
 import java.util.Date;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -41,6 +46,69 @@ import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
 
 class StreamManagerTest extends DatabaseTestBase {
+
+    @Test
+    public void testGetStream() throws IOException {
+        createAssignment(1, 2, 3, 4, AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNED);
+        Group group = createGroup("G1");
+        try (MetadataStore store = new DefaultMetadataStore(getControllerClient(), getSessionFactory(), config)) {
+            store.start();
+            awaitElectedAsLeader(store);
+
+            StreamManager streamManager = new StreamManager(store);
+            StreamMetadata stream = streamManager.getStream(1, 2, group.getId(), StreamRole.STREAM_ROLE_RETRY).join();
+            Assertions.assertNotNull(stream);
+
+            streamManager.describeStream(DescribeStreamRequest.newBuilder().setStreamId(stream.getStreamId()).build());
+        }
+    }
+
+    @Test
+    public void testGetStream_NotFound() throws IOException {
+        Group group = createGroup("G1");
+        try (MetadataStore store = new DefaultMetadataStore(getControllerClient(), getSessionFactory(), config)) {
+            store.start();
+            awaitElectedAsLeader(store);
+
+            StreamManager streamManager = new StreamManager(store);
+            Assertions.assertThrows(CompletionException.class, () -> {
+                streamManager.getStream(1, 2, group.getId(), StreamRole.STREAM_ROLE_RETRY).join();
+            });
+        }
+    }
+
+    @Test
+    public void testGetStream_IllegalState() throws IOException {
+        createAssignment(1, 2, 3, 4, AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNED);
+        createAssignment(1, 2, 3, 4, AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNED);
+        Group group = createGroup("G1");
+        try (MetadataStore store = new DefaultMetadataStore(getControllerClient(), getSessionFactory(), config)) {
+            store.start();
+            awaitElectedAsLeader(store);
+
+            StreamManager streamManager = new StreamManager(store);
+            Assertions.assertThrows(CompletionException.class, () -> {
+                streamManager.getStream(1, 2, group.getId(), StreamRole.STREAM_ROLE_RETRY).join();
+            });
+        }
+    }
+
+    @Test
+    public void testGetStream_AssignmentStatus() throws IOException {
+        createAssignment(1, 2, 3, 4, AssignmentStatus.ASSIGNMENT_STATUS_YIELDING);
+        Group group = createGroup("G1");
+        try (MetadataStore store = new DefaultMetadataStore(getControllerClient(), getSessionFactory(), config)) {
+            store.start();
+            awaitElectedAsLeader(store);
+
+            StreamManager streamManager = new StreamManager(store);
+            Assertions.assertThrows(CompletionException.class, () -> {
+                streamManager.getStream(1, 2, group.getId(), StreamRole.STREAM_ROLE_RETRY).join();
+            });
+        }
+    }
+
+
 
     @Test
     public void testDeleteStream() throws IOException {

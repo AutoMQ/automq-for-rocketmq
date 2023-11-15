@@ -40,7 +40,6 @@ import apache.rocketmq.controller.v1.Topic;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.UpdateGroupRequest;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
-import com.automq.rocketmq.common.exception.ControllerException;
 import com.automq.rocketmq.metadata.dao.Node;
 
 import io.grpc.stub.StreamObserver;
@@ -53,9 +52,9 @@ public interface ControllerClient extends Closeable {
 
     CompletableFuture<Node> registerBroker(String target, String name, String address, String instanceId);
 
-    CompletableFuture<Long> createTopic(String target, CreateTopicRequest request) throws ControllerException;
+    CompletableFuture<Long> createTopic(String target, CreateTopicRequest request);
 
-    CompletableFuture<Void> deleteTopic(String target, long topicId) throws ControllerException;
+    CompletableFuture<Void> deleteTopic(String target, long topicId);
 
     CompletableFuture<Topic> describeTopic(String target, Long topicId, String topicName);
 
@@ -65,7 +64,7 @@ public interface ControllerClient extends Closeable {
 
     CompletableFuture<Void> reassignMessageQueue(String target, long topicId, int queueId, int dstNodeId);
 
-    CompletableFuture<Void> notifyQueueClose(String target, long topicId, int queueId) throws ControllerException;
+    CompletableFuture<Void> notifyQueueClose(String target, long topicId, int queueId);
 
     CompletableFuture<CreateGroupReply> createGroup(String target, CreateGroupRequest request);
 

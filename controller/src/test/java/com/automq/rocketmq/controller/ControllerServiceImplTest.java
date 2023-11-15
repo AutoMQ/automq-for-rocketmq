@@ -187,7 +187,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
             node.setName("b1");
             node.setVolumeId("v-1");
             node.setVpcId("vpc-1");
-            node.setAddress("localhost:1234");
+            node.setAddress("localhost:2345");
             node.setInstanceId("i-1");
             node.setEpoch(1);
             mapper.create(node);

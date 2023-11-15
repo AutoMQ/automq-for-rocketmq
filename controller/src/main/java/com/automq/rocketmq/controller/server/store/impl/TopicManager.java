@@ -163,17 +163,17 @@ public class TopicManager {
                 }
                 return future;
             } else {
-                try {
-                    metadataStore.controllerClient().createTopic(metadataStore.leaderAddress(), request).whenComplete((res, e) -> {
-                        if (null != e) {
-                            future.completeExceptionally(e);
-                        } else {
-                            future.complete(res);
-                        }
-                    });
-                } catch (ControllerException e) {
-                    future.completeExceptionally(e);
+                Optional<String> leaderAddress = metadataStore.electionService().leaderAddress();
+                if (leaderAddress.isEmpty()) {
+                    return CompletableFuture.failedFuture(new ControllerException(Code.NO_LEADER_VALUE, "No leader is elected yet"));
                 }
+                metadataStore.controllerClient().createTopic(leaderAddress.get(), request).whenComplete((res, e) -> {
+                    if (null != e) {
+                        future.completeExceptionally(e);
+                    } else {
+                        future.complete(res);
+                    }
+                });
             }
             break;
         }
@@ -249,17 +249,17 @@ public class TopicManager {
                     future.completeExceptionally(e);
                 }
             } else {
-                try {
-                    metadataStore.controllerClient().updateTopic(metadataStore.leaderAddress(), request).whenComplete((topic, e) -> {
-                        if (null != e) {
-                            future.completeExceptionally(e);
-                        } else {
-                            future.complete(topic);
-                        }
-                    });
-                } catch (ControllerException e) {
-                    future.completeExceptionally(e);
+                Optional<String> leaderAddress = metadataStore.electionService().leaderAddress();
+                if (leaderAddress.isEmpty()) {
+                    return CompletableFuture.failedFuture(new ControllerException(Code.NO_LEADER_VALUE, "No leader is elected yet"));
                 }
+                metadataStore.controllerClient().updateTopic(leaderAddress.get(), request).whenComplete((topic, e) -> {
+                    if (null != e) {
+                        future.completeExceptionally(e);
+                    } else {
+                        future.complete(topic);
+                    }
+                });
             }
             break;
         }
@@ -328,11 +328,11 @@ public class TopicManager {
                     notifyOnResourceChange(toNotify);
                     return null;
                 } else {
-                    try {
-                        return metadataStore.controllerClient().deleteTopic(metadataStore.leaderAddress(), topicId).join();
-                    } catch (ControllerException e) {
-                        throw new CompletionException(e);
+                    Optional<String> leaderAddress = metadataStore.electionService().leaderAddress();
+                    if (leaderAddress.isEmpty()) {
+                        throw new CompletionException(new ControllerException(Code.NO_LEADER_VALUE, "No leader is elected yet"));
                     }
+                    return metadataStore.controllerClient().deleteTopic(leaderAddress.get(), topicId).join();
                 }
             }
         }, metadataStore.asyncExecutor());

@@ -15,32 +15,31 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.controller.store.impl;
+package com.automq.rocketmq.controller.server.store;
 
+import apache.rocketmq.common.v1.Code;
 import apache.rocketmq.controller.v1.AcceptTypes;
 import apache.rocketmq.controller.v1.AssignmentStatus;
 import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
+import apache.rocketmq.controller.v1.DescribeClusterRequest;
 import apache.rocketmq.controller.v1.GroupStatus;
 import apache.rocketmq.controller.v1.GroupType;
+import apache.rocketmq.controller.v1.MessageType;
 import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.StreamState;
 import apache.rocketmq.controller.v1.TopicStatus;
-import apache.rocketmq.controller.v1.MessageType;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.common.exception.ControllerException;
 import com.automq.rocketmq.controller.ControllerClient;
-import com.automq.rocketmq.controller.store.DatabaseTestBase;
 import com.automq.rocketmq.controller.MetadataStore;
-import com.automq.rocketmq.controller.server.store.DefaultMetadataStore;
-import com.automq.rocketmq.controller.server.store.Role;
+import com.automq.rocketmq.controller.store.DatabaseTestBase;
 import com.automq.rocketmq.metadata.dao.Group;
-import com.automq.rocketmq.metadata.dao.Lease;
 import com.automq.rocketmq.metadata.dao.Node;
 import com.automq.rocketmq.metadata.dao.QueueAssignment;
-import com.automq.rocketmq.metadata.dao.Stream;
 import com.automq.rocketmq.metadata.dao.Range;
+import com.automq.rocketmq.metadata.dao.Stream;
 import com.automq.rocketmq.metadata.dao.StreamCriteria;
 import com.automq.rocketmq.metadata.dao.Topic;
 import com.automq.rocketmq.metadata.mapper.GroupMapper;
@@ -49,27 +48,91 @@ import com.automq.rocketmq.metadata.mapper.QueueAssignmentMapper;
 import com.automq.rocketmq.metadata.mapper.RangeMapper;
 import com.automq.rocketmq.metadata.mapper.StreamMapper;
 import com.automq.rocketmq.metadata.mapper.TopicMapper;
-
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.ibatis.session.SqlSession;
 import org.awaitility.Awaitility;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
+
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 class DefaultMetadataStoreTest extends DatabaseTestBase {
     ControllerClient client;
 
     public DefaultMetadataStoreTest() {
         this.client = Mockito.mock(ControllerClient.class);
+    }
+
+    @Test
+    public void testDescribeCluster() throws IOException {
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            metadataStore.start();
+            awaitElectedAsLeader(metadataStore);
+            assertDoesNotThrow(() -> {
+                metadataStore.describeCluster(DescribeClusterRequest.newBuilder().build()).join();
+            });
+        }
+    }
+
+    @Test
+    public void testRegisterCurrentNode() throws IOException {
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            metadataStore.start();
+            awaitElectedAsLeader(metadataStore);
+            assertDoesNotThrow(() -> metadataStore.registerCurrentNode(config.name(), config.advertiseAddress(), config.instanceId()));
+        }
+    }
+
+    @Test
+    public void testApplyStreamChange() throws IOException {
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            metadataStore.start();
+            awaitElectedAsLeader(metadataStore);
+            Stream stream = new Stream();
+            stream.setStreamRole(StreamRole.STREAM_ROLE_RETRY);
+            stream.setId(2L);
+            stream.setState(StreamState.DELETED);
+            stream.setRangeId(1);
+            stream.setQueueId(3);
+            stream.setTopicId(4L);
+            stream.setEpoch(5L);
+            stream.setSrcNodeId(6);
+            stream.setDstNodeId(7);
+            stream.setGroupId(8L);
+            metadataStore.applyStreamChange(List.of(stream));
+        }
+    }
+
+    @Test
+    public void testHeartbeat() throws IOException {
+
+        Mockito.when(client.heartbeat(ArgumentMatchers.anyString(), ArgumentMatchers.anyInt(), ArgumentMatchers.anyLong(), ArgumentMatchers.anyBoolean()))
+            .thenReturn(CompletableFuture.completedFuture(null));
+
+        ElectionService electionService = Mockito.mock(ElectionService.class);
+        Mockito.when(electionService.leaderAddress()).thenReturn(Optional.of("localhost:1234"));
+        Mockito.when(electionService.leaderNodeId()).thenReturn(Optional.of(2));
+        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            metadataStore.setElectionService(electionService);
+            metadataStore.heartbeat();
+        }
     }
 
     @Test
@@ -81,11 +144,8 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
                 .pollInterval(100, TimeUnit.MILLISECONDS)
                 .until(metadataStore::isLeader);
 
-            String name = "broker-0";
-            String address = "localhost:1234";
-            String instanceId = "i-register";
-            Node node = metadataStore.registerBrokerNode(name, address, instanceId).get();
-            Assertions.assertTrue(node.getId() > 0);
+            Node node = metadataStore.registerBrokerNode(config.name(), config.advertiseAddress(), config.instanceId()).get();
+            assertTrue(node.getId() > 0);
             nodeId = node.getId();
         }
 
@@ -106,9 +166,9 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             String name = "test-broker -0";
             String address = "localhost:1234";
             String instanceId = "i-register";
-            Assertions.assertThrows(CompletionException.class, () -> metadataStore.registerBrokerNode("", address, instanceId).join());
-            Assertions.assertThrows(CompletionException.class, () -> metadataStore.registerBrokerNode(name, null, instanceId).join());
-            Assertions.assertThrows(CompletionException.class, () -> metadataStore.registerBrokerNode(name, address, "").join());
+            assertThrows(CompletionException.class, () -> metadataStore.registerBrokerNode("", address, instanceId).join());
+            assertThrows(CompletionException.class, () -> metadataStore.registerBrokerNode(name, null, instanceId).join());
+            assertThrows(CompletionException.class, () -> metadataStore.registerBrokerNode(name, address, "").join());
         }
     }
 
@@ -117,8 +177,8 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
      */
     @Test
     void testGetLease() throws IOException {
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            Assertions.assertNull(metadataStore.getLease());
+        try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            assertTrue(metadataStore.electionService().leaderNodeId().isEmpty());
         }
     }
 
@@ -134,44 +194,25 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
     }
 
     @Test
-    void testLeaderAddress() throws IOException, ControllerException {
-        String address = "localhost:1234";
-        int nodeId;
-        try (SqlSession session = getSessionFactory().openSession()) {
-            NodeMapper nodeMapper = session.getMapper(NodeMapper.class);
-            Node node = new Node();
-            node.setAddress(address);
-            node.setName("broker-test-name");
-            node.setInstanceId("i-leader-address");
-            nodeMapper.create(node);
-            nodeId = node.getId();
-            session.commit();
-        }
-        Mockito.when(config.nodeId()).thenReturn(nodeId);
-
-        try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+    void testLeaderAddress() throws IOException {
+        try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
             Awaitility.await()
                 .with()
                 .atMost(10, TimeUnit.SECONDS)
                 .pollInterval(100, TimeUnit.MILLISECONDS).until(metadataStore::isLeader);
 
-            Awaitility.await()
-                .with()
-                .atMost(10, TimeUnit.SECONDS)
-                .pollInterval(100, TimeUnit.MILLISECONDS).until(() -> !metadataStore.getNodes().isEmpty());
-
-            Assertions.assertEquals(metadataStore.getLease().getNodeId(), nodeId);
-
-            String addr = metadataStore.leaderAddress();
-            Assertions.assertEquals(address, addr);
+            Optional<Integer> leaderNodeId = metadataStore.electionService().leaderNodeId();
+            Optional<String> leaderAddress = metadataStore.electionService().leaderAddress();
+            assertTrue(leaderNodeId.isPresent());
+            assertTrue(leaderAddress.isPresent());
         }
     }
 
     @Test
     void testLeaderAddress_NoLeader() throws IOException {
         try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            Assertions.assertThrows(ControllerException.class, metadataStore::leaderAddress);
+            assertTrue(metadataStore.leaderAddress().isEmpty());
         }
     }
 
@@ -183,14 +224,13 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
                 .with()
                 .atMost(10, TimeUnit.SECONDS)
                 .pollInterval(100, TimeUnit.MILLISECONDS).until(metadataStore::isLeader);
-
-            Assertions.assertThrows(ControllerException.class, metadataStore::leaderAddress);
+            assertTrue(metadataStore.leaderAddress().isPresent());
         }
     }
 
     @Test
     void testCreateTopic() throws IOException, ExecutionException, InterruptedException {
-        String address = "localhost:1234";
+        String address = "localhost:2345";
         int nodeId;
         try (SqlSession session = getSessionFactory().openSession()) {
             NodeMapper nodeMapper = session.getMapper(NodeMapper.class);
@@ -232,16 +272,16 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         try (SqlSession session = getSessionFactory().openSession()) {
             TopicMapper topicMapper = session.getMapper(TopicMapper.class);
             List<Topic> topics = topicMapper.list(null, null);
-            topics.stream().filter(topic -> topic.getName().equals("t1")).forEach(topic -> Assertions.assertEquals(4, topic.getQueueNum()));
+            topics.stream().filter(topic -> topic.getName().equals("t1")).forEach(topic -> assertEquals(4, topic.getQueueNum()));
 
             QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
             List<QueueAssignment> assignments = assignmentMapper.list(topicId, null, null, null, null);
-            Assertions.assertEquals(4, assignments.size());
+            assertEquals(4, assignments.size());
 
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
             List<Stream> streams = streamMapper.byCriteria(StreamCriteria.newBuilder().withTopicId(topicId).build());
             // By default, we create 3 streams for each message queue: data, ops, snapshot
-            Assertions.assertEquals(queueNum * 3, streams.size());
+            assertEquals(queueNum * 3, streams.size());
         }
     }
 
@@ -253,20 +293,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
     @Test
     void testUpdateTopic() throws IOException, ExecutionException, InterruptedException {
-        String address = "localhost:1234";
-        int nodeId;
-        try (SqlSession session = getSessionFactory().openSession()) {
-            NodeMapper nodeMapper = session.getMapper(NodeMapper.class);
-            Node node = new Node();
-            node.setAddress(address);
-            node.setName("broker-test-name");
-            node.setInstanceId("i-leader-address");
-            nodeMapper.create(node);
-            nodeId = node.getId();
-            session.commit();
-        }
-        Mockito.when(config.nodeId()).thenReturn(nodeId);
-
         long topicId;
         int queueNum = 4;
         String topicName = "t1";
@@ -308,25 +334,25 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         try (SqlSession session = getSessionFactory().openSession()) {
             TopicMapper topicMapper = session.getMapper(TopicMapper.class);
             List<Topic> topics = topicMapper.list(null, null);
-            topics.stream().filter(topic -> topic.getName().equals("t1")).forEach(topic -> Assertions.assertEquals(4, topic.getQueueNum()));
+            topics.stream().filter(topic -> topic.getName().equals("t1")).forEach(topic -> assertEquals(4, topic.getQueueNum()));
 
             topics.stream().filter(topic -> topic.getName().equals("t1"))
                 .forEach(topic -> {
                     try {
-                        Assertions.assertEquals(acceptTypes, decodeAcceptTypes(topic.getAcceptMessageTypes()));
+                        assertEquals(acceptTypes, decodeAcceptTypes(topic.getAcceptMessageTypes()));
                     } catch (InvalidProtocolBufferException e) {
-                        Assertions.fail(e);
+                        fail(e);
                     }
                 });
 
             QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
             List<QueueAssignment> assignments = assignmentMapper.list(topicId, null, null, null, null);
-            Assertions.assertEquals(4, assignments.size());
+            assertEquals(4, assignments.size());
 
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
             List<Stream> streams = streamMapper.byCriteria(StreamCriteria.newBuilder().withTopicId(topicId).build());
             // By default, we create 3 streams for each message queue: data, ops, snapshot
-            Assertions.assertEquals(queueNum * 3, streams.size());
+            assertEquals(queueNum * 3, streams.size());
         }
     }
 
@@ -341,36 +367,26 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             assignment.setSrcNodeId(3);
             assignment.setQueueId(4);
             int affectedRows = mapper.create(assignment);
-            Assertions.assertEquals(1, affectedRows);
+            assertEquals(1, affectedRows);
             session.commit();
         }
 
         try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             List<QueueAssignment> assignmentList = metadataStore.listAssignments(null, null, null, null).get();
-            Assertions.assertEquals(1, assignmentList.size());
+            assertEquals(1, assignmentList.size());
             QueueAssignment assignment = assignmentList.get(0);
-            Assertions.assertEquals(1, assignment.getTopicId());
-            Assertions.assertEquals(AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNED, assignment.getStatus());
-            Assertions.assertEquals(2, assignment.getDstNodeId());
-            Assertions.assertEquals(3, assignment.getSrcNodeId());
-            Assertions.assertEquals(4, assignment.getQueueId());
+            assertEquals(1, assignment.getTopicId());
+            assertEquals(AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNED, assignment.getStatus());
+            assertEquals(2, assignment.getDstNodeId());
+            assertEquals(3, assignment.getSrcNodeId());
+            assertEquals(4, assignment.getQueueId());
         }
     }
 
     @Test
     public void testDeleteTopic() throws IOException, ExecutionException, InterruptedException {
-        String address = "localhost:1234";
-        int nodeId;
         long topicId;
         try (SqlSession session = getSessionFactory().openSession()) {
-            NodeMapper nodeMapper = session.getMapper(NodeMapper.class);
-            Node node = new Node();
-            node.setAddress(address);
-            node.setName("broker-test-name");
-            node.setInstanceId("i-leader-address");
-            nodeMapper.create(node);
-            nodeId = node.getId();
-
             TopicMapper topicMapper = session.getMapper(TopicMapper.class);
             Topic topic = new Topic();
             topic.setStatus(TopicStatus.TOPIC_STATUS_ACTIVE);
@@ -381,7 +397,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             topicId = topic.getId();
             session.commit();
         }
-        Mockito.when(config.nodeId()).thenReturn(nodeId);
 
         try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             metadataStore.start();
@@ -389,12 +404,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
                 .until(metadataStore::isLeader);
 
             metadataStore.deleteTopic(topicId).get();
-        }
-
-        try (SqlSession session = this.getSessionFactory().openSession()) {
-            NodeMapper nodeMapper = session.getMapper(NodeMapper.class);
-            nodeMapper.delete(nodeId);
-            session.commit();
         }
 
     }
@@ -405,7 +414,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             metadataStore.start();
             Awaitility.await().with().atMost(10, TimeUnit.SECONDS).pollInterval(100, TimeUnit.MILLISECONDS)
                 .until(metadataStore::isLeader);
-            Assertions.assertThrows(ExecutionException.class, () -> metadataStore.deleteTopic(1).get());
+            assertThrows(ExecutionException.class, () -> metadataStore.deleteTopic(1).get());
         }
     }
 
@@ -452,10 +461,10 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Awaitility.await().with().atMost(10, TimeUnit.SECONDS).pollInterval(100, TimeUnit.MILLISECONDS)
                 .until(metadataStore::isLeader);
             apache.rocketmq.controller.v1.Topic topic = metadataStore.describeTopic(topicId, null).get();
-            Assertions.assertEquals("T1", topic.getName());
-            Assertions.assertEquals(1, topic.getAssignmentsCount());
-            Assertions.assertEquals(1, topic.getReassignmentsCount());
-            Assertions.assertEquals(messageType, JsonFormat.printer().print(topic.getAcceptTypes()));
+            assertEquals("T1", topic.getName());
+            assertEquals(1, topic.getAssignmentsCount());
+            assertEquals(1, topic.getReassignmentsCount());
+            assertEquals(messageType, JsonFormat.printer().print(topic.getAcceptTypes()));
         }
     }
 
@@ -480,7 +489,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             List<QueueAssignment> assignments = metadataStore.listAssignments(2L, null, null, null).get();
             for (QueueAssignment assignment : assignments) {
                 if (assignment.getQueueId() == 1) {
-                    Assertions.assertEquals(AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNED, assignment.getStatus());
+                    assertEquals(AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNED, assignment.getStatus());
                 }
             }
         }
@@ -509,20 +518,19 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         long targetStreamEpoch = streamEpoch + 1;
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            Assertions.assertNull(metadataStore.getLease());
-            Lease lease = new Lease();
-            lease.setNodeId(config.nodeId());
-            metadataStore.setLease(lease);
-            metadataStore.setRole(Role.Leader);
+            metadataStore.start();
+            Awaitility.await().with().atMost(10, TimeUnit.SECONDS)
+                .pollInterval(100, TimeUnit.MILLISECONDS)
+                .until(metadataStore::isLeader);
 
-            StreamMetadata metadata = metadataStore.openStream(streamId, streamEpoch, config.nodeId()).get();
-            Assertions.assertNotNull(metadata);
-            Assertions.assertEquals(streamId, metadata.getStreamId());
-            Assertions.assertEquals(0, metadata.getStartOffset());
-            Assertions.assertEquals(0, metadata.getEndOffset());
-            Assertions.assertEquals(targetStreamEpoch, metadata.getEpoch());
-            Assertions.assertEquals(0, metadata.getRangeId());
-            Assertions.assertEquals(StreamState.OPEN, metadata.getState());
+            StreamMetadata metadata = metadataStore.openStream(streamId, streamEpoch, 1).get();
+            assertNotNull(metadata);
+            assertEquals(streamId, metadata.getStreamId());
+            assertEquals(0, metadata.getStartOffset());
+            assertEquals(0, metadata.getEndOffset());
+            assertEquals(targetStreamEpoch, metadata.getEpoch());
+            assertEquals(0, metadata.getRangeId());
+            assertEquals(StreamState.OPEN, metadata.getState());
 
             metadataStore.closeStream(metadata.getStreamId(), metadata.getEpoch(), config.nodeId());
         }
@@ -532,18 +540,18 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
 
             Stream stream = streamMapper.getByStreamId(streamId);
-            Assertions.assertEquals(streamId, stream.getId());
-            Assertions.assertEquals(0, stream.getStartOffset());
-            Assertions.assertEquals(targetStreamEpoch, stream.getEpoch());
-            Assertions.assertEquals(0, stream.getRangeId());
-            Assertions.assertEquals(StreamState.CLOSED, stream.getState());
+            assertEquals(streamId, stream.getId());
+            assertEquals(0, stream.getStartOffset());
+            assertEquals(targetStreamEpoch, stream.getEpoch());
+            assertEquals(0, stream.getRangeId());
+            assertEquals(StreamState.CLOSED, stream.getState());
 
             Range range = rangeMapper.get(stream.getRangeId(), streamId, null);
-            Assertions.assertEquals(0, range.getRangeId());
-            Assertions.assertEquals(streamId, range.getStreamId());
-            Assertions.assertEquals(targetStreamEpoch, range.getEpoch());
-            Assertions.assertEquals(0, range.getStartOffset());
-            Assertions.assertEquals(0, range.getEndOffset());
+            assertEquals(0, range.getRangeId());
+            assertEquals(streamId, range.getStreamId());
+            assertEquals(targetStreamEpoch, range.getEpoch());
+            assertEquals(0, range.getStartOffset());
+            assertEquals(0, range.getEndOffset());
 
             streamMapper.delete(streamId);
             session.commit();
@@ -585,22 +593,21 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         long targetStreamEpoch = streamEpoch + 1;
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            Assertions.assertNull(metadataStore.getLease());
-            Lease lease = new Lease();
-            lease.setNodeId(config.nodeId());
-            metadataStore.setLease(lease);
-            metadataStore.setRole(Role.Leader);
+            metadataStore.start();
+            Awaitility.await().with().atMost(10, TimeUnit.SECONDS)
+                .pollInterval(100, TimeUnit.MILLISECONDS)
+                .until(metadataStore::isLeader);
 
-            StreamMetadata metadata = metadataStore.openStream(streamId, streamEpoch, config.nodeId()).get();
-            Assertions.assertNotNull(metadata);
-            Assertions.assertEquals(streamId, metadata.getStreamId());
-            Assertions.assertEquals(1234, metadata.getStartOffset());
-            Assertions.assertEquals(targetStreamEpoch, metadata.getEpoch());
-            Assertions.assertEquals(1, metadata.getRangeId());
-            Assertions.assertEquals(2345, metadata.getEndOffset());
-            Assertions.assertEquals(StreamState.OPEN, metadata.getState());
+            StreamMetadata metadata = metadataStore.openStream(streamId, streamEpoch, 1).get();
+            assertNotNull(metadata);
+            assertEquals(streamId, metadata.getStreamId());
+            assertEquals(1234, metadata.getStartOffset());
+            assertEquals(targetStreamEpoch, metadata.getEpoch());
+            assertEquals(1, metadata.getRangeId());
+            assertEquals(2345, metadata.getEndOffset());
+            assertEquals(StreamState.OPEN, metadata.getState());
 
-            metadataStore.closeStream(metadata.getStreamId(), metadata.getEpoch(), config.nodeId());
+            metadataStore.closeStream(metadata.getStreamId(), metadata.getEpoch(), 1);
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -608,18 +615,18 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
 
             Stream stream = streamMapper.getByStreamId(streamId);
-            Assertions.assertEquals(streamId, stream.getId());
-            Assertions.assertEquals(1234, stream.getStartOffset());
-            Assertions.assertEquals(targetStreamEpoch, stream.getEpoch());
-            Assertions.assertEquals(1, stream.getRangeId());
-            Assertions.assertEquals(StreamState.CLOSED, stream.getState());
+            assertEquals(streamId, stream.getId());
+            assertEquals(1234, stream.getStartOffset());
+            assertEquals(targetStreamEpoch, stream.getEpoch());
+            assertEquals(1, stream.getRangeId());
+            assertEquals(StreamState.CLOSED, stream.getState());
 
             Range range = rangeMapper.get(stream.getRangeId(), streamId, null);
-            Assertions.assertEquals(1, range.getRangeId());
-            Assertions.assertEquals(streamId, range.getStreamId());
-            Assertions.assertEquals(targetStreamEpoch, range.getEpoch());
-            Assertions.assertEquals(2345, range.getStartOffset());
-            Assertions.assertEquals(2345, range.getEndOffset());
+            assertEquals(1, range.getRangeId());
+            assertEquals(streamId, range.getStreamId());
+            assertEquals(targetStreamEpoch, range.getEpoch());
+            assertEquals(2345, range.getStartOffset());
+            assertEquals(2345, range.getEndOffset());
 
             streamMapper.delete(streamId);
             session.commit();
@@ -660,40 +667,29 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         long targetStreamEpoch = streamEpoch + 1;
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            Assertions.assertNull(metadataStore.getLease());
-            Lease lease = new Lease();
-            lease.setNodeId(config.nodeId());
-            metadataStore.setLease(lease);
-            metadataStore.setRole(Role.Leader);
+            metadataStore.start();
+            Awaitility.await().with().atMost(10, TimeUnit.SECONDS)
+                .pollInterval(100, TimeUnit.MILLISECONDS)
+                .until(metadataStore::isLeader);
 
             metadataStore.start();
             Awaitility.await().with().atMost(10, TimeUnit.SECONDS)
                 .pollInterval(100, TimeUnit.MILLISECONDS)
                 .until(metadataStore::isLeader);
 
-            String name = "broker-0";
-            String address = "localhost:1234";
-            String instanceId = "i-register";
-            Node node = new Node();
-            node.setName(name);
-            node.setAddress(address);
-            node.setInstanceId(instanceId);
-            node.setId(1);
-            metadataStore.addBrokerNode(node);
+            StreamMetadata metadata = metadataStore.openStream(streamId, streamEpoch, 1).join();
+            assertNotNull(metadata);
+            assertEquals(streamId, metadata.getStreamId());
+            assertEquals(1234, metadata.getStartOffset());
+            assertEquals(targetStreamEpoch, metadata.getEpoch());
+            assertEquals(1, metadata.getRangeId());
+            assertEquals(2345, metadata.getEndOffset());
+            assertEquals(StreamState.OPEN, metadata.getState());
 
-            StreamMetadata metadata = metadataStore.openStream(streamId, streamEpoch, config.nodeId()).join();
-            Assertions.assertNotNull(metadata);
-            Assertions.assertEquals(streamId, metadata.getStreamId());
-            Assertions.assertEquals(1234, metadata.getStartOffset());
-            Assertions.assertEquals(targetStreamEpoch, metadata.getEpoch());
-            Assertions.assertEquals(1, metadata.getRangeId());
-            Assertions.assertEquals(2345, metadata.getEndOffset());
-            Assertions.assertEquals(StreamState.OPEN, metadata.getState());
+            assertThrows(CompletionException.class, () -> metadataStore.openStream(streamId, streamEpoch, 1).join());
+            assertDoesNotThrow(() -> metadataStore.openStream(streamId, streamEpoch + 1, 1).join());
 
-            Assertions.assertThrows(CompletionException.class, () -> metadataStore.openStream(streamId, streamEpoch, config.nodeId()).join());
-            Assertions.assertDoesNotThrow(() -> metadataStore.openStream(streamId, streamEpoch + 1, config.nodeId()).join());
-
-            metadataStore.closeStream(metadata.getStreamId(), metadata.getEpoch(), config.nodeId()).join();
+            metadataStore.closeStream(metadata.getStreamId(), metadata.getEpoch(), 1).join();
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -701,18 +697,18 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
 
             Stream stream = streamMapper.getByStreamId(streamId);
-            Assertions.assertEquals(streamId, stream.getId());
-            Assertions.assertEquals(1234, stream.getStartOffset());
-            Assertions.assertEquals(targetStreamEpoch, stream.getEpoch());
-            Assertions.assertEquals(1, stream.getRangeId());
-            Assertions.assertEquals(StreamState.CLOSED, stream.getState());
+            assertEquals(streamId, stream.getId());
+            assertEquals(1234, stream.getStartOffset());
+            assertEquals(targetStreamEpoch, stream.getEpoch());
+            assertEquals(1, stream.getRangeId());
+            assertEquals(StreamState.CLOSED, stream.getState());
 
             Range range = rangeMapper.get(stream.getRangeId(), streamId, null);
-            Assertions.assertEquals(1, range.getRangeId());
-            Assertions.assertEquals(streamId, range.getStreamId());
-            Assertions.assertEquals(targetStreamEpoch, range.getEpoch());
-            Assertions.assertEquals(2345, range.getStartOffset());
-            Assertions.assertEquals(2345, range.getEndOffset());
+            assertEquals(1, range.getRangeId());
+            assertEquals(streamId, range.getStreamId());
+            assertEquals(targetStreamEpoch, range.getEpoch());
+            assertEquals(2345, range.getStartOffset());
+            assertEquals(2345, range.getEndOffset());
 
             streamMapper.delete(streamId);
             session.commit();
@@ -754,12 +750,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         long targetStreamEpoch = streamEpoch + 1;
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            Assertions.assertNull(metadataStore.getLease());
-            Lease lease = new Lease();
-            lease.setNodeId(config.nodeId());
-            metadataStore.setLease(lease);
-            metadataStore.setRole(Role.Leader);
-
             metadataStore.start();
             Awaitility.await().with().atMost(10, TimeUnit.SECONDS)
                 .pollInterval(100, TimeUnit.MILLISECONDS)
@@ -776,18 +766,18 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             metadataStore.addBrokerNode(node);
 
             // Should throw if node is wrong
-            Assertions.assertThrows(CompletionException.class, () -> metadataStore.openStream(streamId, streamEpoch, nodeId + 1).join());
+            assertThrows(CompletionException.class, () -> metadataStore.openStream(streamId, streamEpoch, nodeId + 1).join());
 
-            StreamMetadata metadata = metadataStore.openStream(streamId, streamEpoch, config.nodeId()).join();
-            Assertions.assertNotNull(metadata);
-            Assertions.assertEquals(streamId, metadata.getStreamId());
-            Assertions.assertEquals(1234, metadata.getStartOffset());
-            Assertions.assertEquals(targetStreamEpoch, metadata.getEpoch());
-            Assertions.assertEquals(1, metadata.getRangeId());
-            Assertions.assertEquals(2345, metadata.getEndOffset());
-            Assertions.assertEquals(StreamState.OPEN, metadata.getState());
+            StreamMetadata metadata = metadataStore.openStream(streamId, streamEpoch, nodeId).join();
+            assertNotNull(metadata);
+            assertEquals(streamId, metadata.getStreamId());
+            assertEquals(1234, metadata.getStartOffset());
+            assertEquals(targetStreamEpoch, metadata.getEpoch());
+            assertEquals(1, metadata.getRangeId());
+            assertEquals(2345, metadata.getEndOffset());
+            assertEquals(StreamState.OPEN, metadata.getState());
 
-            metadataStore.closeStream(metadata.getStreamId(), metadata.getEpoch(), config.nodeId()).join();
+            metadataStore.closeStream(metadata.getStreamId(), metadata.getEpoch(), nodeId).join();
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -795,18 +785,18 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
 
             Stream stream = streamMapper.getByStreamId(streamId);
-            Assertions.assertEquals(streamId, stream.getId());
-            Assertions.assertEquals(1234, stream.getStartOffset());
-            Assertions.assertEquals(targetStreamEpoch, stream.getEpoch());
-            Assertions.assertEquals(1, stream.getRangeId());
-            Assertions.assertEquals(StreamState.CLOSED, stream.getState());
+            assertEquals(streamId, stream.getId());
+            assertEquals(1234, stream.getStartOffset());
+            assertEquals(targetStreamEpoch, stream.getEpoch());
+            assertEquals(1, stream.getRangeId());
+            assertEquals(StreamState.CLOSED, stream.getState());
 
             Range range = rangeMapper.get(stream.getRangeId(), streamId, null);
-            Assertions.assertEquals(1, range.getRangeId());
-            Assertions.assertEquals(streamId, range.getStreamId());
-            Assertions.assertEquals(targetStreamEpoch, range.getEpoch());
-            Assertions.assertEquals(2345, range.getStartOffset());
-            Assertions.assertEquals(2345, range.getEndOffset());
+            assertEquals(1, range.getRangeId());
+            assertEquals(streamId, range.getStreamId());
+            assertEquals(targetStreamEpoch, range.getEpoch());
+            assertEquals(2345, range.getStartOffset());
+            assertEquals(2345, range.getEndOffset());
 
             streamMapper.delete(streamId);
             session.commit();
@@ -847,12 +837,6 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         long targetStreamEpoch = streamEpoch + 1;
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            Assertions.assertNull(metadataStore.getLease());
-            Lease lease = new Lease();
-            lease.setNodeId(config.nodeId());
-            metadataStore.setLease(lease);
-            metadataStore.setRole(Role.Leader);
-
             metadataStore.start();
             Awaitility.await().with().atMost(10, TimeUnit.SECONDS)
                 .pollInterval(100, TimeUnit.MILLISECONDS)
@@ -868,38 +852,38 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             node.setId(1);
             metadataStore.addBrokerNode(node);
 
-            metadataStore.closeStream(streamId, streamEpoch, config.nodeId()).join();
-            metadataStore.closeStream(streamId, streamEpoch, config.nodeId()).join();
+            metadataStore.closeStream(streamId, streamEpoch, 1).join();
+            metadataStore.closeStream(streamId, streamEpoch, 1).join();
 
             try (SqlSession session = getSessionFactory().openSession()) {
                 StreamMapper streamMapper = session.getMapper(StreamMapper.class);
                 RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
 
                 Stream stream = streamMapper.getByStreamId(streamId);
-                Assertions.assertEquals(streamId, stream.getId());
-                Assertions.assertEquals(1234, stream.getStartOffset());
-                Assertions.assertEquals(streamEpoch, stream.getEpoch());
-                Assertions.assertEquals(0, stream.getRangeId());
-                Assertions.assertEquals(StreamState.CLOSED, stream.getState());
+                assertEquals(streamId, stream.getId());
+                assertEquals(1234, stream.getStartOffset());
+                assertEquals(streamEpoch, stream.getEpoch());
+                assertEquals(0, stream.getRangeId());
+                assertEquals(StreamState.CLOSED, stream.getState());
 
                 Range range = rangeMapper.get(stream.getRangeId(), streamId, null);
-                Assertions.assertEquals(0, range.getRangeId());
-                Assertions.assertEquals(streamId, range.getStreamId());
-                Assertions.assertEquals(streamEpoch, range.getEpoch());
-                Assertions.assertEquals(1234, range.getStartOffset());
-                Assertions.assertEquals(2345, range.getEndOffset());
+                assertEquals(0, range.getRangeId());
+                assertEquals(streamId, range.getStreamId());
+                assertEquals(streamEpoch, range.getEpoch());
+                assertEquals(1234, range.getStartOffset());
+                assertEquals(2345, range.getEndOffset());
 
                 session.commit();
             }
 
-            StreamMetadata metadata = metadataStore.openStream(streamId, streamEpoch, config.nodeId()).join();
-            Assertions.assertNotNull(metadata);
-            Assertions.assertEquals(streamId, metadata.getStreamId());
-            Assertions.assertEquals(1234, metadata.getStartOffset());
-            Assertions.assertEquals(targetStreamEpoch, metadata.getEpoch());
-            Assertions.assertEquals(1, metadata.getRangeId());
-            Assertions.assertEquals(2345, metadata.getEndOffset());
-            Assertions.assertEquals(StreamState.OPEN, metadata.getState());
+            StreamMetadata metadata = metadataStore.openStream(streamId, streamEpoch, 1).join();
+            assertNotNull(metadata);
+            assertEquals(streamId, metadata.getStreamId());
+            assertEquals(1234, metadata.getStartOffset());
+            assertEquals(targetStreamEpoch, metadata.getEpoch());
+            assertEquals(1, metadata.getRangeId());
+            assertEquals(2345, metadata.getEndOffset());
+            assertEquals(StreamState.OPEN, metadata.getState());
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -942,12 +926,12 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             long streamId = metadataStore.getStream(1, 2, null, StreamRole.STREAM_ROLE_DATA)
                 .get().getStreamId();
-            Assertions.assertEquals(streamId, dataStreamId);
+            assertEquals(streamId, dataStreamId);
             streamId = metadataStore.getStream(1, 2, null, StreamRole.STREAM_ROLE_OPS).get().getStreamId();
-            Assertions.assertEquals(streamId, opsStreamId);
+            assertEquals(streamId, opsStreamId);
 
             streamId = metadataStore.getStream(1, 2, 3L, StreamRole.STREAM_ROLE_RETRY).get().getStreamId();
-            Assertions.assertEquals(streamId, retryStreamId);
+            assertEquals(streamId, retryStreamId);
         }
     }
 
@@ -969,10 +953,10 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
         try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
             ConsumerGroup got = metadataStore.describeGroup(groupId, null).get();
-            Assertions.assertEquals(5, got.getMaxDeliveryAttempt());
-            Assertions.assertEquals(GroupType.GROUP_TYPE_STANDARD, got.getGroupType());
-            Assertions.assertEquals(1L, got.getDeadLetterTopicId());
-            Assertions.assertEquals("G1", got.getName());
+            assertEquals(5, got.getMaxDeliveryAttempt());
+            assertEquals(GroupType.GROUP_TYPE_STANDARD, got.getGroupType());
+            assertEquals(1L, got.getDeadLetterTopicId());
+            assertEquals("G1", got.getName());
         }
     }
 
@@ -1000,7 +984,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Awaitility.await().with().atMost(3, TimeUnit.SECONDS).pollInterval(100, TimeUnit.MILLISECONDS)
                 .until(metadataStore::isLeader);
             List<StreamMetadata> metadataList = metadataStore.listOpenStreams(4).get();
-            Assertions.assertEquals(1, metadataList.size());
+            assertEquals(1, metadataList.size());
         }
     }
 
@@ -1038,19 +1022,18 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         }
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            Assertions.assertNull(metadataStore.getLease());
-            Lease lease = new Lease();
-            lease.setNodeId(config.nodeId());
-            metadataStore.setLease(lease);
-            metadataStore.setRole(Role.Leader);
+            metadataStore.start();
+            Awaitility.await().with().atMost(10, TimeUnit.SECONDS)
+                .pollInterval(100, TimeUnit.MILLISECONDS)
+                .until(metadataStore::isLeader);
             List<StreamMetadata> streams = metadataStore.listOpenStreams(nodeId).get();
 
-            Assertions.assertFalse(streams.isEmpty());
+            assertFalse(streams.isEmpty());
             StreamMetadata streamMetadata = streams.get(0);
-            Assertions.assertEquals(streamId, streamMetadata.getStreamId());
-            Assertions.assertEquals(StreamState.OPEN, streamMetadata.getState());
-            Assertions.assertEquals(1234, streamMetadata.getStartOffset());
-            Assertions.assertEquals(2345, streamMetadata.getEndOffset());
+            assertEquals(streamId, streamMetadata.getStreamId());
+            assertEquals(StreamState.OPEN, streamMetadata.getState());
+            assertEquals(1234, streamMetadata.getStartOffset());
+            assertEquals(2345, streamMetadata.getEndOffset());
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -1095,14 +1078,14 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         }
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            Assertions.assertNull(metadataStore.getLease());
-            Lease lease = new Lease();
-            lease.setNodeId(config.nodeId());
-            metadataStore.setLease(lease);
-            metadataStore.setRole(Role.Leader);
+            metadataStore.start();
+            Awaitility.await().with().atMost(10, TimeUnit.SECONDS)
+                .pollInterval(100, TimeUnit.MILLISECONDS)
+                .until(metadataStore::isLeader);
+
             List<StreamMetadata> streams = metadataStore.listOpenStreams(nodeId).get();
 
-            Assertions.assertTrue(streams.isEmpty());
+            assertTrue(streams.isEmpty());
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -1123,12 +1106,12 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             metadataStore.commitOffset(groupId, topicId, queueId, 1000);
 
             Long offset = metadataStore.getConsumerOffset(groupId, topicId, queueId).get();
-            Assertions.assertEquals(1000, offset);
+            assertEquals(1000, offset);
 
             metadataStore.commitOffset(groupId, topicId, queueId, 2000);
 
             offset = metadataStore.getConsumerOffset(groupId, topicId, queueId).get();
-            Assertions.assertEquals(2000, offset);
+            assertEquals(2000, offset);
         }
     }
 
@@ -1171,20 +1154,20 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         }
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            Assertions.assertNull(metadataStore.getLease());
-            Lease lease = new Lease();
-            lease.setNodeId(config.nodeId());
-            metadataStore.setLease(lease);
-            metadataStore.setRole(Role.Leader);
+            metadataStore.start();
+            Awaitility.await().with().atMost(10, TimeUnit.SECONDS)
+                .pollInterval(100, TimeUnit.MILLISECONDS)
+                .until(metadataStore::isLeader);
+
             List<StreamMetadata> streams = metadataStore.getStreams(streamIds).get();
 
-            Assertions.assertFalse(streams.isEmpty());
-            Assertions.assertEquals(count, streams.size());
+            assertFalse(streams.isEmpty());
+            assertEquals(count, streams.size());
             long startOffset = 1234;
             for (int i = 0; i < count; i++) {
                 StreamMetadata streamMetadata = streams.get(i);
-                Assertions.assertEquals(startOffset, streamMetadata.getStartOffset());
-                Assertions.assertEquals(startOffset + 100, streamMetadata.getEndOffset());
+                assertEquals(startOffset, streamMetadata.getStartOffset());
+                assertEquals(startOffset + 100, streamMetadata.getEndOffset());
                 startOffset += 100;
             }
         }
@@ -1196,12 +1179,12 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
         List<Long> streamIds = new ArrayList<>();
 
         try (DefaultMetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
-            Assertions.assertNull(metadataStore.getLease());
-            Lease lease = new Lease();
-            lease.setNodeId(config.nodeId());
-            metadataStore.setLease(lease);
-            metadataStore.setRole(Role.Leader);
-            Assertions.assertTrue(metadataStore.getStreams(streamIds).get().isEmpty());
+            metadataStore.start();
+            Awaitility.await().with().atMost(10, TimeUnit.SECONDS)
+                .pollInterval(100, TimeUnit.MILLISECONDS)
+                .until(metadataStore::isLeader);
+
+            assertTrue(metadataStore.getStreams(streamIds).get().isEmpty());
         }
 
     }
@@ -1213,7 +1196,7 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Awaitility.await().with().atMost(10, TimeUnit.SECONDS).pollInterval(100, TimeUnit.MILLISECONDS)
                 .until(metadataStore::isLeader);
             String address = metadataStore.addressOfNode(1).get();
-            Assertions.assertNull(address);
+            assertNull(address);
         }
     }
 
@@ -1235,7 +1218,65 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
             metadataStore.addBrokerNode(node);
             String adr = metadataStore.addressOfNode(1).get();
-            Assertions.assertEquals(address, adr);
+            assertEquals(address, adr);
+        }
+    }
+
+    @Test
+    public void testOnQueueClose() throws IOException {
+        long streamId;
+        try (SqlSession session = getSessionFactory().openSession()) {
+            QueueAssignmentMapper queueAssignmentMapper = session.getMapper(QueueAssignmentMapper.class);
+            QueueAssignment assignment = new QueueAssignment();
+            assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_YIELDING);
+            assignment.setQueueId(1);
+            assignment.setTopicId(2);
+            assignment.setSrcNodeId(3);
+            assignment.setDstNodeId(4);
+            queueAssignmentMapper.create(assignment);
+
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+            Stream stream = new Stream();
+            stream.setId(1L);
+            stream.setQueueId(1);
+            stream.setRangeId(2);
+            stream.setSrcNodeId(3);
+            stream.setDstNodeId(4);
+            stream.setState(StreamState.CLOSING);
+            stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
+            stream.setTopicId(2L);
+            streamMapper.create(stream);
+            streamId = stream.getId();
+            session.commit();
+        }
+
+        try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config);
+             SqlSession session = metadataStore.openSession()) {
+            metadataStore.start();
+            Awaitility.await().with().atMost(10, TimeUnit.SECONDS).pollInterval(100, TimeUnit.MILLISECONDS)
+                .until(metadataStore::isLeader);
+
+            metadataStore.onQueueClosed(2, 1).join();
+
+            StreamMapper mapper = session.getMapper(StreamMapper.class);
+            Stream stream = mapper.getByStreamId(streamId);
+            assertEquals(stream.getState(), StreamState.CLOSED);
+        }
+    }
+
+    @Test
+    public void testOnQueueClose_Remote() throws IOException {
+        Mockito.when(client.notifyQueueClose(ArgumentMatchers.anyString(), ArgumentMatchers.anyLong(),
+            ArgumentMatchers.anyInt())).thenReturn(CompletableFuture.failedFuture(new ControllerException(Code.MOCK_FAILURE_VALUE, "Mock failure")));
+        ElectionService electionService = Mockito.mock(ElectionService.class);
+        Mockito.when(electionService.leaderAddress()).thenReturn(Optional.of("localhost:1234"));
+
+        try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            MetadataStore spy = Mockito.spy(metadataStore);
+            Mockito.when(spy.isLeader()).thenReturn(false);
+            Mockito.doReturn(electionService).when(spy).electionService();
+            Mockito.when(spy.onQueueClosed(ArgumentMatchers.anyLong(), ArgumentMatchers.anyInt())).thenCallRealMethod();
+            assertThrows(CompletionException.class, () -> spy.onQueueClosed(2, 1).join());
         }
     }
 }
