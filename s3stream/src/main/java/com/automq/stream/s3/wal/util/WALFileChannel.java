@@ -37,6 +37,7 @@ public class WALFileChannel implements WALChannel {
     public WALFileChannel(String filePath, long fileCapacityWant) {
         this.filePath = filePath;
         this.fileCapacityWant = fileCapacityWant;
+        // TODO
         if (this.fileCapacityWant > 1 << 30) {
             this.fileCapacityWant = 1 << 30;
         }

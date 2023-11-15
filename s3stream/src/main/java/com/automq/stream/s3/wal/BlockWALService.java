@@ -441,7 +441,6 @@ public class BlockWALService implements WriteAheadLog {
         } finally {
             lock.unlock();
         }
-        slidingWindowService.tryWriteBlock();
 
         final AppendResult appendResult = new AppendResultImpl(expectedWriteOffset, appendResultFuture);
         appendResult.future().whenComplete((nil, ex) -> OperationMetricsStats.getHistogram(S3Operation.APPEND_STORAGE_WAL).update(timerUtil.elapsed()));
@@ -535,7 +534,7 @@ public class BlockWALService implements WriteAheadLog {
         private long slidingWindowInitialSize = 1 << 20;
         private long slidingWindowUpperLimit = 512 << 20;
         private long slidingWindowScaleUnit = 4 << 20;
-        private long blockSoftLimit = 1 << 17; // 128KiB
+        private long blockSoftLimit = 1 << 18; // 256KiB
         private int nodeId = NOOP_NODE_ID;
         private long epoch = NOOP_EPOCH;
         private boolean readOnly;

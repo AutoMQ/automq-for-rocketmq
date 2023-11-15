@@ -32,7 +32,7 @@ import java.util.LinkedList;
 import java.util.Queue;
 import java.util.TreeSet;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Semaphore;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
@@ -73,8 +73,7 @@ public class SlidingWindowService {
      * Blocks that are being written.
      */
     private final TreeSet<Long> writingBlocks = new TreeSet<>();
-    private ExecutorService executorService;
-    private Semaphore semaphore;
+    private ExecutorService ioExecutor;
     /**
      * The current block, records are added to this block.
      */
@@ -105,19 +104,21 @@ public class SlidingWindowService {
     }
 
     public void start() throws IOException {
-        this.executorService = Threads.newFixedThreadPool(ioThreadNums,
+        this.ioExecutor = Threads.newFixedThreadPool(ioThreadNums,
                 ThreadUtils.createThreadFactory("block-wal-io-thread-%d", false), LOGGER);
-        this.semaphore = new Semaphore(ioThreadNums);
+        ScheduledExecutorService pollBlockScheduler = Threads.newSingleThreadScheduledExecutor(
+                ThreadUtils.createThreadFactory("wal-poll-block-thread-%d", false), LOGGER);
+        pollBlockScheduler.scheduleAtFixedRate(this::tryWriteBlock, 0, TimeUnit.SECONDS.toNanos(1) / 3000, TimeUnit.NANOSECONDS);
     }
 
     public boolean shutdown(long timeout, TimeUnit unit) {
         boolean gracefulShutdown;
 
-        this.executorService.shutdown();
+        this.ioExecutor.shutdown();
         try {
-            gracefulShutdown = this.executorService.awaitTermination(timeout, unit);
+            gracefulShutdown = this.ioExecutor.awaitTermination(timeout, unit);
         } catch (InterruptedException e) {
-            this.executorService.shutdownNow();
+            this.ioExecutor.shutdownNow();
             gracefulShutdown = false;
         }
 
@@ -132,13 +133,9 @@ public class SlidingWindowService {
      * Try to write a block. If the semaphore is not available, it will return immediately.
      */
     public void tryWriteBlock() {
-        if (semaphore.tryAcquire()) {
-            Block block = pollBlock();
-            if (block != null) {
-                executorService.submit(new WriteBlockProcessor(block));
-            } else {
-                semaphore.release();
-            }
+        Block block = pollBlock();
+        if (block != null) {
+            ioExecutor.submit(new WriteBlockProcessor(block));
         }
     }
 
@@ -172,8 +169,8 @@ public class SlidingWindowService {
         // The size of the block should not be larger than writable size of the ring buffer
         // Let capacity=100, start=148, trim=49, then maxSize=100-148+49=1
         maxSize = Math.min(recordSectionCapacity - startOffset + trimOffset, maxSize);
-        // Let capacity=100, start=198, trim=198, then maxSize=100-198%100=2
         // The size of the block should not be larger than the end of the physical device
+        // Let capacity=100, start=198, trim=198, then maxSize=100-198%100=2
         maxSize = Math.min(recordSectionCapacity - startOffset % recordSectionCapacity, maxSize);
 
         Block newBlock = new BlockImpl(startOffset, maxSize, blockSoftLimit);
@@ -256,8 +253,9 @@ public class SlidingWindowService {
             return pendingBlock;
         }
 
-        Block currentBlock = getCurrentBlockLocked();
-        if (currentBlock.isEmpty()) {
+        // TODO ugly code
+        Block currentBlock = this.currentBlock;
+        if (currentBlock == null || currentBlock.isEmpty()) {
             // No record to be written
             return null;
         }
@@ -490,12 +488,7 @@ public class SlidingWindowService {
 
         @Override
         public void run() {
-            Block block = this.block;
-            do {
-                writeBlock(block);
-                block = pollBlock();
-            } while (block != null);
-            semaphore.release();
+            writeBlock(this.block);
         }
 
         private void writeBlock(Block block) {
