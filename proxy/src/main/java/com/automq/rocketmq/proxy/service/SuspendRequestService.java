@@ -119,9 +119,10 @@ public class SuspendRequestService extends ServiceThread implements StartAndShut
 
         public boolean completeTimeout() {
             if (inflight.compareAndSet(false, true)) {
-                completed.set(true);
                 context.span().ifPresent(span -> span.setAttribute("result", "expired"));
                 future.complete(Optional.empty());
+
+                completed.set(true);
                 inflight.set(false);
                 return true;
             }
@@ -129,33 +130,41 @@ public class SuspendRequestService extends ServiceThread implements StartAndShut
         }
 
         public CompletableFuture<Boolean> tryFetchMessages() {
+            // If the request is already completed, return immediately.
             if (completed.get()) {
                 return CompletableFuture.completedFuture(true);
             }
 
             if (inflight.compareAndSet(false, true)) {
+                // If the request is already expired, complete it immediately.
                 if (isExpired()) {
                     context.span().ifPresent(span -> span.setAttribute("result", "expired"));
                     future.complete(Optional.empty());
+
                     completed.set(true);
                     inflight.set(false);
                     return CompletableFuture.completedFuture(true);
                 }
 
+                // Otherwise, fetch messages.
                 return supplier.apply(timeRemaining())
                     .thenApply(result -> {
+                        // If there are variable response to write back, return immediately.
                         if (result.needWriteResponse()) {
                             context.span().ifPresent(span -> span.setAttribute("result", "found"));
                             future.complete(Optional.of(result));
+
                             completed.set(true);
                             return true;
                         }
+                        // Otherwise, wait for expire or notification.
                         return false;
                     })
                     .exceptionally(ex -> {
                         LOGGER.error("Error while fetching messages for suspended request.", ex);
                         context.span().ifPresent(span -> span.setAttribute("result", "error"));
                         future.completeExceptionally(ex);
+
                         completed.set(true);
                         return true;
                     })
@@ -166,7 +175,12 @@ public class SuspendRequestService extends ServiceThread implements StartAndShut
 
         @Override
         public int compareTo(@Nonnull SuspendRequestService.SuspendRequestTask o) {
-            return Long.compare(timeRemaining(), o.timeRemaining());
+            int result = Long.compare(timeRemaining(), o.timeRemaining());
+            if (result == 0) {
+                // If the time remaining is the same, use the object identity to break the tie.
+                return Integer.compare(System.identityHashCode(this), System.identityHashCode(o));
+            }
+            return result;
         }
     }
 
@@ -214,7 +228,13 @@ public class SuspendRequestService extends ServiceThread implements StartAndShut
 
         SuspendRequestTask<T> task = new SuspendRequestTask<>(context, timeRemaining, filter, supplier);
         ConcurrentSkipListSet<SuspendRequestTask<?>> taskList = suspendPopRequestMap.computeIfAbsent(Pair.of(topic, queueId), k -> new ConcurrentSkipListSet<>());
-        taskList.add(task);
+        boolean added = taskList.add(task);
+
+        // If the task cannot enqueue, return empty result.
+        if (!added) {
+            return CompletableFuture.completedFuture(Optional.empty());
+        }
+
         suspendRequestCount.incrementAndGet();
         return task.future();
     }
