@@ -29,16 +29,16 @@ public class BlockBatch {
     private final long endOffset;
 
     public BlockBatch(Collection<Block> blocks) {
-        assert blocks.size() > 0;
+        assert !blocks.isEmpty();
         this.blocks = blocks;
         this.startOffset = blocks.stream()
                 .map(Block::startOffset)
                 .min(Long::compareTo)
-                .get();
+                .orElseThrow();
         this.endOffset = blocks.stream()
                 .map(b -> b.startOffset() + b.size())
                 .max(Long::compareTo)
-                .get();
+                .orElseThrow();
     }
 
     public long startOffset() {
