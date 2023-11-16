@@ -1,12 +1,12 @@
 /**
  * Copyright 2019 xujingfeng (kirito.moe@foxmail.com)
- *
+ * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -28,6 +28,14 @@ public class DirectChannelImpl implements DirectChannel {
     private long fileLength;
     private boolean isReadOnly;
 
+    private DirectChannelImpl(DirectIOLib lib, int fd, long fileLength, boolean readOnly) {
+        this.lib = lib;
+        this.fd = fd;
+        this.isOpen = true;
+        this.isReadOnly = readOnly;
+        this.fileLength = fileLength;
+    }
+
     public static DirectChannel getChannel(File file, boolean readOnly) throws IOException {
         DirectIOLib lib = DirectIOLib.getLibForPath(file.toString());
         return getChannel(lib, file, readOnly);
@@ -37,14 +45,6 @@ public class DirectChannelImpl implements DirectChannel {
         int fd = lib.oDirectOpen(file.toString(), readOnly);
         long length = file.length();
         return new DirectChannelImpl(lib, fd, length, readOnly);
-    }
-
-    private DirectChannelImpl(DirectIOLib lib, int fd, long fileLength, boolean readOnly) {
-        this.lib = lib;
-        this.fd = fd;
-        this.isOpen = true;
-        this.isReadOnly = readOnly;
-        this.fileLength = fileLength;
     }
 
     private void ensureOpen() throws ClosedChannelException {
@@ -84,7 +84,7 @@ public class DirectChannelImpl implements DirectChannel {
         ensureWritable();
         if (DirectIOLib.ftruncate(fd, length) < 0) {
             throw new IOException("Error during truncate on descriptor " + fd + ": " +
-                DirectIOLib.getLastError());
+                    DirectIOLib.getLastError());
         }
         fileLength = length;
         return this;
@@ -124,7 +124,7 @@ public class DirectChannelImpl implements DirectChannel {
             isOpen = false;
             if (lib.close(fd) < 0) {
                 throw new IOException("Error closing file with descriptor " + fd + ": " +
-                    DirectIOLib.getLastError());
+                        DirectIOLib.getLastError());
             }
         }
     }

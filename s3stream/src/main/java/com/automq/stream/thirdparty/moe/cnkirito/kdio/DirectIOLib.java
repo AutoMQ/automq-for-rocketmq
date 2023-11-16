@@ -1,12 +1,12 @@
 /**
  * Copyright (C) 2014 Stephen Macke (smacke@cs.stanford.edu)
- *
+ * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *         http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -20,7 +20,8 @@ import com.sun.jna.NativeLong;
 import com.sun.jna.Platform;
 import com.sun.jna.Pointer;
 import com.sun.jna.ptr.PointerByReference;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import sun.nio.ch.DirectBuffer;
 
 import java.io.IOException;
@@ -31,14 +32,15 @@ import java.util.List;
 /**
  * Class containing native hooks and utility methods for performing direct I/O, using
  * the Linux <tt>O_DIRECT</tt> flag.
- *
+ * <p>
  * This class is initialized at class load time, by registering JNA hooks into native methods.
- *     It also calculates Linux kernel version-dependent alignment amount (in bytes) for use with the <tt>O_DIRECT</tt> flag,
- *     when given a string for a file or directory.
+ * It also calculates Linux kernel version-dependent alignment amount (in bytes) for use with the <tt>O_DIRECT</tt> flag,
+ * when given a string for a file or directory.
  */
 public class DirectIOLib {
-    private static final Logger logger = Logger.getLogger(DirectIOLib.class);
+    private static final Logger logger = LoggerFactory.getLogger(DirectIOLib.class);
     public static boolean binit;
+    static final int PC_REC_XFER_ALIGN = 0x11;
 
     static {
         binit = false;
@@ -92,22 +94,21 @@ public class DirectIOLib {
 
     public DirectIOLib(int fsBlockSize) {
         this.fsBlockSize = fsBlockSize;
-        this.fsBlockNotMask = ~((long)fsBlockSize - 1);
+        this.fsBlockNotMask = ~((long) fsBlockSize - 1);
     }
 
 
     /**
      * Static method to register JNA hooks for doing direct I/O
      *
-     * @param workingDir
-     *        A directory within the mounted file system on which we'll be working
-     *        Should preferably BE the directory in which we'll be working.
+     * @param workingDir A directory within the mounted file system on which we'll be working
+     *                   Should preferably BE the directory in which we'll be working.
      */
     public static DirectIOLib getLibForPath(String workingDir) {
         int fsBlockSize = initilizeSoftBlockSize(workingDir);
         if (fsBlockSize == -1) {
             logger.warn("O_DIRECT support non available on your version of Linux (" + System.getProperty("os.version") + "), " +
-                "please upgrade your kernel in order to use jaydio.");
+                    "please upgrade your kernel in order to use jaydio.");
             return null;
         }
         return new DirectIOLib(fsBlockSize);
@@ -117,8 +118,7 @@ public class DirectIOLib {
      * Finds a block size for use with O_DIRECT. Choose it in the most paranoid
      * way possible to maximize probability that things work.
      *
-     * @param fileOrDir
-     * 		  A file or directory within which O_DIRECT access will be performed.
+     * @param fileOrDir A file or directory within which O_DIRECT access will be performed.
      */
     private static int initilizeSoftBlockSize(String fileOrDir) {
 
@@ -127,14 +127,12 @@ public class DirectIOLib {
         if (binit) {
             // get file system block size for use with workingDir
             // see "man 3 posix_memalign" for why we do this
-            final int _PC_REC_XFER_ALIGN = 0x11;
-
-            fsBlockSize = pathconf(fileOrDir, _PC_REC_XFER_ALIGN);
+            fsBlockSize = pathconf(fileOrDir, PC_REC_XFER_ALIGN);
             /* conservative for version >= 2.6
              * "man 2 open":
              *
              * Under Linux 2.6, alignment
-       		 * to 512-byte boundaries suffices.
+             * to 512-byte boundaries suffices.
              */
 
             // Since O_DIRECT requires pages to be memory aligned with the file system block size,
@@ -148,7 +146,7 @@ public class DirectIOLib {
             fsBlockSize = lcm(fsBlockSize, 512);
 
             // lastly, a sanity check
-            if (fsBlockSize <= 0 || ((fsBlockSize & (fsBlockSize-1)) != 0)) {
+            if (fsBlockSize <= 0 || ((fsBlockSize & (fsBlockSize - 1)) != 0)) {
                 logger.warn("file system block size should be a power of two, was found to be " + fsBlockSize);
                 logger.warn("Disabling O_DIRECT support");
                 return -1;
@@ -162,21 +160,98 @@ public class DirectIOLib {
     // -- Java interfaces to native methods
 
     /**
+     * Hooks into errno using Native.getLastError(), and parses it with native strerror function.
+     *
+     * @return An error message corresponding to the last <tt>errno</tt>
+     */
+    public static String getLastError() {
+        return strerror(Native.getLastError());
+    }
+
+    /**
+     * Static variant of {@link #blockEnd(int)}.
+     *
+     * @param blockSize
+     * @param position
+     * @return The smallest number greater than or equal to <tt>position</tt>
+     * which is a multiple of the <tt>blockSize</tt>
+     */
+    public static long blockEnd(int blockSize, long position) {
+        long ceil = (position + blockSize - 1) / blockSize;
+        return ceil * blockSize;
+    }
+
+    /**
+     * Euclid's algo for gcd is more general than we need
+     * since we only have powers of 2, but w/e
+     *
+     * @param x
+     * @param y
+     * @return The least common multiple of <tt>x</tt> and <tt>y</tt>
+     */
+    public static int lcm(long x, long y) {
+        // will hold gcd
+        long g = x;
+        long yc = y;
+
+        // get the gcd first
+        while (yc != 0) {
+            long t = g;
+            g = yc;
+            yc = t % yc;
+        }
+
+        return (int) (x * y / g);
+    }
+
+    /**
+     * Given a pointer-to-pointer <tt>memptr</tt>, sets the dereferenced value to point to the start
+     * of an allocated block of <tt>size</tt> bytes, where the starting address is a multiple of
+     * <tt>alignment</tt>. It is guaranteed that the block may be freed by calling @{link {@link #free(Pointer)}
+     * on the starting address. See "man 3 posix_memalign".
+     *
+     * @param memptr    The pointer-to-pointer which will point to the address of the allocated aligned block
+     * @param alignment The alignment multiple of the starting address of the allocated block
+     * @param size      The number of bytes to allocate
+     * @return 0 on success, one of the C error codes on failure.
+     */
+    public static native int posix_memalign(PointerByReference memptr, NativeLong alignment, NativeLong size);
+
+
+    // -- alignment logic utility methods
+
+    /**
+     * See "man 3 free".
+     *
+     * @param ptr The pointer to the hunk of memory which needs freeing
+     */
+    public static native void free(Pointer ptr);
+
+    public static native int ftruncate(int fd, long length);
+
+    private static native NativeLong pwrite(int fd, Pointer buf, NativeLong count, NativeLong offset);
+
+    private static native NativeLong pread(int fd, Pointer buf, NativeLong count, NativeLong offset);
+
+    private static native int open(String pathname, int flags);
+
+    private static native int open(String pathname, int flags, int mode);
+
+    private static native int getpagesize();
+
+    private static native int pathconf(String path, int name);
+
+    private static native String strerror(int errnum);
+
+    /**
      * Interface into native pread function. Always reads an entire buffer,
      * unlike {@link #pwrite(int, ByteBuffer, long) pwrite()} which uses buffer state
      * to determine how much of buffer to write.
      *
-     * @param fd
-     *        A file discriptor to pass to native pread
-     *
-     * @param buf
-     *        The direct buffer into which to record the file read
-     *
-     * @param offset
-     *        The file offset at which to read
-     *
+     * @param fd     A file discriptor to pass to native pread
+     * @param buf    The direct buffer into which to record the file read
+     * @param offset The file offset at which to read
      * @return The number of bytes successfully read from the file
-     *
      * @throws IOException
      */
     public int pread(int fd, ByteBuffer buf, long offset) throws IOException {
@@ -195,17 +270,10 @@ public class DirectIOLib {
      * Interface into native pwrite function. Writes bytes corresponding to the nearest file
      * system block boundaries between <tt>buf.position()</tt> and <tt>buf.limit()</tt>.
      *
-     * @param fd
-     *        A file descriptor to pass to native pwrite
-     *
-     * @param buf
-     *        The direct buffer from which to write
-     *
-     * @param offset
-     *        The file offset at which to write
-     *
+     * @param fd     A file descriptor to pass to native pwrite
+     * @param buf    The direct buffer from which to write
+     * @param offset The file offset at which to write
      * @return The number of bytes successfully written to the file
-     *
      * @throws IOException
      */
     public int pwrite(int fd, ByteBuffer buf, long offset) throws IOException {
@@ -227,21 +295,18 @@ public class DirectIOLib {
         return n;
     }
 
+    // -- more native function hooks --
+
     /**
      * Use the <tt>open</tt> Linux system call and pass in the <tt>O_DIRECT</tt> flag.
      * Currently the only other flags passed in are <tt>O_RDONLY</tt> if <tt>readOnly</tt>
      * is <tt>true</tt>, and (if not) <tt>O_RDWR</tt> and <tt>O_CREAT</tt>.
      *
-     * @param pathname
-     * 		  The path to the file to open. If file does not exist and we are opening
-     *        with <tt>readOnly</tt>, this will throw an error. Otherwise, if it does
-     *        not exist but we have <tt>readOnly</tt> set to false, create the file.
-     *
-     * @param readOnly
-     *        Whether to pass in <tt>O_RDONLY</tt>
-     *
+     * @param pathname The path to the file to open. If file does not exist and we are opening
+     *                 with <tt>readOnly</tt>, this will throw an error. Otherwise, if it does
+     *                 not exist but we have <tt>readOnly</tt> set to false, create the file.
+     * @param readOnly Whether to pass in <tt>O_RDONLY</tt>
      * @return An integer file descriptor for the opened file
-     *
      */
     public int oDirectOpen(String pathname, boolean readOnly) throws IOException {
         int flags = OpenFlags.O_DIRECT;
@@ -258,20 +323,8 @@ public class DirectIOLib {
     }
 
     /**
-     * Hooks into errno using Native.getLastError(), and parses it with native strerror function.
-     *
-     * @return An error message corresponding to the last <tt>errno</tt>
-     */
-    public static String getLastError() {
-        return strerror(Native.getLastError());
-    }
-
-
-    // -- alignment logic utility methods
-
-    /**
      * @return The soft block size for use with transfer multiples
-     *         and memory alignment multiples
+     * and memory alignment multiples
      */
     public int blockSize() {
         return fsBlockSize;
@@ -293,12 +346,11 @@ public class DirectIOLib {
      *
      * @param value
      * @return The largest number less than or equal to <tt>value</tt>
-     *         which is a multiple of the soft block size
+     * which is a multiple of the soft block size
      */
     public long blockStart(long value) {
         return value & fsBlockNotMask;
     }
-
 
     /**
      * @see #blockStart(long)
@@ -307,20 +359,17 @@ public class DirectIOLib {
         return (int) (value & fsBlockNotMask);
     }
 
-
     /**
      * Given <tt>value</tt>, find the smallest number greater than or equal
      * to <tt>value</tt> which is a multiple of the fs block size.
      *
      * @param value
      * @return The smallest number greater than or equal to <tt>value</tt>
-     *         which is a multiple of the soft block size
+     * which is a multiple of the soft block size
      */
     public long blockEnd(long value) {
-        return (value + fsBlockSize- 1) & fsBlockNotMask;
+        return (value + fsBlockSize - 1) & fsBlockNotMask;
     }
-
-
 
     /**
      * @see #blockEnd(long)
@@ -329,87 +378,12 @@ public class DirectIOLib {
         return (int) ((value + fsBlockSize - 1) & fsBlockNotMask);
     }
 
-
-    /**
-     * Static variant of {@link #blockEnd(int)}.
-     * @param blockSize
-     * @param position
-     * @return The smallest number greater than or equal to <tt>position</tt>
-     *         which is a multiple of the <tt>blockSize</tt>
-     */
-    public static long blockEnd(int blockSize, long position) {
-        long ceil = (position + blockSize - 1)/blockSize;
-        return ceil*blockSize;
-    }
-
-
-    /**
-     * Euclid's algo for gcd is more general than we need
-     * since we only have powers of 2, but w/e
-     * @param x
-     * @param y
-     * @return The least common multiple of <tt>x</tt> and <tt>y</tt>
-     */
-    public static int lcm(long x, long y) {
-        // will hold gcd
-        long g = x;
-        long yc = y;
-
-        // get the gcd first
-        while (yc != 0) {
-            long t = g;
-            g = yc;
-            yc = t % yc;
-        }
-
-        return (int)(x*y/g);
-    }
-
-
-    /**
-     * Given a pointer-to-pointer <tt>memptr</tt>, sets the dereferenced value to point to the start
-     * of an allocated block of <tt>size</tt> bytes, where the starting address is a multiple of
-     * <tt>alignment</tt>. It is guaranteed that the block may be freed by calling @{link {@link #free(Pointer)}
-     * on the starting address. See "man 3 posix_memalign".
-     *
-     * @param memptr The pointer-to-pointer which will point to the address of the allocated aligned block
-     *
-     * @param alignment The alignment multiple of the starting address of the allocated block
-     *
-     * @param size The number of bytes to allocate
-     *
-     * @return 0 on success, one of the C error codes on failure.
-     */
-    public static native int posix_memalign(PointerByReference memptr, NativeLong alignment, NativeLong size);
-
-
-    /**
-     * See "man 3 free".
-     *
-     * @param ptr The pointer to the hunk of memory which needs freeing
-     */
-    public static native void free(Pointer ptr);
-
-
     /**
      * See "man 2 close"
      *
      * @param fd The file descriptor of the file to close
-     *
      * @return 0 on success, -1 on error
      */
     public native int close(int fd); // musn't forget to do this
-
-    // -- more native function hooks --
-
-    public static native int ftruncate(int fd, long length);
-
-    private static native NativeLong pwrite(int fd, Pointer buf, NativeLong count, NativeLong offset);
-    private static native NativeLong pread(int fd, Pointer buf, NativeLong count, NativeLong offset);
-    private static native int open(String pathname, int flags);
-    private static native int open(String pathname, int flags, int mode);
-    private static native int getpagesize();
-    private static native int pathconf(String path, int name);
-    private static native String strerror(int errnum);
 
 }
