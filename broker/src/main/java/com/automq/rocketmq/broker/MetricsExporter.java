@@ -247,18 +247,21 @@ public class MetricsExporter implements Lifecycle {
         streamMetricsManager.initAttributesBuilder(MetricsExporter::newAttributesBuilder);
         storeMetricsManager.initAttributesBuilder(MetricsExporter::newAttributesBuilder);
         proxyMetricsManager.initAttributesBuilder(MetricsExporter::newAttributesBuilder);
+        topicMetricsManager.initAttributesBuilder(MetricsExporter::newAttributesBuilder);
     }
 
     private void initStaticMetrics() {
         streamMetricsManager.initStaticMetrics(brokerMeter);
         storeMetricsManager.initStaticMetrics(brokerMeter);
         proxyMetricsManager.initStaticMetrics(brokerMeter);
+        topicMetricsManager.initStaticMetrics(brokerMeter);
     }
 
     private void initDynamicMetrics() {
         streamMetricsManager.initDynamicMetrics(brokerMeter);
         storeMetricsManager.initDynamicMetrics(brokerMeter);
         proxyMetricsManager.initDynamicMetrics(brokerMeter);
+        topicMetricsManager.initDynamicMetrics(brokerMeter);
         storeMetricsManager.start();
     }
 
