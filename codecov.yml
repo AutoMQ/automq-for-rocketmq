@@ -30,6 +30,8 @@ ignore:
   - "**/metadata/database/dao/*"
   - "**/*Exception*"
   - "apache/rocketmq/controller/**/*"
+  - "**/thirdparty/**/*"
+  - "**/benchmark/**/*"
 
 comment:
   layout: "diff, components, tree"
