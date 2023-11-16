@@ -288,10 +288,15 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
 
     private AckCommitter getAckCommitter(long consumerGroupId, ByteBuffer serializedBitmapBuffer) {
         ConsumerGroupMetadata metadata = this.consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId));
-        return this.ackCommitterMap.computeIfAbsent(consumerGroupId, k -> new AckCommitter(metadata.getAckOffset(), offset -> {
-            metadata.setAckOffset(offset);
-            this.ackOffsetListeners.forEach(listener -> listener.onOffset(consumerGroupId, offset));
-        }, serializedBitmapBuffer));
+        return this.ackCommitterMap.computeIfAbsent(consumerGroupId, k ->
+            new AckCommitter(
+                metadata.getAckOffset(),
+                offset -> {
+                    metadata.setAckOffset(offset);
+                    this.ackOffsetListeners.forEach(listener -> listener.onOffset(consumerGroupId, offset));
+                },
+                serializedBitmapBuffer
+            ));
     }
 
     private AckCommitter getRetryAckCommitter(long consumerGroupId) {
@@ -632,10 +637,10 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
     }
 
     static class AckCommitter {
-        private long ackOffset;
+        private final long baseOffset;
+        private volatile long ackOffset;
         private final RoaringBitmap bitmap;
         private final Consumer<Long> ackAdvanceFn;
-        private final long baseOffset;
 
         public AckCommitter(long ackOffset, Consumer<Long> ackAdvanceFn) {
             this(ackOffset, ackAdvanceFn, null);
@@ -654,7 +659,7 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
             }
         }
 
-        public void commitAck(long offset) {
+        public synchronized void commitAck(long offset) {
             if (offset >= ackOffset) {
                 // TODO: how to handle overflow?
                 int offsetInBitmap = (int) (offset - baseOffset);
@@ -671,7 +676,7 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
         }
 
         // <baseOffset>/<bitmap>
-        public ByteBuffer getSerializedBuffer() {
+        public synchronized ByteBuffer getSerializedBuffer() {
             int length = bitmap.serializedSizeInBytes() + Long.BYTES;
             ByteBuffer buffer = ByteBuffer.allocate(length);
             buffer.putLong(baseOffset);
