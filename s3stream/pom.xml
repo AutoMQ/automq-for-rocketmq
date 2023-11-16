@@ -174,10 +174,8 @@
                     <source>${maven.compiler.source}</source>
                     <target>${maven.compiler.target}</target>
                     <compilerArgs>
-                        <arg>--add-exports</arg>
-                        <arg>java.base/sun.nio.ch=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg>
-                        <arg>java.base/jdk.internal.access=ALL-UNNAMED</arg>
+                        <arg>--add-exports=java.base/sun.nio.ch=ALL-UNNAMED</arg>
+                        <arg>--add-exports=java.base/jdk.internal.access=ALL-UNNAMED</arg>
                     </compilerArgs>
                 </configuration>
             </plugin>
