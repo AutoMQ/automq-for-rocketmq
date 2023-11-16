@@ -18,27 +18,57 @@
 # Declare variables to be passed into your templates.
 
 broker:
-  namespace: default
   replicaCount: 1
   image:
-    pullPolicy: Always
-    repository: "automqinc/rocketmq_e2e"
-    tag: "5.1.3-alpine"
+    pullPolicy: IfNotPresent
+    repository: "automqinc/automq-for-rocketmq"
+    tag: "v0.0.2-alpha"
 
-  partition: 0
   persistence:
     enabled: false
     size: 8Gi
 
   nameOverride: "broker"
   fullnameOverride: ""
-  namesrvAddr: ""
 
   conf:
+    name: ""
     clusterNameOverride: ""
     brokerNamePrefixOverride: ""
-  
-  config: ""
+
+    inner:
+      accessKey: "automq"
+      secretKey: "rocketmq"
+
+    s3Stream:
+      s3WALPath: "/tmp/s3rocketmq/wal"
+      s3Endpoint: "http://minio.local:9000"
+      s3Bucket: "bucket-name"
+      s3Region: "us-east-1"
+      s3ForcePathStyle: true
+      s3AccessKey: "access-key"
+      s3SecretKey: "secret-key"
+      networkBaselineBandwidth: 5242880
+      refillPeriodMs: 100
+    db:
+      url: "jdbc:mysql://mysql-server:3306/metadata"
+      userName: "root"
+      password: "password"
+    store:
+      kvPath: "/tmp/s3rocketmq/kvstore"
+    controller:
+      recycleS3IntervalInSecs: 360
+      dumpHeapOnError: true
+    metrics:
+      exporterType: "OTLP_GRPC"
+      grpcExporterTarget: "http://10.129.63.127:4317"
+      grpcExporterHeader: ""
+      grpcExporterTimeOutInMills: 31000
+      periodicExporterIntervalInMills: 30000
+      promExporterPort: 5557
+      promExporterHost: "localhost"
+      labels: ""
+      exportInDelta: false
 
   service:
     port: 8081
@@ -55,24 +85,4 @@ broker:
   nodeSelector: { }
 
   tolerations: [ ]
-
-  inner:
-    accessKey: "aa"
-    secretKey: "bb"
-
-  s3stream:
-    s3WALPath: "/tmp/s3rocketmq/wal"
-    s3Endpoint: "http://minio.hellocorp.test"
-    s3Bucket: "wxy"
-    s3Region: "us-east-1"
-    s3ForcePathStyle: true
-    s3AccessKey: "Y6pKg2MmFL3wlWiEJEtc"
-    s3SecretKey: "eTWpQEutpExoYXebV8D1HXJ8TwDWyoKoAVJpX32K"
-
-
-  db:
-    url: "jdbc:mysql://mysql-server:3306/metadata"
-    userName: "root"
-    password: "password"
-
 

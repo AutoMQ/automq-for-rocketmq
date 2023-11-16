@@ -21,8 +21,8 @@ broker:
   replicaCount: 1
   image:
     pullPolicy: IfNotPresent
-    repository: "automq-for-rocketmq"
-    tag: "0.0.2-alpine"
+    repository: "automqinc/automq-for-rocketmq"
+    tag: "v0.0.2-alpha"
 
   persistence:
     enabled: false
