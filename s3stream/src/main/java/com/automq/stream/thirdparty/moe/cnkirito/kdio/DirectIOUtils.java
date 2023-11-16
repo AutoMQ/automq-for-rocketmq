@@ -18,8 +18,8 @@ package com.automq.stream.thirdparty.moe.cnkirito.kdio;
 import com.sun.jna.NativeLong;
 import com.sun.jna.Pointer;
 import com.sun.jna.ptr.PointerByReference;
+import jdk.internal.access.SharedSecrets;
 
-import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
@@ -56,70 +56,9 @@ public class DirectIOUtils {
      * @return Byte buffer wrapping the given memory.
      */
     public static ByteBuffer wrapPointer(long ptr, int len) {
-        try {
-            ByteBuffer buf = (ByteBuffer) NEW_DIRECT_BUF_MTD.invoke(JAVA_NIO_ACCESS_OBJ, ptr, len, null);
+        ByteBuffer buf = SharedSecrets.getJavaNioAccess().newDirectByteBuffer(ptr, len, null, null);
 
-            assert buf.isDirect();
-            return buf;
-        } catch (ReflectiveOperationException e) {
-            throw new RuntimeException("JavaNioAccess#newDirectByteBuffer() method is unavailable.", e);
-        }
-    }
-
-    /**
-     * JavaNioAccess object.
-     */
-    private static final Object JAVA_NIO_ACCESS_OBJ = javaNioAccessObject();
-
-    /**
-     * JavaNioAccess#newDirectByteBuffer method.
-     */
-    private static final Method NEW_DIRECT_BUF_MTD = newDirectBufferMethod();
-
-    /**
-     * Returns reference to {@code JavaNioAccess.newDirectByteBuffer} method
-     * from private API for corresponding Java version.
-     *
-     * @return Reference to {@code JavaNioAccess.newDirectByteBuffer} method
-     * @throws RuntimeException If getting access to the private API is failed.
-     */
-    private static Method newDirectBufferMethod() {
-
-        try {
-            Class<?> cls = JAVA_NIO_ACCESS_OBJ.getClass();
-
-            Method mtd = cls.getMethod("newDirectByteBuffer", long.class, int.class, Object.class);
-
-            mtd.setAccessible(true);
-
-            return mtd;
-        } catch (ReflectiveOperationException e) {
-            throw new RuntimeException(miscPackage() + ".JavaNioAccess#newDirectByteBuffer() method is unavailable.", e);
-        }
-    }
-
-    /**
-     * Returns {@code JavaNioAccess} instance from private API for corresponding Java version.
-     *
-     * @return {@code JavaNioAccess} instance for corresponding Java version.
-     * @throws RuntimeException If getting access to the private API is failed.
-     */
-    private static Object javaNioAccessObject() {
-        String pkgName = miscPackage();
-
-        try {
-            Class<?> cls = Class.forName(pkgName + ".misc.SharedSecrets");
-
-            Method mth = cls.getMethod("getJavaNioAccess");
-
-            return mth.invoke(null);
-        } catch (ReflectiveOperationException e) {
-            throw new RuntimeException(pkgName + ".misc.JavaNioAccess class is unavailable.", e);
-        }
-    }
-
-    private static String miscPackage() {
-        // Need return 'jdk.interna' if current Java version >= 9
-        return "sun";
+        assert buf.isDirect();
+        return buf;
     }
 }
