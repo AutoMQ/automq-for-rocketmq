@@ -101,13 +101,13 @@ class ReviveServiceTest {
             FlatMessageExt flatMessageExt = ink.getArgument(1);
             assertNotNull(flatMessageExt);
             return CompletableFuture.completedFuture(null);
-        }).when(deadLetterSender).send(Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
+        }).when(deadLetterSender).send(Mockito.any(), Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
         // mock max delivery attempts
         Mockito.doReturn(CompletableFuture.completedFuture(2))
             .when(metadataService).maxDeliveryAttemptsOf(Mockito.anyLong());
         // Append mock message.
         FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
-        logicQueue.put(message).join();
+        logicQueue.put(StoreContext.EMPTY, message).join();
         // pop message
         int invisibleDuration = 100;
         PopResult popResult = logicQueue.popNormal(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
@@ -149,7 +149,7 @@ class ReviveServiceTest {
 
         // check if this message has been sent to DLQ
         Mockito.verify(deadLetterSender, Mockito.times(1))
-            .send(Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
+            .send(Mockito.any(), Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
         PopResult popResult1 = logicQueue.popRetry(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
         assertEquals(0, popResult1.messageList().size());
     }
@@ -157,19 +157,19 @@ class ReviveServiceTest {
     @Test
     void revive_fifo() throws StoreException {
         Mockito.doAnswer(ink -> {
-            long consumerGroupId = ink.getArgument(0);
+            long consumerGroupId = ink.getArgument(1);
             assertEquals(CONSUMER_GROUP_ID, consumerGroupId);
-            FlatMessageExt flatMessageExt = ink.getArgument(1);
+            FlatMessageExt flatMessageExt = ink.getArgument(2);
             assertNotNull(flatMessageExt);
             return CompletableFuture.completedFuture(null);
-        }).when(deadLetterSender).send(Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
+        }).when(deadLetterSender).send(Mockito.any(), Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
         // mock max delivery attempts
         Mockito.doReturn(CompletableFuture.completedFuture(2))
             .when(metadataService).maxDeliveryAttemptsOf(Mockito.anyLong());
         // Append mock message.
         for (int i = 0; i < 2; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
-            logicQueue.put(message).join();
+            logicQueue.put(StoreContext.EMPTY, message).join();
         }
         // pop message
         int invisibleDuration = 100;
@@ -209,7 +209,7 @@ class ReviveServiceTest {
 
         // check if this message has been sent to DLQ
         Mockito.verify(deadLetterSender, Mockito.times(1))
-            .send(Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
+            .send(Mockito.any(), Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
 
         assertEquals(1, logicQueue.getAckOffset(CONSUMER_GROUP_ID));
 
@@ -224,18 +224,18 @@ class ReviveServiceTest {
     @Test
     void revive_dead_letter() throws Exception {
         Mockito.doAnswer(ink -> {
-            long consumerGroupId = ink.getArgument(0);
+            long consumerGroupId = ink.getArgument(1);
             assertEquals(CONSUMER_GROUP_ID, consumerGroupId);
-            FlatMessageExt flatMessageExt = ink.getArgument(1);
+            FlatMessageExt flatMessageExt = ink.getArgument(2);
             assertNotNull(flatMessageExt);
             return CompletableFuture.completedFuture(null);
-        }).when(deadLetterSender).send(Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
+        }).when(deadLetterSender).send(Mockito.any(), Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
         // mock max delivery attempts
         Mockito.doReturn(CompletableFuture.completedFuture(2))
             .when(metadataService).maxDeliveryAttemptsOf(Mockito.anyLong());
         // Append mock message.
         FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
-        logicQueue.put(message).join();
+        logicQueue.put(StoreContext.EMPTY, message).join();
         // pop message
         int invisibleDuration = 100;
         PopResult popResult = logicQueue.popNormal(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
@@ -276,7 +276,7 @@ class ReviveServiceTest {
         });
 
         // check if this message has been sent to DLQ
-        Mockito.verify(deadLetterSender, Mockito.times(1)).send(Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
+        Mockito.verify(deadLetterSender, Mockito.times(1)).send(Mockito.any(), Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
         // check ck not exist
         assertTrue(retryPopResult.messageList().get(0).receiptHandle().isPresent());
         handle = SerializeUtil.decodeReceiptHandle(retryPopResult.messageList().get(0).receiptHandle().get());

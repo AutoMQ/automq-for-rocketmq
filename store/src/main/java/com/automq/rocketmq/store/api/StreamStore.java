@@ -56,7 +56,7 @@ public interface StreamStore extends Lifecycle {
      * @param recordBatch the record batch to append.
      * @return the future of append result.
      */
-    CompletableFuture<AppendResult> append(long streamId, RecordBatch recordBatch);
+    CompletableFuture<AppendResult> append(StoreContext context, long streamId, RecordBatch recordBatch);
 
     /**
      * Close streams.

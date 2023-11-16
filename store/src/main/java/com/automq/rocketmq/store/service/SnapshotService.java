@@ -17,10 +17,12 @@
 
 package com.automq.rocketmq.store.service;
 
+import com.automq.rocketmq.common.trace.TraceHelper;
 import com.automq.rocketmq.common.util.Lifecycle;
 import com.automq.rocketmq.store.MessageStoreImpl;
 import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.rocketmq.store.exception.StoreException;
+import com.automq.rocketmq.store.model.StoreContext;
 import com.automq.rocketmq.store.model.generated.CheckPoint;
 import com.automq.rocketmq.store.model.kv.KVReadOptions;
 import com.automq.rocketmq.store.model.message.TopicQueueId;
@@ -30,6 +32,7 @@ import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.util.SerializeUtil;
 import com.automq.stream.utils.FutureUtil;
 import com.automq.stream.utils.ThreadUtils;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -129,7 +132,7 @@ public class SnapshotService implements Lifecycle, Runnable {
                 if (task == null) {
                     continue;
                 }
-                CompletableFuture<Void> takeCf = takeSnapshot(task)
+                CompletableFuture<Void> takeCf = takeSnapshot(new StoreContext("", "", TraceHelper.getTracer()), task)
                     .exceptionally(e -> {
                         Throwable cause = FutureUtil.cause(e);
                         task.completeFailure(cause);
@@ -145,11 +148,18 @@ public class SnapshotService implements Lifecycle, Runnable {
         runningCf.complete(null);
     }
 
-    CompletableFuture<Void> takeSnapshot(SnapshotTask task) {
+    @WithSpan
+    CompletableFuture<Void> takeSnapshot(StoreContext context, SnapshotTask task) {
         if (stopped) {
             task.abort();
             return CompletableFuture.completedFuture(null);
         }
+
+        context.span().ifPresent(span -> {
+            span.setAttribute("topicId", task.topicId);
+            span.setAttribute("queueId", task.queueId);
+        });
+
         OperationSnapshot snapshot;
         try {
             snapshot = task.snapshotSupplier.get();
@@ -187,9 +197,12 @@ public class SnapshotService implements Lifecycle, Runnable {
         snapshot.setCheckPoints(checkPointList);
         byte[] snapshotData = SerializeUtil.encodeOperationSnapshot(snapshot);
 
+        context.span().ifPresent(span -> span.setAttribute("snapshotSize", snapshotData.length));
+
         // append snapshot to snapshot stream
-        return streamStore.append(snapshotStreamId, new SingleRecord(ByteBuffer.wrap(snapshotData)))
+        return streamStore.append(context, snapshotStreamId, new SingleRecord(ByteBuffer.wrap(snapshotData)))
             .thenComposeAsync(appendResult -> {
+                context.span().ifPresent(span -> span.setAttribute("snapshotOffset", appendResult.baseOffset()));
                 // trim operation stream
                 return streamStore.trim(operationStreamId, snapshot.getSnapshotEndOffset() + 1);
             }, backgroundExecutor)

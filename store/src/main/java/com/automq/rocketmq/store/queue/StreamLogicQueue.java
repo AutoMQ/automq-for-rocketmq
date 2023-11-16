@@ -58,6 +58,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.rocketmq.logging.org.slf4j.Logger;
 import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
@@ -199,22 +200,36 @@ public class StreamLogicQueue extends LogicQueue {
     }
 
     @Override
-    public CompletableFuture<PutResult> put(FlatMessage flatMessage) {
+    @WithSpan(kind = SpanKind.SERVER)
+    public CompletableFuture<PutResult> put(StoreContext context, FlatMessage flatMessage) {
         if (state.get() != State.OPENED) {
             return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.QUEUE_NOT_OPENED, "Topic queue not opened"));
         }
-        return streamStore.append(dataStreamId, new SingleRecord(flatMessage.getByteBuffer()))
+
+        String messageId = flatMessage.systemProperties().messageId();
+        if (messageId != null) {
+            context.span().ifPresent(span -> span.setAttribute("messageId", messageId));
+        }
+
+        return streamStore.append(context, dataStreamId, new SingleRecord(flatMessage.getByteBuffer()))
             .thenApply(appendResult -> new PutResult(PutResult.Status.PUT_OK, appendResult.baseOffset()));
     }
 
     @Override
-    public CompletableFuture<PutResult> putRetry(long consumerGroupId, FlatMessage flatMessage) {
+    @WithSpan
+    public CompletableFuture<PutResult> putRetry(StoreContext context, long consumerGroupId, FlatMessage flatMessage) {
         if (state.get() != State.OPENED) {
             return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.QUEUE_NOT_OPENED, "Topic queue not opened"));
         }
+
+        String messageId = flatMessage.systemProperties().messageId();
+        if (messageId != null) {
+            context.span().ifPresent(span -> span.setAttribute("messageId", messageId));
+        }
+
         CompletableFuture<Long> retryStreamIdCf = retryStreamId(consumerGroupId);
         return retryStreamIdCf.thenCompose(streamId ->
-            streamStore.append(streamId, new SingleRecord(flatMessage.getByteBuffer()))
+            streamStore.append(context, streamId, new SingleRecord(flatMessage.getByteBuffer()))
                 .thenApply(appendResult -> new PutResult(PutResult.Status.PUT_OK, appendResult.baseOffset())));
     }
 
@@ -389,10 +404,13 @@ public class StreamLogicQueue extends LogicQueue {
 
         return streamStore.fetch(context, streamId, offset, batchSize)
             .thenApply(fetchResult -> {
+                AtomicLong fetchBytes = new AtomicLong();
+
                 // TODO: Assume message count is always 1 in each batch for now.
                 List<FlatMessageExt> resultList = fetchResult.recordBatchList()
                     .stream()
                     .map(batch -> {
+                        fetchBytes.addAndGet(batch.rawPayload().remaining());
                         FlatMessage message = FlatMessage.getRootAsFlatMessage(batch.rawPayload());
                         long messageOffset = batch.baseOffset();
                         return FlatMessageExt.Builder.builder()
@@ -402,10 +420,7 @@ public class StreamLogicQueue extends LogicQueue {
                     })
                     .toList();
 
-                context.span().ifPresent(span -> {
-                    span.setAttribute("messageCount", resultList.size());
-                    span.setAttribute("cacheAccess", fetchResult.getCacheAccessType().name().toLowerCase());
-                });
+                context.span().ifPresent(span -> span.setAttribute("fetchBytes", fetchBytes.get()));
 
                 return resultList;
             });

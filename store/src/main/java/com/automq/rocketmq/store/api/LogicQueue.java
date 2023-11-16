@@ -49,9 +49,10 @@ public abstract class LogicQueue {
 
     public abstract CompletableFuture<Void> close();
 
-    public abstract CompletableFuture<PutResult> put(FlatMessage flatMessage);
+    public abstract CompletableFuture<PutResult> put(StoreContext context, FlatMessage flatMessage);
 
-    public abstract CompletableFuture<PutResult> putRetry(long consumerGroupId, FlatMessage flatMessage);
+    public abstract CompletableFuture<PutResult> putRetry(StoreContext context, long consumerGroupId,
+        FlatMessage flatMessage);
 
     public abstract CompletableFuture<PopResult> popNormal(StoreContext context, long consumerGroup, Filter filter,
         int batchSize, long invisibleDuration);

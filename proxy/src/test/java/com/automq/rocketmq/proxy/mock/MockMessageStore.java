@@ -113,7 +113,7 @@ public class MockMessageStore implements MessageStore {
     }
 
     @Override
-    public CompletableFuture<PutResult> put(FlatMessage message) {
+    public CompletableFuture<PutResult> put(StoreContext context, FlatMessage message) {
         long offset = this.offsetMap.computeIfAbsent(message.topicId() + message.queueId(), queueId -> new AtomicLong()).getAndIncrement();
         FlatMessageExt messageExt = FlatMessageExt.Builder.builder().message(message).offset(offset).build();
         List<FlatMessageExt> messageList = messageMap.computeIfAbsent(message.topicId() + message.queueId(), v -> new ArrayList<>());

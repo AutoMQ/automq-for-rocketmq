@@ -22,9 +22,15 @@ import apache.rocketmq.v2.Message;
 import apache.rocketmq.v2.Resource;
 import apache.rocketmq.v2.SendMessageRequest;
 import apache.rocketmq.v2.SendMessageResponse;
+import com.automq.rocketmq.common.trace.TraceHelper;
+import com.automq.rocketmq.proxy.model.ProxyContextExt;
 import com.automq.rocketmq.proxy.model.VirtualQueue;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.api.trace.Tracer;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import org.apache.rocketmq.proxy.common.ContextVariable;
 import org.apache.rocketmq.proxy.common.ProxyContext;
 import org.apache.rocketmq.proxy.grpc.v2.channel.GrpcChannelManager;
 import org.apache.rocketmq.proxy.grpc.v2.common.GrpcClientSettingsManager;
@@ -40,6 +46,7 @@ import org.slf4j.LoggerFactory;
 
 public class ExtendSendMessageActivity extends SendMessageActivity {
     public static final Logger LOGGER = LoggerFactory.getLogger(ExtendSendMessageActivity.class);
+
     public ExtendSendMessageActivity(MessagingProcessor messagingProcessor,
         GrpcClientSettingsManager grpcClientSettingsManager,
         GrpcChannelManager grpcChannelManager) {
@@ -49,6 +56,17 @@ public class ExtendSendMessageActivity extends SendMessageActivity {
     @Override
     public CompletableFuture<SendMessageResponse> sendMessage(ProxyContext ctx, SendMessageRequest request) {
         CompletableFuture<SendMessageResponse> future = new CompletableFuture<>();
+
+        ProxyContextExt contextExt = (ProxyContextExt) ctx;
+        Tracer tracer = contextExt.tracer().get();
+        Span rootSpan = tracer.spanBuilder("SendMessage")
+            .setNoParent()
+            .setSpanKind(SpanKind.SERVER)
+            .setAttribute(ContextVariable.PROTOCOL_TYPE, ctx.getProtocolType())
+            .setAttribute(ContextVariable.ACTION, ctx.getAction())
+            .setAttribute(ContextVariable.CLIENT_ID, ctx.getClientID())
+            .startSpan();
+        contextExt.attachSpan(rootSpan);
 
         try {
             if (request.getMessagesCount() <= 0) {
@@ -61,21 +79,29 @@ public class ExtendSendMessageActivity extends SendMessageActivity {
             validateTopic(topic);
 
             future = this.messagingProcessor.sendMessage(
-                ctx,
-                new SendMessageQUeueSelector(request),
-                GrpcConverter.getInstance().wrapResourceWithNamespace(topic),
-                buildSysFlag(message),
-                buildMessage(ctx, request.getMessagesList(), topic)
-            ).thenApply(result -> convertToSendMessageResponse(ctx, request, result));
+                    ctx,
+                    new SendMessageQueueSelector(request),
+                    GrpcConverter.getInstance().wrapResourceWithNamespace(topic),
+                    buildSysFlag(message),
+                    buildMessage(ctx, request.getMessagesList(), topic)
+                ).thenApply(result -> convertToSendMessageResponse(ctx, request, result))
+                .whenComplete((response, throwable) -> {
+                    if (response != null) {
+                        rootSpan.setAttribute("code", response.getStatus().getCode().name().toLowerCase());
+                    }
+                    TraceHelper.endSpan(contextExt, rootSpan, throwable);
+                });
         } catch (Throwable t) {
+            TraceHelper.endSpan(contextExt, rootSpan, t);
             future.completeExceptionally(t);
         }
         return future;
     }
 
-    static class SendMessageQUeueSelector implements QueueSelector {
+    static class SendMessageQueueSelector implements QueueSelector {
         private final SendMessageRequest request;
-        public SendMessageQUeueSelector(SendMessageRequest request) {
+
+        public SendMessageQueueSelector(SendMessageRequest request) {
             this.request = request;
         }
 

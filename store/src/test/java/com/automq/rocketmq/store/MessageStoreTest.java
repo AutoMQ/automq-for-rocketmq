@@ -99,7 +99,7 @@ public class MessageStoreTest {
         logicQueueManager = new DefaultLogicQueueManager(config, streamStore, kvService, timerService, metadataService, operationLogService, inflightService, streamReclaimService);
         DeadLetterSender deadLetterSender = Mockito.mock(DeadLetterSender.class);
         Mockito.doReturn(CompletableFuture.completedFuture(null))
-            .when(deadLetterSender).send(Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
+            .when(deadLetterSender).send(Mockito.any(), Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
         MessageArrivalNotificationService messageArrivalNotificationService = new MessageArrivalNotificationService();
         reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, kvService, timerService, metadataService, messageArrivalNotificationService,
             logicQueueManager, deadLetterSender);
@@ -120,7 +120,7 @@ public class MessageStoreTest {
         // 1. append 5 message
         for (int i = 0; i < 5; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
-            messageStore.put(message).join();
+            messageStore.put(StoreContext.EMPTY, message).join();
         }
         List<String> receiptHandles = new ArrayList<>();
         // 2. pop 3 message
@@ -195,7 +195,7 @@ public class MessageStoreTest {
         // 1. append 5 message
         for (int i = 0; i < 5; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
-            messageStore.put(message).join();
+            messageStore.put(StoreContext.EMPTY, message).join();
         }
         List<String> receiptHandles = new ArrayList<>();
         // 2. pop 3 message
@@ -264,7 +264,7 @@ public class MessageStoreTest {
         // 1. append 5 message
         for (int i = 0; i < 5; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
-            messageStore.put(message).join();
+            messageStore.put(StoreContext.EMPTY, message).join();
         }
         List<String> receiptHandles = new ArrayList<>();
         // 2. pop 3 message
@@ -349,7 +349,7 @@ public class MessageStoreTest {
         // 1. append 5 message
         for (int i = 0; i < 5; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
-            messageStore.put(message).join();
+            messageStore.put(StoreContext.EMPTY, message).join();
         }
         List<String> receiptHandles = new ArrayList<>();
         // 2. pop 3 message
@@ -445,7 +445,7 @@ public class MessageStoreTest {
         // 1. append 5 message
         for (int i = 0; i < 5; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
-            messageStore.put(message).join();
+            messageStore.put(StoreContext.EMPTY, message).join();
         }
         // 2. pop 3 message
         // regard as forever invisible
@@ -477,7 +477,7 @@ public class MessageStoreTest {
         // 1. append 5 message
         for (int i = 0; i < 5; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
-            messageStore.put(message).join();
+            messageStore.put(StoreContext.EMPTY, message).join();
         }
         // 2. pop 3 message
         // regard as forever invisible

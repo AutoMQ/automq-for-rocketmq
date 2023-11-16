@@ -25,9 +25,12 @@ import com.automq.rocketmq.common.model.generated.KeyValueT;
 import com.automq.rocketmq.common.model.generated.SystemProperties;
 import com.automq.rocketmq.common.model.generated.SystemPropertiesT;
 import com.automq.rocketmq.common.system.MessageConstants;
+import com.automq.rocketmq.proxy.model.ProxyContextExt;
 import com.automq.rocketmq.proxy.model.VirtualQueue;
 import com.google.common.base.Strings;
 import com.google.flatbuffers.FlatBufferBuilder;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -109,7 +112,9 @@ public class FlatMessageUtil {
         return deliveryTimestamp;
     }
 
-    public static FlatMessage convertTo(long topicId, int queueId, String storeHost, Message rmqMessage) {
+    @WithSpan(kind = SpanKind.SERVER)
+    public static FlatMessage convertTo(ProxyContextExt context, long topicId, int queueId, String storeHost,
+        Message rmqMessage) {
         FlatMessageT flatMessageT = new FlatMessageT();
         flatMessageT.setTopicId(topicId);
         flatMessageT.setQueueId(queueId);
@@ -195,7 +200,9 @@ public class FlatMessageUtil {
         return messageExt;
     }
 
-    public static List<MessageExt> convertTo(List<FlatMessageExt> messageList, String topicName, long invisibleTime,
+    @WithSpan(kind = SpanKind.SERVER)
+    public static List<MessageExt> convertTo(ProxyContextExt context, List<FlatMessageExt> messageList,
+        String topicName, long invisibleTime,
         String host, int port) {
         return messageList.stream()
             .map(messageExt -> convertTo(messageExt, topicName, invisibleTime, host, port))

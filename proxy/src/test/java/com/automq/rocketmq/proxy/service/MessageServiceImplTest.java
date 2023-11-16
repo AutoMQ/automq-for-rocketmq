@@ -29,6 +29,7 @@ import com.automq.rocketmq.proxy.util.FlatMessageUtil;
 import com.automq.rocketmq.proxy.util.ReceiptHandleUtil;
 import com.automq.rocketmq.store.api.DeadLetterSender;
 import com.automq.rocketmq.store.api.MessageStore;
+import com.automq.rocketmq.store.model.StoreContext;
 import com.automq.rocketmq.store.model.message.TagFilter;
 import java.lang.reflect.Field;
 import java.util.List;
@@ -99,7 +100,7 @@ class MessageServiceImplTest {
         messageStore = new MockMessageStore();
         ProxyConfig config = new ProxyConfig();
         deadLetterSender = Mockito.mock(DeadLetterSender.class);
-        Mockito.doReturn(CompletableFuture.completedFuture(null)).when(deadLetterSender).send(Mockito.anyLong(), Mockito.any());
+        Mockito.doReturn(CompletableFuture.completedFuture(null)).when(deadLetterSender).send(Mockito.any(), Mockito.anyLong(), Mockito.any());
         messageService = new MessageServiceImpl(config, messageStore, metadataService, new LockService(config), deadLetterSender);
     }
 
@@ -155,7 +156,7 @@ class MessageServiceImplTest {
         assertEquals(header.getBname(), queue.getBrokerName());
         assertEquals(header.getTopic(), queue.getTopic());
         assertEquals(header.getQueueId(), queue.getQueueId());
-        Mockito.verify(deadLetterSender, Mockito.never()).send(Mockito.anyLong(), Mockito.any());
+        Mockito.verify(deadLetterSender, Mockito.never()).send(Mockito.any(), Mockito.anyLong(), Mockito.any());
     }
 
     @Test
@@ -184,7 +185,7 @@ class MessageServiceImplTest {
         assertEquals(header.getBname(), queue.getBrokerName());
         assertEquals(header.getTopic(), queue.getTopic());
         assertEquals(header.getQueueId(), queue.getQueueId());
-        Mockito.verify(deadLetterSender, Mockito.times(1)).send(Mockito.anyLong(), Mockito.any());
+        Mockito.verify(deadLetterSender, Mockito.times(1)).send(Mockito.any(), Mockito.anyLong(), Mockito.any());
     }
 
     @Test
@@ -209,8 +210,8 @@ class MessageServiceImplTest {
         header.setExpressionType(ExpressionType.TAG);
         header.setSubscription(TagFilter.SUB_ALL);
         long topicId = metadataService.topicOf(topicName).join().getTopicId();
-        messageStore.put(FlatMessageUtil.convertTo(topicId, 0, "", new Message(topicName, "", new byte[] {})));
-        messageStore.put(FlatMessageUtil.convertTo(topicId, 0, "", new Message(topicName, "", new byte[] {})));
+        messageStore.put(StoreContext.EMPTY, FlatMessageUtil.convertTo(ProxyContextExt.create(), topicId, 0, "", new Message(topicName, "", new byte[] {})));
+        messageStore.put(StoreContext.EMPTY, FlatMessageUtil.convertTo(ProxyContextExt.create(), topicId, 0, "", new Message(topicName, "", new byte[] {})));
 
         result = messageService.pullMessage(ProxyContextExt.create(), messageQueue, header, 0L).join();
         assertEquals(PullStatus.FOUND, result.getPullStatus());
@@ -243,25 +244,25 @@ class MessageServiceImplTest {
         assertEquals(realException.getMessage(), "Message not found from server.");
 
         long topicId = metadataService.topicOf(topicName).join().getTopicId();
-        messageStore.put(FlatMessageUtil.convertTo(topicId, 0, "", new Message(topicName, "", new byte[] {})));
+        messageStore.put(StoreContext.EMPTY, FlatMessageUtil.convertTo(ProxyContextExt.create(), topicId, 0, "", new Message(topicName, "", new byte[] {})));
 
         // Broker controlled delay level.
         header.setDelayLevel(0);
         RemotingCommand response = messageService.sendMessageBack(ProxyContextExt.create(), null, null, header, 0L).join();
         assertEquals(ResponseCode.SUCCESS, response.getCode());
-        Mockito.verify(deadLetterSender, Mockito.never()).send(Mockito.anyLong(), Mockito.any());
+        Mockito.verify(deadLetterSender, Mockito.never()).send(Mockito.any(), Mockito.anyLong(), Mockito.any());
 
         // Client controlled delay level.
         header.setDelayLevel(16);
         response = messageService.sendMessageBack(ProxyContextExt.create(), null, null, header, 0L).join();
         assertEquals(ResponseCode.SUCCESS, response.getCode());
-        Mockito.verify(deadLetterSender, Mockito.never()).send(Mockito.anyLong(), Mockito.any());
+        Mockito.verify(deadLetterSender, Mockito.never()).send(Mockito.any(), Mockito.anyLong(), Mockito.any());
 
         // Forward message into dead letter topic.
         header.setDelayLevel(-1);
         response = messageService.sendMessageBack(ProxyContextExt.create(), null, null, header, 0L).join();
         assertEquals(ResponseCode.SUCCESS, response.getCode());
-        Mockito.verify(deadLetterSender, Mockito.times(1)).send(Mockito.anyLong(), Mockito.any());
+        Mockito.verify(deadLetterSender, Mockito.times(1)).send(Mockito.any(), Mockito.anyLong(), Mockito.any());
     }
 
     @Test
@@ -346,8 +347,8 @@ class MessageServiceImplTest {
         header.setExp(TagFilter.SUB_ALL);
         long consumerGroupId = metadataService.consumerGroupOf(groupName).join().getGroupId();
         long topicId = metadataService.topicOf(topicName).join().getTopicId();
-        messageStore.put(FlatMessageUtil.convertTo(topicId, 0, "", new Message(topicName, "", new byte[] {})));
-        messageStore.put(FlatMessageUtil.convertTo(topicId, 0, "", new Message(topicName, "", new byte[] {})));
+        messageStore.put(StoreContext.EMPTY, FlatMessageUtil.convertTo(ProxyContextExt.create(), topicId, 0, "", new Message(topicName, "", new byte[] {})));
+        messageStore.put(StoreContext.EMPTY, FlatMessageUtil.convertTo(ProxyContextExt.create(), topicId, 0, "", new Message(topicName, "", new byte[] {})));
 
         result = messageService.popMessage(ProxyContextExt.create(), messageQueue, header, 0L).join();
         assertEquals(PopStatus.FOUND, result.getPopStatus());
@@ -380,9 +381,9 @@ class MessageServiceImplTest {
         header.setOrder(true);
 
         long topicId = metadataService.topicOf(topicName).join().getTopicId();
-        messageStore.put(FlatMessageUtil.convertTo(topicId, 0, "", new Message(topicName, "", new byte[] {})));
-        messageStore.put(FlatMessageUtil.convertTo(topicId, 0, "", new Message(topicName, "", new byte[] {})));
-        messageStore.put(FlatMessageUtil.convertTo(topicId, 0, "", new Message(topicName, "", new byte[] {})));
+        messageStore.put(StoreContext.EMPTY, FlatMessageUtil.convertTo(ProxyContextExt.create(), topicId, 0, "", new Message(topicName, "", new byte[] {})));
+        messageStore.put(StoreContext.EMPTY, FlatMessageUtil.convertTo(ProxyContextExt.create(), topicId, 0, "", new Message(topicName, "", new byte[] {})));
+        messageStore.put(StoreContext.EMPTY, FlatMessageUtil.convertTo(ProxyContextExt.create(), topicId, 0, "", new Message(topicName, "", new byte[] {})));
 
         // Pop message with client id "client1".
         ProxyContext context = ProxyContextExt.create();
