@@ -89,6 +89,14 @@ public class TopicManager {
         this.topicNameRequests = new ConcurrentHashMap<>();
     }
 
+    public Optional<String> nameOf(long topicId) {
+        Topic topic = topicCache.byId(topicId);
+        if (null == topic) {
+            return Optional.empty();
+        }
+        return Optional.of(topic.getName());
+    }
+
     public TopicCache getTopicCache() {
         return topicCache;
     }

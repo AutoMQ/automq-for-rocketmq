@@ -80,6 +80,10 @@ public interface MetadataStore extends Closeable {
 
     ElectionService electionService();
 
+    List<QueueAssignment> assignmentsOf(int nodeId);
+
+    List<Long> streamsOf(long topicId, int queueId);
+
     void start();
 
     CompletableFuture<Cluster> describeCluster(DescribeClusterRequest request);

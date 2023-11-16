@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.metadata.service;
+package com.automq.rocketmq.metadata.service.cache;
 
 import com.automq.rocketmq.metadata.dao.S3StreamObject;
 import com.google.common.collect.Lists;

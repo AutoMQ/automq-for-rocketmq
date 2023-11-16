@@ -20,6 +20,9 @@ package com.automq.rocketmq.broker;
 import com.automq.rocketmq.common.config.BrokerConfig;
 import com.automq.rocketmq.common.config.MetricsConfig;
 import com.automq.rocketmq.common.util.Lifecycle;
+import com.automq.rocketmq.controller.MetadataStore;
+import com.automq.rocketmq.metadata.service.S3MetadataService;
+import com.automq.rocketmq.controller.server.TopicMetricsManager;
 import com.automq.rocketmq.proxy.metrics.ProxyMetricsManager;
 import com.automq.rocketmq.proxy.processor.ExtendMessagingProcessor;
 import com.automq.rocketmq.store.MessageStoreImpl;
@@ -84,15 +87,19 @@ public class MetricsExporter implements Lifecycle {
     private final StoreMetricsManager storeMetricsManager;
     private final StreamMetricsManager streamMetricsManager;
 
+    private final TopicMetricsManager topicMetricsManager;
+
     public static Supplier<AttributesBuilder> attributesBuilderSupplier = Attributes::builder;
 
     public MetricsExporter(BrokerConfig brokerConfig, MessageStoreImpl messageStore,
-        ExtendMessagingProcessor messagingProcessor, Resource resource, SdkTracerProvider tracerProvider) {
+        ExtendMessagingProcessor messagingProcessor, Resource resource, SdkTracerProvider tracerProvider,
+        MetadataStore metadataStore, S3MetadataService s3MetadataService) {
         this.brokerConfig = brokerConfig;
         this.metricsConfig = brokerConfig.metrics();
         this.proxyMetricsManager = new ProxyMetricsManager(messagingProcessor);
         this.storeMetricsManager = new StoreMetricsManager(metricsConfig, messageStore);
         this.streamMetricsManager = new StreamMetricsManager();
+        this.topicMetricsManager = new TopicMetricsManager(metadataStore, s3MetadataService);
         init(resource, tracerProvider);
         S3StreamMetricsRegistry.setMetricsGroup(this.streamMetricsManager);
     }
