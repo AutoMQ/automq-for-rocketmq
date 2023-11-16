@@ -28,7 +28,7 @@ import java.nio.ByteBuffer;
  */
 public class DirectRandomAccessFile implements Closeable {
 
-    private DirectChannel channel;
+    private final DirectChannel channel;
 
 
     /**
@@ -42,9 +42,9 @@ public class DirectRandomAccessFile implements Closeable {
             throws IOException {
 
         boolean readOnly = false;
-        if (mode.equals("r")) {
+        if ("r".equals(mode)) {
             readOnly = true;
-        } else if (!mode.equals("rw")) {
+        } else if (!"rw".equals(mode)) {
             throw new IllegalArgumentException("only r and rw modes supported");
         }
 

@@ -22,11 +22,11 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.NonWritableChannelException;
 
 public class DirectChannelImpl implements DirectChannel {
-    private DirectIOLib lib;
-    private int fd;
+    private final DirectIOLib lib;
+    private final int fd;
     private boolean isOpen;
     private long fileLength;
-    private boolean isReadOnly;
+    private final boolean isReadOnly;
 
     private DirectChannelImpl(DirectIOLib lib, int fd, long fileLength, boolean readOnly) {
         this.lib = lib;
@@ -38,6 +38,9 @@ public class DirectChannelImpl implements DirectChannel {
 
     public static DirectChannel getChannel(File file, boolean readOnly) throws IOException {
         DirectIOLib lib = DirectIOLib.getLibForPath(file.toString());
+        if (null == lib) {
+            throw new IOException("No DirectIOLib found for path " + file);
+        }
         return getChannel(lib, file, readOnly);
     }
 

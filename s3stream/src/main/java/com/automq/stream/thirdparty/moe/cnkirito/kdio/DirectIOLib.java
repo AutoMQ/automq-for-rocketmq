@@ -54,7 +54,7 @@ public class DirectIOLib {
                 final int minorRev = 2;
 
                 List<Integer> versionNumbers = new ArrayList<Integer>();
-                for (String v : System.getProperty("os.version").split("\\.|-")) {
+                for (String v : System.getProperty("os.version").split("[.\\-]")) {
                     if (v.matches("\\d")) {
                         versionNumbers.add(Integer.parseInt(v));
                     }
@@ -89,12 +89,12 @@ public class DirectIOLib {
         }
     }
 
-    private int fsBlockSize;
-    private long fsBlockNotMask;
+    private final int fsBlockSize;
+    private final long fsBlockNotMask;
 
     public DirectIOLib(int fsBlockSize) {
         this.fsBlockSize = fsBlockSize;
-        this.fsBlockNotMask = ~((long) fsBlockSize - 1);
+        this.fsBlockNotMask = -((long) fsBlockSize);
     }
 
 
@@ -384,6 +384,6 @@ public class DirectIOLib {
      * @param fd The file descriptor of the file to close
      * @return 0 on success, -1 on error
      */
-    public native int close(int fd); // musn't forget to do this
+    public native int close(int fd); // mustn't forget to do this
 
 }
