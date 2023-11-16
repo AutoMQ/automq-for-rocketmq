@@ -120,7 +120,7 @@ public class BrokerController implements Lifecycle {
         this.extendMessageService = messageServiceImpl;
         serviceManager = new DefaultServiceManager(brokerConfig, proxyMetadataService, dlqService, messageService, messageStore);
 
-        messagingProcessor = ExtendMessagingProcessor.createForS3RocketMQ(serviceManager);
+        messagingProcessor = ExtendMessagingProcessor.createForS3RocketMQ(serviceManager, brokerConfig.proxy());
 
         // Build resource.
         Properties gitProperties;

@@ -21,6 +21,7 @@ import apache.rocketmq.v2.Code;
 import apache.rocketmq.v2.ReceiveMessageRequest;
 import apache.rocketmq.v2.ReceiveMessageResponse;
 import apache.rocketmq.v2.Status;
+import com.automq.rocketmq.common.trace.TraceHelper;
 import com.automq.rocketmq.proxy.metrics.ProxyMetricsManager;
 import com.automq.rocketmq.proxy.model.ProxyContextExt;
 import io.grpc.stub.StreamObserver;
@@ -64,19 +65,25 @@ public class ExtendReceiveMessageResponseStreamWriter extends ReceiveMessageResp
             case FOUND:
                 if (popResult.getMsgFoundList().isEmpty()) {
                     recordRpcLatency(ctx, Code.MESSAGE_NOT_FOUND);
+                    rootSpan.setAttribute("code", Code.MESSAGE_NOT_FOUND.name().toLowerCase());
                 } else {
                     recordRpcLatency(ctx, Code.OK);
+                    rootSpan.setAttribute("code", Code.OK.name().toLowerCase());
                 }
                 break;
             case POLLING_FULL:
                 recordRpcLatency(ctx, Code.TOO_MANY_REQUESTS);
+                rootSpan.setAttribute("code", Code.TOO_MANY_REQUESTS.name().toLowerCase());
                 break;
             case NO_NEW_MSG:
             case POLLING_NOT_FOUND:
             default:
                 recordRpcLatency(ctx, Code.MESSAGE_NOT_FOUND);
+                rootSpan.setAttribute("code", Code.MESSAGE_NOT_FOUND.name().toLowerCase());
                 break;
         }
+        rootSpan.setStatus(StatusCode.OK);
+        rootSpan.end();
     }
 
     @Override
@@ -85,6 +92,7 @@ public class ExtendReceiveMessageResponseStreamWriter extends ReceiveMessageResp
         recordRpcLatency(ctx, code);
         rootSpan.setStatus(StatusCode.OK);
         rootSpan.setAttribute("code", code.name().toLowerCase());
+        rootSpan.end();
     }
 
     @Override
@@ -92,18 +100,7 @@ public class ExtendReceiveMessageResponseStreamWriter extends ReceiveMessageResp
         super.writeAndComplete(ctx, request, throwable);
         Status status = ResponseBuilder.getInstance().buildStatus(throwable);
         recordRpcLatency(ctx, status.getCode());
-        if (throwable != null) {
-            rootSpan.recordException(throwable);
-            rootSpan.setStatus(StatusCode.ERROR);
-        } else {
-            rootSpan.setStatus(StatusCode.OK);
-        }
         rootSpan.setAttribute("code", status.getCode().name().toLowerCase());
-    }
-
-    @Override
-    protected void onComplete() {
-        super.onComplete();
-        rootSpan.end();
+        TraceHelper.endSpan((ProxyContextExt) ctx, rootSpan, throwable);
     }
 }
