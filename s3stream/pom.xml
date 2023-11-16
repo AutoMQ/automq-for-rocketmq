@@ -51,17 +51,6 @@
             <version>8.5.0</version>
         </dependency>
         <dependency>
-            <groupId>moe.cnkirito.kdio</groupId>
-            <artifactId>kdio-core</artifactId>
-            <version>1.0.0</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>log4j</groupId>
-                    <artifactId>log4j</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
             <version>3.13.0</version>
