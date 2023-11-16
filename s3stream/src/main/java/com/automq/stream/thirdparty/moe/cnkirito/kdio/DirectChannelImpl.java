@@ -119,16 +119,10 @@ public class DirectChannelImpl implements DirectChannel {
         if (!isOpen()) {
             return;
         }
-        try {
-            if (!isReadOnly()) {
-                truncate(fileLength);
-            }
-        } finally {
-            isOpen = false;
-            if (lib.close(fd) < 0) {
-                throw new IOException("Error closing file with descriptor " + fd + ": " +
-                        DirectIOLib.getLastError());
-            }
+        isOpen = false;
+        if (lib.close(fd) < 0) {
+            throw new IOException("Error closing file with descriptor " + fd + ": " +
+                    DirectIOLib.getLastError());
         }
     }
 }
