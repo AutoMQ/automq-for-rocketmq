@@ -62,8 +62,8 @@ public class S3WalObjectCache {
         objectIds.forEach(cache::remove);
     }
 
-    public void onCommit(S3WalObject object) throws InvalidProtocolBufferException {
-        cache.put(object.getObjectId(), Helper.buildS3WALObject(object));
+    public void onCommit(S3WALObject object) {
+        cache.put(object.getObjectId(), object);
     }
 
     public long streamDataSize(long streamId) {

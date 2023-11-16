@@ -127,10 +127,12 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
 
     @Override
     public CompletableFuture<StreamMetadata> openStream(long streamId, long streamEpoch) {
+
         AtomicBoolean loop = new AtomicBoolean(true);
         return Futures.loop(loop::get, () -> metadataStore.openStream(streamId, streamEpoch, metadataStore.config().nodeId())
             .thenApply(res -> {
                 loop.set(false);
+                s3MetadataService.onStreamOpen(streamId);
                 return res;
             }), MoreExecutors.directExecutor());
     }
@@ -141,6 +143,7 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
         return Futures.loop(loop::get, () -> metadataStore.closeStream(streamId, streamEpoch, metadataStore.config().nodeId())
             .thenApply(res -> {
                 loop.set(false);
+                s3MetadataService.onStreamClose(streamId);
                 return res;
             }), MoreExecutors.directExecutor());
     }

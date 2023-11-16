@@ -51,6 +51,10 @@ public interface S3MetadataService extends Closeable {
 
     CompletableFuture<Void> trimStream(long streamId, long streamEpoch, long newStartOffset);
 
+    void onStreamOpen(long streamId);
+
+    void onStreamClose(long streamId);
+
     long streamDataSize(long streamId);
 
     long streamStartTime(long streamId);

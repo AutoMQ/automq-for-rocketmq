@@ -21,7 +21,6 @@ import apache.rocketmq.controller.v1.S3ObjectState;
 import com.automq.rocketmq.metadata.dao.S3Object;
 import com.automq.rocketmq.metadata.mapper.S3ObjectMapper;
 import java.util.Collection;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;

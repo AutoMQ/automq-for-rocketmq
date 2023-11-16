@@ -307,6 +307,8 @@ public class DefaultS3MetadataService implements S3MetadataService {
                 : toCache.entrySet()) {
                 s3StreamObjectCache.cache(entry.getKey(), entry.getValue());
             }
+            s3WalObjectCache.onCommit(walObject);
+            s3WalObjectCache.onCompact(compactedObjects);
             LOGGER.info("broker[broke-id={}] commit wal object[object-id={}] success, compacted objects[{}], stream objects[{}]",
                 brokerId, walObject.getObjectId(), compactedObjects, streamObjects);
             future.complete(null);
@@ -558,7 +560,9 @@ public class DefaultS3MetadataService implements S3MetadataService {
         s3Object.setStreamId(streamId);
         s3Object.setObjectSize(objectSize);
         s3Object.setState(S3ObjectState.BOS_COMMITTED);
-        return s3ObjectMapper.commit(s3Object) == 1;
+        boolean ok = s3ObjectMapper.commit(s3Object) == 1;
+        s3ObjectCache.onObjectAdd(List.of(s3Object));
+        return ok;
     }
 
     private void extendRange(SqlSession session, Map<Long, Pair<Long, Long>> segments) {
@@ -756,6 +760,7 @@ public class DefaultS3MetadataService implements S3MetadataService {
                     S3Object s3Object = s3ObjectMapper.getById(streamObject.getObjectId());
                     s3Object.setMarkedForDeletionTimestamp(new Date());
                     s3ObjectMapper.markToDelete(s3Object.getId(), new Date());
+                    s3ObjectCache.onObjectDelete(s3Object.getStreamId(), List.of(s3Object.getId()));
                 }
             });
 
@@ -806,6 +811,16 @@ public class DefaultS3MetadataService implements S3MetadataService {
     @Override
     public long streamStartTime(long streamId) {
         return Long.min(s3ObjectCache.streamStartTime(streamId), s3WalObjectCache.streamStartTime(streamId));
+    }
+
+    @Override
+    public void onStreamOpen(long streamId) {
+        s3ObjectCache.onStreamOpen(streamId);
+    }
+
+    @Override
+    public void onStreamClose(long streamId) {
+        s3ObjectCache.onStreamClose(streamId);
     }
 
     @Override
