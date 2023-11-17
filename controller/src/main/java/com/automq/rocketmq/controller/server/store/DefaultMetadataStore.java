@@ -729,7 +729,18 @@ public class DefaultMetadataStore implements MetadataStore {
     public Optional<BrokerNode> getNode(int nodeId) {
         BrokerNode node = nodes.get(nodeId);
         if (null == node) {
-            return Optional.empty();
+            try (SqlSession session = openSession()) {
+                NodeMapper mapper = session.getMapper(NodeMapper.class);
+                Node rawNode = mapper.get(nodeId, null, null, null);
+                if (null != rawNode) {
+                    addBrokerNode(rawNode);
+                }
+            }
+
+            node = nodes.get(nodeId);
+            if (null == node) {
+                return Optional.empty();
+            }
         }
         return Optional.of(node);
     }
