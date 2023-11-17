@@ -253,13 +253,15 @@ public class DirectIOLib {
      * @throws IOException
      */
     public int pread(int fd, ByteBuffer buf, long offset) throws IOException {
+        final int start = buf.position();
+        assert start == blockStart(start);
+        final int toRead = buf.remaining();
+        assert toRead == blockStart(toRead);
         assert offset == blockStart(offset);
-        assert buf.position() == 0;
-        assert buf.remaining() == blockStart(buf.remaining());
 
         final long address = PlatformDependent.directBufferAddress(buf);
         Pointer pointer = new Pointer(address);
-        int n = pread(fd, pointer, new NativeLong(buf.limit()), new NativeLong(offset)).intValue();
+        int n = pread(fd, pointer.share(start), new NativeLong(toRead), new NativeLong(offset)).intValue();
         if (n < 0) {
             throw new IOException("error reading file at offset " + offset + ": " + getLastError());
         }
@@ -284,7 +286,9 @@ public class DirectIOLib {
         // we will later truncate.
         final int start = buf.position();
         assert start == blockStart(start);
-        final int toWrite = blockEnd(buf.limit()) - start;
+        final int toWrite = buf.remaining();
+        assert toWrite == blockStart(toWrite);
+        assert offset == blockStart(offset);
 
         final long address = PlatformDependent.directBufferAddress(buf);
         Pointer pointer = new Pointer(address);
@@ -293,6 +297,7 @@ public class DirectIOLib {
         if (n < 0) {
             throw new IOException("error writing file at offset " + offset + ": " + getLastError());
         }
+        buf.position(start + n);
         return n;
     }
 
