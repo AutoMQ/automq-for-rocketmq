@@ -34,7 +34,10 @@ public class Helper {
     public static Topic buildTopic(com.automq.rocketmq.metadata.dao.Topic topic,
         Collection<QueueAssignment> assignments) throws InvalidProtocolBufferException {
         AcceptTypes.Builder builder = AcceptTypes.newBuilder();
+
+        // This method is kind of CPU-intensive
         JsonFormat.parser().ignoringUnknownFields().merge(topic.getAcceptMessageTypes(), builder);
+
         apache.rocketmq.controller.v1.Topic.Builder topicBuilder = apache.rocketmq.controller.v1.Topic
             .newBuilder()
             .setTopicId(topic.getId())
@@ -42,7 +45,11 @@ public class Helper {
             .setCount(topic.getQueueNum())
             .setRetentionHours(topic.getRetentionHours())
             .setAcceptTypes(builder.build());
+        setAssignments(topicBuilder, assignments);
+        return topicBuilder.build();
+    }
 
+    public static void setAssignments(Topic.Builder topicBuilder, Collection<QueueAssignment> assignments) {
         if (null != assignments) {
             for (QueueAssignment assignment : assignments) {
                 switch (assignment.getStatus()) {
@@ -73,7 +80,6 @@ public class Helper {
                 }
             }
         }
-        return topicBuilder.build();
     }
 
     public enum AddFutureResult {

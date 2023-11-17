@@ -90,7 +90,7 @@ public class TopicManager {
     }
 
     public Optional<String> nameOf(long topicId) {
-        Topic topic = topicCache.byId(topicId);
+        apache.rocketmq.controller.v1.Topic topic = topicCache.byId(topicId);
         if (null == topic) {
             return Optional.empty();
         }
@@ -374,26 +374,24 @@ public class TopicManager {
         }
     }
 
-    public CompletableFuture<apache.rocketmq.controller.v1.Topic> describeTopic(Long topicId,
-        String topicName) {
-
+    public CompletableFuture<apache.rocketmq.controller.v1.Topic> describeTopic(Long topicId, String topicName) {
         // Look up cache first
-        Topic topicMetadataCache = null;
-        if (null != topicId) {
-            topicMetadataCache = this.topicCache.byId(topicId);
-        }
-        if (null == topicMetadataCache && null != topicName) {
-            topicMetadataCache = this.topicCache.byName(topicName);
-        }
-        if (null != topicMetadataCache) {
-            Map<Integer, QueueAssignment> assignmentMap = assignmentCache.byTopicId(topicMetadataCache.getId());
-            if (null != assignmentMap && !assignmentMap.isEmpty()) {
-                try {
-                    apache.rocketmq.controller.v1.Topic topic =
-                        Helper.buildTopic(topicMetadataCache, assignmentMap.values());
-                    return CompletableFuture.completedFuture(topic);
-                } catch (InvalidProtocolBufferException e) {
-                    return CompletableFuture.failedFuture(e);
+        {
+            apache.rocketmq.controller.v1.Topic topic = null;
+            if (null != topicId) {
+                topic = topicCache.byId(topicId);
+            }
+
+            if (null == topic && null != topicName) {
+                topic = topicCache.byName(topicName);
+            }
+
+            if (null != topic) {
+                Map<Integer, QueueAssignment> assignmentMap = assignmentCache.byTopicId(topic.getTopicId());
+                if (null != assignmentMap && !assignmentMap.isEmpty()) {
+                    apache.rocketmq.controller.v1.Topic.Builder topicBuilder = topic.toBuilder();
+                    Helper.setAssignments(topicBuilder, assignmentMap.values());
+                    return CompletableFuture.completedFuture(topicBuilder.build());
                 }
             }
         }
