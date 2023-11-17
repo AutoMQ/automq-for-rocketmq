@@ -14,7 +14,7 @@
 # limitations under the License.
 
 broker:
-  replicaCount: 2
+  replicaCount: 1
   conf:
     clusterNameOverride: "automq"
     s3Stream:
