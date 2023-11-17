@@ -38,7 +38,7 @@ spec:
           imagePullPolicy: {{ $.Values.broker.image.pullPolicy }}
         {{- end }}
           command: [ "/bin/sh" ]
-          args: [ "-c", "./run-server.sh com.automq.rocketmq.broker.BrokerStartup -c /home/rocketmq/automq-for-rocketmq-5.1.3/conf/broker/$(CLUSTER_NAME)-$(POD_NAME)" ]
+          args: [ "-c", "./run-server.sh com.automq.rocketmq.broker.BrokerStartup -c /home/rocketmq/automq-for-rocketmq/conf/broker/$(CLUSTER_NAME)-$(POD_NAME)" ]
           env:
             - name: POD_NAME
               valueFrom:
@@ -81,7 +81,7 @@ spec:
           resources:
             {{- toYaml .Values.broker.resources | nindent 12 }}
           volumeMounts:
-            - mountPath: /home/rocketmq/automq-for-rocketmq-5.1.3/conf/broker
+            - mountPath: /home/rocketmq/automq-for-rocketmq/conf/broker
               name: broker-config
             - mountPath: /root/logs/rocketmqlogs
               name: broker-storage
