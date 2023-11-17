@@ -69,8 +69,6 @@ public class WALBlockDeviceChannel implements WALChannel {
         if (!blockDevicePath.startsWith(WALChannelBuilder.DEVICE_PREFIX)) {
             // If the block device path is not a device, we create a file with the capacity we want
             // This is ONLY for test purpose, so we don't check the capacity of the file
-            File file = new File(blockDevicePath);
-            assert !file.exists();
             try (RandomAccessFile raf = new RandomAccessFile(blockDevicePath, "rw")) {
                 raf.setLength(capacityWant);
             }
@@ -162,11 +160,11 @@ public class WALBlockDeviceChannel implements WALChannel {
         ByteBuffer tmpBuf = getBuffer(alignedSize);
         tmpBuf.position(0).limit(alignedSize);
 
-        int bytesRead = read(tmpBuf, alignedStart);
+        read(tmpBuf, alignedStart);
         tmpBuf.position((int) (start - alignedStart)).limit((int) (end - alignedStart));
 
         dst.writeBytes(tmpBuf);
-        return bytesRead;
+        return (int) (end - start);
     }
 
     private int read(ByteBuffer dst, long position) throws IOException {
