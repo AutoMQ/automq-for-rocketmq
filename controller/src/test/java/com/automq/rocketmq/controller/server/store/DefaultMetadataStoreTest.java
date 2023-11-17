@@ -60,6 +60,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import org.apache.ibatis.session.SqlSession;
 import org.awaitility.Awaitility;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
@@ -1277,6 +1278,29 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
             Mockito.doReturn(electionService).when(spy).electionService();
             Mockito.when(spy.onQueueClosed(ArgumentMatchers.anyLong(), ArgumentMatchers.anyInt())).thenCallRealMethod();
             assertThrows(CompletionException.class, () -> spy.onQueueClosed(2, 1).join());
+        }
+    }
+
+    @Test
+    public void testGetNode() throws IOException {
+        try (MetadataStore metadataStore = new DefaultMetadataStore(client, getSessionFactory(), config)) {
+            metadataStore.start();
+            awaitElectedAsLeader(metadataStore);
+            Optional<BrokerNode> brokerNode = metadataStore.getNode(config.nodeId());
+            Assertions.assertTrue(brokerNode.isPresent());
+            Assertions.assertTrue(metadataStore.leaderAddress().isPresent());
+
+            try (SqlSession session = metadataStore.openSession()) {
+                NodeMapper mapper = session.getMapper(NodeMapper.class);
+                Node node = new Node();
+                node.setName("n1");
+                node.setAddress("localhost:2345");
+                node.setInstanceId("i-2345");
+                node.setVolumeId("v-2345");
+                mapper.create(node);
+                session.commit();
+                Assertions.assertTrue(metadataStore.getNode(node.getId()).isPresent());
+            }
         }
     }
 }
