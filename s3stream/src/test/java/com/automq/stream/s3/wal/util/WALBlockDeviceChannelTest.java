@@ -33,6 +33,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -117,7 +118,7 @@ public class WALBlockDeviceChannelTest {
         channel.open();
 
         ByteBuf data = TestUtils.random(42);
-        assertThrows(AssertionError.class, () -> channel.writeAndFlush(data, 0));
+        assertDoesNotThrow(() -> channel.writeAndFlush(data, 0));
 
         channel.close();
     }
@@ -139,7 +140,6 @@ public class WALBlockDeviceChannelTest {
         channel.open();
 
         ByteBuf data = TestUtils.random(4096);
-        // TODO
         assertThrows(AssertionError.class, () -> channel.writeAndFlush(data, 8192));
 
         channel.close();

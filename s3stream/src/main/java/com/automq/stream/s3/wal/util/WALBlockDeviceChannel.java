@@ -119,6 +119,7 @@ public class WALBlockDeviceChannel implements WALChannel {
         assert position % WALUtil.BLOCK_SIZE == 0;
 
         int alignedSize = (int) WALUtil.alignLargeByBlockSize(src.readableBytes());
+        assert position + alignedSize <= capacity();
         ByteBuffer tmpBuf = getBuffer(alignedSize);
         tmpBuf.clear();
 
