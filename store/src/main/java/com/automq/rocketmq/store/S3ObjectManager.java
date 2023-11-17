@@ -145,8 +145,7 @@ public class S3ObjectManager implements ObjectManager {
     }
 
     @Override
-    public CompletableFuture<List<S3ObjectMetadata>> getObjects(long streamId, long startOffset, long endOffset,
-        int limit) {
+    public CompletableFuture<List<S3ObjectMetadata>> getObjects(long streamId, long startOffset, long endOffset, int limit) {
         CompletableFuture<Pair<List<S3StreamObject>, List<S3WALObject>>> cf = metaService.listObjects(streamId, startOffset, endOffset, limit);
         // Retrieve S3ObjectMetadata from stream objects and wal objects
         return cf.thenApply(pair -> {
