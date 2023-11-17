@@ -33,6 +33,7 @@ class TopicCacheTest {
         topic.setName("T1");
         topic.setRetentionHours(3);
         topic.setAcceptMessageTypes("{}");
+        topic.setQueueNum(1);
         topic.setStatus(TopicStatus.TOPIC_STATUS_DELETED);
         cache.apply(List.of(topic));
 
