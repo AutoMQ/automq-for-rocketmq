@@ -17,23 +17,47 @@
 
 package com.automq.rocketmq.metadata;
 
-import com.zaxxer.hikari.HikariConfig;
-import com.zaxxer.hikari.HikariDataSource;
+import com.alibaba.druid.pool.DruidDataSource;
+import java.sql.SQLException;
 import java.util.Properties;
 import javax.sql.DataSource;
 import org.apache.ibatis.datasource.pooled.PooledDataSourceFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class HikariCPDataSourceFactory extends PooledDataSourceFactory {
-    private static HikariDataSource dataSource;
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(HikariCPDataSourceFactory.class);
+
+    private static DruidDataSource dataSource;
 
     @Override
     public void setProperties(Properties properties) {
         synchronized (HikariCPDataSourceFactory.class) {
             if (null == dataSource) {
-                HikariConfig config = new HikariConfig(properties);
-                config.setMaximumPoolSize(20);
-                config.setAutoCommit(false);
-                dataSource = new HikariDataSource(config);
+                dataSource = new DruidDataSource();
+                dataSource.setUrl(properties.getProperty("jdbcUrl"));
+                dataSource.setUsername(properties.getProperty("username"));
+                dataSource.setPassword(properties.getProperty("password"));
+                try {
+                    dataSource.setFilters("stat,slf4j");
+                } catch (SQLException e) {
+                    LOGGER.error("Failed to set stat filter", e);
+                }
+                dataSource.setMaxActive(20);
+                dataSource.setInitialSize(5);
+                dataSource.setMinIdle(1);
+                dataSource.setMaxWait(6000);
+
+                dataSource.setTimeBetweenEvictionRunsMillis(60000);
+                dataSource.setMinEvictableIdleTimeMillis(300000);
+                dataSource.setTestWhileIdle(true);
+                dataSource.setTestOnBorrow(true);
+                dataSource.setTestOnReturn(false);
+
+                dataSource.setPoolPreparedStatements(true);
+                dataSource.setMaxOpenPreparedStatements(20);
+                dataSource.setAsyncInit(true);
             }
         }
     }
