@@ -244,9 +244,7 @@ public class DirectIOLib {
     private static native String strerror(int errnum);
 
     /**
-     * Interface into native pread function. Always reads an entire buffer,
-     * unlike {@link #pwrite(int, ByteBuffer, long) pwrite()} which uses buffer state
-     * to determine how much of buffer to write.
+     * Interface into native pread function.
      *
      * @param fd     A file discriptor to pass to native pread
      * @param buf    The direct buffer into which to record the file read
@@ -255,10 +253,14 @@ public class DirectIOLib {
      * @throws IOException
      */
     public int pread(int fd, ByteBuffer buf, long offset) throws IOException {
+        assert offset == blockStart(offset);
+        assert buf.position() == 0;
+        assert buf.remaining() == blockStart(buf.remaining());
+
         buf.clear(); // so that we read an entire buffer
         final long address = PlatformDependent.directBufferAddress(buf);
         Pointer pointer = new Pointer(address);
-        int n = pread(fd, pointer, new NativeLong(buf.capacity()), new NativeLong(offset)).intValue();
+        int n = pread(fd, pointer, new NativeLong(buf.limit()), new NativeLong(offset)).intValue();
         if (n < 0) {
             throw new IOException("error reading file at offset " + offset + ": " + getLastError());
         }
