@@ -125,11 +125,7 @@ public class WALBlockDeviceChannel implements WALChannel {
         for (ByteBuffer buffer : src.nioBuffers()) {
             tmpBuf.put(buffer);
         }
-        // padding
-        for (int i = src.readableBytes(); i < alignedSize; i++) {
-            tmpBuf.put((byte) 0);
-        }
-        tmpBuf.flip();
+        tmpBuf.position(0).limit(alignedSize);
 
         write(tmpBuf, position);
     }
