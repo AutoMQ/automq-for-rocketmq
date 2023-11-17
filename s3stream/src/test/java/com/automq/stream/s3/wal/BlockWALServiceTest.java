@@ -24,6 +24,7 @@ import com.automq.stream.s3.wal.util.WALChannel;
 import com.automq.stream.s3.wal.util.WALUtil;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
+import io.netty.buffer.Unpooled;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -62,6 +63,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Tag("S3Unit")
 class BlockWALServiceTest {
 
+    static final String TEST_BLOCK_DEVICE = System.getenv("WAL_TEST_BLOCK_DEVICE");
+
     @ParameterizedTest(name = "Test {index}: mergeWrite={0}")
     @ValueSource(booleans = {false, true})
     public void testSingleThreadAppendBasic(boolean mergeWrite) throws IOException, OverCapacityException {
@@ -75,12 +78,33 @@ class BlockWALServiceTest {
         testSingleThreadAppendBasic0(mergeWrite, true);
     }
 
+    /**
+     * Write "zero"s to the block device to reset it.
+     */
+    private static void resetBlockDevice(String path, long capacity) throws IOException {
+        WALChannel channel = WALChannel.builder(path)
+                .capacity(capacity)
+                .direct(true)
+                .build();
+        channel.open();
+        ByteBuf buf = Unpooled.buffer((int) capacity);
+        buf.writeZero((int) capacity);
+        channel.write(buf, 0);
+        channel.close();
+    }
+
     private static void testSingleThreadAppendBasic0(boolean mergeWrite, boolean directIO) throws IOException, OverCapacityException {
         final int recordSize = 4096 + 1;
         final int recordCount = 100;
         final long blockDeviceCapacity = WALUtil.alignLargeByBlockSize(recordSize) * recordCount + WAL_HEADER_TOTAL_CAPACITY;
 
-        BlockWALService.BlockWALServiceBuilder builder = BlockWALService.builder(TestUtils.tempFilePath(), blockDeviceCapacity)
+        String path = TestUtils.tempFilePath();
+        if (directIO && TEST_BLOCK_DEVICE != null) {
+            path = TEST_BLOCK_DEVICE;
+            resetBlockDevice(path, blockDeviceCapacity);
+        }
+
+        BlockWALService.BlockWALServiceBuilder builder = BlockWALService.builder(path, blockDeviceCapacity)
                 .direct(directIO)
                 .slidingWindowInitialSize(0)
                 .slidingWindowScaleUnit(4096);
@@ -147,7 +171,13 @@ class BlockWALServiceTest {
             blockDeviceCapacity = WALUtil.alignLargeByBlockSize(recordSize * recordCount / 3) + WAL_HEADER_TOTAL_CAPACITY;
         }
 
-        BlockWALService.BlockWALServiceBuilder builder = BlockWALService.builder(TestUtils.tempFilePath(), blockDeviceCapacity)
+        String path = TestUtils.tempFilePath();
+        if (directIO && TEST_BLOCK_DEVICE != null) {
+            path = TEST_BLOCK_DEVICE;
+            resetBlockDevice(path, blockDeviceCapacity);
+        }
+
+        BlockWALService.BlockWALServiceBuilder builder = BlockWALService.builder(path, blockDeviceCapacity)
                 .direct(directIO)
                 .slidingWindowInitialSize(0)
                 .slidingWindowScaleUnit(4096);
@@ -224,7 +254,13 @@ class BlockWALServiceTest {
         final int threadCount = 8;
         final long blockDeviceCapacity = WALUtil.alignLargeByBlockSize(recordSize) * recordCount * threadCount + WAL_HEADER_TOTAL_CAPACITY;
 
-        BlockWALService.BlockWALServiceBuilder builder = BlockWALService.builder(TestUtils.tempFilePath(), blockDeviceCapacity)
+        String path = TestUtils.tempFilePath();
+        if (directIO && TEST_BLOCK_DEVICE != null) {
+            path = TEST_BLOCK_DEVICE;
+            resetBlockDevice(path, blockDeviceCapacity);
+        }
+
+        BlockWALService.BlockWALServiceBuilder builder = BlockWALService.builder(path, blockDeviceCapacity)
                 .direct(directIO);
         if (!mergeWrite) {
             builder.blockSoftLimit(0);
@@ -353,10 +389,15 @@ class BlockWALServiceTest {
         } else {
             blockDeviceCapacity = WALUtil.alignLargeByBlockSize(recordSize) * recordCount + WAL_HEADER_TOTAL_CAPACITY;
         }
-        final String tempFilePath = TestUtils.tempFilePath();
+        String path = TestUtils.tempFilePath();
+
+        if (directIO && TEST_BLOCK_DEVICE != null) {
+            path = TEST_BLOCK_DEVICE;
+            resetBlockDevice(path, blockDeviceCapacity);
+        }
 
         // Append records
-        final WriteAheadLog previousWAL = BlockWALService.builder(tempFilePath, blockDeviceCapacity)
+        final WriteAheadLog previousWAL = BlockWALService.builder(path, blockDeviceCapacity)
                 .direct(directIO)
                 .flushHeaderIntervalSeconds(1 << 20)
                 .build()
@@ -367,7 +408,7 @@ class BlockWALServiceTest {
         }
 
         // Recover records
-        final WriteAheadLog wal = BlockWALService.builder(tempFilePath, blockDeviceCapacity)
+        final WriteAheadLog wal = BlockWALService.builder(path, blockDeviceCapacity)
                 .direct(directIO)
                 .build()
                 .start();
@@ -420,10 +461,15 @@ class BlockWALServiceTest {
         } else {
             blockDeviceCapacity = WALUtil.alignLargeByBlockSize(recordSize) * recordCount + WAL_HEADER_TOTAL_CAPACITY;
         }
-        final String tempFilePath = TestUtils.tempFilePath();
+        String path = TestUtils.tempFilePath();
+
+        if (directIO && TEST_BLOCK_DEVICE != null) {
+            path = TEST_BLOCK_DEVICE;
+            resetBlockDevice(path, blockDeviceCapacity);
+        }
 
         // Append records
-        final WriteAheadLog previousWAL = BlockWALService.builder(tempFilePath, blockDeviceCapacity)
+        final WriteAheadLog previousWAL = BlockWALService.builder(path, blockDeviceCapacity)
                 .direct(directIO)
                 .flushHeaderIntervalSeconds(1 << 20)
                 .build()
@@ -434,7 +480,7 @@ class BlockWALServiceTest {
         }
 
         // Recover records
-        final WriteAheadLog wal = BlockWALService.builder(tempFilePath, blockDeviceCapacity)
+        final WriteAheadLog wal = BlockWALService.builder(path, blockDeviceCapacity)
                 .direct(directIO)
                 .build()
                 .start();
@@ -503,9 +549,14 @@ class BlockWALServiceTest {
 
     private void testAppendAfterRecover0(boolean directIO) throws IOException, OverCapacityException {
         final int recordSize = 4096 + 1;
-        final String tempFilePath = TestUtils.tempFilePath();
+        String path = TestUtils.tempFilePath();
 
-        final WriteAheadLog previousWAL = BlockWALService.builder(tempFilePath, 1 << 20)
+        if (directIO && TEST_BLOCK_DEVICE != null) {
+            path = TEST_BLOCK_DEVICE;
+            resetBlockDevice(path, 1 << 20);
+        }
+
+        final WriteAheadLog previousWAL = BlockWALService.builder(path, 1 << 20)
                 .direct(directIO)
                 .flushHeaderIntervalSeconds(1 << 20)
                 .build()
@@ -516,7 +567,7 @@ class BlockWALServiceTest {
         long appended1 = append(previousWAL, recordSize);
         assertEquals(WALUtil.alignLargeByBlockSize(recordSize), appended1);
 
-        final WriteAheadLog wal = BlockWALService.builder(tempFilePath, 1 << 20)
+        final WriteAheadLog wal = BlockWALService.builder(path, 1 << 20)
                 .direct(directIO)
                 .flushHeaderIntervalSeconds(1 << 20)
                 .build()
@@ -846,8 +897,13 @@ class BlockWALServiceTest {
             List<Long> recoveredOffsets,
             boolean directIO
     ) throws IOException {
-        final String tempFilePath = TestUtils.tempFilePath();
-        final WALChannel walChannel = WALChannel.builder(tempFilePath)
+        String path = TestUtils.tempFilePath();
+        if (directIO && TEST_BLOCK_DEVICE != null) {
+            path = TEST_BLOCK_DEVICE;
+            resetBlockDevice(path, capacity);
+        }
+
+        final WALChannel walChannel = WALChannel.builder(path)
                 .capacity(capacity)
                 // we may write to un-aligned position here, so we need to disable directIO
                 .direct(false)
@@ -861,7 +917,7 @@ class BlockWALServiceTest {
         }
         walChannel.close();
 
-        final WriteAheadLog wal = BlockWALService.builder(tempFilePath, capacity)
+        final WriteAheadLog wal = BlockWALService.builder(path, capacity)
                 .direct(directIO)
                 .flushHeaderIntervalSeconds(1 << 30)
                 .build()
@@ -899,10 +955,15 @@ class BlockWALServiceTest {
         final int recordSize = 4096 + 1;
         final int recordCount = 10;
         final long blockDeviceCapacity = WALUtil.alignLargeByBlockSize(recordSize) * recordCount * 2 + WAL_HEADER_TOTAL_CAPACITY;
-        final String tempFilePath = TestUtils.tempFilePath();
+        String path = TestUtils.tempFilePath();
+
+        if (directIO && TEST_BLOCK_DEVICE != null) {
+            path = TEST_BLOCK_DEVICE;
+            resetBlockDevice(path, blockDeviceCapacity);
+        }
 
         // 1. append and force shutdown
-        final WriteAheadLog wal1 = BlockWALService.builder(tempFilePath, blockDeviceCapacity)
+        final WriteAheadLog wal1 = BlockWALService.builder(path, blockDeviceCapacity)
                 .direct(directIO)
                 .flushHeaderIntervalSeconds(1 << 30)
                 .build()
@@ -910,7 +971,7 @@ class BlockWALServiceTest {
         List<Long> appended1 = appendWithoutTrim(wal1, recordSize, recordCount);
 
         // 2. recover and reset
-        final WriteAheadLog wal2 = BlockWALService.builder(tempFilePath, blockDeviceCapacity)
+        final WriteAheadLog wal2 = BlockWALService.builder(path, blockDeviceCapacity)
                 .direct(directIO)
                 .flushHeaderIntervalSeconds(1 << 30)
                 .build()
@@ -930,7 +991,7 @@ class BlockWALServiceTest {
         List<Long> appended2 = appendWithoutTrim(wal2, recordSize, recordCount);
 
         // 4. recover again
-        final WriteAheadLog wal3 = BlockWALService.builder(tempFilePath, blockDeviceCapacity)
+        final WriteAheadLog wal3 = BlockWALService.builder(path, blockDeviceCapacity)
                 .direct(directIO)
                 .flushHeaderIntervalSeconds(1 << 30)
                 .build()
