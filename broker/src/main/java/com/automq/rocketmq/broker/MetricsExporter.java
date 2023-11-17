@@ -21,8 +21,8 @@ import com.automq.rocketmq.common.config.BrokerConfig;
 import com.automq.rocketmq.common.config.MetricsConfig;
 import com.automq.rocketmq.common.util.Lifecycle;
 import com.automq.rocketmq.controller.MetadataStore;
-import com.automq.rocketmq.metadata.service.S3MetadataService;
 import com.automq.rocketmq.controller.server.TopicMetricsManager;
+import com.automq.rocketmq.metadata.service.S3MetadataService;
 import com.automq.rocketmq.proxy.metrics.ProxyMetricsManager;
 import com.automq.rocketmq.proxy.processor.ExtendMessagingProcessor;
 import com.automq.rocketmq.store.MessageStoreImpl;
@@ -280,6 +280,10 @@ public class MetricsExporter implements Lifecycle {
         }
 
         for (Pair<InstrumentSelector, View> selectorViewPair : StoreMetricsManager.getMetricsView()) {
+            providerBuilder.registerView(selectorViewPair.getLeft(), selectorViewPair.getRight());
+        }
+
+        for (Pair<InstrumentSelector, View> selectorViewPair : StreamMetricsManager.getMetricsView()) {
             providerBuilder.registerView(selectorViewPair.getLeft(), selectorViewPair.getRight());
         }
     }
