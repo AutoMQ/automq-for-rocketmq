@@ -56,6 +56,9 @@ public class WALBlockDeviceChannel implements WALChannel {
     public WALBlockDeviceChannel(String blockDevicePath, long blockDeviceCapacityWant) {
         this.blockDevicePath = blockDevicePath;
         this.capacityWant = blockDeviceCapacityWant;
+        if (blockDeviceCapacityWant != WALUtil.alignSmallByBlockSize(blockDeviceCapacityWant)) {
+            throw new RuntimeException("wal capacity must be aligned by block size when using block device");
+        }
         DirectIOLib lib = DirectIOLib.getLibForPath(blockDevicePath);
         if (null == lib || !DirectIOLib.binit) {
             throw new RuntimeException("O_DIRECT not supported");

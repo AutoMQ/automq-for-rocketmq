@@ -78,21 +78,6 @@ class BlockWALServiceTest {
         testSingleThreadAppendBasic0(mergeWrite, true);
     }
 
-    /**
-     * Write "zero"s to the block device to reset it.
-     */
-    private static void resetBlockDevice(String path, long capacity) throws IOException {
-        WALChannel channel = WALChannel.builder(path)
-                .capacity(capacity)
-                .direct(true)
-                .build();
-        channel.open();
-        ByteBuf buf = Unpooled.buffer((int) capacity);
-        buf.writeZero((int) capacity);
-        channel.write(buf, 0);
-        channel.close();
-    }
-
     private static void testSingleThreadAppendBasic0(boolean mergeWrite, boolean directIO) throws IOException, OverCapacityException {
         final int recordSize = 4096 + 1;
         final int recordCount = 100;
@@ -174,6 +159,7 @@ class BlockWALServiceTest {
         String path = TestUtils.tempFilePath();
         if (directIO && TEST_BLOCK_DEVICE != null) {
             path = TEST_BLOCK_DEVICE;
+            blockDeviceCapacity = WALUtil.alignLargeByBlockSize(blockDeviceCapacity);
             resetBlockDevice(path, blockDeviceCapacity);
         }
 
@@ -393,6 +379,7 @@ class BlockWALServiceTest {
 
         if (directIO && TEST_BLOCK_DEVICE != null) {
             path = TEST_BLOCK_DEVICE;
+            blockDeviceCapacity = WALUtil.alignLargeByBlockSize(blockDeviceCapacity);
             resetBlockDevice(path, blockDeviceCapacity);
         }
 
@@ -465,6 +452,7 @@ class BlockWALServiceTest {
 
         if (directIO && TEST_BLOCK_DEVICE != null) {
             path = TEST_BLOCK_DEVICE;
+            blockDeviceCapacity = WALUtil.alignLargeByBlockSize(blockDeviceCapacity);
             resetBlockDevice(path, blockDeviceCapacity);
         }
 
@@ -900,6 +888,7 @@ class BlockWALServiceTest {
         String path = TestUtils.tempFilePath();
         if (directIO && TEST_BLOCK_DEVICE != null) {
             path = TEST_BLOCK_DEVICE;
+            capacity = WALUtil.alignLargeByBlockSize(capacity);
             resetBlockDevice(path, capacity);
         }
 
@@ -913,6 +902,10 @@ class BlockWALServiceTest {
         walChannel.open();
         writeWALHeader(walChannel, trimOffset, startOffset, nextOffset, maxLength);
         for (long writeOffset : writeOffsets) {
+            if (directIO && TEST_BLOCK_DEVICE != null && writeOffset % WALUtil.BLOCK_SIZE != 0) {
+                // skip the test as we can't write to un-aligned position on block device
+                return;
+            }
             write(walChannel, writeOffset, recordSize);
         }
         walChannel.close();
@@ -1032,5 +1025,20 @@ class BlockWALServiceTest {
         } finally {
             wal.shutdownGracefully();
         }
+    }
+
+    /**
+     * Write "0"s to the block device to reset it.
+     */
+    private static void resetBlockDevice(String path, long capacity) throws IOException {
+        WALChannel channel = WALChannel.builder(path)
+                .capacity(capacity)
+                .direct(true)
+                .build();
+        channel.open();
+        ByteBuf buf = Unpooled.buffer((int) capacity);
+        buf.writeZero((int) capacity);
+        channel.write(buf, 0);
+        channel.close();
     }
 }
