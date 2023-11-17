@@ -257,7 +257,6 @@ public class DirectIOLib {
         assert buf.position() == 0;
         assert buf.remaining() == blockStart(buf.remaining());
 
-        buf.clear(); // so that we read an entire buffer
         final long address = PlatformDependent.directBufferAddress(buf);
         Pointer pointer = new Pointer(address);
         int n = pread(fd, pointer, new NativeLong(buf.limit()), new NativeLong(offset)).intValue();
