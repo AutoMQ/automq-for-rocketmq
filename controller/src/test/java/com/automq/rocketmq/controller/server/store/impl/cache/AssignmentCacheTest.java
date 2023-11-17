@@ -29,7 +29,6 @@ class AssignmentCacheTest {
     @Test
     public void testApply() {
         AssignmentCache cache = new AssignmentCache();
-
         QueueAssignment assignment = new QueueAssignment();
         assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNED);
         assignment.setTopicId(1);
@@ -45,7 +44,21 @@ class AssignmentCacheTest {
 
         Assertions.assertEquals(1, cache.queueNumOfNode(4));
         Assertions.assertEquals(0, cache.queueNumOfNode(3));
+    }
 
+    @Test
+    public void testByNode() {
+        AssignmentCache cache = new AssignmentCache();
+        QueueAssignment assignment = new QueueAssignment();
+        assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNED);
+        assignment.setTopicId(1);
+        assignment.setQueueId(2);
+        assignment.setSrcNodeId(3);
+        assignment.setDstNodeId(4);
+        cache.apply(List.of(assignment));
+
+        Assertions.assertFalse(cache.byNode(4).isEmpty());
+        Assertions.assertTrue(cache.byNode(3).isEmpty());
     }
 
 }

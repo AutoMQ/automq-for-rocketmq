@@ -50,4 +50,23 @@ class StreamCacheTest {
         Assertions.assertEquals(0, cache.streamNumOfNode(6));
     }
 
+    @Test
+    public void testStreamsOf() {
+        StreamCache cache = new StreamCache();
+        Stream stream = new Stream();
+        stream.setStreamRole(StreamRole.STREAM_ROLE_DATA);
+        stream.setRangeId(1);
+        stream.setTopicId(2L);
+        stream.setQueueId(3);
+        stream.setId(4L);
+        stream.setEpoch(5L);
+        stream.setSrcNodeId(6);
+        stream.setDstNodeId(7);
+        stream.setState(StreamState.OPEN);
+        cache.apply(List.of(stream));
+
+        List<Long> streams = cache.streamsOf(2, 3);
+        Assertions.assertFalse(streams.isEmpty());
+    }
+
 }

@@ -18,6 +18,7 @@
 package com.automq.rocketmq.controller.server.store.impl.cache;
 
 import com.automq.rocketmq.metadata.dao.QueueAssignment;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +41,27 @@ public class AssignmentCache {
         for (QueueAssignment assignment : assignments) {
             cacheItem(assignment);
         }
+    }
+
+    public List<QueueAssignment> byNode(int nodeId) {
+        List<QueueAssignment> result = new ArrayList<>();
+        for (Map.Entry<Long, Map<Integer, QueueAssignment>> entry : assignments.entrySet()) {
+            for (Map.Entry<Integer, QueueAssignment> e : entry.getValue().entrySet()) {
+                switch (e.getValue().getStatus()) {
+                    case ASSIGNMENT_STATUS_YIELDING -> {
+                        if (e.getValue().getSrcNodeId() == nodeId) {
+                            result.add(e.getValue());
+                        }
+                    }
+                    case ASSIGNMENT_STATUS_ASSIGNED -> {
+                        if (e.getValue().getDstNodeId() == nodeId) {
+                            result.add(e.getValue());
+                        }
+                    }
+                }
+            }
+        }
+        return result;
     }
 
     public Map<Integer, QueueAssignment> byTopicId(Long topicId) {

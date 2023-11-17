@@ -77,5 +77,12 @@
             <if test="null != streamId">AND stream_id = #{streamId}</if>
         </where>
     </select>
-    
+
+    <select id="totalDataSize" resultType="java.lang.Long">
+        SELECT SUM(object_size) AS total
+        FROM s3object
+        WHERE stream_id = #{streamId}
+    </select>
+
+
 </mapper>

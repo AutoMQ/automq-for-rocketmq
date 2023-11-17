@@ -29,6 +29,8 @@ import org.apache.commons.lang3.tuple.Pair;
  */
 public interface S3MetadataService extends Closeable {
 
+    public void start();
+
     CompletableFuture<Long> prepareS3Objects(int count, int ttlInMinutes);
 
     CompletableFuture<Void> commitWalObject(S3WALObject walObject, List<S3StreamObject> streamObjects,
@@ -48,4 +50,12 @@ public interface S3MetadataService extends Closeable {
         long endOffset, int limit);
 
     CompletableFuture<Void> trimStream(long streamId, long streamEpoch, long newStartOffset);
+
+    void onStreamOpen(long streamId);
+
+    void onStreamClose(long streamId);
+
+    long streamDataSize(long streamId);
+
+    long streamStartTime(long streamId);
 }

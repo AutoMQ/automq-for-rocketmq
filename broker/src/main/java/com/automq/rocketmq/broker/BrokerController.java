@@ -91,6 +91,8 @@ public class BrokerController implements Lifecycle {
     private final MessageService messageService;
     private final ExtendMessageService extendMessageService;
 
+    private final S3MetadataService s3MetadataService;
+
     public BrokerController(BrokerConfig brokerConfig) throws Exception {
         this.brokerConfig = brokerConfig;
 
@@ -100,7 +102,7 @@ public class BrokerController implements Lifecycle {
         metadataStore = MetadataStoreBuilder.build(brokerConfig);
 
         proxyMetadataService = new DefaultProxyMetadataService(metadataStore);
-        S3MetadataService s3MetadataService = new DefaultS3MetadataService(metadataStore.config(),
+        s3MetadataService = new DefaultS3MetadataService(metadataStore.config(),
             metadataStore.sessionFactory(), metadataStore.asyncExecutor());
         storeMetadataService = new DefaultStoreMetadataService(metadataStore, s3MetadataService);
 
@@ -170,7 +172,8 @@ public class BrokerController implements Lifecycle {
         }
 
         // Init the metrics exporter before accept requests.
-        metricsExporter = new MetricsExporter(brokerConfig, messageStore, messagingProcessor, resource, sdkTracerProvider);
+        metricsExporter = new MetricsExporter(brokerConfig, messageStore, messagingProcessor, resource,
+            sdkTracerProvider, metadataStore, s3MetadataService);
 
         // Init the profiler agent.
         ProfilerConfig profilerConfig = brokerConfig.profiler();
@@ -204,6 +207,7 @@ public class BrokerController implements Lifecycle {
         remotingServer.start();
         metadataStore.registerCurrentNode(brokerConfig.name(), brokerConfig.advertiseAddress(), brokerConfig.instanceId());
         metricsExporter.start();
+        s3MetadataService.start();
 
         startThreadPoolMonitor();
     }

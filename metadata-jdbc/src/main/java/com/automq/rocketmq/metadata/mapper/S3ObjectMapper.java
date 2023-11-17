@@ -42,4 +42,6 @@ public interface S3ObjectMapper {
     int prepare(S3Object s3Object);
 
     int rollback(@Param("current")Date current);
+
+    long totalDataSize(@Param("streamId") long streamId);
 }

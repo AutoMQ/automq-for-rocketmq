@@ -171,6 +171,16 @@ public class DefaultMetadataStore implements MetadataStore {
         return electionService;
     }
 
+    @Override
+    public List<QueueAssignment> assignmentsOf(int nodeId) {
+        return topicManager.getAssignmentCache().byNode(nodeId);
+    }
+
+    @Override
+    public List<Long> streamsOf(long topicId, int queueId) {
+        return topicManager.getStreamCache().streamsOf(topicId, queueId);
+    }
+
     /**
      * Expose for test purpose only.
      *

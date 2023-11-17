@@ -261,6 +261,10 @@ message SubStream {
   int64 stream_id = 1;
   // The start offset of the range, inclusive.
   int64 start_offset = 2;
+
   // End offset of this range, exclusive.
   int64 end_offset = 3;
+
+  // Total records size in bytes
+  int64 data_size = 4;
 }

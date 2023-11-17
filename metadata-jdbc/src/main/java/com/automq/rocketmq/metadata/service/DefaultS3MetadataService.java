@@ -38,6 +38,9 @@ import com.automq.rocketmq.metadata.mapper.S3StreamObjectMapper;
 import com.automq.rocketmq.metadata.mapper.S3WalObjectMapper;
 import com.automq.rocketmq.metadata.mapper.SequenceMapper;
 import com.automq.rocketmq.metadata.mapper.StreamMapper;
+import com.automq.rocketmq.metadata.service.cache.S3ObjectCache;
+import com.automq.rocketmq.metadata.service.cache.S3StreamObjectCache;
+import com.automq.rocketmq.metadata.service.cache.S3WalObjectCache;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.TextFormat;
 import com.google.protobuf.util.JsonFormat;
@@ -77,12 +80,31 @@ public class DefaultS3MetadataService implements S3MetadataService {
 
     private final S3StreamObjectCache s3StreamObjectCache;
 
+    private final S3ObjectCache s3ObjectCache;
+
+    private final S3WalObjectCache s3WalObjectCache;
+
+
     public DefaultS3MetadataService(ControllerConfig nodeConfig, SqlSessionFactory sessionFactory,
         ExecutorService asyncExecutorService) {
         this.nodeConfig = nodeConfig;
         this.sessionFactory = sessionFactory;
         this.asyncExecutorService = asyncExecutorService;
         this.s3StreamObjectCache = new S3StreamObjectCache();
+        this.s3ObjectCache = new S3ObjectCache(sessionFactory);
+        this.s3WalObjectCache = new S3WalObjectCache(sessionFactory);
+    }
+
+    public void start() {
+        this.s3WalObjectCache.load(nodeConfig.nodeId());
+    }
+
+    public S3ObjectCache getS3ObjectCache() {
+        return s3ObjectCache;
+    }
+
+    public S3WalObjectCache getS3WalObjectCache() {
+        return s3WalObjectCache;
     }
 
     public CompletableFuture<Long> prepareS3Objects(int count, int ttlInMinutes) {
@@ -285,6 +307,8 @@ public class DefaultS3MetadataService implements S3MetadataService {
                 : toCache.entrySet()) {
                 s3StreamObjectCache.cache(entry.getKey(), entry.getValue());
             }
+            s3WalObjectCache.onCommit(walObject);
+            s3WalObjectCache.onCompact(compactedObjects);
             LOGGER.info("broker[broke-id={}] commit wal object[object-id={}] success, compacted objects[{}], stream objects[{}]",
                 brokerId, walObject.getObjectId(), compactedObjects, streamObjects);
             future.complete(null);
@@ -387,7 +411,7 @@ public class DefaultS3MetadataService implements S3MetadataService {
             List<S3WALObject> walObjects = s3WalObjectMapper.list(nodeConfig.nodeId(), null).stream()
                 .map(s3WALObject -> {
                     try {
-                        return buildS3WALObject(s3WALObject, decode(s3WALObject.getSubStreams()));
+                        return Helper.buildS3WALObject(s3WALObject, Helper.decode(s3WALObject.getSubStreams()));
                     } catch (InvalidProtocolBufferException e) {
                         LOGGER.error("Failed to deserialize SubStreams", e);
                         return null;
@@ -421,7 +445,7 @@ public class DefaultS3MetadataService implements S3MetadataService {
                 s3WalObjects.stream()
                     .map(s3WalObject -> {
                         try {
-                            Map<Long, SubStream> subStreams = decode(s3WalObject.getSubStreams()).getSubStreamsMap();
+                            Map<Long, SubStream> subStreams = Helper.decode(s3WalObject.getSubStreams()).getSubStreamsMap();
                             Map<Long, SubStream> streamsRecords = new HashMap<>();
                             if (subStreams.containsKey(streamId)) {
                                 SubStream subStream = subStreams.get(streamId);
@@ -430,7 +454,7 @@ public class DefaultS3MetadataService implements S3MetadataService {
                                 }
                             }
                             if (!streamsRecords.isEmpty()) {
-                                return buildS3WALObject(s3WalObject, SubStreams.newBuilder()
+                                return Helper.buildS3WALObject(s3WalObject, SubStreams.newBuilder()
                                     .putAllSubStreams(streamsRecords)
                                     .build());
                             }
@@ -507,26 +531,7 @@ public class DefaultS3MetadataService implements S3MetadataService {
             .build();
     }
 
-    private S3WALObject buildS3WALObject(
-        S3WalObject originalObject,
-        SubStreams subStreams) {
-        return S3WALObject.newBuilder()
-            .setObjectId(originalObject.getObjectId())
-            .setObjectSize(originalObject.getObjectSize())
-            .setBrokerId(originalObject.getNodeId())
-            .setSequenceId(originalObject.getSequenceId())
-            .setBaseDataTimestamp(originalObject.getBaseDataTimestamp().getTime())
-            .setCommittedTimestamp(originalObject.getCommittedTimestamp() != null ?
-                originalObject.getCommittedTimestamp().getTime() : S3Constants.NOOP_OBJECT_COMMIT_TIMESTAMP)
-            .setSubStreams(subStreams)
-            .build();
-    }
 
-    private SubStreams decode(String json) throws InvalidProtocolBufferException {
-        SubStreams.Builder builder = SubStreams.newBuilder();
-        JsonFormat.parser().ignoringUnknownFields().merge(json, builder);
-        return builder.build();
-    }
 
     private boolean commitObject(Long objectId, long streamId, long objectSize, SqlSession session) {
         S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
@@ -555,7 +560,9 @@ public class DefaultS3MetadataService implements S3MetadataService {
         s3Object.setStreamId(streamId);
         s3Object.setObjectSize(objectSize);
         s3Object.setState(S3ObjectState.BOS_COMMITTED);
-        return s3ObjectMapper.commit(s3Object) == 1;
+        boolean ok = s3ObjectMapper.commit(s3Object) == 1;
+        s3ObjectCache.onObjectAdd(List.of(s3Object));
+        return ok;
     }
 
     private void extendRange(SqlSession session, Map<Long, Pair<Long, Long>> segments) {
@@ -611,13 +618,13 @@ public class DefaultS3MetadataService implements S3MetadataService {
                     .stream()
                     .map(s3WalObject -> {
                         try {
-                            Map<Long, SubStream> subStreams = decode(s3WalObject.getSubStreams()).getSubStreamsMap();
+                            Map<Long, SubStream> subStreams = Helper.decode(s3WalObject.getSubStreams()).getSubStreamsMap();
                             Map<Long, SubStream> streamsRecords = new HashMap<>();
                             subStreams.entrySet().stream()
                                 .filter(entry -> !Objects.isNull(entry) && entry.getKey().equals(streamId))
                                 .filter(entry -> entry.getValue().getStartOffset() <= endOffset && entry.getValue().getEndOffset() > startOffset)
                                 .forEach(entry -> streamsRecords.put(entry.getKey(), entry.getValue()));
-                            return streamsRecords.isEmpty() ? null : buildS3WALObject(s3WalObject,
+                            return streamsRecords.isEmpty() ? null : Helper.buildS3WALObject(s3WalObject,
                                 SubStreams.newBuilder().putAllSubStreams(streamsRecords).build());
                         } catch (InvalidProtocolBufferException e) {
                             LOGGER.error("Failed to deserialize SubStreams", e);
@@ -753,6 +760,7 @@ public class DefaultS3MetadataService implements S3MetadataService {
                     S3Object s3Object = s3ObjectMapper.getById(streamObject.getObjectId());
                     s3Object.setMarkedForDeletionTimestamp(new Date());
                     s3ObjectMapper.markToDelete(s3Object.getId(), new Date());
+                    s3ObjectCache.onObjectDelete(s3Object.getStreamId(), List.of(s3Object.getId()));
                 }
             });
 
@@ -760,7 +768,7 @@ public class DefaultS3MetadataService implements S3MetadataService {
             s3WALObjectMapper.list(stream.getDstNodeId(), null).stream()
                 .map(s3WALObject -> {
                     try {
-                        return buildS3WALObject(s3WALObject, decode(s3WALObject.getSubStreams()));
+                        return Helper.buildS3WALObject(s3WALObject, Helper.decode(s3WALObject.getSubStreams()));
                     } catch (InvalidProtocolBufferException e) {
                         LOGGER.error("Failed to decode");
                         return null;
@@ -793,6 +801,26 @@ public class DefaultS3MetadataService implements S3MetadataService {
             future.completeExceptionally(ex);
         }
         return future;
+    }
+
+    @Override
+    public long streamDataSize(long streamId) {
+        return s3WalObjectCache.streamDataSize(streamId) + s3ObjectCache.streamDataSize(streamId);
+    }
+
+    @Override
+    public long streamStartTime(long streamId) {
+        return Long.min(s3ObjectCache.streamStartTime(streamId), s3WalObjectCache.streamStartTime(streamId));
+    }
+
+    @Override
+    public void onStreamOpen(long streamId) {
+        s3ObjectCache.onStreamOpen(streamId);
+    }
+
+    @Override
+    public void onStreamClose(long streamId) {
+        s3ObjectCache.onStreamClose(streamId);
     }
 
     @Override
