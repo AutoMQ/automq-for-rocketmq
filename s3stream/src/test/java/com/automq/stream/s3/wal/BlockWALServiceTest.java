@@ -151,7 +151,7 @@ class BlockWALServiceTest {
         final int recordCount = 100;
         long blockDeviceCapacity;
         if (!mergeWrite) {
-            blockDeviceCapacity = WALUtil.alignLargeByBlockSize(recordSize) * recordCount / 3 + WAL_HEADER_TOTAL_CAPACITY;
+            blockDeviceCapacity = recordCount / 3 * WALUtil.alignLargeByBlockSize(recordSize) + WAL_HEADER_TOTAL_CAPACITY;
         } else {
             blockDeviceCapacity = WALUtil.alignLargeByBlockSize(recordSize * recordCount / 3) + WAL_HEADER_TOTAL_CAPACITY;
         }
