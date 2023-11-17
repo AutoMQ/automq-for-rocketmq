@@ -119,9 +119,9 @@ class BlockWALServiceTest {
             }
         } finally {
             wal.shutdownGracefully();
-            assertTrue(maxFlushedOffset.get() > maxRecordOffset.get(),
-                    "maxFlushedOffset should be greater than maxRecordOffset. maxFlushedOffset: " + maxFlushedOffset.get() + ", maxRecordOffset: " + maxRecordOffset.get());
         }
+        assertTrue(maxFlushedOffset.get() > maxRecordOffset.get(),
+                "maxFlushedOffset should be greater than maxRecordOffset. maxFlushedOffset: " + maxFlushedOffset.get() + ", maxRecordOffset: " + maxRecordOffset.get());
     }
 
     @ParameterizedTest(name = "Test {index}: mergeWrite={0}")
@@ -200,9 +200,9 @@ class BlockWALServiceTest {
             }
         } finally {
             wal.shutdownGracefully();
-            assertTrue(maxFlushedOffset.get() > maxRecordOffset.get(),
-                    "maxFlushedOffset should be greater than maxRecordOffset. maxFlushedOffset: " + maxFlushedOffset.get() + ", maxRecordOffset: " + maxRecordOffset.get());
         }
+        assertTrue(maxFlushedOffset.get() > maxRecordOffset.get(),
+                "maxFlushedOffset should be greater than maxRecordOffset. maxFlushedOffset: " + maxFlushedOffset.get() + ", maxRecordOffset: " + maxRecordOffset.get());
     }
 
     @ParameterizedTest(name = "Test {index}: mergeWrite={0}")
@@ -267,9 +267,9 @@ class BlockWALServiceTest {
             executorService.shutdown();
             assertTrue(executorService.awaitTermination(15, TimeUnit.SECONDS));
             wal.shutdownGracefully();
-            assertTrue(maxFlushedOffset.get() > maxRecordOffset.get(),
-                    "maxFlushedOffset should be greater than maxRecordOffset. maxFlushedOffset: " + maxFlushedOffset.get() + ", maxRecordOffset: " + maxRecordOffset.get());
         }
+        assertTrue(maxFlushedOffset.get() > maxRecordOffset.get(),
+                "maxFlushedOffset should be greater than maxRecordOffset. maxFlushedOffset: " + maxFlushedOffset.get() + ", maxRecordOffset: " + maxRecordOffset.get());
     }
 
     private long append(WriteAheadLog wal, int recordSize) throws OverCapacityException {
