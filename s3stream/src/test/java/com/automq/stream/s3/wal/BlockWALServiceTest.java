@@ -849,7 +849,8 @@ class BlockWALServiceTest {
         final String tempFilePath = TestUtils.tempFilePath();
         final WALChannel walChannel = WALChannel.builder(tempFilePath)
                 .capacity(capacity)
-                .direct(directIO)
+                // we may write to un-aligned position here, so we need to disable directIO
+                .direct(false)
                 .build();
 
         // Simulate disaster
