@@ -104,6 +104,7 @@ public class WALBlockDeviceChannel implements WALChannel {
             if (alignedSize <= PRE_ALLOCATED_BYTE_BUFFER_MAX_SIZE) {
                 ByteBuffer newBuf = DirectIOUtils.allocateForDirectIO(directIOLib, alignedSize);
                 threadLocalByteBuffer.set(newBuf);
+                DirectIOUtils.release(currentBuf);
                 return newBuf;
             } else {
                 throw new RuntimeException("too large write size");
