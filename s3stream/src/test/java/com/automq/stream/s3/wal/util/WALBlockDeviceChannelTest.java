@@ -85,7 +85,7 @@ public class WALBlockDeviceChannelTest {
     @Test
     public void testMultiThreadWrite() throws IOException, InterruptedException {
         final int size = 4096 + 1;
-        final int count = 100;
+        final int count = 1000;
         final int threads = 8;
         final long capacity = WALUtil.alignLargeByBlockSize(size) * count;
 
@@ -113,18 +113,19 @@ public class WALBlockDeviceChannelTest {
     }
 
     @Test
-    public void testWriteInvalidBufferSize() throws IOException {
+    public void testWriteNotAlignedBufferSize() throws IOException {
         WALBlockDeviceChannel channel = new WALBlockDeviceChannel(TestUtils.tempFilePath(), 1 << 20);
         channel.open();
 
         ByteBuf data = TestUtils.random(42);
+        // It's ok to do this
         assertDoesNotThrow(() -> channel.writeAndFlush(data, 0));
 
         channel.close();
     }
 
     @Test
-    public void testWriteInvalidPosition() throws IOException {
+    public void testWriteNotAlignedPosition() throws IOException {
         WALBlockDeviceChannel channel = new WALBlockDeviceChannel(TestUtils.tempFilePath(), 1 << 20);
         channel.open();
 
@@ -141,6 +142,88 @@ public class WALBlockDeviceChannelTest {
 
         ByteBuf data = TestUtils.random(4096);
         assertThrows(AssertionError.class, () -> channel.writeAndFlush(data, 8192));
+
+        channel.close();
+    }
+
+    @Test
+    public void testReadBasic() throws IOException {
+        final int size = 4096 + 1;
+        final int count = 100;
+        final long capacity = WALUtil.alignLargeByBlockSize(size) * count;
+        final String path = TestUtils.tempFilePath();
+
+        WALBlockDeviceChannel wChannel = new WALBlockDeviceChannel(path, capacity);
+        wChannel.open();
+        WALBlockDeviceChannel rChannel = new WALBlockDeviceChannel(path, capacity);
+        rChannel.open();
+
+        for (int i = 0; i < count; i++) {
+            ByteBuf data = TestUtils.random(size);
+            long pos = ThreadLocalRandom.current().nextLong(0, capacity - size);
+            pos = WALUtil.alignSmallByBlockSize(pos);
+            wChannel.writeAndFlush(data, pos);
+
+            ByteBuf buf = Unpooled.buffer(size);
+            int read = rChannel.read(buf, pos);
+            assert read == size;
+            assert data.equals(buf);
+        }
+
+        rChannel.close();
+        wChannel.close();
+    }
+
+    @Test
+    public void testReadInside() throws IOException {
+        final int size = 4096 * 4 + 1;
+        final int count = 100;
+        final long capacity = WALUtil.alignLargeByBlockSize(size) * count;
+        final String path = TestUtils.tempFilePath();
+
+        WALBlockDeviceChannel wChannel = new WALBlockDeviceChannel(path, capacity);
+        wChannel.open();
+        WALBlockDeviceChannel rChannel = new WALBlockDeviceChannel(path, capacity);
+        rChannel.open();
+
+        for (int i = 0; i < count; i++) {
+            ByteBuf data = TestUtils.random(size);
+            long pos = ThreadLocalRandom.current().nextLong(0, capacity - size);
+            pos = WALUtil.alignSmallByBlockSize(pos);
+            wChannel.writeAndFlush(data, pos);
+
+            int start = ThreadLocalRandom.current().nextInt(0, size - 1);
+            int end = ThreadLocalRandom.current().nextInt(start + 1, size);
+            ByteBuf buf = Unpooled.buffer(end - start);
+            int read = rChannel.read(buf, pos + start);
+            assert read == end - start;
+            assert data.slice(start, end - start).equals(buf);
+        }
+
+        rChannel.close();
+        wChannel.close();
+    }
+
+    @Test
+    public void testReadNotAlignedBufferSize() throws IOException {
+        WALBlockDeviceChannel channel = new WALBlockDeviceChannel(TestUtils.tempFilePath(), 1 << 20);
+        channel.open();
+
+        ByteBuf data = Unpooled.buffer(42);
+        // It's ok to do this
+        assertDoesNotThrow(() -> channel.read(data, 0));
+
+        channel.close();
+    }
+
+    @Test
+    public void testReadNotAlignedPosition() throws IOException {
+        WALBlockDeviceChannel channel = new WALBlockDeviceChannel(TestUtils.tempFilePath(), 1 << 20);
+        channel.open();
+
+        ByteBuf data = Unpooled.buffer(4096);
+        // It's ok to do this
+        assertDoesNotThrow(() -> channel.read(data, 42));
 
         channel.close();
     }
