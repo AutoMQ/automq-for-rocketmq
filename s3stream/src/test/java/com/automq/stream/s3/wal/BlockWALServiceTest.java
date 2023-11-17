@@ -27,6 +27,8 @@ import io.netty.buffer.CompositeByteBuf;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -63,11 +65,23 @@ class BlockWALServiceTest {
     @ParameterizedTest(name = "Test {index}: mergeWrite={0}")
     @ValueSource(booleans = {false, true})
     public void testSingleThreadAppendBasic(boolean mergeWrite) throws IOException, OverCapacityException {
+        testSingleThreadAppendBasic0(mergeWrite, false);
+    }
+
+    @ParameterizedTest(name = "Test {index}: mergeWrite={0}")
+    @ValueSource(booleans = {false, true})
+    @EnabledOnOs(OS.LINUX)
+    public void testSingleThreadAppendBasicDirectIO(boolean mergeWrite) throws IOException, OverCapacityException {
+        testSingleThreadAppendBasic0(mergeWrite, true);
+    }
+
+    private static void testSingleThreadAppendBasic0(boolean mergeWrite, boolean directIO) throws IOException, OverCapacityException {
         final int recordSize = 4096 + 1;
         final int recordCount = 100;
         final long blockDeviceCapacity = WALUtil.alignLargeByBlockSize(recordSize) * recordCount + WAL_HEADER_TOTAL_CAPACITY;
 
         BlockWALService.BlockWALServiceBuilder builder = BlockWALService.builder(TestUtils.tempFilePath(), blockDeviceCapacity)
+                .direct(directIO)
                 .slidingWindowInitialSize(0)
                 .slidingWindowScaleUnit(4096);
         if (!mergeWrite) {
@@ -113,6 +127,17 @@ class BlockWALServiceTest {
     @ParameterizedTest(name = "Test {index}: mergeWrite={0}")
     @ValueSource(booleans = {false, true})
     public void testSingleThreadAppendWhenOverCapacity(boolean mergeWrite) throws IOException {
+        testSingleThreadAppendWhenOverCapacity0(mergeWrite, false);
+    }
+
+    @ParameterizedTest(name = "Test {index}: mergeWrite={0}")
+    @ValueSource(booleans = {false, true})
+    @EnabledOnOs(OS.LINUX)
+    public void testSingleThreadAppendWhenOverCapacityDirectIO(boolean mergeWrite) throws IOException {
+        testSingleThreadAppendWhenOverCapacity0(mergeWrite, true);
+    }
+
+    private static void testSingleThreadAppendWhenOverCapacity0(boolean mergeWrite, boolean directIO) throws IOException {
         final int recordSize = 4096 + 1;
         final int recordCount = 100;
         long blockDeviceCapacity;
@@ -123,6 +148,7 @@ class BlockWALServiceTest {
         }
 
         BlockWALService.BlockWALServiceBuilder builder = BlockWALService.builder(TestUtils.tempFilePath(), blockDeviceCapacity)
+                .direct(directIO)
                 .slidingWindowInitialSize(0)
                 .slidingWindowScaleUnit(4096);
         if (!mergeWrite) {
@@ -182,12 +208,24 @@ class BlockWALServiceTest {
     @ParameterizedTest(name = "Test {index}: mergeWrite={0}")
     @ValueSource(booleans = {false, true})
     public void testMultiThreadAppend(boolean mergeWrite) throws InterruptedException, IOException {
+        testMultiThreadAppend0(mergeWrite, false);
+    }
+
+    @ParameterizedTest(name = "Test {index}: mergeWrite={0}")
+    @ValueSource(booleans = {false, true})
+    @EnabledOnOs(OS.LINUX)
+    public void testMultiThreadAppendDirectIO(boolean mergeWrite) throws InterruptedException, IOException {
+        testMultiThreadAppend0(mergeWrite, true);
+    }
+
+    private static void testMultiThreadAppend0(boolean mergeWrite, boolean directIO) throws IOException, InterruptedException {
         final int recordSize = 4096 + 1;
         final int recordCount = 10;
         final int threadCount = 8;
         final long blockDeviceCapacity = WALUtil.alignLargeByBlockSize(recordSize) * recordCount * threadCount + WAL_HEADER_TOTAL_CAPACITY;
 
-        BlockWALService.BlockWALServiceBuilder builder = BlockWALService.builder(TestUtils.tempFilePath(), blockDeviceCapacity);
+        BlockWALService.BlockWALServiceBuilder builder = BlockWALService.builder(TestUtils.tempFilePath(), blockDeviceCapacity)
+                .direct(directIO);
         if (!mergeWrite) {
             builder.blockSoftLimit(0);
         }
@@ -287,6 +325,27 @@ class BlockWALServiceTest {
         "false, true, 11",
     })
     public void testSingleThreadRecover(boolean shutdown, boolean overCapacity, int recordCount) throws IOException {
+        testSingleThreadRecover0(shutdown, overCapacity, recordCount, false);
+    }
+
+    @ParameterizedTest(name = "Test {index}: shutdown={0}, overCapacity={1}, recordCount={2}")
+    @CsvSource({
+        "true, false, 10",
+        "true, true, 9",
+        "true, true, 10",
+        "true, true, 11",
+
+        "false, false, 10",
+        "false, true, 9",
+        "false, true, 10",
+        "false, true, 11",
+    })
+    @EnabledOnOs(OS.LINUX)
+    public void testSingleThreadRecoverDirectIO(boolean shutdown, boolean overCapacity, int recordCount) throws IOException {
+        testSingleThreadRecover0(shutdown, overCapacity, recordCount, true);
+    }
+
+    private void testSingleThreadRecover0(boolean shutdown, boolean overCapacity, int recordCount, boolean directIO) throws IOException {
         final int recordSize = 4096 + 1;
         long blockDeviceCapacity;
         if (overCapacity) {
@@ -298,6 +357,7 @@ class BlockWALServiceTest {
 
         // Append records
         final WriteAheadLog previousWAL = BlockWALService.builder(tempFilePath, blockDeviceCapacity)
+                .direct(directIO)
                 .flushHeaderIntervalSeconds(1 << 20)
                 .build()
                 .start();
@@ -308,6 +368,7 @@ class BlockWALServiceTest {
 
         // Recover records
         final WriteAheadLog wal = BlockWALService.builder(tempFilePath, blockDeviceCapacity)
+                .direct(directIO)
                 .build()
                 .start();
         try {
@@ -335,6 +396,22 @@ class BlockWALServiceTest {
         "false, true",
     })
     public void testRecoverAfterMergeWrite(boolean shutdown, boolean overCapacity) throws IOException {
+        testRecoverAfterMergeWrite0(shutdown, overCapacity, false);
+    }
+
+    @ParameterizedTest(name = "Test {index}: shutdown={0}, overCapacity={1}")
+    @CsvSource({
+        "true, false",
+        "true, true",
+        "false, false",
+        "false, true",
+    })
+    @EnabledOnOs(OS.LINUX)
+    public void testRecoverAfterMergeWriteDirectIO(boolean shutdown, boolean overCapacity) throws IOException {
+        testRecoverAfterMergeWrite0(shutdown, overCapacity, true);
+    }
+
+    private static void testRecoverAfterMergeWrite0(boolean shutdown, boolean overCapacity, boolean directIO) throws IOException {
         final int recordSize = 1024 + 1;
         final int recordCount = 100;
         long blockDeviceCapacity;
@@ -347,6 +424,7 @@ class BlockWALServiceTest {
 
         // Append records
         final WriteAheadLog previousWAL = BlockWALService.builder(tempFilePath, blockDeviceCapacity)
+                .direct(directIO)
                 .flushHeaderIntervalSeconds(1 << 20)
                 .build()
                 .start();
@@ -357,6 +435,7 @@ class BlockWALServiceTest {
 
         // Recover records
         final WriteAheadLog wal = BlockWALService.builder(tempFilePath, blockDeviceCapacity)
+                .direct(directIO)
                 .build()
                 .start();
         try {
@@ -413,10 +492,21 @@ class BlockWALServiceTest {
 
     @Test
     public void testAppendAfterRecover() throws IOException, OverCapacityException {
+        testAppendAfterRecover0(false);
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX)
+    public void testAppendAfterRecoverDirectIO() throws IOException, OverCapacityException {
+        testAppendAfterRecover0(true);
+    }
+
+    private void testAppendAfterRecover0(boolean directIO) throws IOException, OverCapacityException {
         final int recordSize = 4096 + 1;
         final String tempFilePath = TestUtils.tempFilePath();
 
         final WriteAheadLog previousWAL = BlockWALService.builder(tempFilePath, 1 << 20)
+                .direct(directIO)
                 .flushHeaderIntervalSeconds(1 << 20)
                 .build()
                 .start();
@@ -427,6 +517,7 @@ class BlockWALServiceTest {
         assertEquals(WALUtil.alignLargeByBlockSize(recordSize), appended1);
 
         final WriteAheadLog wal = BlockWALService.builder(tempFilePath, 1 << 20)
+                .direct(directIO)
                 .flushHeaderIntervalSeconds(1 << 20)
                 .build()
                 .start();
@@ -723,8 +814,43 @@ class BlockWALServiceTest {
             List<Long> writeOffsets,
             List<Long> recoveredOffsets
     ) throws IOException {
+        testRecoverFromDisaster0(name, recordSize, capacity, trimOffset, startOffset, nextOffset, maxLength, writeOffsets, recoveredOffsets, false);
+    }
+
+    @ParameterizedTest(name = "Test {index} {0}")
+    @MethodSource("testRecoverFromDisasterData")
+    @EnabledOnOs({OS.LINUX})
+    public void testRecoverFromDisasterDirectIO(
+            String name,
+            int recordSize,
+            long capacity,
+            long trimOffset,
+            long startOffset,
+            long nextOffset,
+            long maxLength,
+            List<Long> writeOffsets,
+            List<Long> recoveredOffsets
+    ) throws IOException {
+        testRecoverFromDisaster0(name, recordSize, capacity, trimOffset, startOffset, nextOffset, maxLength, writeOffsets, recoveredOffsets, true);
+    }
+
+    private void testRecoverFromDisaster0(
+            String name,
+            int recordSize,
+            long capacity,
+            long trimOffset,
+            long startOffset,
+            long nextOffset,
+            long maxLength,
+            List<Long> writeOffsets,
+            List<Long> recoveredOffsets,
+            boolean directIO
+    ) throws IOException {
         final String tempFilePath = TestUtils.tempFilePath();
-        final WALChannel walChannel = WALChannel.builder(tempFilePath).capacity(capacity).build();
+        final WALChannel walChannel = WALChannel.builder(tempFilePath)
+                .capacity(capacity)
+                .direct(directIO)
+                .build();
 
         // Simulate disaster
         walChannel.open();
@@ -735,6 +861,7 @@ class BlockWALServiceTest {
         walChannel.close();
 
         final WriteAheadLog wal = BlockWALService.builder(tempFilePath, capacity)
+                .direct(directIO)
                 .flushHeaderIntervalSeconds(1 << 30)
                 .build()
                 .start();
@@ -758,6 +885,16 @@ class BlockWALServiceTest {
 
     @Test
     public void testRecoverAfterReset() throws IOException, OverCapacityException {
+        testRecoverAfterReset0(false);
+    }
+
+    @Test
+    @EnabledOnOs({OS.LINUX})
+    public void testRecoverAfterResetDirectIO() throws IOException, OverCapacityException {
+        testRecoverAfterReset0(true);
+    }
+
+    private void testRecoverAfterReset0(boolean directIO) throws IOException, OverCapacityException {
         final int recordSize = 4096 + 1;
         final int recordCount = 10;
         final long blockDeviceCapacity = WALUtil.alignLargeByBlockSize(recordSize) * recordCount * 2 + WAL_HEADER_TOTAL_CAPACITY;
@@ -765,6 +902,7 @@ class BlockWALServiceTest {
 
         // 1. append and force shutdown
         final WriteAheadLog wal1 = BlockWALService.builder(tempFilePath, blockDeviceCapacity)
+                .direct(directIO)
                 .flushHeaderIntervalSeconds(1 << 30)
                 .build()
                 .start();
@@ -772,6 +910,7 @@ class BlockWALServiceTest {
 
         // 2. recover and reset
         final WriteAheadLog wal2 = BlockWALService.builder(tempFilePath, blockDeviceCapacity)
+                .direct(directIO)
                 .flushHeaderIntervalSeconds(1 << 30)
                 .build()
                 .start();
@@ -791,6 +930,7 @@ class BlockWALServiceTest {
 
         // 4. recover again
         final WriteAheadLog wal3 = BlockWALService.builder(tempFilePath, blockDeviceCapacity)
+                .direct(directIO)
                 .flushHeaderIntervalSeconds(1 << 30)
                 .build()
                 .start();

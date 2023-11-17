@@ -24,6 +24,7 @@ import io.netty.buffer.ByteBuf;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 
 public class WALBlockDeviceChannel implements WALChannel {
@@ -65,6 +66,16 @@ public class WALBlockDeviceChannel implements WALChannel {
 
     @Override
     public void open() throws IOException {
+        if (!blockDevicePath.startsWith(WALChannelBuilder.DEVICE_PREFIX)) {
+            // If the block device path is not a device, we create a file with the capacity we want
+            // This is ONLY for test purpose, so we don't check the capacity of the file
+            File file = new File(blockDevicePath);
+            assert !file.exists();
+            try (RandomAccessFile raf = new RandomAccessFile(blockDevicePath, "rw")) {
+                raf.setLength(capacityWant);
+            }
+        }
+
         randomAccessFile = new DirectRandomAccessFile(new File(blockDevicePath), "rw");
         // We cannot get the actual capacity of the block device here, so we just use the capacity we want
         // And it's the caller's responsibility to make sure the capacity is right
