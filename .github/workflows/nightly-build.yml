@@ -1,8 +1,12 @@
 name: Nightly Build
+#on:
+#  workflow_dispatch:
+#  schedule:
+#    - cron: '0 20 * * *'
+
 on:
-  workflow_dispatch:
-  schedule:
-    - cron: '20 8 * * *'
+  pull_request:
+    types: [opened, reopened, synchronize]
 
 env:
   HELM_NAME: automq-for-rocketmq
