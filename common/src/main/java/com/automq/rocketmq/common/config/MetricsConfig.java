@@ -34,6 +34,9 @@ public class MetricsConfig {
 
     private boolean exportInDelta = false;
 
+    private boolean exportJVMMetrics = false;
+    private boolean exportSystemMetrics = false;
+
     public String exporterType() {
         return exporterType;
     }
@@ -68,5 +71,13 @@ public class MetricsConfig {
 
     public boolean exportInDelta() {
         return exportInDelta;
+    }
+
+    public boolean exportJVMMetrics() {
+        return exportJVMMetrics;
+    }
+
+    public boolean exportSystemMetrics() {
+        return exportSystemMetrics;
     }
 }

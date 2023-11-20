@@ -41,6 +41,7 @@ import io.opentelemetry.exporter.logging.LoggingMetricExporter;
 import io.opentelemetry.exporter.otlp.metrics.OtlpGrpcMetricExporter;
 import io.opentelemetry.exporter.otlp.metrics.OtlpGrpcMetricExporterBuilder;
 import io.opentelemetry.exporter.prometheus.PrometheusHttpServer;
+import io.opentelemetry.instrumentation.oshi.SystemMetrics;
 import io.opentelemetry.instrumentation.runtimemetrics.java17.RuntimeMetrics;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.OpenTelemetrySdkBuilder;
@@ -241,10 +242,18 @@ public class MetricsExporter implements Lifecycle {
 
         brokerMeter = openTelemetrySdk.getMeter("automq-for-rocketmq");
 
-        runtimeMetrics = RuntimeMetrics.builder(openTelemetrySdk)
-            .enableAllFeatures()
-            .enableExperimentalJmxTelemetry()
-            .build();
+        // JVM metrics
+        if (metricsConfig.exportJVMMetrics()) {
+            runtimeMetrics = RuntimeMetrics.builder(openTelemetrySdk)
+                .enableAllFeatures()
+                .enableExperimentalJmxTelemetry()
+                .build();
+        }
+
+        // System metrics
+        if (metricsConfig.exportSystemMetrics()) {
+            SystemMetrics.registerObservers(openTelemetrySdk);
+        }
 
         initAttributesBuilder();
         initStaticMetrics();

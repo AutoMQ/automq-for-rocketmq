@@ -79,5 +79,15 @@
             <artifactId>opentelemetry-runtime-telemetry-java17</artifactId>
             <version>${alapha.opentelemetry.version}</version>
         </dependency>
+        <dependency>
+            <groupId>com.github.oshi</groupId>
+            <artifactId>oshi-core-java11</artifactId>
+            <version>6.4.7</version>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry.instrumentation</groupId>
+            <artifactId>opentelemetry-oshi</artifactId>
+            <version>${alapha.opentelemetry.version}</version>
+        </dependency>
     </dependencies>
 </project>
