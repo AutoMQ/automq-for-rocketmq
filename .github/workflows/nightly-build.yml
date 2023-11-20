@@ -103,7 +103,7 @@ jobs:
         run: sudo bash install_flatc.sh
       - name: Build rocketmq dependency
         run: |
-          mvn clean install -U -DskipTests
+          mvn clean install -U -Dmaven.test.skip=true
       - uses: actions/checkout@v3
         if: always()
         with:
@@ -153,7 +153,7 @@ jobs:
         run: sudo bash install_flatc.sh
       - name: Build rocketmq dependency
         run: |
-          mvn clean install -U -DskipTests
+          mvn clean install -U -Dmaven.test.skip=true
       - uses: actions/checkout@v3
         if: always()
         with:
