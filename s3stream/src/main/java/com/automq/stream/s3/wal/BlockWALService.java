@@ -119,8 +119,12 @@ public class BlockWALService implements WriteAheadLog {
     private int nodeId = NOOP_NODE_ID;
     private long epoch = NOOP_EPOCH;
 
-    public static BlockWALServiceBuilder builder(String blockDevicePath, long capacity) {
-        return new BlockWALServiceBuilder(blockDevicePath, capacity);
+    public static BlockWALServiceBuilder builder(String path, long capacity) {
+        return new BlockWALServiceBuilder(path, capacity);
+    }
+
+    public static BlockWALServiceBuilder recoveryBuilder(String path) {
+        return new BlockWALServiceBuilder(path);
     }
 
     private void startFlushWALHeaderScheduler() {
@@ -277,14 +281,73 @@ public class BlockWALService implements WriteAheadLog {
         }
     }
 
-    private WALHeader recoverEntireWALAndCorrectWALHeader(WALHeader paramWALHeader) {
+    @Override
+    public WriteAheadLog start() throws IOException {
+        StopWatch stopWatch = StopWatch.createStarted();
+
+        walChannel.open();
+
+        WALHeader header = tryReadWALHeader();
+        if (null == header) {
+            header = newWALHeader();
+        } else {
+            checkCapacity(header);
+            recoverWALHeader(header);
+        }
+        walHeaderReady(header);
+
+        if (!recoveryMode) {
+            startFlushWALHeaderScheduler();
+        }
+        slidingWindowService.start();
+        readyToServe.set(true);
+
+        LOGGER.info("block WAL service started, cost: {} ms", stopWatch.getTime(TimeUnit.MILLISECONDS));
+        return this;
+    }
+
+    /**
+     * Try to read the header from WAL, return the latest one.
+     */
+    private WALHeader tryReadWALHeader() {
+        WALHeader header = null;
+        for (int i = 0; i < WAL_HEADER_COUNT; i++) {
+            ByteBuf buf = DirectByteBufAlloc.byteBuffer(WALHeader.WAL_HEADER_SIZE);
+            try {
+                int read = walChannel.read(buf, i * WAL_HEADER_CAPACITY);
+                if (read != WALHeader.WAL_HEADER_SIZE) {
+                    continue;
+                }
+                WALHeader tmpHeader = WALHeader.unmarshal(buf);
+                if (header == null || header.getLastWriteTimestamp() < tmpHeader.getLastWriteTimestamp()) {
+                    header = tmpHeader;
+                }
+            } catch (IOException | UnmarshalException ignored) {
+                // failed to parse WALHeader, ignore
+            } finally {
+                buf.release();
+            }
+        }
+        return header;
+    }
+
+    /**
+     * Check whether the capacity of the WAL channel is the same as the capacity in the header.
+     */
+    private void checkCapacity(WALHeader header) throws WALCapacityMismatchException {
+        if (header.getCapacity() != walChannel.capacity()) {
+            throw new WALCapacityMismatchException(walChannel.path(), walChannel.capacity(), header.getCapacity());
+        }
+    }
+
+    private void recoverWALHeader(WALHeader paramWALHeader) {
         // initialize flushTrimOffset
         paramWALHeader.setFlushedTrimOffset(paramWALHeader.getTrimOffset());
 
         // graceful shutdown, no need to correct the header
         if (paramWALHeader.getShutdownType().equals(ShutdownType.GRACEFULLY)) {
             LOGGER.info("recovered from graceful shutdown, WALHeader: {}", paramWALHeader);
-            return paramWALHeader;
+            return;
         }
 
         // ungraceful shutdown, need to correct the header
@@ -314,48 +377,23 @@ public class BlockWALService implements WriteAheadLog {
         paramWALHeader.setSlidingWindowStartOffset(windowInitOffset).setSlidingWindowNextWriteOffset(windowInitOffset);
 
         LOGGER.info("recovered from ungraceful shutdown, WALHeader: {}", paramWALHeader);
-        return paramWALHeader;
     }
 
-    private void recoverWALHeader() throws IOException {
-        WALHeader walHeaderAvailable = null;
+    private WALHeader newWALHeader() {
+        WALHeader header =  new WALHeader()
+                .setCapacity(walChannel.capacity())
+                .setSlidingWindowMaxLength(initialWindowSize)
+                .setShutdownType(ShutdownType.UNGRACEFULLY);
+        LOGGER.info("create new WALHeader: {}", header);
+        return header;
+    }
 
-        for (int i = 0; i < WAL_HEADER_COUNT; i++) {
-            ByteBuf buf = DirectByteBufAlloc.byteBuffer(WALHeader.WAL_HEADER_SIZE);
-            try {
-                int read = walChannel.read(buf, i * WAL_HEADER_CAPACITY);
-                if (read != WALHeader.WAL_HEADER_SIZE) {
-                    continue;
-                }
-                WALHeader walHeader = WALHeader.unmarshal(buf);
-                if (walHeaderAvailable == null || walHeaderAvailable.getLastWriteTimestamp() < walHeader.getLastWriteTimestamp()) {
-                    walHeaderAvailable = walHeader;
-                }
-            } catch (IOException | UnmarshalException ignored) {
-                // failed to parse WALHeader, ignore
-            } finally {
-                buf.release();
-            }
-        }
-
-        if (walHeaderAvailable != null) {
-            if (walHeaderAvailable.getCapacity() != walChannel.capacity()) {
-                LOGGER.warn("WAL capacity mismatch, in header: {}, in file: {}", walHeaderAvailable.getCapacity(), walChannel.capacity());
-                throw new IOException("WAL capacity mismatch");
-            }
-            walHeader = recoverEntireWALAndCorrectWALHeader(walHeaderAvailable);
-        } else {
-            walHeader = new WALHeader()
-                    .setCapacity(walChannel.capacity())
-                    .setSlidingWindowMaxLength(initialWindowSize)
-                    .setShutdownType(ShutdownType.UNGRACEFULLY);
-            LOGGER.info("no valid WALHeader found, create new WALHeader: {}", walHeader);
-        }
+    private void walHeaderReady(WALHeader header) throws IOException {
         if (nodeId != NOOP_NODE_ID) {
-            walHeader.setNodeId(nodeId);
-            walHeader.setEpoch(epoch);
+            header.setNodeId(nodeId);
+            header.setEpoch(epoch);
         }
-
+        this.walHeader = header;
         flushWALHeader();
         slidingWindowService.resetWindowWhenRecoverOver(
                 walHeader.getSlidingWindowStartOffset(),
@@ -365,32 +403,19 @@ public class BlockWALService implements WriteAheadLog {
     }
 
     @Override
-    public WriteAheadLog start() throws IOException {
-        StopWatch stopWatch = StopWatch.createStarted();
-
-        walChannel.open();
-        recoverWALHeader();
-        // TODO: no need to start the scheduler in recovery mode
-        startFlushWALHeaderScheduler();
-        slidingWindowService.start();
-        readyToServe.set(true);
-
-        LOGGER.info("block WAL service started, cost: {} ms", stopWatch.getTime(TimeUnit.MILLISECONDS));
-        return this;
-    }
-
-    @Override
     public void shutdownGracefully() {
         StopWatch stopWatch = StopWatch.createStarted();
 
         readyToServe.set(false);
-        flushWALHeaderScheduler.shutdown();
-        try {
-            if (!flushWALHeaderScheduler.awaitTermination(5, TimeUnit.SECONDS)) {
+        if (null != flushWALHeaderScheduler) {
+            flushWALHeaderScheduler.shutdown();
+            try {
+                if (!flushWALHeaderScheduler.awaitTermination(5, TimeUnit.SECONDS)) {
+                    flushWALHeaderScheduler.shutdownNow();
+                }
+            } catch (InterruptedException e) {
                 flushWALHeaderScheduler.shutdownNow();
             }
-        } catch (InterruptedException e) {
-            flushWALHeaderScheduler.shutdownNow();
         }
 
         boolean gracefulShutdown = slidingWindowService.shutdown(1, TimeUnit.DAYS);
@@ -537,10 +562,6 @@ public class BlockWALService implements WriteAheadLog {
         );
     }
 
-    public static BlockWALServiceBuilder builder(String path) {
-        return new BlockWALServiceBuilder(path);
-    }
-
     public static class BlockWALServiceBuilder {
         private final String blockDevicePath;
         private long blockDeviceCapacityWant;
@@ -565,6 +586,7 @@ public class BlockWALService implements WriteAheadLog {
 
         public BlockWALServiceBuilder(String blockDevicePath) {
             this.blockDevicePath = blockDevicePath;
+            this.recoveryMode = true;
         }
 
         public BlockWALServiceBuilder capacity(long capacity) {
@@ -645,11 +667,6 @@ public class BlockWALService implements WriteAheadLog {
 
         public BlockWALServiceBuilder epoch(long epoch) {
             this.epoch = epoch;
-            return this;
-        }
-
-        public BlockWALServiceBuilder recoveryMode() {
-            this.recoveryMode = true;
             return this;
         }
 

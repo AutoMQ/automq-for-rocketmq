@@ -113,8 +113,12 @@ public class WALBlockDeviceChannel implements WALChannel {
 
     @Override
     public long capacity() {
-        // FIXME: check the capacity outside
         return capacity;
+    }
+
+    @Override
+    public String path() {
+        return blockDevicePath;
     }
 
     private ByteBuffer getBuffer(int alignedSize) {

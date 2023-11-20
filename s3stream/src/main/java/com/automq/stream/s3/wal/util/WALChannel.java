@@ -38,6 +38,8 @@ public interface WALChannel {
 
     long capacity();
 
+    String path();
+
     /**
      * Write bytes from the given buffer to the given position of the channel from the current reader index
      * to the end of the buffer. It only returns when all bytes are written successfully.
@@ -107,6 +109,7 @@ public interface WALChannel {
         }
 
         public WALChannel build() {
+            // TODO: If the OS supports O_DIRECT, we use it by default. Otherwise, we use file system.
             if (direct || path.startsWith(DEVICE_PREFIX)) {
                 return new WALBlockDeviceChannel(path, capacity, initBufferSize, maxBufferSize);
             } else {

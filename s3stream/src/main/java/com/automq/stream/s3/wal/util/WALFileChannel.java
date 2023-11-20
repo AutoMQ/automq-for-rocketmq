@@ -17,6 +17,7 @@
 
 package com.automq.stream.s3.wal.util;
 
+import com.automq.stream.s3.wal.WALCapacityMismatchException;
 import com.automq.stream.s3.wal.WALNotInitializedException;
 import io.netty.buffer.ByteBuf;
 
@@ -55,7 +56,7 @@ public class WALFileChannel implements WALChannel {
             fileCapacityFact = randomAccessFile.length();
             if (!recoveryMode && fileCapacityFact != fileCapacityWant) {
                 // the file exists but not the same size as requested
-                throw new IOException("file " + filePath + " capacity " + fileCapacityFact + " not equal to requested " + fileCapacityWant);
+                throw new WALCapacityMismatchException(filePath, fileCapacityWant, fileCapacityFact);
             }
         } else {
             if (!file.getParentFile().exists() && !file.getParentFile().mkdirs()) {
@@ -87,6 +88,11 @@ public class WALFileChannel implements WALChannel {
     @Override
     public long capacity() {
         return fileCapacityFact;
+    }
+
+    @Override
+    public String path() {
+        return filePath;
     }
 
     @Override
