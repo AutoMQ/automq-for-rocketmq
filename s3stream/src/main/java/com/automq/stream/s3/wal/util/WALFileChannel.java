@@ -30,30 +30,36 @@ public class WALFileChannel implements WALChannel {
     final String filePath;
     final long fileCapacityWant;
     long fileCapacityFact = 0;
-    boolean readOnly;
+    boolean recoveryMode;
     RandomAccessFile randomAccessFile;
     FileChannel fileChannel;
 
-    public WALFileChannel(String filePath, long fileCapacityWant, boolean readOnly) {
+    public WALFileChannel(String filePath, long fileCapacityWant, boolean recoveryMode) {
         this.filePath = filePath;
-        this.fileCapacityWant = fileCapacityWant;
-        this.readOnly = readOnly;
+        this.recoveryMode = recoveryMode;
+        if (recoveryMode) {
+            this.fileCapacityWant = -1;
+        } else {
+            this.fileCapacityWant = fileCapacityWant;
+        }
     }
 
     @Override
     public void open() throws IOException {
         File file = new File(filePath);
+        if (!file.exists() && recoveryMode) {
+            throw new WALNotInitializedException("try to open an uninitialized WAL in recovery mode. path: " + filePath);
+        }
         if (file.exists()) {
             randomAccessFile = new RandomAccessFile(file, "rw");
             fileCapacityFact = randomAccessFile.length();
-            if (!readOnly && fileCapacityFact != fileCapacityWant) {
+            if (!recoveryMode && fileCapacityFact != fileCapacityWant) {
+                // the file exists but not the same size as requested
                 throw new IOException("file " + filePath + " capacity " + fileCapacityFact + " not equal to requested " + fileCapacityWant);
             }
-        } else if (!readOnly) {
-            if (!file.getParentFile().exists()) {
-                if (!file.getParentFile().mkdirs()) {
-                    throw new IOException("mkdirs " + file.getParentFile() + " fail");
-                }
+        } else {
+            if (!file.getParentFile().exists() && !file.getParentFile().mkdirs()) {
+                throw new IOException("mkdirs " + file.getParentFile() + " fail");
             }
             if (!file.createNewFile()) {
                 throw new IOException("create " + filePath + " fail");
@@ -64,8 +70,6 @@ public class WALFileChannel implements WALChannel {
             randomAccessFile = new RandomAccessFile(file, "rw");
             randomAccessFile.setLength(fileCapacityWant);
             fileCapacityFact = fileCapacityWant;
-        } else {
-            throw new WALNotInitializedException("read only open uninitialized WAL " + filePath);
         }
 
         fileChannel = randomAccessFile.getChannel();

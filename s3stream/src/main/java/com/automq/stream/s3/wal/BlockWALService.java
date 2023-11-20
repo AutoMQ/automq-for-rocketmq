@@ -115,6 +115,7 @@ public class BlockWALService implements WriteAheadLog {
     private WALChannel walChannel;
     private SlidingWindowService slidingWindowService;
     private WALHeader walHeader;
+    private boolean recoveryMode;
     private int nodeId = NOOP_NODE_ID;
     private long epoch = NOOP_EPOCH;
 
@@ -338,6 +339,10 @@ public class BlockWALService implements WriteAheadLog {
         }
 
         if (walHeaderAvailable != null) {
+            if (walHeaderAvailable.getCapacity() != walChannel.capacity()) {
+                LOGGER.warn("WAL capacity mismatch, in header: {}, in file: {}", walHeaderAvailable.getCapacity(), walChannel.capacity());
+                throw new IOException("WAL capacity mismatch");
+            }
             walHeader = recoverEntireWALAndCorrectWALHeader(walHeaderAvailable);
         } else {
             walHeader = new WALHeader()
@@ -365,6 +370,7 @@ public class BlockWALService implements WriteAheadLog {
 
         walChannel.open();
         recoverWALHeader();
+        // TODO: no need to start the scheduler in recovery mode
         startFlushWALHeaderScheduler();
         slidingWindowService.start();
         readyToServe.set(true);
@@ -420,9 +426,10 @@ public class BlockWALService implements WriteAheadLog {
         }
     }
 
-    public AppendResult append0(ByteBuf body, int crc) throws OverCapacityException {
+    private AppendResult append0(ByteBuf body, int crc) throws OverCapacityException {
         TimerUtil timerUtil = new TimerUtil();
         checkReadyToServe();
+        checkWriteMode();
 
         final long recordSize = RECORD_HEADER_SIZE + body.readableBytes();
         final CompletableFuture<AppendResult.CallbackResult> appendResultFuture = new CompletableFuture<>();
@@ -489,6 +496,7 @@ public class BlockWALService implements WriteAheadLog {
     @Override
     public CompletableFuture<Void> trim(long offset) {
         checkReadyToServe();
+        checkWriteMode();
 
         if (offset >= slidingWindowService.getWindowCoreData().getWindowStartOffset()) {
             throw new IllegalArgumentException("failed to trim: record at offset " + offset + " has not been flushed yet");
@@ -511,6 +519,12 @@ public class BlockWALService implements WriteAheadLog {
     private void checkReadyToServe() {
         if (!readyToServe.get()) {
             throw new IllegalStateException("WriteAheadLog is not ready to serve");
+        }
+    }
+
+    private void checkWriteMode() {
+        if (recoveryMode) {
+            throw new IllegalStateException("WriteAheadLog is in recovery mode");
         }
     }
 
@@ -542,7 +556,7 @@ public class BlockWALService implements WriteAheadLog {
         private int writeRateLimit = 3000;
         private int nodeId = NOOP_NODE_ID;
         private long epoch = NOOP_EPOCH;
-        private boolean readOnly;
+        private boolean recoveryMode = false;
 
         public BlockWALServiceBuilder(String blockDevicePath, long capacity) {
             this.blockDevicePath = blockDevicePath;
@@ -634,14 +648,14 @@ public class BlockWALService implements WriteAheadLog {
             return this;
         }
 
-        public BlockWALServiceBuilder readOnly() {
-            this.readOnly = true;
+        public BlockWALServiceBuilder recoveryMode() {
+            this.recoveryMode = true;
             return this;
         }
 
         public BlockWALService build() {
-            // TODO: BlockWALService support readOnly mode
-            // TODO: readOnly mode: throw WALNotInitializedException when WAL is not initialized
+            // TODO: BlockWALService support recovery mode
+            // TODO: recovery mode: throw WALNotInitializedException when WAL is not initialized
             BlockWALService blockWALService = new BlockWALService();
 
             // make blockDeviceCapacityWant align to BLOCK_SIZE
@@ -659,7 +673,7 @@ public class BlockWALService implements WriteAheadLog {
                     .direct(direct)
                     .initBufferSize(initBufferSize)
                     .maxBufferSize(maxBufferSize)
-                    .readOnly(readOnly)
+                    .recoveryMode(recoveryMode)
                     .build();
 
             blockWALService.slidingWindowService = new SlidingWindowService(
@@ -671,6 +685,8 @@ public class BlockWALService implements WriteAheadLog {
                     writeRateLimit,
                     blockWALService.flusher()
             );
+
+            blockWALService.recoveryMode = recoveryMode;
 
             if (nodeId != NOOP_NODE_ID) {
                 blockWALService.nodeId = nodeId;
@@ -687,6 +703,9 @@ public class BlockWALService implements WriteAheadLog {
             return "BlockWALServiceBuilder{"
                     + "blockDevicePath='" + blockDevicePath
                     + ", blockDeviceCapacityWant=" + blockDeviceCapacityWant
+                    + ", direct=" + direct
+                    + ", initBufferSize=" + initBufferSize
+                    + ", maxBufferSize=" + maxBufferSize
                     + ", flushHeaderIntervalSeconds=" + flushHeaderIntervalSeconds
                     + ", ioThreadNums=" + ioThreadNums
                     + ", slidingWindowInitialSize=" + slidingWindowInitialSize
@@ -694,6 +713,9 @@ public class BlockWALService implements WriteAheadLog {
                     + ", slidingWindowScaleUnit=" + slidingWindowScaleUnit
                     + ", blockSoftLimit=" + blockSoftLimit
                     + ", writeRateLimit=" + writeRateLimit
+                    + ", nodeId=" + nodeId
+                    + ", epoch=" + epoch
+                    + ", recoveryMode=" + recoveryMode
                     + '}';
         }
     }
