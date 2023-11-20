@@ -73,6 +73,8 @@ public interface WALChannel {
         private final String path;
         private boolean direct;
         private long capacity;
+        private int initBufferSize;
+        private int maxBufferSize;
         private boolean readOnly;
 
         private WALChannelBuilder(String path) {
@@ -89,6 +91,16 @@ public interface WALChannel {
             return this;
         }
 
+        public WALChannelBuilder initBufferSize(int initBufferSize) {
+            this.initBufferSize = initBufferSize;
+            return this;
+        }
+
+        public WALChannelBuilder maxBufferSize(int maxBufferSize) {
+            this.maxBufferSize = maxBufferSize;
+            return this;
+        }
+
         public WALChannelBuilder readOnly(boolean readOnly) {
             this.readOnly = readOnly;
             return this;
@@ -96,7 +108,7 @@ public interface WALChannel {
 
         public WALChannel build() {
             if (direct || path.startsWith(DEVICE_PREFIX)) {
-                return new WALBlockDeviceChannel(path, capacity);
+                return new WALBlockDeviceChannel(path, capacity, initBufferSize, maxBufferSize);
             } else {
                 return new WALFileChannel(path, capacity, readOnly);
             }

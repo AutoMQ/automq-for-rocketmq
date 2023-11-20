@@ -531,11 +531,13 @@ public class BlockWALService implements WriteAheadLog {
         private final String blockDevicePath;
         private long blockDeviceCapacityWant;
         private boolean direct = false;
+        private int initBufferSize = 1 << 20; // 1MiB
+        private int maxBufferSize = 1 << 24; // 16MiB
         private int flushHeaderIntervalSeconds = 10;
         private int ioThreadNums = 8;
-        private long slidingWindowInitialSize = 1 << 20;
-        private long slidingWindowUpperLimit = 512 << 20;
-        private long slidingWindowScaleUnit = 4 << 20;
+        private long slidingWindowInitialSize = 1 << 20; // 1MiB
+        private long slidingWindowUpperLimit = 1 << 29; // 512MiB
+        private long slidingWindowScaleUnit = 1 << 22; // 4MiB
         private long blockSoftLimit = 1 << 18; // 256KiB
         private int writeRateLimit = 3000;
         private int nodeId = NOOP_NODE_ID;
@@ -551,8 +553,16 @@ public class BlockWALService implements WriteAheadLog {
             this.blockDevicePath = blockDevicePath;
         }
 
+        public BlockWALServiceBuilder capacity(long capacity) {
+            this.blockDeviceCapacityWant = capacity;
+            return this;
+        }
+
         public BlockWALServiceBuilder config(Config config) {
             return this
+                    .capacity(config.walCapacity())
+                    .initBufferSize(config.walInitBufferSize())
+                    .maxBufferSize(config.walMaxBufferSize())
                     .flushHeaderIntervalSeconds(config.walHeaderFlushIntervalSeconds())
                     .ioThreadNums(config.walThread())
                     .slidingWindowInitialSize(config.walWindowInitial())
@@ -566,6 +576,16 @@ public class BlockWALService implements WriteAheadLog {
 
         public BlockWALServiceBuilder direct(boolean direct) {
             this.direct = direct;
+            return this;
+        }
+
+        public BlockWALServiceBuilder initBufferSize(int initBufferSize) {
+            this.initBufferSize = initBufferSize;
+            return this;
+        }
+
+        public BlockWALServiceBuilder maxBufferSize(int maxBufferSize) {
+            this.maxBufferSize = maxBufferSize;
             return this;
         }
 
@@ -634,7 +654,13 @@ public class BlockWALService implements WriteAheadLog {
             blockWALService.walHeaderFlushIntervalSeconds = flushHeaderIntervalSeconds;
             blockWALService.initialWindowSize = slidingWindowInitialSize;
 
-            blockWALService.walChannel = WALChannel.builder(blockDevicePath).capacity(blockDeviceCapacityWant).direct(direct).readOnly(readOnly).build();
+            blockWALService.walChannel = WALChannel.builder(blockDevicePath)
+                    .capacity(blockDeviceCapacityWant)
+                    .direct(direct)
+                    .initBufferSize(initBufferSize)
+                    .maxBufferSize(maxBufferSize)
+                    .readOnly(readOnly)
+                    .build();
 
             blockWALService.slidingWindowService = new SlidingWindowService(
                     blockWALService.walChannel,
