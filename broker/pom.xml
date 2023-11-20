@@ -74,5 +74,10 @@
             <artifactId>agent</artifactId>
             <version>0.12.2</version>
         </dependency>
+        <dependency>
+            <groupId>io.opentelemetry.instrumentation</groupId>
+            <artifactId>opentelemetry-runtime-telemetry-java17</artifactId>
+            <version>${alapha.opentelemetry.version}</version>
+        </dependency>
     </dependencies>
 </project>
