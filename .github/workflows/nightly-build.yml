@@ -17,6 +17,7 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    if: always()
     timeout-minutes: 30
     outputs:
       version-json: ${{ steps.build_images.outputs.nightly-version }}
@@ -55,6 +56,7 @@ jobs:
           echo "nightly-version=$VERSION" >> $GITHUB_OUTPUT
 
   deploy:
+    if: ${{ success() }}
     name: Deploy AutoMQ for RocketMQ
     needs: [build]
     runs-on: private-k3s
@@ -92,6 +94,7 @@ jobs:
 
 
   run_e2e_grpc_java:
+    if: ${{ success() }}
     name: Run e2e test for grpc java
     needs: [ build, deploy ]
     runs-on: private-k3s
@@ -134,6 +137,7 @@ jobs:
           path: testlog.txt
 
   run_e2e_remoting_java:
+    if: ${{ success() }}
     name: Run e2e test for remoting java
     needs: [ build, deploy ]
     runs-on: private-k3s
@@ -182,7 +186,8 @@ jobs:
 
 
   clean:
-    name: Clean
+    if: always()
+    name: Clean AutoMQ for RocketMQ
     needs: [deploy, run_e2e_grpc_java, run_e2e_remoting_java]
     runs-on: private-k3s
     timeout-minutes: 60
