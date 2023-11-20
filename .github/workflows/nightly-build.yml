@@ -3,7 +3,6 @@ name: Nightly Build
 #  workflow_dispatch:
 #  schedule:
 #    - cron: '0 20 * * *'
-
 on:
   pull_request:
     types: [opened, reopened, synchronize]
@@ -106,7 +105,7 @@ jobs:
         run: sudo bash install_flatc.sh
       - name: Build rocketmq dependency
         run: |
-          mvn clean install -U
+          mvn clean install -U -DskipTests
       - uses: actions/checkout@v3
         if: always()
         with:
@@ -148,7 +147,7 @@ jobs:
         run: sudo bash install_flatc.sh
       - name: Build rocketmq dependency
         run: |
-          mvn clean install -U
+          mvn clean install -U -DskipTests
       - uses: actions/checkout@v3
         if: always()
         with:
@@ -179,13 +178,6 @@ jobs:
     runs-on: private-k3s
     timeout-minutes: 60
     steps:
-      - uses: apache/rocketmq-test-tool@7d84d276ad7755b1dc5cf9657a7a9bff6ae6d288
-        name: clean
-        with:
-          action: "clean"
-          ask-config: "${{ secrets.KUBE_CONFIG }}"
-          test-version: "${{ needs.build.outputs.version-json }}"
-          job-id: "${{ env.JOB_INDEX }}"
       - name: clean Rocketmq
         working-directory: distribution/helm
         env:
@@ -193,3 +185,10 @@ jobs:
           DOCKER_REPO: ${{ env.DOCKER_REPO }}
         run: |
           sh clean-ci.sh ${NAMESPACE}
+      - uses: apache/rocketmq-test-tool@7d84d276ad7755b1dc5cf9657a7a9bff6ae6d288
+        name: clean
+        with:
+          action: "clean"
+          ask-config: "${{ secrets.KUBE_CONFIG }}"
+          test-version: "${{ needs.build.outputs.version-json }}"
+          job-id: "${{ env.JOB_INDEX }}"
