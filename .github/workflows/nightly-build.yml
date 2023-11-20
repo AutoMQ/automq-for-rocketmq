@@ -175,10 +175,17 @@ jobs:
   clean:
     if: always()
     name: Clean AutoMQ for RocketMQ
-    needs: [deploy, run_e2e_grpc_java, run_e2e_remoting_java]
+    needs: [build, deploy, run_e2e_grpc_java, run_e2e_remoting_java]
     runs-on: private-k3s
     timeout-minutes: 60
     steps:
+      - uses: apache/rocketmq-test-tool@7d84d276ad7755b1dc5cf9657a7a9bff6ae6d288
+        name: clean
+        with:
+          action: "clean"
+          ask-config: "${{ secrets.KUBE_CONFIG }}"
+          test-version: "${{ needs.build.outputs.version-json }}"
+          job-id: "${{ env.JOB_INDEX }}"
       - name: clean Rocketmq
         working-directory: distribution/helm
         env:
