@@ -44,10 +44,10 @@ public class DruidDataSourceFactory extends PooledDataSourceFactory {
                 } catch (SQLException e) {
                     LOGGER.error("Failed to set stat filter", e);
                 }
-                dataSource.setMaxActive(20);
-                dataSource.setInitialSize(5);
-                dataSource.setMinIdle(1);
-                dataSource.setMaxWait(6000);
+                dataSource.setMaxActive(100);
+                dataSource.setInitialSize(20);
+                dataSource.setMinIdle(5);
+                dataSource.setMaxWait(60000);
 
                 dataSource.setTimeBetweenEvictionRunsMillis(60000);
                 dataSource.setMinEvictableIdleTimeMillis(300000);
