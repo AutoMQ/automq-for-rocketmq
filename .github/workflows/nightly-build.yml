@@ -47,7 +47,7 @@ jobs:
           DOCKER_REPO: ${{ env.DOCKER_REPO }}
           DOCKER_NIGHTLY_VERSION: ${{ env.DOCKER_NIGHTLY_VERSION }}
         run: |
-          FULL_NODE_VERSION=${git ls-remote --tags | awk -F '/' 'END{print $3}'}
+          FULL_NODE_VERSION=$(git ls-remote --tags | awk -F '/' 'END{print $3}')
           COMMIT_VERSION=$(git rev-parse --short HEAD)
           VERSION=${FULL_NODE_VERSION}-${COMMIT_VERSION}-${DOCKER_NIGHTLY_VERSION}
           sh build-ci.sh ${DOCKER_REPO} ${VERSION}
