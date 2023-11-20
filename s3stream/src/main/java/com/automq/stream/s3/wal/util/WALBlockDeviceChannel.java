@@ -73,6 +73,7 @@ public class WALBlockDeviceChannel implements WALChannel {
         this.blockDevicePath = blockDevicePath;
         // We cannot get the actual capacity of the block device here, so we just use the capacity we want
         // And it's the caller's responsibility to make sure the capacity is right
+        // FIXME: in recovery mode, `capacity` will be set to CAPACITY_NOT_SET here. It should be corrected after recovery.
         this.capacity = blockDeviceCapacityWant;
         if (blockDeviceCapacityWant != WALUtil.alignSmallByBlockSize(blockDeviceCapacityWant)) {
             throw new RuntimeException("wal capacity must be aligned by block size when using block device");

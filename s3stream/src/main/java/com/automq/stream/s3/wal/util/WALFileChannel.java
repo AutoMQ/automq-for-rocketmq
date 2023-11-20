@@ -27,10 +27,15 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
+import static com.automq.stream.s3.Constants.CAPACITY_NOT_SET;
+
 public class WALFileChannel implements WALChannel {
     final String filePath;
     final long fileCapacityWant;
     long fileCapacityFact = 0;
+    /**
+     * When set to true, the file should exist and the file size does not need to be verified.
+     */
     boolean recoveryMode;
     RandomAccessFile randomAccessFile;
     FileChannel fileChannel;
@@ -39,8 +44,9 @@ public class WALFileChannel implements WALChannel {
         this.filePath = filePath;
         this.recoveryMode = recoveryMode;
         if (recoveryMode) {
-            this.fileCapacityWant = -1;
+            this.fileCapacityWant = CAPACITY_NOT_SET;
         } else {
+            assert fileCapacityWant > 0;
             this.fileCapacityWant = fileCapacityWant;
         }
     }
@@ -48,9 +54,6 @@ public class WALFileChannel implements WALChannel {
     @Override
     public void open() throws IOException {
         File file = new File(filePath);
-        if (!file.exists() && recoveryMode) {
-            throw new WALNotInitializedException("try to open an uninitialized WAL in recovery mode. path: " + filePath);
-        }
         if (file.exists()) {
             randomAccessFile = new RandomAccessFile(file, "rw");
             fileCapacityFact = randomAccessFile.length();
@@ -59,6 +62,9 @@ public class WALFileChannel implements WALChannel {
                 throw new WALCapacityMismatchException(filePath, fileCapacityWant, fileCapacityFact);
             }
         } else {
+            if (recoveryMode) {
+                throw new WALNotInitializedException("try to open an uninitialized WAL in recovery mode. path: " + filePath);
+            }
             if (!file.getParentFile().exists() && !file.getParentFile().mkdirs()) {
                 throw new IOException("mkdirs " + file.getParentFile() + " fail");
             }

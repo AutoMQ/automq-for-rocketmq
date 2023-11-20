@@ -31,7 +31,6 @@ public class Config {
     private long walCapacity = 1024L * 1024 * 1024;
     private int walInitBufferSize = 1024 * 1024;
     private int walMaxBufferSize = 16 * 1024 * 1024;
-    private int walHeaderFlushIntervalSeconds = 10;
     private int walThread = 8;
     private long walWindowInitial = 1048576L;
     private long walWindowIncrement = 4194304L;
@@ -103,10 +102,6 @@ public class Config {
 
     public int walMaxBufferSize() {
         return walMaxBufferSize;
-    }
-
-    public int walHeaderFlushIntervalSeconds() {
-        return walHeaderFlushIntervalSeconds;
     }
 
     public int walThread() {
@@ -280,11 +275,6 @@ public class Config {
 
     public Config walMaxBufferSize(int walMaxBufferSize) {
         this.walMaxBufferSize = walMaxBufferSize;
-        return this;
-    }
-
-    public Config walHeaderFlushIntervalSeconds(int s3WALHeaderFlushIntervalSeconds) {
-        this.walHeaderFlushIntervalSeconds = s3WALHeaderFlushIntervalSeconds;
         return this;
     }
 

@@ -37,12 +37,13 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 
+import static com.automq.stream.s3.Constants.CAPACITY_NOT_SET;
 import static com.automq.stream.s3.Constants.NOOP_EPOCH;
 import static com.automq.stream.s3.Constants.NOOP_NODE_ID;
 
@@ -73,9 +74,7 @@ import static com.automq.stream.s3.Constants.NOOP_NODE_ID;
  * WAL Header
  * <p>
  * There are {@link BlockWALService#WAL_HEADER_COUNT} WAL headers, each of which is {@link WALUtil#BLOCK_SIZE} bytes.
- * Every {@link BlockWALService#walHeaderFlushIntervalSeconds}, the service will flush the WAL header to the block
- * device. The WAL header is used to record the meta information of the WAL, and is used to recover the WAL when
- * the service is restarted.
+ * The WAL header is used to record the meta information of the WAL, and is used to recover the WAL when the service is restarted.
  * <p>
  * Sliding Window
  * <p>
@@ -108,16 +107,21 @@ public class BlockWALService implements WriteAheadLog {
     public static final int WAL_HEADER_TOTAL_CAPACITY = WAL_HEADER_CAPACITY * WAL_HEADER_COUNT;
     private static final Logger LOGGER = LoggerFactory.getLogger(BlockWALService.class);
     private final AtomicBoolean readyToServe = new AtomicBoolean(false);
+    private final AtomicBoolean resetFinished = new AtomicBoolean(false);
     private final AtomicLong writeHeaderRoundTimes = new AtomicLong(0);
-    private int walHeaderFlushIntervalSeconds;
+    private final ExecutorService walHeaderFlusher = Threads.newFixedThreadPool(1, ThreadUtils.createThreadFactory("flush-wal-header-thread-%d", true), LOGGER);
     private long initialWindowSize;
-    private ScheduledExecutorService flushWALHeaderScheduler;
     private WALChannel walChannel;
     private SlidingWindowService slidingWindowService;
     private WALHeader walHeader;
     private boolean recoveryMode;
     private int nodeId = NOOP_NODE_ID;
     private long epoch = NOOP_EPOCH;
+    /**
+     * The offset at which the recovery is complete. It is safe to write records at this offset.
+     * It is always aligned to the {@link WALUtil#BLOCK_SIZE}.
+     */
+    private long recoveryCompleteOffset = -1;
 
     public static BlockWALServiceBuilder builder(String path, long capacity) {
         return new BlockWALServiceBuilder(path, capacity);
@@ -127,32 +131,8 @@ public class BlockWALService implements WriteAheadLog {
         return new BlockWALServiceBuilder(path);
     }
 
-    private void startFlushWALHeaderScheduler() {
-        this.flushWALHeaderScheduler = Threads.newSingleThreadScheduledExecutor(
-                ThreadUtils.createThreadFactory("flush-wal-header-thread-%d", true), LOGGER);
-        this.flushWALHeaderScheduler.scheduleAtFixedRate(() -> {
-            try {
-                BlockWALService.this.flushWALHeader(
-                        this.slidingWindowService.getWindowCoreData().getWindowStartOffset(),
-                        this.slidingWindowService.getWindowCoreData().getWindowMaxLength(),
-                        this.slidingWindowService.getWindowCoreData().getWindowNextWriteOffset(),
-                        ShutdownType.UNGRACEFULLY);
-            } catch (IOException ignored) {
-            }
-        }, walHeaderFlushIntervalSeconds, walHeaderFlushIntervalSeconds, TimeUnit.SECONDS);
-    }
-
-    @Deprecated
-    private void flushWALHeader(long windowStartOffset,
-                                long windowMaxLength,
-                                long windowNextWriteOffset,
-                                ShutdownType shutdownType
-    ) throws IOException {
-        walHeader
-                .setSlidingWindowStartOffset(windowStartOffset)
-                .setSlidingWindowMaxLength(windowMaxLength)
-                .setSlidingWindowNextWriteOffset(windowNextWriteOffset)
-                .setShutdownType(shutdownType);
+    private void flushWALHeader(long windowMaxLength, ShutdownType shutdownType) throws IOException {
+        walHeader.setSlidingWindowMaxLength(windowMaxLength).setShutdownType(shutdownType);
         flushWALHeader();
     }
 
@@ -164,7 +144,7 @@ public class BlockWALService implements WriteAheadLog {
             ByteBuf buf = walHeader.marshal();
             this.walChannel.writeAndFlush(buf, position);
             buf.release();
-            walHeader.setFlushedTrimOffset(trimOffset);
+            walHeader.updateFlushedTrimOffset(trimOffset);
             LOGGER.debug("WAL header flushed, position: {}, header: {}", position, walHeader);
         } catch (IOException e) {
             LOGGER.error("failed to flush WAL header, position: {}, header: {}", position, walHeader, e);
@@ -289,17 +269,18 @@ public class BlockWALService implements WriteAheadLog {
 
         WALHeader header = tryReadWALHeader();
         if (null == header) {
+            if (recoveryMode) {
+                throw new WALNotInitializedException("try to open an uninitialized WAL in recovery mode. path: " + walChannel.path());
+            }
             header = newWALHeader();
+            // TODO: no need to recovery and reset later
+            LOGGER.info("no available WALHeader, create a new one: {}", header);
         } else {
             checkCapacity(header);
-            recoverWALHeader(header);
+            LOGGER.info("read WALHeader from WAL: {}", header);
         }
         walHeaderReady(header);
 
-        if (!recoveryMode) {
-            startFlushWALHeaderScheduler();
-        }
-        slidingWindowService.start();
         readyToServe.set(true);
 
         LOGGER.info("block WAL service started, cost: {} ms", stopWatch.getTime(TimeUnit.MILLISECONDS));
@@ -340,52 +321,11 @@ public class BlockWALService implements WriteAheadLog {
         }
     }
 
-    private void recoverWALHeader(WALHeader paramWALHeader) {
-        // initialize flushTrimOffset
-        paramWALHeader.setFlushedTrimOffset(paramWALHeader.getTrimOffset());
-
-        // graceful shutdown, no need to correct the header
-        if (paramWALHeader.getShutdownType().equals(ShutdownType.GRACEFULLY)) {
-            LOGGER.info("recovered from graceful shutdown, WALHeader: {}", paramWALHeader);
-            return;
-        }
-
-        // ungraceful shutdown, need to correct the header
-        long recoverStartOffset = WALUtil.alignLargeByBlockSize(paramWALHeader.getSlidingWindowStartOffset());
-        long recoverRemainingBytes = paramWALHeader.recordSectionCapacity();
-        final long recordSectionCapacity = paramWALHeader.recordSectionCapacity();
-
-        long nextRecoverStartOffset;
-        long meetIllegalRecordTimes = 0;
-        LOGGER.info("start to recover from ungraceful shutdown, recoverStartOffset: {}, recoverRemainingBytes: {}", recoverStartOffset, recoverRemainingBytes);
-        do {
-            try {
-                ByteBuf body = readRecord(recordSectionCapacity, recoverStartOffset);
-                nextRecoverStartOffset = recoverStartOffset + RECORD_HEADER_SIZE + body.readableBytes();
-                body.release();
-            } catch (ReadRecordException e) {
-                nextRecoverStartOffset = e.getJumpNextRecoverOffset();
-                LOGGER.debug("failed to read record, try next, recoverStartOffset: {}, meetIllegalRecordTimes: {}, recoverRemainingBytes: {}, error: {}",
-                        recoverStartOffset, meetIllegalRecordTimes, recoverRemainingBytes, e.getMessage());
-                meetIllegalRecordTimes++;
-            }
-
-            recoverRemainingBytes -= nextRecoverStartOffset - recoverStartOffset;
-            recoverStartOffset = nextRecoverStartOffset;
-        } while (recoverRemainingBytes > 0);
-        long windowInitOffset = WALUtil.alignLargeByBlockSize(nextRecoverStartOffset);
-        paramWALHeader.setSlidingWindowStartOffset(windowInitOffset).setSlidingWindowNextWriteOffset(windowInitOffset);
-
-        LOGGER.info("recovered from ungraceful shutdown, WALHeader: {}", paramWALHeader);
-    }
-
     private WALHeader newWALHeader() {
-        WALHeader header =  new WALHeader()
+        return new WALHeader()
                 .setCapacity(walChannel.capacity())
                 .setSlidingWindowMaxLength(initialWindowSize)
                 .setShutdownType(ShutdownType.UNGRACEFULLY);
-        LOGGER.info("create new WALHeader: {}", header);
-        return header;
     }
 
     private void walHeaderReady(WALHeader header) throws IOException {
@@ -395,11 +335,6 @@ public class BlockWALService implements WriteAheadLog {
         }
         this.walHeader = header;
         flushWALHeader();
-        slidingWindowService.resetWindowWhenRecoverOver(
-                walHeader.getSlidingWindowStartOffset(),
-                walHeader.getSlidingWindowNextWriteOffset(),
-                walHeader.getSlidingWindowMaxLength()
-        );
     }
 
     @Override
@@ -407,23 +342,19 @@ public class BlockWALService implements WriteAheadLog {
         StopWatch stopWatch = StopWatch.createStarted();
 
         readyToServe.set(false);
-        if (null != flushWALHeaderScheduler) {
-            flushWALHeaderScheduler.shutdown();
-            try {
-                if (!flushWALHeaderScheduler.awaitTermination(5, TimeUnit.SECONDS)) {
-                    flushWALHeaderScheduler.shutdownNow();
-                }
-            } catch (InterruptedException e) {
-                flushWALHeaderScheduler.shutdownNow();
+        walHeaderFlusher.shutdown();
+        try {
+            if (!walHeaderFlusher.awaitTermination(5, TimeUnit.SECONDS)) {
+                walHeaderFlusher.shutdownNow();
             }
+        } catch (InterruptedException e) {
+            walHeaderFlusher.shutdownNow();
         }
 
         boolean gracefulShutdown = slidingWindowService.shutdown(1, TimeUnit.DAYS);
         try {
             flushWALHeader(
-                    slidingWindowService.getWindowCoreData().getWindowStartOffset(),
                     slidingWindowService.getWindowCoreData().getWindowMaxLength(),
-                    slidingWindowService.getWindowCoreData().getWindowNextWriteOffset(),
                     gracefulShutdown ? ShutdownType.GRACEFULLY : ShutdownType.UNGRACEFULLY
             );
         } catch (IOException e) {
@@ -455,6 +386,7 @@ public class BlockWALService implements WriteAheadLog {
         TimerUtil timerUtil = new TimerUtil();
         checkReadyToServe();
         checkWriteMode();
+        checkResetFinished();
 
         final long recordSize = RECORD_HEADER_SIZE + body.readableBytes();
         final CompletableFuture<AppendResult.CallbackResult> appendResultFuture = new CompletableFuture<>();
@@ -505,23 +437,31 @@ public class BlockWALService implements WriteAheadLog {
         if (recoverStartOffset < 0) {
             recoverStartOffset = 0;
         }
-        return new RecoverIterator(recoverStartOffset, trimmedOffset);
+        long windowLength = walHeader.getSlidingWindowMaxLength();
+        return new RecoverIterator(recoverStartOffset, trimmedOffset, windowLength);
     }
 
     @Override
     public CompletableFuture<Void> reset() {
         checkReadyToServe();
+        checkRecoverFinished();
 
-        long previousNextWriteOffset = slidingWindowService.getWindowCoreData().getWindowNextWriteOffset();
-        slidingWindowService.resetWindow(previousNextWriteOffset + WALUtil.BLOCK_SIZE);
-        LOGGER.info("reset sliding window and trim WAL to offset: {}", previousNextWriteOffset);
-        return trim(previousNextWriteOffset);
+        slidingWindowService.start(walHeader.getSlidingWindowMaxLength(), recoveryCompleteOffset + WALUtil.BLOCK_SIZE);
+        LOGGER.info("reset sliding window and trim WAL to offset: {}", recoveryCompleteOffset);
+        return trim(recoveryCompleteOffset, true).thenRun(() -> resetFinished.set(true));
     }
 
     @Override
     public CompletableFuture<Void> trim(long offset) {
+        return trim(offset, false);
+    }
+
+    private CompletableFuture<Void> trim(long offset, boolean internal) {
         checkReadyToServe();
         checkWriteMode();
+        if (!internal) {
+            checkResetFinished();
+        }
 
         if (offset >= slidingWindowService.getWindowCoreData().getWindowStartOffset()) {
             throw new IllegalArgumentException("failed to trim: record at offset " + offset + " has not been flushed yet");
@@ -530,15 +470,13 @@ public class BlockWALService implements WriteAheadLog {
         walHeader.updateTrimOffset(offset);
         return CompletableFuture.runAsync(() -> {
             // TODO: more beautiful
-            this.walHeader.setSlidingWindowStartOffset(slidingWindowService.getWindowCoreData().getWindowStartOffset());
-            this.walHeader.setSlidingWindowNextWriteOffset(slidingWindowService.getWindowCoreData().getWindowNextWriteOffset());
             this.walHeader.setSlidingWindowMaxLength(slidingWindowService.getWindowCoreData().getWindowMaxLength());
             try {
                 flushWALHeader();
             } catch (IOException e) {
                 throw new CompletionException(e);
             }
-        }, flushWALHeaderScheduler);
+        }, walHeaderFlusher);
     }
 
     private void checkReadyToServe() {
@@ -553,22 +491,28 @@ public class BlockWALService implements WriteAheadLog {
         }
     }
 
+    private void checkRecoverFinished() {
+        if (recoveryCompleteOffset < 0) {
+            throw new IllegalStateException("WriteAheadLog has not been completely recovered yet");
+        }
+    }
+
+    private void checkResetFinished() {
+        if (!resetFinished.get()) {
+            throw new IllegalStateException("WriteAheadLog has not been reset yet");
+        }
+    }
+
     private SlidingWindowService.WALHeaderFlusher flusher() {
-        return windowMaxLength -> flushWALHeader(
-                slidingWindowService.getWindowCoreData().getWindowStartOffset(),
-                windowMaxLength,
-                slidingWindowService.getWindowCoreData().getWindowNextWriteOffset(),
-                ShutdownType.UNGRACEFULLY
-        );
+        return windowMaxLength -> flushWALHeader(windowMaxLength, ShutdownType.UNGRACEFULLY);
     }
 
     public static class BlockWALServiceBuilder {
         private final String blockDevicePath;
-        private long blockDeviceCapacityWant;
+        private long blockDeviceCapacityWant = CAPACITY_NOT_SET;
         private boolean direct = false;
         private int initBufferSize = 1 << 20; // 1MiB
         private int maxBufferSize = 1 << 24; // 16MiB
-        private int flushHeaderIntervalSeconds = 10;
         private int ioThreadNums = 8;
         private long slidingWindowInitialSize = 1 << 20; // 1MiB
         private long slidingWindowUpperLimit = 1 << 29; // 512MiB
@@ -599,7 +543,6 @@ public class BlockWALService implements WriteAheadLog {
                     .capacity(config.walCapacity())
                     .initBufferSize(config.walInitBufferSize())
                     .maxBufferSize(config.walMaxBufferSize())
-                    .flushHeaderIntervalSeconds(config.walHeaderFlushIntervalSeconds())
                     .ioThreadNums(config.walThread())
                     .slidingWindowInitialSize(config.walWindowInitial())
                     .slidingWindowScaleUnit(config.walWindowIncrement())
@@ -622,11 +565,6 @@ public class BlockWALService implements WriteAheadLog {
 
         public BlockWALServiceBuilder maxBufferSize(int maxBufferSize) {
             this.maxBufferSize = maxBufferSize;
-            return this;
-        }
-
-        public BlockWALServiceBuilder flushHeaderIntervalSeconds(int flushHeaderIntervalSeconds) {
-            this.flushHeaderIntervalSeconds = flushHeaderIntervalSeconds;
             return this;
         }
 
@@ -671,19 +609,18 @@ public class BlockWALService implements WriteAheadLog {
         }
 
         public BlockWALService build() {
+            if (recoveryMode) {
+                assert blockDeviceCapacityWant == CAPACITY_NOT_SET;
+                assert nodeId == NOOP_NODE_ID;
+                assert epoch == NOOP_EPOCH;
+            } else {
+                // make blockDeviceCapacityWant align to BLOCK_SIZE
+                blockDeviceCapacityWant = blockDeviceCapacityWant / WALUtil.BLOCK_SIZE * WALUtil.BLOCK_SIZE;
+            }
+
             // TODO: BlockWALService support recovery mode
             // TODO: recovery mode: throw WALNotInitializedException when WAL is not initialized
             BlockWALService blockWALService = new BlockWALService();
-
-            // make blockDeviceCapacityWant align to BLOCK_SIZE
-            blockDeviceCapacityWant = blockDeviceCapacityWant / WALUtil.BLOCK_SIZE * WALUtil.BLOCK_SIZE;
-
-            // make sure window size is less than capacity
-            slidingWindowInitialSize = Math.min(slidingWindowInitialSize, blockDeviceCapacityWant - WAL_HEADER_TOTAL_CAPACITY);
-            slidingWindowUpperLimit = Math.min(slidingWindowUpperLimit, blockDeviceCapacityWant - WAL_HEADER_TOTAL_CAPACITY);
-
-            blockWALService.walHeaderFlushIntervalSeconds = flushHeaderIntervalSeconds;
-            blockWALService.initialWindowSize = slidingWindowInitialSize;
 
             blockWALService.walChannel = WALChannel.builder(blockDevicePath)
                     .capacity(blockDeviceCapacityWant)
@@ -693,6 +630,11 @@ public class BlockWALService implements WriteAheadLog {
                     .recoveryMode(recoveryMode)
                     .build();
 
+            // TODO: in recovery mode, no need to create sliding window service
+            // make sure window size is less than capacity
+            slidingWindowInitialSize = Math.min(slidingWindowInitialSize, blockDeviceCapacityWant - WAL_HEADER_TOTAL_CAPACITY);
+            slidingWindowUpperLimit = Math.min(slidingWindowUpperLimit, blockDeviceCapacityWant - WAL_HEADER_TOTAL_CAPACITY);
+            blockWALService.initialWindowSize = slidingWindowInitialSize;
             blockWALService.slidingWindowService = new SlidingWindowService(
                     blockWALService.walChannel,
                     ioThreadNums,
@@ -723,7 +665,6 @@ public class BlockWALService implements WriteAheadLog {
                     + ", direct=" + direct
                     + ", initBufferSize=" + initBufferSize
                     + ", maxBufferSize=" + maxBufferSize
-                    + ", flushHeaderIntervalSeconds=" + flushHeaderIntervalSeconds
                     + ", ioThreadNums=" + ioThreadNums
                     + ", slidingWindowInitialSize=" + slidingWindowInitialSize
                     + ", slidingWindowUpperLimit=" + slidingWindowUpperLimit
@@ -771,17 +712,25 @@ public class BlockWALService implements WriteAheadLog {
 
     class RecoverIterator implements Iterator<RecoverResult> {
         private final long skipRecordAtOffset;
+        private final long windowLength;
         private long nextRecoverOffset;
+        private long firstInvalidOffset = -1;
         private RecoverResult next;
 
-        public RecoverIterator(long nextRecoverOffset, long skipRecordAtOffset) {
+        public RecoverIterator(long nextRecoverOffset, long skipRecordAtOffset, long windowLength) {
             this.nextRecoverOffset = nextRecoverOffset;
             this.skipRecordAtOffset = skipRecordAtOffset;
+            this.windowLength = windowLength;
         }
 
         @Override
         public boolean hasNext() {
-            return tryReadNextRecord();
+            boolean hasNext = tryReadNextRecord();
+            if (!hasNext) {
+                // recovery complete
+                recoveryCompleteOffset = WALUtil.alignLargeByBlockSize(nextRecoverOffset);
+            }
+            return hasNext;
         }
 
         @Override
@@ -817,9 +766,13 @@ public class BlockWALService implements WriteAheadLog {
                     next = recoverResult;
                     return true;
                 } catch (ReadRecordException e) {
+                    if (firstInvalidOffset == -1) {
+                        // set to `nextRecoverOffset` is ok too, but it's safer to set to `e.getJumpNextRecoverOffset()`
+                        firstInvalidOffset = e.getJumpNextRecoverOffset();
+                    }
                     nextRecoverOffset = e.getJumpNextRecoverOffset();
                 }
-            } while (nextRecoverOffset < walHeader.getSlidingWindowNextWriteOffset());
+            } while (firstInvalidOffset == -1 || nextRecoverOffset < firstInvalidOffset + windowLength);
             return false;
         }
     }
