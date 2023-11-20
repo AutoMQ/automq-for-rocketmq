@@ -106,7 +106,7 @@ jobs:
         run: sudo bash install_flatc.sh
       - name: Build rocketmq dependency
         run: |
-          mvn clean install -U -Dmaven.test.skip=true
+          mvn clean install -U
       - uses: actions/checkout@v3
         if: always()
         with:
@@ -129,12 +129,6 @@ jobs:
           annotate_only: true
           include_passed: true
           detailed_summary: true
-      - uses: actions/upload-artifact@v3
-        if: always()
-        name: Upload test log
-        with:
-          name: test-e2e-grpc-java-log.txt
-          path: testlog.txt
 
   run_e2e_remoting_java:
     if: ${{ success() }}
@@ -144,7 +138,7 @@ jobs:
     steps:
       - name: Delay
         env:
-          DELAY_SECONDS: 30
+          DELAY_SECONDS: 60
         run: |
           sleep $DELAY_SECONDS
       - uses: actions/checkout@v3
@@ -154,7 +148,7 @@ jobs:
         run: sudo bash install_flatc.sh
       - name: Build rocketmq dependency
         run: |
-          mvn clean install -U -Dmaven.test.skip=true
+          mvn clean install -U
       - uses: actions/checkout@v3
         if: always()
         with:
@@ -177,13 +171,6 @@ jobs:
           annotate_only: true
           include_passed: true
           detailed_summary: true
-      - uses: actions/upload-artifact@v3
-        if: always()
-        name: Upload test log
-        with:
-          name: test-e2e-remoting-java-log.txt
-          path: testlog.txt
-
 
   clean:
     if: always()
