@@ -61,9 +61,6 @@ jobs:
     timeout-minutes: 60
     outputs:
       namespace: ${{ steps.create_namespace.outputs.namespace }}
-    strategy:
-      matrix:
-        version: ${{ needs.build.outputs.version-json }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -89,8 +86,9 @@ jobs:
         env:
           NAMESPACE: ${{ steps.create_namespace.outputs.namespace }}
           DOCKER_REPO: ${{ env.DOCKER_REPO }}
+          VERSION: ${{ needs.build.outputs.version-json }}
         run: |
-          sh deploy-ci.sh ${DOCKER_REPO} ${{ matrix.version }} ${NAMESPACE}
+          sh deploy-ci.sh ${DOCKER_REPO} ${VERSION} ${NAMESPACE}
 
 
   run_e2e_grpc_java:
