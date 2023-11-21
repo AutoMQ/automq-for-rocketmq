@@ -110,6 +110,7 @@ public class S3StreamStore implements StreamStore {
             "StoreWorkingThreadPool",
             storeConfig.workingThreadQueueCapacity()
         );
+        ThreadPoolMonitor.init();
     }
 
     @Override
