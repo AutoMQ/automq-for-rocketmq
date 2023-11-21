@@ -131,11 +131,12 @@ public class RocksDBKVService implements KVService {
         if (!columnFamilyNameHandleMap.containsKey(namespace)) {
             return null;
         }
-        ReadOptions readOptions = new ReadOptions();
-        transformKVReadOptions(readOptions, kvReadOptions);
-        ColumnFamilyHandle handle = columnFamilyNameHandleMap.get(namespace);
-        return transformException(() -> rocksDB.get(handle, readOptions, key)
-            , "Failed to get value from RocksDB.");
+        try (ReadOptions readOptions = new ReadOptions()) {
+            transformKVReadOptions(readOptions, kvReadOptions);
+            ColumnFamilyHandle handle = columnFamilyNameHandleMap.get(namespace);
+            return transformException(() -> rocksDB.get(handle, readOptions, key)
+                , "Failed to get value from RocksDB.");
+        }
     }
 
     private void transformKVReadOptions(ReadOptions readOptions, KVReadOptions kvReadOptions) {
@@ -171,11 +172,12 @@ public class RocksDBKVService implements KVService {
         if (columnFamilyHandle == null) {
             return;
         }
-        ReadOptions readOptions = new ReadOptions();
-        transformKVReadOptions(readOptions, kvReadOptions);
-        try (RocksIterator iterator = rocksDB.newIterator(columnFamilyHandle, readOptions)) {
-            for (iterator.seekToFirst(); iterator.isValid(); iterator.next()) {
-                callback.onRead(iterator.key(), iterator.value());
+        try (ReadOptions readOptions = new ReadOptions()) {
+            transformKVReadOptions(readOptions, kvReadOptions);
+            try (RocksIterator iterator = rocksDB.newIterator(columnFamilyHandle, readOptions)) {
+                for (iterator.seekToFirst(); iterator.isValid(); iterator.next()) {
+                    callback.onRead(iterator.key(), iterator.value());
+                }
             }
         }
     }
@@ -284,11 +286,11 @@ public class RocksDBKVService implements KVService {
         if (stopped) {
             throw new StoreException(StoreErrorCode.KV_SERVICE_IS_NOT_RUNNING, "KV service is stopped.");
         }
-        WriteOptions writeOptions = new WriteOptions()
-            .setDisableWAL(true);
-        ColumnFamilyHandle handle = getOrCreateColumnFamily(namespace);
-        transformException(() -> rocksDB.put(handle, writeOptions, key, value),
-            "Failed to put value into RocksDB.");
+        try (WriteOptions writeOptions = new WriteOptions().setDisableWAL(true)) {
+            ColumnFamilyHandle handle = getOrCreateColumnFamily(namespace);
+            transformException(() -> rocksDB.put(handle, writeOptions, key, value),
+                "Failed to put value into RocksDB.");
+        }
     }
 
     @Override
@@ -339,7 +341,10 @@ public class RocksDBKVService implements KVService {
             ColumnFamilyHandle handle = columnFamilyNameHandleMap.get(namespace);
             transformException(() -> rocksDB.dropColumnFamily(handle),
                 "Failed to drop column family.");
-            columnFamilyNameHandleMap.remove(namespace);
+            ColumnFamilyHandle nativeHandle = columnFamilyNameHandleMap.remove(namespace);
+            if (nativeHandle != null) {
+                nativeHandle.close();
+            }
         }
     }
 
@@ -392,8 +397,8 @@ public class RocksDBKVService implements KVService {
         }
         Snapshot snapshot = snapshotMap.remove(snapshotVersionId);
         if (snapshot != null) {
-            snapshot.close();
             rocksDB.releaseSnapshot(snapshot);
+            snapshot.close();
         }
     }
 }

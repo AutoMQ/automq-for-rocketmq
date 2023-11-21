@@ -49,7 +49,7 @@
         <grpc.version>1.58.0</grpc.version><!-- CURRENT_GRPC_VERSION -->
         <protobuf.version>3.24.0</protobuf.version>
         <protoc.version>3.24.0</protoc.version>
-        <rocksdb.version>8.5.3</rocksdb.version>
+        <rocksdb.version>8.6.7</rocksdb.version>
         <guava.version>32.0.1-jre</guava.version>
         <slf4j.version>2.0.9</slf4j.version>
         <snakeyaml.version>2.2</snakeyaml.version>
