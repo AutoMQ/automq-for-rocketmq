@@ -42,6 +42,7 @@ import com.automq.stream.s3.operator.S3Operator;
 import com.automq.stream.s3.streams.StreamManager;
 import com.automq.stream.s3.wal.BlockWALService;
 import com.automq.stream.s3.wal.WriteAheadLog;
+import com.automq.stream.utils.threads.S3StreamThreadPoolMonitor;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.instrumentation.annotations.SpanAttribute;
 import io.opentelemetry.instrumentation.annotations.WithSpan;
@@ -110,7 +111,7 @@ public class S3StreamStore implements StreamStore {
             "StoreWorkingThreadPool",
             storeConfig.workingThreadQueueCapacity()
         );
-        ThreadPoolMonitor.init();
+        S3StreamThreadPoolMonitor.init();
     }
 
     @Override
