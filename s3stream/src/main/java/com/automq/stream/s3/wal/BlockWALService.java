@@ -759,6 +759,7 @@ public class BlockWALService implements WriteAheadLog {
             if (next != null) {
                 return true;
             }
+            // FIXME: do-while -> while-do
             do {
                 try {
                     boolean skip = nextRecoverOffset == skipRecordAtOffset;
@@ -775,6 +776,8 @@ public class BlockWALService implements WriteAheadLog {
                     if (firstInvalidOffset == -1) {
                         // set to `nextRecoverOffset` is ok too, but it's safer to set to `e.getJumpNextRecoverOffset()`
                         firstInvalidOffset = e.getJumpNextRecoverOffset();
+                        // FIXME: if nextRecoverOffset is not aligned by BLOCK_SIZE, it should not be regarded as invalid offset
+                        firstInvalidOffset = nextRecoverOffset;
                     }
                     nextRecoverOffset = e.getJumpNextRecoverOffset();
                 }

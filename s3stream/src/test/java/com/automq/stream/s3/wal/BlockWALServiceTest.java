@@ -711,7 +711,7 @@ class BlockWALServiceTest {
                         100L,
                         20230920L,
                         50L,
-                        Arrays.asList(20230900L, 20230910L, 20230916L, 20230920L, 20230930L, 20230940L, 20230950L, 20230960L, 20230970L),
+                        Arrays.asList(20230900L, 20230910L, 20230916L, 20230920L, 20230930L, 20230940L, 20230950L, 20230960L, 20230970L, 20230980L),
                         Arrays.asList(20230930L, 20230940L, 20230950L, 20230960L, 20230970L),
                         WALUtil.BLOCK_SIZE
                 ).toArguments("big logic offset"),
@@ -721,7 +721,7 @@ class BlockWALServiceTest {
                         180L,
                         50L,
                         Arrays.asList(150L, 160L, 170L, 180L, 190L, 200L, 202L, 210L, 220L, 230L, 240L),
-                        Arrays.asList(190L, 200L, 202L, 210L, 220L, 230L, 240L),
+                        Arrays.asList(190L, 200L, 202L, 210L, 220L, 230L),
                         WALUtil.BLOCK_SIZE
                 ).toArguments("round robin"),
                 new RecoverFromDisasterParam(
@@ -731,10 +731,72 @@ class BlockWALServiceTest {
                         50L,
                         Arrays.asList(111L, 113L, 115L, 117L, 119L, 120L, 130L,
                                 210L, 215L, 220L, 230L, 240L, 250L, 260L, 270L, 280L, 290L),
-                        Arrays.asList(215L, 220L, 230L, 240L, 250L, 260L, 270L, 280L, 290L),
+                        Arrays.asList(215L, 220L, 230L, 240L, 250L, 260L),
                         WALUtil.BLOCK_SIZE
                 ).toArguments("overwrite"),
-                // TODO: test window max length
+                new RecoverFromDisasterParam(
+                        WALUtil.BLOCK_SIZE + 1,
+                        100L,
+                        -1L,
+                        1L,
+                        Arrays.asList(0L, 2L, 5L, 7L),
+                        List.of(0L, 2L),
+                        WALUtil.BLOCK_SIZE
+                ).toArguments("small window - record size not aligned"),
+                new RecoverFromDisasterParam(
+                        WALUtil.BLOCK_SIZE + 1,
+                        100L,
+                        10L,
+                        3L,
+                        Arrays.asList(10L, 12L, 15L, 17L, 19L),
+                        List.of(12L, 15L),
+                        WALUtil.BLOCK_SIZE
+                ).toArguments("invalid record in window - record size not aligned"),
+                new RecoverFromDisasterParam(
+                        WALUtil.BLOCK_SIZE + 1,
+                        100L,
+                        10L,
+                        9L,
+                        Arrays.asList(9L, 13L, 17L, 19L),
+                        List.of(13L, 17L),
+                        WALUtil.BLOCK_SIZE
+                ).toArguments("trim at an invalid record - record size not aligned"),
+                new RecoverFromDisasterParam(
+                        WALUtil.BLOCK_SIZE,
+                        100L,
+                        -1L,
+                        1L,
+                        Arrays.asList(0L, 1L, 3L, 4L, 5L),
+                        List.of(0L, 1L),
+                        WALUtil.BLOCK_SIZE
+                ).toArguments("small window - record size aligned"),
+                new RecoverFromDisasterParam(
+                        WALUtil.BLOCK_SIZE,
+                        100L,
+                        10L,
+                        3L,
+                        Arrays.asList(10L, 11L, 13L, 14L, 15L, 16L),
+                        List.of(11L, 13L, 14L),
+                        WALUtil.BLOCK_SIZE
+                ).toArguments("invalid record in window - record size aligned"),
+                new RecoverFromDisasterParam(
+                        WALUtil.BLOCK_SIZE,
+                        100L,
+                        10L,
+                        5L,
+                        Arrays.asList(9L, 11L, 13L, 14L, 15L, 16L),
+                        List.of(11L, 13L, 14L, 15L),
+                        WALUtil.BLOCK_SIZE
+                ).toArguments("trim at an invalid record - record size aligned"),
+                new RecoverFromDisasterParam(
+                        WALUtil.BLOCK_SIZE,
+                        100L,
+                        10L,
+                        0L,
+                        Arrays.asList(10L, 11L, 12L, 14L),
+                        List.of(11L, 12L),
+                        WALUtil.BLOCK_SIZE
+                ).toArguments("zero window"),
                 new RecoverFromDisasterParam(
                         42,
                         8192L,
@@ -748,7 +810,7 @@ class BlockWALServiceTest {
                         42,
                         8192L,
                         42L,
-                        50L,
+                        8192L,
                         Arrays.asList(0L, 42L, 84L, 126L),
                         Arrays.asList(84L, 126L),
                         1
@@ -757,7 +819,7 @@ class BlockWALServiceTest {
                         42,
                         8192L,
                         42L,
-                        50L,
+                        8192L,
                         Arrays.asList(0L, 42L, 42 * 2L, 42 * 4L, 4096L, 4096L + 42L, 4096L + 42 * 3L),
                         Arrays.asList(42 * 2L, 4096L, 4096L + 42L),
                         1
@@ -766,7 +828,7 @@ class BlockWALServiceTest {
                         42,
                         8192L,
                         42L,
-                        50L,
+                        8192L,
                         Arrays.asList(42L, 42 * 4L, 42 * 2L, 4096L + 42 * 3L, 0L, 4096L, 4096L + 42L),
                         Arrays.asList(42 * 2L, 4096L, 4096L + 42L),
                         1
@@ -775,7 +837,7 @@ class BlockWALServiceTest {
                         1000,
                         8192L,
                         2000L,
-                        50L,
+                        8192L,
                         Arrays.asList(0L, 1000L, 2000L, 3000L, 4000L, 5000L, 7000L),
                         Arrays.asList(3000L, 4000L, 5000L),
                         1
@@ -784,7 +846,7 @@ class BlockWALServiceTest {
                         42,
                         8192L,
                         8192L + 4096L + 42L,
-                        50L,
+                        8192L,
                         Arrays.asList(8192L + 4096L, 8192L + 4096L + 42L, 8192L + 4096L + 42 * 2L, 8192L + 4096L + 42 * 4L, 16384L, 16384L + 42L, 16384L + 42 * 3L),
                         Arrays.asList(8192L + 4096L + 42 * 2L, 16384L, 16384L + 42L),
                         1
@@ -793,12 +855,70 @@ class BlockWALServiceTest {
                         1000,
                         8192L,
                         12000L,
-                        50L,
+                        8192L,
                         Arrays.asList(1000L, 2000L, 3000L, 4000L, 5000L, 6000L, 7000L,
                                 9000L, 10000L, 11000L, 12000L, 13000L, 14000L, 15000L),
                         Arrays.asList(13000L, 14000L, 15000L),
                         1
-                ).toArguments("merge write - overwrite")
+                ).toArguments("merge write - overwrite"),
+                new RecoverFromDisasterParam(
+                        42,
+                        8192L,
+                        -1L,
+                        4096L,
+                        Arrays.asList(0L, 42L, 42 * 3L, 4096L, 4096L + 42L, 4096L + 42 * 3L, 12288L, 12288L + 42L, 12288L + 42 * 3L, 16384L),
+                        Arrays.asList(0L, 42L, 4096L, 4096L + 42L),
+                        1
+                ).toArguments("merge write - small window"),
+                new RecoverFromDisasterParam(
+                        42,
+                        4096L * 20,
+                        4096L * 2,
+                        4096L * 4,
+                        Arrays.asList(4096L * 2, 4096L * 2 + 42L, 4096L * 2 + 42 * 3L,
+                                4096L * 4, 4096L * 4 + 42L, 4096L * 4 + 42 * 3L,
+                                4096L * 5, 4096L * 5 + 42L, 4096L * 5 + 42 * 3L,
+                                4096L * 6, 4096L * 6 + 42L, 4096L * 6 + 42 * 3L,
+                                4096L * 7, 4096L * 7 + 42L, 4096L * 7 + 42 * 3L,
+                                4096L * 8),
+                        Arrays.asList(4096L * 2 + 42L, 4096L * 4, 4096L * 4 + 42L,
+                                4096L * 5, 4096L * 5 + 42L, 4096L * 6, 4096L * 6 + 42L),
+                        1
+                ).toArguments("merge write - invalid record in window"),
+                new RecoverFromDisasterParam(
+                        42,
+                        4096L * 20,
+                        4096L * 2 + 42 * 2L,
+                        4096L * 2,
+                        Arrays.asList(4096L * 2, 4096L * 2 + 42L, 4096L * 2 + 42 * 3L,
+                                4096L * 3, 4096L * 3 + 42L, 4096L * 3 + 42 * 3L,
+                                4096L * 5, 4096L * 5 + 42L, 4096L * 5 + 42 * 3L,
+                                4096L * 6, 4096L * 6 + 42L, 4096L * 6 + 42 * 3L,
+                                4096L * 7),
+                        Arrays.asList(4096L * 4, 4096L * 4 + 42L, 4096L * 5, 4096L * 5 + 42L),
+                        1
+                ).toArguments("merge write - trim at an invalid record"),
+                new RecoverFromDisasterParam(
+                        42,
+                        4096L * 20,
+                        4096L * 2,
+                        0L,
+                        Arrays.asList(4096L * 2, 4096L * 2 + 42L, 4096L * 2 + 42 * 3L,
+                                4096L * 3, 4096L * 3 + 42L, 4096L * 3 + 42 * 3L,
+                                4096L * 5, 4096L * 5 + 42L, 4096L * 5 + 42 * 3L,
+                                4096L * 6),
+                        Arrays.asList(4096L * 2 + 42L, 4096L * 3, 4096L * 3 + 42L),
+                        1
+                ).toArguments("merge write - zero window"),
+                new RecoverFromDisasterParam(
+                        42,
+                        8192L,
+                        42L,
+                        8192L,
+                        Arrays.asList(0L, 42L, 42 * 2L, 42 * 4L, 4096L, 4096L + 42L, 4096L + 42 * 3L),
+                        Arrays.asList(42 * 2L, 4096L, 4096L + 42L),
+                        1
+                ).toArguments("todo: delete me")
         );
     }
 
