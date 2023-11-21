@@ -759,8 +759,7 @@ public class BlockWALService implements WriteAheadLog {
             if (next != null) {
                 return true;
             }
-            // FIXME: do-while -> while-do
-            do {
+            while (firstInvalidOffset == -1 || nextRecoverOffset < firstInvalidOffset + windowLength) {
                 try {
                     boolean skip = nextRecoverOffset == skipRecordAtOffset;
                     ByteBuf nextRecordBody = readRecord(walHeader.recordSectionCapacity(), nextRecoverOffset);
@@ -779,7 +778,7 @@ public class BlockWALService implements WriteAheadLog {
                     }
                     nextRecoverOffset = e.getJumpNextRecoverOffset();
                 }
-            } while (firstInvalidOffset == -1 || nextRecoverOffset < firstInvalidOffset + windowLength);
+            }
             return false;
         }
     }
