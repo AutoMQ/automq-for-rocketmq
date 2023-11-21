@@ -33,6 +33,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.concurrent.CompletableFuture;
@@ -115,6 +116,7 @@ public class BlockWALService implements WriteAheadLog {
     private SlidingWindowService slidingWindowService;
     private WALHeader walHeader;
     private boolean recoveryMode;
+    private boolean firstStart;
     private int nodeId = NOOP_NODE_ID;
     private long epoch = NOOP_EPOCH;
     /**
@@ -273,7 +275,7 @@ public class BlockWALService implements WriteAheadLog {
                 throw new WALNotInitializedException("try to open an uninitialized WAL in recovery mode. path: " + walChannel.path());
             }
             header = newWALHeader();
-            // TODO: no need to recovery and reset later
+            firstStart = true;
             LOGGER.info("no available WALHeader, create a new one: {}", header);
         } else {
             checkCapacity(header);
@@ -431,6 +433,10 @@ public class BlockWALService implements WriteAheadLog {
     @Override
     public Iterator<RecoverResult> recover() {
         checkReadyToServe();
+        if (firstStart) {
+            recoveryCompleteOffset = 0;
+            return Collections.emptyIterator();
+        }
 
         long trimmedOffset = walHeader.getTrimOffset();
         long recoverStartOffset = trimmedOffset;
@@ -446,9 +452,9 @@ public class BlockWALService implements WriteAheadLog {
         checkReadyToServe();
         checkRecoverFinished();
 
-        slidingWindowService.start(walHeader.getSlidingWindowMaxLength(), recoveryCompleteOffset + WALUtil.BLOCK_SIZE);
-        LOGGER.info("reset sliding window and trim WAL to offset: {}", recoveryCompleteOffset);
-        return trim(recoveryCompleteOffset, true).thenRun(() -> resetFinished.set(true));
+        slidingWindowService.start(walHeader.getSlidingWindowMaxLength(), recoveryCompleteOffset);
+        LOGGER.info("reset sliding window to offset: {}", recoveryCompleteOffset);
+        return trim(recoveryCompleteOffset - 1, true).thenRun(() -> resetFinished.set(true));
     }
 
     @Override
