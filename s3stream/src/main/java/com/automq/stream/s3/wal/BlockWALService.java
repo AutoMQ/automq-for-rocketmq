@@ -773,10 +773,8 @@ public class BlockWALService implements WriteAheadLog {
                     next = recoverResult;
                     return true;
                 } catch (ReadRecordException e) {
-                    if (firstInvalidOffset == -1) {
-                        // set to `nextRecoverOffset` is ok too, but it's safer to set to `e.getJumpNextRecoverOffset()`
-                        firstInvalidOffset = e.getJumpNextRecoverOffset();
-                        // FIXME: if nextRecoverOffset is not aligned by BLOCK_SIZE, it should not be regarded as invalid offset
+                    if (firstInvalidOffset == -1 && WALUtil.isAligned(nextRecoverOffset)) {
+                        // first invalid offset
                         firstInvalidOffset = nextRecoverOffset;
                     }
                     nextRecoverOffset = e.getJumpNextRecoverOffset();

@@ -75,7 +75,7 @@ public class WALBlockDeviceChannel implements WALChannel {
         // And it's the caller's responsibility to make sure the capacity is right
         // FIXME: in recovery mode, `capacity` will be set to CAPACITY_NOT_SET here. It should be corrected after recovery.
         this.capacity = blockDeviceCapacityWant;
-        if (blockDeviceCapacityWant != WALUtil.alignSmallByBlockSize(blockDeviceCapacityWant)) {
+        if (!WALUtil.isAligned(blockDeviceCapacityWant)) {
             throw new RuntimeException("wal capacity must be aligned by block size when using block device");
         }
         this.initTempBufferSize = initTempBufferSize;
@@ -123,7 +123,7 @@ public class WALBlockDeviceChannel implements WALChannel {
     }
 
     private ByteBuffer getBuffer(int alignedSize) {
-        assert alignedSize % WALUtil.BLOCK_SIZE == 0;
+        assert WALUtil.isAligned(alignedSize);
 
         ByteBuffer currentBuf = threadLocalByteBuffer.get();
         if (alignedSize <= currentBuf.capacity()) {
@@ -141,7 +141,7 @@ public class WALBlockDeviceChannel implements WALChannel {
 
     @Override
     public void write(ByteBuf src, long position) throws IOException {
-        assert position % WALUtil.BLOCK_SIZE == 0;
+        assert WALUtil.isAligned(position);
 
         int alignedSize = (int) WALUtil.alignLargeByBlockSize(src.readableBytes());
         assert position + alignedSize <= capacity();
@@ -157,7 +157,7 @@ public class WALBlockDeviceChannel implements WALChannel {
     }
 
     private int write(ByteBuffer src, long position) throws IOException {
-        assert src.remaining() % WALUtil.BLOCK_SIZE == 0;
+        assert WALUtil.isAligned(src.remaining());
 
         int bytesWritten = 0;
         while (src.hasRemaining()) {
