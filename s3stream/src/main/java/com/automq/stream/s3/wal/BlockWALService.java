@@ -444,7 +444,7 @@ public class BlockWALService implements WriteAheadLog {
             recoverStartOffset = 0;
         }
         long windowLength = walHeader.getSlidingWindowMaxLength();
-        return new RecoverIterator(recoverStartOffset, trimmedOffset, windowLength);
+        return new RecoverIterator(recoverStartOffset, windowLength, trimmedOffset);
     }
 
     @Override
@@ -717,13 +717,13 @@ public class BlockWALService implements WriteAheadLog {
     }
 
     class RecoverIterator implements Iterator<RecoverResult> {
-        private final long skipRecordAtOffset;
         private final long windowLength;
+        private final long skipRecordAtOffset;
         private long nextRecoverOffset;
         private long firstInvalidOffset = -1;
         private RecoverResult next;
 
-        public RecoverIterator(long nextRecoverOffset, long skipRecordAtOffset, long windowLength) {
+        public RecoverIterator(long nextRecoverOffset, long windowLength, long skipRecordAtOffset) {
             this.nextRecoverOffset = nextRecoverOffset;
             this.skipRecordAtOffset = skipRecordAtOffset;
             this.windowLength = windowLength;
@@ -772,8 +772,10 @@ public class BlockWALService implements WriteAheadLog {
                     next = recoverResult;
                     return true;
                 } catch (ReadRecordException e) {
-                    if (firstInvalidOffset == -1 && WALUtil.isAligned(nextRecoverOffset)) {
+                    if (firstInvalidOffset == -1 && WALUtil.isAligned(nextRecoverOffset) && nextRecoverOffset != skipRecordAtOffset) {
                         // first invalid offset
+                        LOGGER.info("meet the first invalid offset during recovery. offset: {}, window: {}, detail: '{}'",
+                                nextRecoverOffset, windowLength, e.getMessage());
                         firstInvalidOffset = nextRecoverOffset;
                     }
                     nextRecoverOffset = e.getJumpNextRecoverOffset();

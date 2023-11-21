@@ -757,8 +757,8 @@ class BlockWALServiceTest {
                         100L,
                         10L,
                         9L,
-                        Arrays.asList(9L, 13L, 17L, 19L),
-                        List.of(13L, 17L),
+                        Arrays.asList(9L, 14L, 18L, 20L),
+                        List.of(14L, 18L),
                         WALUtil.BLOCK_SIZE
                 ).toArguments("trim at an invalid record - record size not aligned"),
                 new RecoverFromDisasterParam(
@@ -784,8 +784,8 @@ class BlockWALServiceTest {
                         100L,
                         10L,
                         5L,
-                        Arrays.asList(9L, 11L, 13L, 14L, 15L, 16L),
-                        List.of(11L, 13L, 14L, 15L),
+                        Arrays.asList(9L, 11L, 13L, 15L, 16L, 17L),
+                        List.of(11L, 13L, 15L, 16L),
                         WALUtil.BLOCK_SIZE
                 ).toArguments("trim at an invalid record - record size aligned"),
                 new RecoverFromDisasterParam(
@@ -863,7 +863,7 @@ class BlockWALServiceTest {
                 ).toArguments("merge write - overwrite"),
                 new RecoverFromDisasterParam(
                         42,
-                        8192L,
+                        4096L * 20,
                         -1L,
                         4096L,
                         Arrays.asList(0L, 42L, 42 * 3L, 4096L, 4096L + 42L, 4096L + 42 * 3L, 12288L, 12288L + 42L, 12288L + 42 * 3L, 16384L),
@@ -895,7 +895,7 @@ class BlockWALServiceTest {
                                 4096L * 5, 4096L * 5 + 42L, 4096L * 5 + 42 * 3L,
                                 4096L * 6, 4096L * 6 + 42L, 4096L * 6 + 42 * 3L,
                                 4096L * 7),
-                        Arrays.asList(4096L * 4, 4096L * 4 + 42L, 4096L * 5, 4096L * 5 + 42L),
+                        Arrays.asList(4096L * 3, 4096L * 3 + 42L, 4096L * 5, 4096L * 5 + 42L),
                         1
                 ).toArguments("merge write - trim at an invalid record"),
                 new RecoverFromDisasterParam(
@@ -909,16 +909,7 @@ class BlockWALServiceTest {
                                 4096L * 6),
                         Arrays.asList(4096L * 2 + 42L, 4096L * 3, 4096L * 3 + 42L),
                         1
-                ).toArguments("merge write - zero window"),
-                new RecoverFromDisasterParam(
-                        42,
-                        8192L,
-                        42L,
-                        8192L,
-                        Arrays.asList(0L, 42L, 42 * 2L, 42 * 4L, 4096L, 4096L + 42L, 4096L + 42 * 3L),
-                        Arrays.asList(42 * 2L, 4096L, 4096L + 42L),
-                        1
-                ).toArguments("todo: delete me")
+                ).toArguments("merge write - zero window")
         );
     }
 
