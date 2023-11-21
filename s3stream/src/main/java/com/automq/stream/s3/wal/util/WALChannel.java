@@ -131,7 +131,7 @@ public interface WALChannel {
             }
 
             if (useDirect) {
-                return new WALBlockDeviceChannel(path, capacity, initBufferSize, maxBufferSize);
+                return new WALBlockDeviceChannel(path, capacity, initBufferSize, maxBufferSize, recoveryMode);
             } else {
                 return new WALFileChannel(path, capacity, recoveryMode);
             }

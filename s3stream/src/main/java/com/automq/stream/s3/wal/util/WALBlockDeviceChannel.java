@@ -17,6 +17,8 @@
 
 package com.automq.stream.s3.wal.util;
 
+import com.automq.stream.s3.wal.WALCapacityMismatchException;
+import com.automq.stream.s3.wal.WALNotInitializedException;
 import com.automq.stream.thirdparty.moe.cnkirito.kdio.DirectIOLib;
 import com.automq.stream.thirdparty.moe.cnkirito.kdio.DirectIOUtils;
 import com.automq.stream.thirdparty.moe.cnkirito.kdio.DirectRandomAccessFile;
@@ -24,13 +26,14 @@ import io.netty.buffer.ByteBuf;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 
-public class WALBlockDeviceChannel implements WALChannel {
+import static com.automq.stream.s3.Constants.CAPACITY_NOT_SET;
 
-    final String blockDevicePath;
-    final long capacity;
+public class WALBlockDeviceChannel implements WALChannel {
+    final String path;
+    final long capacityWant;
+    final boolean recoveryMode;
     final DirectIOLib directIOLib;
     /**
      * 0 means allocate on demand
@@ -41,6 +44,7 @@ public class WALBlockDeviceChannel implements WALChannel {
      */
     final int maxTempBufferSize;
 
+    long capacityFact = 0;
     DirectRandomAccessFile randomAccessFile;
 
     ThreadLocal<ByteBuffer> threadLocalByteBuffer = new ThreadLocal<>() {
@@ -50,23 +54,26 @@ public class WALBlockDeviceChannel implements WALChannel {
         }
     };
 
-    public WALBlockDeviceChannel(String blockDevicePath, long blockDeviceCapacityWant) {
-        this(blockDevicePath, blockDeviceCapacityWant, 0, 0);
+    public WALBlockDeviceChannel(String path, long capacityWant) {
+        this(path, capacityWant, 0, 0, false);
     }
 
-    public WALBlockDeviceChannel(String blockDevicePath, long blockDeviceCapacityWant, int initTempBufferSize, int maxTempBufferSize) {
-        this.blockDevicePath = blockDevicePath;
-        // We cannot get the actual capacity of the block device here, so we just use the capacity we want
-        // And it's the caller's responsibility to make sure the capacity is right
-        // FIXME: in recovery mode, `capacity` will be set to CAPACITY_NOT_SET here. It should be corrected after recovery.
-        this.capacity = blockDeviceCapacityWant;
-        if (!WALUtil.isAligned(blockDeviceCapacityWant)) {
-            throw new RuntimeException("wal capacity must be aligned by block size when using block device");
+    public WALBlockDeviceChannel(String path, long capacityWant, int initTempBufferSize, int maxTempBufferSize, boolean recoveryMode) {
+        this.path = path;
+        this.recoveryMode = recoveryMode;
+        if (recoveryMode) {
+            this.capacityWant = CAPACITY_NOT_SET;
+        } else {
+            assert capacityWant > 0;
+            this.capacityWant = capacityWant;
+            if (!WALUtil.isAligned(capacityWant)) {
+                throw new RuntimeException("wal capacity must be aligned by block size when using block device");
+            }
         }
         this.initTempBufferSize = initTempBufferSize;
         this.maxTempBufferSize = maxTempBufferSize;
 
-        DirectIOLib lib = DirectIOLib.getLibForPath(blockDevicePath);
+        DirectIOLib lib = DirectIOLib.getLibForPath(path);
         if (null == lib) {
             throw new RuntimeException("O_DIRECT not supported");
         } else {
@@ -92,16 +99,36 @@ public class WALBlockDeviceChannel implements WALChannel {
 
     @Override
     public void open() throws IOException {
-        // TODO: pass a function to open which can read the real capacity from the block device
-        if (!blockDevicePath.startsWith(WALChannelBuilder.DEVICE_PREFIX)) {
-            // If the block device path is not a device, we create a file with the capacity we want
-            // This is ONLY for test purpose, so we don't check the capacity of the file
-            try (RandomAccessFile raf = new RandomAccessFile(blockDevicePath, "rw")) {
-                raf.setLength(capacity);
-            }
+        // TODO: pass a function to `open` which can read the real capacity from the block device
+        if (!path.startsWith(WALChannelBuilder.DEVICE_PREFIX)) {
+            openAndCheckFile();
         }
 
-        randomAccessFile = new DirectRandomAccessFile(new File(blockDevicePath), "rw");
+        randomAccessFile = new DirectRandomAccessFile(new File(path), "rw");
+    }
+
+    /**
+     * Create the file and set length if not exists, and check the file size if exists.
+     */
+    private void openAndCheckFile() throws IOException {
+        File file = new File(path);
+        if (file.exists()) {
+            if (!file.isFile()) {
+                throw new IOException(path + " is not a file");
+            }
+            capacityFact = file.length();
+            if (!recoveryMode && capacityFact != capacityWant) {
+                // the file exists but not the same size as requested
+                throw new WALCapacityMismatchException(path, capacityWant, capacityFact);
+            }
+        } else {
+            // the file does not exist
+            if (recoveryMode) {
+                throw new WALNotInitializedException("try to open an uninitialized WAL in recovery mode. path: " + path);
+            }
+            WALUtil.createFile(path, capacityWant);
+            capacityFact = capacityWant;
+        }
     }
 
     @Override
@@ -116,12 +143,12 @@ public class WALBlockDeviceChannel implements WALChannel {
 
     @Override
     public long capacity() {
-        return capacity;
+        return capacityFact;
     }
 
     @Override
     public String path() {
-        return blockDevicePath;
+        return path;
     }
 
     private ByteBuffer getBuffer(int alignedSize) {
