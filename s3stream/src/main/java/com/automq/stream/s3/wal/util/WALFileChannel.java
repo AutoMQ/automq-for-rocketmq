@@ -52,7 +52,7 @@ public class WALFileChannel implements WALChannel {
     }
 
     @Override
-    public void open() throws IOException {
+    public void open(CapacityReader reader) throws IOException {
         File file = new File(filePath);
         if (file.exists()) {
             if (!file.isFile()) {
@@ -75,6 +75,19 @@ public class WALFileChannel implements WALChannel {
         }
 
         fileChannel = randomAccessFile.getChannel();
+
+        checkCapacity(reader);
+    }
+
+    private void checkCapacity(CapacityReader reader) throws IOException {
+        if (null == reader) {
+            return;
+        }
+        Long capacity = reader.capacity(this);
+        if (null != capacity && fileCapacityFact != capacity) {
+            throw new WALCapacityMismatchException(filePath, fileCapacityFact, capacity);
+        }
+        assert fileCapacityFact != CAPACITY_NOT_SET;
     }
 
     @Override

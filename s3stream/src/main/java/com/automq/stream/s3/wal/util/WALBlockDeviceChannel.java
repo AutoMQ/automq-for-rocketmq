@@ -98,13 +98,17 @@ public class WALBlockDeviceChannel implements WALChannel {
     }
 
     @Override
-    public void open() throws IOException {
-        // TODO: pass a function to `open` which can read the real capacity from the block device
+    public void open(CapacityReader reader) throws IOException {
         if (!path.startsWith(WALChannelBuilder.DEVICE_PREFIX)) {
             openAndCheckFile();
+        } else {
+            // we could not get the real capacity of the block device, so we just use the `capacityWant`
+            capacityFact = capacityWant;
         }
 
         randomAccessFile = new DirectRandomAccessFile(new File(path), "rw");
+
+        checkCapacity(reader);
     }
 
     /**
@@ -129,6 +133,24 @@ public class WALBlockDeviceChannel implements WALChannel {
             WALUtil.createFile(path, capacityWant);
             capacityFact = capacityWant;
         }
+    }
+
+    private void checkCapacity(CapacityReader reader) throws IOException {
+        if (null == reader) {
+            return;
+        }
+        Long capacity = reader.capacity(this);
+        if (null == capacity) {
+            if (recoveryMode) {
+                throw new WALNotInitializedException("try to open an uninitialized WAL in recovery mode. path: " + path);
+            }
+        } else if (capacityFact == CAPACITY_NOT_SET) {
+            // recovery mode on block device
+            capacityFact = capacity;
+        } else if (capacityFact != capacity) {
+            throw new WALCapacityMismatchException(path, capacityFact, capacity);
+        }
+        assert capacityFact != CAPACITY_NOT_SET;
     }
 
     @Override

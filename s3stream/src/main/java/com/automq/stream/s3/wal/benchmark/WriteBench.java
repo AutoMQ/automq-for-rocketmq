@@ -31,6 +31,7 @@ import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
 import net.sourceforge.argparse4j.inf.Namespace;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.NavigableSet;
@@ -87,18 +88,24 @@ public class WriteBench implements AutoCloseable {
     }
 
     private static void resetWALHeader(String path) throws IOException {
-        if (!path.startsWith(WALChannel.WALChannelBuilder.DEVICE_PREFIX)) {
-            return;
-        }
         System.out.println("Resetting WAL header");
-        int capacity = BlockWALService.WAL_HEADER_TOTAL_CAPACITY;
-        WALChannel channel = WALChannel.builder(path).capacity(capacity).build();
-        channel.open();
-        ByteBuf buf = DirectByteBufAlloc.byteBuffer(capacity);
-        buf.writeZero(capacity);
-        channel.write(buf, 0);
-        buf.release();
-        channel.close();
+        if (path.startsWith(WALChannel.WALChannelBuilder.DEVICE_PREFIX)) {
+            // block device
+            int capacity = BlockWALService.WAL_HEADER_TOTAL_CAPACITY;
+            WALChannel channel = WALChannel.builder(path).capacity(capacity).build();
+            channel.open();
+            ByteBuf buf = DirectByteBufAlloc.byteBuffer(capacity);
+            buf.writeZero(capacity);
+            channel.write(buf, 0);
+            buf.release();
+            channel.close();
+        } else {
+            // normal file
+            File file = new File(path);
+            if (file.isFile() && !file.delete()) {
+                throw new IOException("Failed to delete existing file " + file);
+            }
+        }
     }
 
     private static void logIt(Config config, Stat stat) {

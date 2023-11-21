@@ -36,6 +36,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
@@ -267,9 +268,11 @@ public class BlockWALService implements WriteAheadLog {
     public WriteAheadLog start() throws IOException {
         StopWatch stopWatch = StopWatch.createStarted();
 
-        walChannel.open();
+        walChannel.open(channel -> Optional.ofNullable(tryReadWALHeader(walChannel))
+                .map(WALHeader::getCapacity)
+                .orElse(null));
 
-        WALHeader header = tryReadWALHeader();
+        WALHeader header = tryReadWALHeader(walChannel);
         if (null == header) {
             if (recoveryMode) {
                 throw new WALNotInitializedException("try to open an uninitialized WAL in recovery mode. path: " + walChannel.path());
@@ -278,7 +281,6 @@ public class BlockWALService implements WriteAheadLog {
             firstStart = true;
             LOGGER.info("no available WALHeader, create a new one: {}", header);
         } else {
-            checkCapacity(header);
             LOGGER.info("read WALHeader from WAL: {}", header);
         }
         walHeaderReady(header);
@@ -292,7 +294,7 @@ public class BlockWALService implements WriteAheadLog {
     /**
      * Try to read the header from WAL, return the latest one.
      */
-    private WALHeader tryReadWALHeader() {
+    private WALHeader tryReadWALHeader(WALChannel walChannel) {
         WALHeader header = null;
         for (int i = 0; i < WAL_HEADER_COUNT; i++) {
             ByteBuf buf = DirectByteBufAlloc.byteBuffer(WALHeader.WAL_HEADER_SIZE);
@@ -312,15 +314,6 @@ public class BlockWALService implements WriteAheadLog {
             }
         }
         return header;
-    }
-
-    /**
-     * Check whether the capacity of the WAL channel is the same as the capacity in the header.
-     */
-    private void checkCapacity(WALHeader header) throws WALCapacityMismatchException {
-        if (header.getCapacity() != walChannel.capacity()) {
-            throw new WALCapacityMismatchException(walChannel.path(), walChannel.capacity(), header.getCapacity());
-        }
     }
 
     private WALHeader newWALHeader() {
