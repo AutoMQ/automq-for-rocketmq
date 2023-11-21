@@ -57,10 +57,6 @@ public class WALBlockDeviceChannel implements WALChannel {
     ThreadLocal<ByteBuffer> threadLocalByteBuffer = new ThreadLocal<>() {
         @Override
         protected ByteBuffer initialValue() {
-            if (initTempBufferSize == 0) {
-                // An empty buffer just to avoid NPE
-                return ByteBuffer.allocate(0);
-            }
             return DirectIOUtils.allocateForDirectIO(directIOLib, initTempBufferSize);
         }
     };
@@ -135,7 +131,7 @@ public class WALBlockDeviceChannel implements WALChannel {
 
         ByteBuffer newBuf = DirectIOUtils.allocateForDirectIO(directIOLib, alignedSize);
         threadLocalByteBuffer.set(newBuf);
-        DirectIOUtils.release(currentBuf);
+        DirectIOUtils.releaseDirectBuffer(currentBuf);
         return newBuf;
     }
 
