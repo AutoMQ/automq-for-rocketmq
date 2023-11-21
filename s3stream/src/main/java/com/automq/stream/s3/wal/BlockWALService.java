@@ -617,8 +617,6 @@ public class BlockWALService implements WriteAheadLog {
                 blockDeviceCapacityWant = blockDeviceCapacityWant / WALUtil.BLOCK_SIZE * WALUtil.BLOCK_SIZE;
             }
 
-            // TODO: BlockWALService support recovery mode
-            // TODO: recovery mode: throw WALNotInitializedException when WAL is not initialized
             BlockWALService blockWALService = new BlockWALService();
 
             blockWALService.walChannel = WALChannel.builder(blockDevicePath)

@@ -81,6 +81,11 @@ public class SlidingWindowService {
      */
     private Block currentBlock;
 
+    /**
+     * Whether the service is started.
+     * Only used for testing.
+     */
+    private boolean started = false;
     private ExecutorService ioExecutor;
 
     /**
@@ -99,6 +104,7 @@ public class SlidingWindowService {
     }
 
     public WindowCoreData getWindowCoreData() {
+        assert started;
         return windowCoreData;
     }
 
@@ -111,6 +117,7 @@ public class SlidingWindowService {
         ScheduledExecutorService pollBlockScheduler = Threads.newSingleThreadScheduledExecutor(
                 ThreadUtils.createThreadFactory("wal-poll-block-thread-%d", false), LOGGER);
         pollBlockScheduler.scheduleAtFixedRate(this::tryWriteBlock, 0, minWriteIntervalNanos, TimeUnit.NANOSECONDS);
+        started = true;
     }
 
     public boolean shutdown(long timeout, TimeUnit unit) {
@@ -133,6 +140,7 @@ public class SlidingWindowService {
      * Try to write a block. If it exceeds the rate limit, it will return immediately.
      */
     public void tryWriteBlock() {
+        assert started;
         if (!tryAcquireWriteRateLimit()) {
             return;
         }
@@ -155,6 +163,7 @@ public class SlidingWindowService {
     }
 
     public Lock getBlockLock() {
+        assert started;
         return blockLock;
     }
 
@@ -165,6 +174,7 @@ public class SlidingWindowService {
      * Note: this method is NOT thread safe, and it should be called with {@link #blockLock} locked.
      */
     public Block sealAndNewBlockLocked(Block previousBlock, long minSize, long trimOffset, long recordSectionCapacity) throws OverCapacityException {
+        assert started;
         long startOffset = nextBlockStartOffset(previousBlock);
 
         // If the end of the physical device is insufficient for this block, jump to the start of the physical device
@@ -205,6 +215,7 @@ public class SlidingWindowService {
      * Note: this method is NOT thread safe, and it should be called with {@link #blockLock} locked.
      */
     public Block getCurrentBlockLocked() {
+        assert started;
         // The current block is null only when no record has been written
         if (null == currentBlock) {
             currentBlock = nextBlock(windowCoreData.getWindowNextWriteOffset());
@@ -262,8 +273,7 @@ public class SlidingWindowService {
      * Note: this method is NOT thread safe, and it should be called with {@link #blockLock} locked.
      */
     private BlockBatch pollBlocksLocked() {
-        // TODO ugly code
-        Block currentBlock = this.currentBlock;
+        Block currentBlock = getCurrentBlockLocked();
 
         boolean isPendingBlockEmpty = pendingBlocks.isEmpty();
         boolean isCurrentBlockEmpty = currentBlock == null || currentBlock.isEmpty();

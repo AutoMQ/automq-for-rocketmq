@@ -963,6 +963,7 @@ class BlockWALServiceTest {
         final WALChannel walChannel = WALChannel.builder(path)
                 .capacity(capacity)
                 // we may write to un-aligned position here, so we need to disable directIO
+                // TODO support directIO for un-aligned position
                 .direct(false)
                 .build();
 
