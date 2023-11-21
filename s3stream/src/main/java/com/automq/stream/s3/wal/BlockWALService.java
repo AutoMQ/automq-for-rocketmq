@@ -464,8 +464,8 @@ public class BlockWALService implements WriteAheadLog {
 
     private CompletableFuture<Void> trim(long offset, boolean internal) {
         checkReadyToServe();
-        checkWriteMode();
         if (!internal) {
+            checkWriteMode();
             checkResetFinished();
         }
 

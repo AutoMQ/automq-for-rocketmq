@@ -58,6 +58,7 @@ import static com.automq.stream.s3.wal.WriteAheadLog.RecoverResult;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Tag("S3Unit")
@@ -1091,6 +1092,34 @@ class BlockWALServiceTest {
         } finally {
             wal.shutdownGracefully();
         }
+    }
+
+    @Test
+    public void testRecoveryMode() throws IOException, OverCapacityException {
+        final String path = TestUtils.tempFilePath();
+        final int nodeId = 10;
+        final long epoch = 100;
+
+        // simulate a crash
+        WriteAheadLog wal1 = BlockWALService.builder(path, 1 << 20)
+                .nodeId(nodeId)
+                .epoch(epoch)
+                .build()
+                .start();
+        recoverAndReset(wal1);
+        wal1.append(TestUtils.random(4097)).future().join();
+
+        // open in recovery mode
+        WriteAheadLog wal2 = BlockWALService.recoveryBuilder(path)
+                .build()
+                .start();
+        assertEquals(nodeId, wal2.metadata().nodeId());
+        assertEquals(epoch, wal2.metadata().epoch());
+        // we can recover and reset the WAL
+        recoverAndReset(wal2);
+        // but we can't append to or trim it
+        assertThrows(IllegalStateException.class, () -> wal2.append(TestUtils.random(4097)).future().join());
+        assertThrows(IllegalStateException.class, () -> wal2.trim(0).join());
     }
 
     private static void recoverAndReset(WriteAheadLog wal) {
