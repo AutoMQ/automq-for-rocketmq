@@ -50,22 +50,6 @@ public class WALBlockDeviceChannel implements WALChannel {
         }
     };
 
-    /**
-     * Check whether the {@link WALBlockDeviceChannel} is available.
-     *
-     * @return null if available, otherwise the reason why it's not available
-     */
-    public static String checkAvailable() {
-        if (!DirectIOLib.binit) {
-            return "O_DIRECT not supported";
-        }
-        if (!DirectIOUtils.allocatorAvailable()) {
-            return "java.nio.DirectByteBuffer.<init>(long, int) not available." +
-                    " Add --add-opens=java.base/java.nio=ALL-UNNAMED and -Dio.netty.tryReflectionSetAccessible=true to JVM options may fix this.";
-        }
-        return null;
-    }
-
     public WALBlockDeviceChannel(String blockDevicePath, long blockDeviceCapacityWant) {
         this(blockDevicePath, blockDeviceCapacityWant, 0, 0);
     }
@@ -90,8 +74,25 @@ public class WALBlockDeviceChannel implements WALChannel {
         }
     }
 
+    /**
+     * Check whether the {@link WALBlockDeviceChannel} is available.
+     *
+     * @return null if available, otherwise the reason why it's not available
+     */
+    public static String checkAvailable() {
+        if (!DirectIOLib.binit) {
+            return "O_DIRECT not supported";
+        }
+        if (!DirectIOUtils.allocatorAvailable()) {
+            return "java.nio.DirectByteBuffer.<init>(long, int) not available." +
+                    " Add --add-opens=java.base/java.nio=ALL-UNNAMED and -Dio.netty.tryReflectionSetAccessible=true to JVM options may fix this.";
+        }
+        return null;
+    }
+
     @Override
     public void open() throws IOException {
+        // TODO: pass a function to open which can read the real capacity from the block device
         if (!blockDevicePath.startsWith(WALChannelBuilder.DEVICE_PREFIX)) {
             // If the block device path is not a device, we create a file with the capacity we want
             // This is ONLY for test purpose, so we don't check the capacity of the file
