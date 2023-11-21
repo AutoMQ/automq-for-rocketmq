@@ -31,13 +31,8 @@ If release name contains chart name it will be used as a full name.
 {{- define "rocketmq-broker.fullname" -}}
 {{- if .Values.broker.fullnameOverride }}
 {{- .Values.broker.fullnameOverride | trunc 63 | trimSuffix "-" }}
-{{- else }}
-{{- $name := default .Chart.Name .Values.broker.nameOverride }}
-{{- if contains $name .Release.Name }}
-{{- .Release.Name | trunc 63 | trimSuffix "-" }}
-{{- else }}
-{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
-{{- end }}
+{{- else -}}
+rocketmq-broker
 {{- end }}
 {{- end }}
 
@@ -72,7 +67,7 @@ app.kubernetes.io/cluster: {{ include "rocketmq-broker.clusterName" . }}
 {{- if .Values.broker.conf.clusterNameOverride }}
 {{- .Values.broker.conf.clusterNameOverride | trunc 63 | trimSuffix "-" }}
 {{- else -}}
-DefaultCluster
+{{ .Release.Name }}
 {{- end }}
 {{- end }}
 
