@@ -116,6 +116,11 @@ public class S3StreamStore implements StreamStore {
     @WithSpan(kind = SpanKind.SERVER)
     public CompletableFuture<FetchResult> fetch(StoreContext context, @SpanAttribute long streamId,
         @SpanAttribute long startOffset, @SpanAttribute int maxCount) {
+
+        if (maxCount <= 0) {
+            return CompletableFuture.completedFuture(new EmptyFetchResult());
+        }
+
         Optional<Stream> stream = streamClient.getStream(streamId);
         if (stream.isEmpty()) {
             throw new IllegalStateException("Stream " + streamId + " is not opened.");

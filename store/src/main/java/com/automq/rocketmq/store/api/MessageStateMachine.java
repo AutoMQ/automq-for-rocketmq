@@ -18,16 +18,20 @@
 package com.automq.rocketmq.store.api;
 
 import com.automq.rocketmq.store.exception.StoreException;
+import com.automq.rocketmq.store.model.generated.CheckPoint;
 import com.automq.rocketmq.store.model.operation.AckOperation;
 import com.automq.rocketmq.store.model.operation.ChangeInvisibleDurationOperation;
 import com.automq.rocketmq.store.model.operation.OperationSnapshot;
 import com.automq.rocketmq.store.model.operation.PopOperation;
 import com.automq.rocketmq.store.model.operation.ResetConsumeOffsetOperation;
+import java.util.List;
 
 public interface MessageStateMachine {
     long topicId();
 
     int queueId();
+
+    void writeCheckPointsAndRelatedStates(List<CheckPoint> checkPointList) throws StoreException;
 
     ReplayPopResult replayPopOperation(long operationOffset, PopOperation operation) throws StoreException;
 

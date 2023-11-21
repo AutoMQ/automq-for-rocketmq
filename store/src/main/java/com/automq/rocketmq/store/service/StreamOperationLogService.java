@@ -23,9 +23,11 @@ import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.rocketmq.store.exception.StoreErrorCode;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.StoreContext;
+import com.automq.rocketmq.store.model.generated.CheckPoint;
 import com.automq.rocketmq.store.model.operation.AckOperation;
 import com.automq.rocketmq.store.model.operation.ChangeInvisibleDurationOperation;
 import com.automq.rocketmq.store.model.operation.Operation;
+import com.automq.rocketmq.store.model.operation.OperationSnapshot;
 import com.automq.rocketmq.store.model.operation.PopOperation;
 import com.automq.rocketmq.store.model.operation.ResetConsumeOffsetOperation;
 import com.automq.rocketmq.store.model.stream.SingleRecord;
@@ -35,8 +37,12 @@ import com.automq.stream.api.AppendResult;
 import com.automq.stream.api.RecordBatchWithContext;
 import com.automq.stream.utils.FutureUtil;
 import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,6 +71,9 @@ public class StreamOperationLogService implements OperationLogService {
         long endOffset = streamStore.nextOffset(operationStreamId);
         CompletableFuture<Long/*op replay start offset*/> snapshotFetch;
         long snapEndOffset = snapshotStatus.snapshotEndOffset().get();
+
+        // Keep a reference to the snapshot so that we can write the remaining checkpoints to the kv service after replaying all operations
+        AtomicReference<OperationSnapshot> operationSnapshot = new AtomicReference<>();
         if (snapStartOffset == snapEndOffset) {
             // no snapshot
             snapshotFetch = CompletableFuture.completedFuture(startOffset);
@@ -73,37 +82,48 @@ public class StreamOperationLogService implements OperationLogService {
                 .thenApply(result -> SerializeUtil.decodeOperationSnapshot(result.recordBatchList().get(0).rawPayload()))
                 .thenApply(snapshot -> {
                     stateMachine.loadSnapshot(snapshot);
+                    operationSnapshot.set(snapshot);
                     return snapshot.getSnapshotEndOffset() + 1;
                 });
         }
 
-        if (startOffset == endOffset) {
-            // no operation
-            return snapshotFetch.thenAccept(offset -> {
-            });
-        }
-
+        TreeMap<Long, Operation> treeMap = new TreeMap<>();
         // 2. get all operations
         // TODO: batch fetch, fetch all at once may cause some problems
         return snapshotFetch.thenCompose(offset -> streamStore.fetch(StoreContext.EMPTY, operationStreamId, offset, (int) (endOffset - offset))
-            .thenAccept(result -> {
-                // load operations
-                for (RecordBatchWithContext batchWithContext : result.recordBatchList()) {
-                    try {
-                        // TODO: assume that a batch only contains one operation
-                        Operation operation = SerializeUtil.decodeOperation(batchWithContext.rawPayload(), stateMachine,
-                            operationStreamId, snapshotStreamId);
-
-                        // TODO: operation may be null
-                        replay(batchWithContext.baseOffset(), operation);
-                    } catch (StoreException e) {
-                        LOGGER.error("Topic {}, queue: {}, operation stream id: {}, offset: {}: replay operation failed when recover", stateMachine.topicId(), stateMachine.queueId(), operationStreamId, batchWithContext.baseOffset(), e);
-                        if (e.code() != StoreErrorCode.ILLEGAL_ARGUMENT) {
-                            throw new CompletionException(e);
+                .thenAccept(result -> {
+                    // load operations
+                    for (RecordBatchWithContext batchWithContext : result.recordBatchList()) {
+                        try {
+                            // TODO: assume that a batch only contains one operation
+                            Operation operation = SerializeUtil.decodeOperation(batchWithContext.rawPayload(), stateMachine,
+                                operationStreamId, snapshotStreamId);
+                            annihilate(batchWithContext.baseOffset(), operation, operationSnapshot.get(), treeMap);
+                        } catch (StoreException e) {
+                            LOGGER.error("Topic {}, queue: {}, operation stream id: {}, offset: {}: replay operation failed when recover", stateMachine.topicId(), stateMachine.queueId(), operationStreamId, batchWithContext.baseOffset(), e);
+                            if (e.code() != StoreErrorCode.ILLEGAL_ARGUMENT) {
+                                throw new CompletionException(e);
+                            }
                         }
                     }
+                }))
+            .whenComplete((v, throwable) -> {
+                // Write the remaining checkpoints to the kv service and replay the remaining operations
+                try {
+                    OperationSnapshot snapshot = operationSnapshot.get();
+                    if (null != snapshot) {
+                        List<CheckPoint> checkpoints = snapshot.getCheckPoints();
+                        if (null != operationSnapshot.get() && null != checkpoints && !checkpoints.isEmpty()) {
+                            stateMachine.writeCheckPointsAndRelatedStates(checkpoints);
+                        }
+                    }
+                    for (Map.Entry<Long, Operation> entry : treeMap.entrySet()) {
+                        replay(entry.getKey(), entry.getValue());
+                    }
+                } catch (StoreException e) {
+                    throw new CompletionException(e);
                 }
-            }));
+            });
     }
 
     @Override
@@ -213,5 +233,35 @@ public class StreamOperationLogService implements OperationLogService {
         }
 
         return logResult;
+    }
+
+    private void annihilate(long operationOffset, Operation operation, OperationSnapshot snapshot,
+        Map<Long, Operation> operationMap) {
+        switch (operation.operationType()) {
+            case POP -> {
+                if (null != operationMap) {
+                    operationMap.put(operationOffset, operation);
+                }
+            }
+            case ACK -> {
+                boolean annihilated = false;
+                if (null != operationMap) {
+                    annihilated = operationMap.remove(((AckOperation) operation).operationId()) != null;
+                }
+
+                if (!annihilated && null != snapshot) {
+                    List<CheckPoint> checkPoints = snapshot.getCheckPoints();
+                    if (null != checkPoints && !checkPoints.isEmpty()) {
+                        annihilated = checkPoints.removeIf(checkPoint -> checkPoint.operationId() == ((AckOperation) operation).operationId());
+                    }
+                }
+
+                if (!annihilated) {
+                    // Something is wrong, we should not have an ack operation without a corresponding pop operation
+                    LOGGER.warn("Topic {}, queue: {}: Ack operation: {} is not annihilated", operation.topicId(), operation.queueId(), operation);
+                }
+            }
+            default -> operationMap.put(operationOffset, operation);
+        }
     }
 }

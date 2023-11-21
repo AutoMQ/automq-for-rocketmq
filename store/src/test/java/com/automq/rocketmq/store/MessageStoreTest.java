@@ -397,11 +397,14 @@ public class MessageStoreTest {
             (key, value) -> Assertions.fail("check point should be cleared"));
 
         // check if all ck have been recovered
-        logicQueueManager.getOrCreate(StoreContext.EMPTY, TOPIC_ID, QUEUE_ID).join();
-        AtomicInteger ckNum = new AtomicInteger();
-        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, tqPrefix, null, null,
-            (key, value) -> ckNum.getAndIncrement());
-        assertEquals(3, ckNum.get());
+        {
+            final LogicQueue logicQueue = logicQueueManager.getOrCreate(StoreContext.EMPTY, TOPIC_ID, QUEUE_ID).join();
+            Assertions.assertEquals(logicQueue.getState(), LogicQueue.State.OPENED);
+            AtomicInteger ckNum = new AtomicInteger();
+            kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, tqPrefix, null, null,
+                (key, value) -> ckNum.getAndIncrement());
+            assertEquals(3, ckNum.get());
+        }
 
         // 8. after 1100ms, pop again
         Thread.sleep(1100);
