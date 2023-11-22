@@ -23,25 +23,25 @@
 
     <Appenders>
         <RollingFile name="rollingFile" fileName="${LOG_DIR}/automq.log" filePattern="${LOG_DIR}/automq.%i.log">
-            <PatternLayout pattern = "%d{yyyy-MM-dd HH:mm:ss} %-5p %m%n"/>
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS}{GMT+8} %-5p %m%n"/>
             <SizeBasedTriggeringPolicy size="100MB" />
             <DefaultRolloverStrategy max="10"/>
         </RollingFile>
 
         <RollingFile name="controllerAppender" fileName="${LOG_DIR}/controller.log" filePattern="${LOG_DIR}/controller.%i.log">
-            <PatternLayout pattern = "%d{yyyy-MM-dd HH:mm:ss,SSS} %-5p %m%n"/>
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS}{GMT+8} %-5p %m%n"/>
             <SizeBasedTriggeringPolicy size="100MB" />
             <DefaultRolloverStrategy max="10"/>
         </RollingFile>
 
         <RollingFile name="mybatisAppender" fileName="${LOG_DIR}/mybatis.log" filePattern="${LOG_DIR}/mybatis.%i.log">
-            <PatternLayout pattern = "%d{yyyy-MM-dd HH:mm:ss,SSS} %-5p %m%n"/>
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS}{GMT+8} %-5p %m%n"/>
             <SizeBasedTriggeringPolicy size="100MB" />
             <DefaultRolloverStrategy max="2"/>
         </RollingFile>
 
         <RollingFile name="streamAppender" fileName="${LOG_DIR}/stream.log" filePattern="${LOG_DIR}/stream.%i.log">
-            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss,SSS} %-5p %m%n"/>
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS}{GMT+8} %-5p %m%n"/>
             <SizeBasedTriggeringPolicy size="100MB"/>
             <DefaultRolloverStrategy max="10"/>
         </RollingFile>
