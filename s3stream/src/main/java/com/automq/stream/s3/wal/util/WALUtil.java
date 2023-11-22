@@ -52,8 +52,9 @@ public class WALUtil {
         return (int) (crc32.getValue() & 0x7FFFFFFF);
     }
 
-    public static long recordOffsetToPosition(long offset, long recordSectionCapacity, long headerSize) {
-        return offset % recordSectionCapacity + headerSize;
+    public static long recordOffsetToPosition(long offset, long physicalCapacity, long headerSize) {
+        long capacity = physicalCapacity - headerSize;
+        return offset % capacity + headerSize;
     }
 
     public static long alignLargeByBlockSize(long offset) {

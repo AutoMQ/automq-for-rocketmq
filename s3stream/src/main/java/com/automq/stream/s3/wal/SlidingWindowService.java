@@ -338,8 +338,7 @@ public class SlidingWindowService {
 
     private void writeBlockData(BlockBatch blocks) throws IOException {
         for (Block block : blocks.blocks()) {
-            // TODO: make this beautiful
-            long position = WALUtil.recordOffsetToPosition(block.startOffset(), walChannel.capacity() - WAL_HEADER_TOTAL_CAPACITY, WAL_HEADER_TOTAL_CAPACITY);
+            long position = WALUtil.recordOffsetToPosition(block.startOffset(), walChannel.capacity(), WAL_HEADER_TOTAL_CAPACITY);
             walChannel.write(block.data(), position);
         }
         walChannel.flush();

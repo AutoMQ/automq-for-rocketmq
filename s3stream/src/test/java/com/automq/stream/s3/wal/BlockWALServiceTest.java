@@ -606,8 +606,7 @@ class BlockWALServiceTest {
         CompositeByteBuf record = DirectByteBufAlloc.compositeByteBuffer();
         record.addComponents(true, recordHeader, recordBody);
 
-        // TODO: make this beautiful
-        long position = WALUtil.recordOffsetToPosition(logicOffset, walChannel.capacity() - WAL_HEADER_TOTAL_CAPACITY, WAL_HEADER_TOTAL_CAPACITY);
+        long position = WALUtil.recordOffsetToPosition(logicOffset, walChannel.capacity(), WAL_HEADER_TOTAL_CAPACITY);
         walChannel.writeAndFlush(record, position);
     }
 
