@@ -93,7 +93,7 @@ class S3ObjectManagerTest {
         List<Long> compactedObjectIds = Collections.singletonList(400L);
         walObjectRequest.setCompactedObjectIds(compactedObjectIds);
         List<ObjectStreamRange> streamRanges = Collections.singletonList(
-            new ObjectStreamRange(1, 1, 100, 200));
+            new ObjectStreamRange(1, 1, 100, 200, 300));
         walObjectRequest.setStreamRanges(streamRanges);
 
         StreamObject streamObject = new StreamObject();
