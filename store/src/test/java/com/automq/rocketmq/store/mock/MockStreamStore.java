@@ -78,6 +78,11 @@ public class MockStreamStore implements StreamStore {
     }
 
     @Override
+    public boolean isOpened(long streamId) {
+        return openedStreams.containsKey(streamId);
+    }
+
+    @Override
     public long startOffset(long streamId) {
         if (!openedStreams.containsKey(streamId)) {
             throw new IllegalStateException("Stream " + streamId + " is not opened.");

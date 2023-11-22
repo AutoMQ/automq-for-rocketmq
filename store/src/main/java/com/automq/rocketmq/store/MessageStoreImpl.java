@@ -125,7 +125,7 @@ public class MessageStoreImpl implements MessageStore {
         }
         logicQueueManager.shutdown();
         snapshotService.shutdown();
-        timerService.start();
+        timerService.shutdown();
         streamStore.shutdown();
         clearStateMachineData();
     }
