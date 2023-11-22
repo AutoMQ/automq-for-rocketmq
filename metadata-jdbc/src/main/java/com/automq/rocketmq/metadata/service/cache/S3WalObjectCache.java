@@ -79,7 +79,7 @@ public class S3WalObjectCache {
     }
 
     public long streamStartTime(long streamId) {
-        long startTime = Long.MAX_VALUE;
+        long startTime = System.currentTimeMillis();
         for (Map.Entry<Long, S3WALObject> entry : cache.entrySet()) {
             for (Map.Entry<Long, SubStream> e : entry.getValue().getSubStreams().getSubStreamsMap().entrySet()) {
                 if (e.getValue().getStreamId() == streamId) {
