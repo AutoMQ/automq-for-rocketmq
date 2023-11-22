@@ -108,7 +108,7 @@ public class BlockWALService implements WriteAheadLog {
     public static final int WAL_HEADER_CAPACITY = WALUtil.BLOCK_SIZE;
     public static final int WAL_HEADER_TOTAL_CAPACITY = WAL_HEADER_CAPACITY * WAL_HEADER_COUNT;
     private static final Logger LOGGER = LoggerFactory.getLogger(BlockWALService.class);
-    private final AtomicBoolean readyToServe = new AtomicBoolean(false);
+    private final AtomicBoolean started = new AtomicBoolean(false);
     private final AtomicBoolean resetFinished = new AtomicBoolean(false);
     private final AtomicLong writeHeaderRoundTimes = new AtomicLong(0);
     private final ExecutorService walHeaderFlusher = Threads.newFixedThreadPool(1, ThreadUtils.createThreadFactory("flush-wal-header-thread-%d", true), LOGGER);
@@ -285,7 +285,7 @@ public class BlockWALService implements WriteAheadLog {
         }
         walHeaderReady(header);
 
-        readyToServe.set(true);
+        started.set(true);
 
         LOGGER.info("block WAL service started, cost: {} ms", stopWatch.getTime(TimeUnit.MILLISECONDS));
         return this;
@@ -336,7 +336,10 @@ public class BlockWALService implements WriteAheadLog {
     public void shutdownGracefully() {
         StopWatch stopWatch = StopWatch.createStarted();
 
-        readyToServe.set(false);
+        if (!started.getAndSet(false)) {
+            LOGGER.warn("block WAL service already shutdown or not started yet");
+            return;
+        }
         walHeaderFlusher.shutdown();
         try {
             if (!walHeaderFlusher.awaitTermination(5, TimeUnit.SECONDS)) {
@@ -346,12 +349,12 @@ public class BlockWALService implements WriteAheadLog {
             walHeaderFlusher.shutdownNow();
         }
 
+        long maxLength = slidingWindowService.initialized()
+                ? slidingWindowService.getWindowCoreData().getWindowMaxLength()
+                : walHeader.getSlidingWindowMaxLength();
         boolean gracefulShutdown = slidingWindowService.shutdown(1, TimeUnit.DAYS);
         try {
-            flushWALHeader(
-                    slidingWindowService.getWindowCoreData().getWindowMaxLength(),
-                    gracefulShutdown ? ShutdownType.GRACEFULLY : ShutdownType.UNGRACEFULLY
-            );
+            flushWALHeader(maxLength, gracefulShutdown ? ShutdownType.GRACEFULLY : ShutdownType.UNGRACEFULLY);
         } catch (IOException e) {
             LOGGER.error("failed to flush WALHeader when shutdown gracefully", e);
         }
@@ -379,7 +382,7 @@ public class BlockWALService implements WriteAheadLog {
 
     private AppendResult append0(ByteBuf body, int crc) throws OverCapacityException {
         TimerUtil timerUtil = new TimerUtil();
-        checkReadyToServe();
+        checkStarted();
         checkWriteMode();
         checkResetFinished();
 
@@ -425,7 +428,7 @@ public class BlockWALService implements WriteAheadLog {
 
     @Override
     public Iterator<RecoverResult> recover() {
-        checkReadyToServe();
+        checkStarted();
         if (firstStart) {
             recoveryCompleteOffset = 0;
             return Collections.emptyIterator();
@@ -442,7 +445,7 @@ public class BlockWALService implements WriteAheadLog {
 
     @Override
     public CompletableFuture<Void> reset() {
-        checkReadyToServe();
+        checkStarted();
         checkRecoverFinished();
 
         slidingWindowService.start(walHeader.getSlidingWindowMaxLength(), recoveryCompleteOffset);
@@ -456,7 +459,7 @@ public class BlockWALService implements WriteAheadLog {
     }
 
     private CompletableFuture<Void> trim(long offset, boolean internal) {
-        checkReadyToServe();
+        checkStarted();
         if (!internal) {
             checkWriteMode();
             checkResetFinished();
@@ -478,9 +481,9 @@ public class BlockWALService implements WriteAheadLog {
         }, walHeaderFlusher);
     }
 
-    private void checkReadyToServe() {
-        if (!readyToServe.get()) {
-            throw new IllegalStateException("WriteAheadLog is not ready to serve");
+    private void checkStarted() {
+        if (!started.get()) {
+            throw new IllegalStateException("WriteAheadLog has not been started yet");
         }
     }
 

@@ -35,6 +35,7 @@ import java.util.TreeSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -86,6 +87,11 @@ public class SlidingWindowService {
      * Only used for testing.
      */
     private boolean started = false;
+    /**
+     * Whether the service is initialized.
+     * After the service is initialized, data in {@link #windowCoreData} is valid.
+     */
+    private AtomicBoolean initialized = new AtomicBoolean(false);
     private ExecutorService ioExecutor;
 
     /**
@@ -104,7 +110,7 @@ public class SlidingWindowService {
     }
 
     public WindowCoreData getWindowCoreData() {
-        assert started;
+        assert initialized();
         return windowCoreData;
     }
 
@@ -112,12 +118,17 @@ public class SlidingWindowService {
         windowCoreData.setWindowMaxLength(windowMaxLength);
         windowCoreData.setWindowStartOffset(windowStartOffset);
         windowCoreData.setWindowNextWriteOffset(windowStartOffset);
+        initialized.set(true);
         this.ioExecutor = Threads.newFixedThreadPoolWithMonitor(ioThreadNums,
                 "block-wal-io-thread", false, LOGGER);
         ScheduledExecutorService pollBlockScheduler = Threads.newSingleThreadScheduledExecutor(
                 ThreadUtils.createThreadFactory("wal-poll-block-thread-%d", false), LOGGER);
         pollBlockScheduler.scheduleAtFixedRate(this::tryWriteBlock, 0, minWriteIntervalNanos, TimeUnit.NANOSECONDS);
         started = true;
+    }
+
+    public boolean initialized() {
+        return initialized.get();
     }
 
     public boolean shutdown(long timeout, TimeUnit unit) {
