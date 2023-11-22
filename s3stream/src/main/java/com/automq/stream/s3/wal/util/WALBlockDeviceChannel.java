@@ -107,7 +107,8 @@ public class WALBlockDeviceChannel implements WALChannel {
         if (!path.startsWith(WALChannelBuilder.DEVICE_PREFIX)) {
             openAndCheckFile();
         } else {
-            // we could not get the real capacity of the block device, so we just use the `capacityWant`
+            // We could not get the real capacity of the block device, so we just use the `capacityWant` as the capacity here
+            // It will be checked and updated in `checkCapacity` later
             capacityFact = capacityWant;
         }
 
@@ -133,7 +134,7 @@ public class WALBlockDeviceChannel implements WALChannel {
         } else {
             // the file does not exist
             if (recoveryMode) {
-                throw new WALNotInitializedException("try to open an uninitialized WAL in recovery mode. path: " + path);
+                throw new WALNotInitializedException("try to open an uninitialized WAL in recovery mode: file not exists. path: " + path);
             }
             WALUtil.createFile(path, capacityWant);
             capacityFact = capacityWant;
@@ -147,7 +148,7 @@ public class WALBlockDeviceChannel implements WALChannel {
         Long capacity = reader.capacity(this);
         if (null == capacity) {
             if (recoveryMode) {
-                throw new WALNotInitializedException("try to open an uninitialized WAL in recovery mode. path: " + path);
+                throw new WALNotInitializedException("try to open an uninitialized WAL in recovery mode: empty header. path: " + path);
             }
         } else if (capacityFact == CAPACITY_NOT_SET) {
             // recovery mode on block device

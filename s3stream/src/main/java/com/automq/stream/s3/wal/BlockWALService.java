@@ -274,9 +274,6 @@ public class BlockWALService implements WriteAheadLog {
 
         WALHeader header = tryReadWALHeader(walChannel);
         if (null == header) {
-            if (recoveryMode) {
-                throw new WALNotInitializedException("try to open an uninitialized WAL in recovery mode. path: " + walChannel.path());
-            }
             header = newWALHeader();
             firstStart = true;
             LOGGER.info("no available WALHeader, create a new one: {}", header);

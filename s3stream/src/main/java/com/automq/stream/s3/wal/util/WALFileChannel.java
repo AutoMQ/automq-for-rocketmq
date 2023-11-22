@@ -67,7 +67,7 @@ public class WALFileChannel implements WALChannel {
         } else {
             // the file does not exist
             if (recoveryMode) {
-                throw new WALNotInitializedException("try to open an uninitialized WAL in recovery mode. path: " + filePath);
+                throw new WALNotInitializedException("try to open an uninitialized WAL in recovery mode: file not exists: " + filePath);
             }
             WALUtil.createFile(filePath, fileCapacityWant);
             randomAccessFile = new RandomAccessFile(filePath, "rw");
@@ -84,7 +84,11 @@ public class WALFileChannel implements WALChannel {
             return;
         }
         Long capacity = reader.capacity(this);
-        if (null != capacity && fileCapacityFact != capacity) {
+        if (null == capacity) {
+            if (recoveryMode) {
+                throw new WALNotInitializedException("try to open an uninitialized WAL in recovery mode: empty header. path: " + filePath);
+            }
+        } else if (fileCapacityFact != capacity) {
             throw new WALCapacityMismatchException(filePath, fileCapacityFact, capacity);
         }
         assert fileCapacityFact != CAPACITY_NOT_SET;
