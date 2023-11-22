@@ -28,7 +28,7 @@ broker:
     enabled: false
     size: 8Gi
 
-  nameOverride: "broker"
+  nameOverride: ""
   fullnameOverride: ""
 
   conf:
@@ -76,11 +76,11 @@ broker:
   jvmMemory: " -Xms4g -Xmx4g -Xmn2g -XX:MaxDirectMemorySize=8g "
   resources:
     limits:
-      cpu: 2
-      memory: 4Gi
+      cpu: 4
+      memory: 8Gi
     requests:
-      cpu: 2
-      memory: 4Gi
+      cpu: 4
+      memory: 8Gi
 
   nodeSelector: { }
 

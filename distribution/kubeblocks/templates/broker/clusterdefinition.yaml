@@ -22,11 +22,11 @@ metadata:
 spec:
   type: automq-for-rocketmq
   componentDefs:
-    - name: automq-for-rocketmq-broker
+    - name: rocketmq-broker
       description: |-
-        Rocketmq broker that act as both brokers and controllers are referred to as "combined" servers.
+        automq-for-rocketmq broker that act as both brokers and controllers are referred to as "combined" servers.
       workloadType: Stateful
-      characterType: rocketmq-broker
+      characterType: broker
       probes:
       monitor:
       configSpecs:
@@ -44,7 +44,7 @@ spec:
         containers:
           - name: broker
             command: [ "/bin/sh" ]
-            args: [ "-c", "./run-server.sh com.automq.rocketmq.broker.BrokerStartup -c /home/rocketmq/automq-for-rocketmq-5.1.3/conf/broker/$(POD_NAME)" ]
+            args: [ "-c", "./run-server.sh com.automq.rocketmq.broker.BrokerStartup -c /home/rocketmq/automq-for-rocketmq/conf/broker/$(POD_NAME)" ]
             env:
               - name: POD_NAME
                 valueFrom:
@@ -53,7 +53,7 @@ spec:
               - name: CLUSTER_NAME
                 valueFrom:
                   fieldRef:
-                    fieldPath: metadata.labels['app.kubernetes.io/cluster']
+                    fieldPath: metadata.labels['app.kubernetes.io/instance']
               - name: INSTANCE_NAME
                 valueFrom:
                   fieldRef:
@@ -93,7 +93,7 @@ spec:
               tcpSocket:
                 port: rocketmq-broker
             volumeMounts:
-              - mountPath: /home/rocketmq/automq-for-rocketmq-5.1.3/conf/broker
+              - mountPath: /home/rocketmq/automq-for-rocketmq/conf/broker
                 name: broker-conf
               - mountPath: /root/logs/rocketmqlogs
                 name: broker-storage

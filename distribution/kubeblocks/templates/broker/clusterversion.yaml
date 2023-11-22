@@ -22,7 +22,7 @@ metadata:
 spec:
   clusterDefinitionRef: {{ .Release.Name }}
   componentVersions:
-    - componentDefRef: automq-for-rocketmq-broker
+    - componentDefRef: rocketmq-broker
       versionsContext:
         containers:
           - name: broker
