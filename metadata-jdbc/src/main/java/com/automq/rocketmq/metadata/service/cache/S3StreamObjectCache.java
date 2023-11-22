@@ -136,7 +136,21 @@ public class S3StreamObjectCache {
         } finally {
             lock.readLock().unlock();
         }
+    }
 
+    public long streamStartTime(long streamId) {
+        List<S3StreamObject> objs = s3StreamObjects.get(streamId);
+        long startTime = System.currentTimeMillis();
+        if (null == objs) {
+            return startTime;
+        }
+        for (S3StreamObject obj : objs) {
+            long ts = obj.getBaseDataTimestamp().getTime();
+            if (ts < startTime) {
+                startTime = ts;
+            }
+        }
+        return startTime;
     }
 
 }

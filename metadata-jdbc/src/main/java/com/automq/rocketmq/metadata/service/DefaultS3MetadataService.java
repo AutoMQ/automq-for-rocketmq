@@ -813,7 +813,8 @@ public class DefaultS3MetadataService implements S3MetadataService {
 
     @Override
     public long streamStartTime(long streamId) {
-        return Long.min(s3ObjectCache.streamStartTime(streamId), s3WalObjectCache.streamStartTime(streamId));
+        return Long.min(s3StreamObjectCache.streamStartTime(streamId),
+            Long.min(s3ObjectCache.streamStartTime(streamId), s3WalObjectCache.streamStartTime(streamId)));
     }
 
     @Override
