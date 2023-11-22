@@ -167,7 +167,7 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
         requestList.add(timerEnqueueRequest);
 
         Integer currentConsumeTimes = metadata.getConsumeTimes().getOrDefault(offset, 0);
-        Integer newConsumeTimes = currentConsumeTimes + 1;
+        int newConsumeTimes = currentConsumeTimes + 1;
         metadata.getConsumeTimes().put(offset, newConsumeTimes);
 
         kvService.batch(requestList.toArray(new BatchRequest[0]));
@@ -483,7 +483,7 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
         return requestList;
     }
 
-    private void writeCheckPointsAndRelatedStates(List<CheckPoint> checkPointList) throws StoreException {
+    public void writeCheckPointsAndRelatedStates(List<CheckPoint> checkPointList) throws StoreException {
         List<BatchRequest> batchRequests = checkPointList.stream()
             .map(this::writeCheckPointAndRelatedStatesReqs)
             .flatMap(List::stream)
@@ -561,8 +561,6 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
                 getRetryAckCommitter(metadataSnapshot.getConsumerGroupId(), ByteBuffer.wrap(metadataSnapshot.getRetryAckOffsetBitmapBuffer()));
             });
             this.currentOperationOffset = snapshot.getSnapshotEndOffset();
-            // recover states in kv service
-            writeCheckPointsAndRelatedStates(snapshot.getCheckPoints());
         } catch (Exception e) {
             Throwable cause = FutureUtil.cause(e);
             LOGGER.error("{}: Load snapshot:{} failed", identity, snapshot, cause);
