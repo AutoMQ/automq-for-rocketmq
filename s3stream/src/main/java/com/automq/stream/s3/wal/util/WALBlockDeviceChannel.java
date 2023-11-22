@@ -197,12 +197,12 @@ public class WALBlockDeviceChannel implements WALChannel {
 
     @Override
     public void write(ByteBuf src, long position) throws IOException {
-        if (!WALUtil.isAligned(position)) {
+        if (unalignedWrite) {
             // unaligned write, just used for testing
-            assert unalignedWrite;
             unalignedWrite(src, position);
             return;
         }
+        assert WALUtil.isAligned(position);
 
         int alignedSize = (int) WALUtil.alignLargeByBlockSize(src.readableBytes());
         assert position + alignedSize <= capacity();
