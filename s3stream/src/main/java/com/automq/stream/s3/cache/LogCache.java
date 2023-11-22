@@ -25,11 +25,11 @@ import com.automq.stream.utils.biniarysearch.StreamRecordBatchList;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -269,10 +269,10 @@ public class LogCache {
         private final long blockId;
         private final long maxSize;
         private final int maxStreamCount;
-        private final Map<Long, List<StreamRecordBatch>> map = new HashMap<>();
+        private final Map<Long, List<StreamRecordBatch>> map = new ConcurrentHashMap<>();
         private long size = 0;
         private long confirmOffset;
-        boolean free;
+        volatile boolean free;
 
         public LogCacheBlock(long maxSize, int maxStreamCount) {
             this.blockId = BLOCK_ID_ALLOC.getAndIncrement();
