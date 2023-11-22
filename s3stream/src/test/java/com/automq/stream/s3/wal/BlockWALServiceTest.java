@@ -1280,7 +1280,7 @@ class BlockWALServiceTest {
         WriteAheadLog wal2 = BlockWALService.recoveryBuilder(path)
                 .direct(directIO)
                 .build();
-        assertThrows(WALNotInitializedException.class, wal2::start, "WAL header not found");
+        assertThrows(WALNotInitializedException.class, wal2::start);
     }
 
     /**
