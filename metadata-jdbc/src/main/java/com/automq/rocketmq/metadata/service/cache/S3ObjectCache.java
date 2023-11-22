@@ -84,7 +84,7 @@ public class S3ObjectCache {
 
     public long streamStartTime(long streamId) {
         Map<Long, S3Object> objs = cache.get(streamId);
-        long startTime = Long.MAX_VALUE;
+        long startTime = System.currentTimeMillis();
         if (null == objs) {
             return startTime;
         }

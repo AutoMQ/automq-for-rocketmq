@@ -81,10 +81,10 @@ public class TopicMetricsManager implements MetricsManager {
         long currentTs = System.currentTimeMillis();
         for (QueueAssignment assignment : list) {
             List<Long> streamIds = metadataStore.streamsOf(assignment.getTopicId(), assignment.getQueueId());
-            long startTime = Long.MAX_VALUE;
+            long startTime = currentTs;
             for (long id : streamIds) {
                 long ts = s3MetadataService.streamStartTime(id);
-                if (ts < startTime) {
+                if (ts < startTime && ts > 0) {
                     startTime = ts;
                 }
             }

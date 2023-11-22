@@ -84,7 +84,6 @@ public class DefaultS3MetadataService implements S3MetadataService {
 
     private final S3WalObjectCache s3WalObjectCache;
 
-
     public DefaultS3MetadataService(ControllerConfig nodeConfig, SqlSessionFactory sessionFactory,
         ExecutorService asyncExecutorService) {
         this.nodeConfig = nodeConfig;
@@ -299,6 +298,13 @@ public class DefaultS3MetadataService implements S3MetadataService {
                 String subStreams = JsonFormat.printer().print(walObject.getSubStreams());
                 s3WALObject.setSubStreams(subStreams);
                 s3WALObjectMapper.create(s3WALObject);
+
+                // Cache WAL object
+                s3WalObjectCache.onCommit(walObject.toBuilder()
+                    .setBaseDataTimestamp(s3WALObject.getBaseDataTimestamp().getTime())
+                    .setCommittedTimestamp(s3WALObject.getCommittedTimestamp().getTime())
+                    .setSequenceId(sequenceId)
+                    .build());
             }
             session.commit();
 
@@ -307,7 +313,6 @@ public class DefaultS3MetadataService implements S3MetadataService {
                 : toCache.entrySet()) {
                 s3StreamObjectCache.cache(entry.getKey(), entry.getValue());
             }
-            s3WalObjectCache.onCommit(walObject);
             s3WalObjectCache.onCompact(compactedObjects);
             LOGGER.info("broker[broke-id={}] commit wal object[object-id={}] success, compacted objects[{}], stream objects[{}]",
                 brokerId, walObject.getObjectId(), compactedObjects, streamObjects);
@@ -531,8 +536,6 @@ public class DefaultS3MetadataService implements S3MetadataService {
             .build();
     }
 
-
-
     private boolean commitObject(Long objectId, long streamId, long objectSize, SqlSession session) {
         S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
         S3Object s3Object = s3ObjectMapper.getById(objectId);
@@ -550,13 +553,13 @@ public class DefaultS3MetadataService implements S3MetadataService {
             return false;
         }
 
-        Date commitData = new Date();
-        if (s3Object.getExpiredTimestamp().getTime() < commitData.getTime()) {
+        Date commitDate = new Date();
+        if (s3Object.getExpiredTimestamp().getTime() < commitDate.getTime()) {
             LOGGER.error("object[object-id={}] is expired", objectId);
             return false;
         }
 
-        s3Object.setCommittedTimestamp(commitData);
+        s3Object.setCommittedTimestamp(commitDate);
         s3Object.setStreamId(streamId);
         s3Object.setObjectSize(objectSize);
         s3Object.setState(S3ObjectState.BOS_COMMITTED);
