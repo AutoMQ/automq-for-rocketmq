@@ -336,10 +336,13 @@ public class LogCache {
 
         StreamRange getStreamRange(long streamId) {
             List<StreamRecordBatch> streamRecords = map.get(streamId);
-            if (streamRecords == null || streamRecords.isEmpty()) {
+            if (streamRecords == null) {
                 return new StreamRange(NOOP_OFFSET, NOOP_OFFSET);
             } else {
                 synchronized (streamRecords) {
+                    if (streamRecords.isEmpty()) {
+                        return new StreamRange(NOOP_OFFSET, NOOP_OFFSET);
+                    }
                     return new StreamRange(streamRecords.get(0).getBaseOffset(), streamRecords.get(streamRecords.size() - 1).getLastOffset());
                 }
             }
