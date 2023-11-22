@@ -73,6 +73,11 @@ public class SlidingWindowService {
      */
     private final TreeSet<Long> writingBlocks = new TreeSet<>();
     /**
+     * Whether the service is initialized.
+     * After the service is initialized, data in {@link #windowCoreData} is valid.
+     */
+    private final AtomicBoolean initialized = new AtomicBoolean(false);
+    /**
      * Blocks that are waiting to be written.
      * All blocks in this queue are ordered by the start offset.
      */
@@ -82,16 +87,6 @@ public class SlidingWindowService {
      */
     private Block currentBlock;
 
-    /**
-     * Whether the service is started.
-     * Only used for testing.
-     */
-    private boolean started = false;
-    /**
-     * Whether the service is initialized.
-     * After the service is initialized, data in {@link #windowCoreData} is valid.
-     */
-    private AtomicBoolean initialized = new AtomicBoolean(false);
     private ExecutorService ioExecutor;
 
     /**
@@ -118,13 +113,12 @@ public class SlidingWindowService {
         windowCoreData.setWindowMaxLength(windowMaxLength);
         windowCoreData.setWindowStartOffset(windowStartOffset);
         windowCoreData.setWindowNextWriteOffset(windowStartOffset);
-        initialized.set(true);
         this.ioExecutor = Threads.newFixedThreadPoolWithMonitor(ioThreadNums,
                 "block-wal-io-thread", false, LOGGER);
         ScheduledExecutorService pollBlockScheduler = Threads.newSingleThreadScheduledExecutor(
                 ThreadUtils.createThreadFactory("wal-poll-block-thread-%d", false), LOGGER);
         pollBlockScheduler.scheduleAtFixedRate(this::tryWriteBlock, 0, minWriteIntervalNanos, TimeUnit.NANOSECONDS);
-        started = true;
+        initialized.set(true);
     }
 
     public boolean initialized() {
@@ -151,7 +145,7 @@ public class SlidingWindowService {
      * Try to write a block. If it exceeds the rate limit, it will return immediately.
      */
     public void tryWriteBlock() {
-        assert started;
+        assert initialized();
         if (!tryAcquireWriteRateLimit()) {
             return;
         }
@@ -174,7 +168,7 @@ public class SlidingWindowService {
     }
 
     public Lock getBlockLock() {
-        assert started;
+        assert initialized();
         return blockLock;
     }
 
@@ -185,7 +179,7 @@ public class SlidingWindowService {
      * Note: this method is NOT thread safe, and it should be called with {@link #blockLock} locked.
      */
     public Block sealAndNewBlockLocked(Block previousBlock, long minSize, long trimOffset, long recordSectionCapacity) throws OverCapacityException {
-        assert started;
+        assert initialized();
         long startOffset = nextBlockStartOffset(previousBlock);
 
         // If the end of the physical device is insufficient for this block, jump to the start of the physical device
@@ -226,7 +220,7 @@ public class SlidingWindowService {
      * Note: this method is NOT thread safe, and it should be called with {@link #blockLock} locked.
      */
     public Block getCurrentBlockLocked() {
-        assert started;
+        assert initialized();
         // The current block is null only when no record has been written
         if (null == currentBlock) {
             currentBlock = nextBlock(windowCoreData.getWindowNextWriteOffset());
