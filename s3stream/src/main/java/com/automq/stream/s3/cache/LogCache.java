@@ -309,10 +309,11 @@ public class LogCache {
             if (streamRecords == null) {
                 return Collections.emptyList();
             }
-            if (streamRecords.get(0).getBaseOffset() > startOffset || streamRecords.get(streamRecords.size() - 1).getLastOffset() <= startOffset) {
-                return Collections.emptyList();
-            }
+
             synchronized (streamRecords) {
+                if (streamRecords.get(0).getBaseOffset() > startOffset || streamRecords.get(streamRecords.size() - 1).getLastOffset() <= startOffset) {
+                    return Collections.emptyList();
+                }
                 StreamRecordBatchList records = new StreamRecordBatchList(streamRecords);
                 int startIndex = records.search(startOffset);
                 if (startIndex == -1) {
