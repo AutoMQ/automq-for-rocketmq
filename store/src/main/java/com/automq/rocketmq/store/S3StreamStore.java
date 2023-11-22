@@ -238,6 +238,11 @@ public class S3StreamStore implements StreamStore {
             });
     }
 
+    @Override
+    public boolean isOpened(long streamId) {
+        return streamClient.getStream(streamId).isPresent();
+    }
+
     private Config configFrom(S3StreamConfig streamConfig) {
         Config config = new Config();
         config.endpoint(streamConfig.s3Endpoint());

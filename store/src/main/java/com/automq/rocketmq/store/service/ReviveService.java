@@ -127,17 +127,6 @@ public class ReviveService {
             CompletableFuture<Triple<LogicQueue, PullResult, PopOperation.PopOperationType>> fetchMessageFuture =
                 future.thenCompose(nil -> logicQueueManager.getOrCreate(StoreContext.EMPTY, topicId, queueId))
                     .thenComposeAsync(queue -> {
-                        // TODO: prevent adding ck into kv when queue is not opened
-//                        LogicQueue.State queueState = queue.getState();
-//                        if (queueState == LogicQueue.State.OPENING) {
-//                            // queue is opening, ignore its revive operation
-//                            LOGGER.info("{}: Queue: {} is opening, ignore revive operation: {}", identity, TopicQueueId.of(topicId, queueId), operationId);
-//                            throw new CompletionException(new StoreException(QUEUE_OPENING, "Queue is opening"));
-//                        }
-//                        if (queueState != LogicQueue.State.OPENED) {
-//                            throw new CompletionException(new StoreException(QUEUE_NOT_OPENED, "Queue is not opened"));
-//                        }
-
                         byte[] ckKey = SerializeUtil.buildCheckPointKey(topicId, queueId, consumerGroupId, operationId);
                         byte[] ckValue;
                         try {

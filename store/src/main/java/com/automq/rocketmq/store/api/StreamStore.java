@@ -40,6 +40,14 @@ public interface StreamStore extends Lifecycle {
     CompletableFuture<Void> open(long streamId, long epoch);
 
     /**
+     * Check if the specified stream is opened.
+     *
+     * @param streamId stream id.
+     * @return true if the stream is opened, otherwise false.
+     */
+    boolean isOpened(long streamId);
+
+    /**
      * Fetch records from stream store.
      *
      * @param streamId    the target stream id.

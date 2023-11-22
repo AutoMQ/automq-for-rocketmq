@@ -28,11 +28,15 @@ import com.automq.rocketmq.store.api.LogicQueueManager;
 import com.automq.rocketmq.store.api.MessageStore;
 import com.automq.rocketmq.store.api.S3ObjectOperator;
 import com.automq.rocketmq.store.api.StreamStore;
+import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.mock.MockStoreMetadataService;
 import com.automq.rocketmq.store.mock.MockStreamStore;
 import com.automq.rocketmq.store.model.StoreContext;
+import com.automq.rocketmq.store.model.message.AckResult;
+import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
 import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PopResult;
+import com.automq.rocketmq.store.model.message.ResetConsumeOffsetResult;
 import com.automq.rocketmq.store.queue.DefaultLogicQueueManager;
 import com.automq.rocketmq.store.service.InflightService;
 import com.automq.rocketmq.store.service.MessageArrivalNotificationService;
@@ -343,7 +347,7 @@ public class MessageStoreTest {
     }
 
     @Test
-    public void pop_snapshot_recover() throws Exception {
+    public void recover_pop_snapshot() throws Exception {
         // set snapshot interval to 7
         config.setOperationSnapshotInterval(7);
         // 1. append 5 message
@@ -378,7 +382,7 @@ public class MessageStoreTest {
         popResult = messageStore.pop(StoreContext.EMPTY, CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, true, 800).join();
         assertEquals(PopResult.Status.END_OF_QUEUE, popResult.status());
 
-        // 6. after 500ms, check if snapshot is taken
+        // 6. wait for the snapshot to be taken
         StreamMetadata opStream = metadataService.operationStreamOf(TOPIC_ID, QUEUE_ID).join();
         await().until(() -> streamStore.startOffset(opStream.getStreamId()) == 7);
 
@@ -441,6 +445,108 @@ public class MessageStoreTest {
         messageStore.ack(popResult.messageList().get(2).receiptHandle().get()).join();
 
         assertEquals(3, logicQueue.getRetryAckOffset(CONSUMER_GROUP_ID));
+    }
+
+    @Test
+    public void recover_all_operation() throws StoreException {
+        config.setOperationSnapshotInterval(7);
+
+        // 1. append 4 message
+        for (int i = 0; i < 4; i++) {
+            FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
+            messageStore.put(StoreContext.EMPTY, message).join();
+        }
+
+        List<String> receiptHandles = new ArrayList<>();
+        // 2. pop 3 message
+        PopResult popResult = messageStore.pop(StoreContext.EMPTY, CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, 800).join();
+        assertEquals(3, popResult.messageList().size());
+        for (FlatMessageExt message : popResult.messageList()) {
+            assertTrue(message.receiptHandle().isPresent());
+            receiptHandles.add(message.receiptHandle().get());
+        }
+
+        // 3. ack them all
+        for (String handle : receiptHandles) {
+            AckResult ackResult = messageStore.ack(handle).join();
+            assertEquals(AckResult.Status.SUCCESS, ackResult.status());
+        }
+        receiptHandles.clear();
+
+        // 4. pop the last message
+        popResult = messageStore.pop(StoreContext.EMPTY, CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 3, false, false, 800).join();
+        assertEquals(1, popResult.messageList().size());
+
+        // 5. wait for the snapshot to be taken
+        StreamMetadata opStream = metadataService.operationStreamOf(TOPIC_ID, QUEUE_ID).join();
+        await().until(() -> streamStore.startOffset(opStream.getStreamId()) == 7);
+
+        StreamMetadata snapshotStream = metadataService.snapshotStreamOf(TOPIC_ID, QUEUE_ID).join();
+        assertEquals(0, streamStore.startOffset(snapshotStream.getStreamId()));
+        assertEquals(1, streamStore.nextOffset(snapshotStream.getStreamId()));
+
+        // 6. rest consume offset to 0
+        LogicQueue logicQueue = logicQueueManager.getOrCreate(StoreContext.EMPTY, TOPIC_ID, QUEUE_ID).join();
+        ResetConsumeOffsetResult resetConsumeOffsetResult = logicQueue.resetConsumeOffset(CONSUMER_GROUP_ID, 0).join();
+        assertEquals(ResetConsumeOffsetResult.Status.SUCCESS, resetConsumeOffsetResult.status());
+
+        Long offset = messageStore.getConsumeOffset(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID).join();
+        assertEquals(0, offset.longValue());
+
+        // 7. pop 1 message with long invisible duration
+        popResult = messageStore.pop(StoreContext.EMPTY, CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 1, false, false, Long.MAX_VALUE).join();
+        assertEquals(1, popResult.messageList().size());
+        FlatMessageExt messageExt = popResult.messageList().get(0);
+        assertTrue(messageExt.receiptHandle().isPresent());
+
+        // 8. change invisible duration
+        ChangeInvisibleDurationResult changeInvisibleDurationResult = messageStore.changeInvisibleDuration(messageExt.receiptHandle().get(), 1000).join();
+        assertEquals(ChangeInvisibleDurationResult.Status.SUCCESS, changeInvisibleDurationResult.status());
+
+        // 8. pop 1 message with short invisible duration
+        popResult = messageStore.pop(StoreContext.EMPTY, CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 1, false, false, 1000).join();
+        assertEquals(1, popResult.messageList().size());
+        long nextVisibleTimestamp = System.currentTimeMillis() + 800;
+
+        // check consume offset and retry message count before closing
+        offset = messageStore.getConsumeOffset(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID).join();
+        assertEquals(2, offset.longValue());
+
+        StreamMetadata retryStream = metadataService.retryStreamOf(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID).join();
+        assertFalse(streamStore.isOpened(retryStream.getStreamId()));
+
+        // 9. close the queue
+        logicQueueManager.close(TOPIC_ID, QUEUE_ID).join();
+
+        // check if all tq related data is cleared
+        byte[] tqPrefix = ByteBuffer.allocate(12)
+            .putLong(TOPIC_ID)
+            .putInt(QUEUE_ID)
+            .array();
+        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, tqPrefix, null, null,
+            (key, value) -> Assertions.fail("check point should be cleared"));
+
+        // 10. reopen the queue and check if all operations are recovered
+        logicQueue = logicQueueManager.getOrCreate(StoreContext.EMPTY, TOPIC_ID, QUEUE_ID).join();
+        Assertions.assertEquals(logicQueue.getState(), LogicQueue.State.OPENED);
+        AtomicInteger checkpointCount = new AtomicInteger();
+        kvService.iterate(MessageStoreImpl.KV_NAMESPACE_CHECK_POINT, tqPrefix, null, null,
+            (key, value) -> checkpointCount.getAndIncrement());
+        assertEquals(2, checkpointCount.get());
+
+        AtomicInteger timerTagCount = new AtomicInteger();
+        kvService.iterate(KV_NAMESPACE_TIMER_TAG, (key, value) -> timerTagCount.getAndIncrement());
+        assertEquals(2, timerTagCount.get());
+
+        // check consume offset and retry message count after opening
+        offset = messageStore.getConsumeOffset(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID).join();
+        assertEquals(2, offset.longValue());
+        assertFalse(streamStore.isOpened(retryStream.getStreamId()));
+
+        await().atMost(Duration.ofSeconds(5))
+            .until(() -> reviveService.reviveTimestamp() >= nextVisibleTimestamp && reviveService.inflightReviveCount() == 0);
+        assertTrue(streamStore.isOpened(retryStream.getStreamId()));
+        assertEquals(2, streamStore.nextOffset(retryStream.getStreamId()));
     }
 
     @Test
