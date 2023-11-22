@@ -17,11 +17,13 @@
 
 package com.automq.rocketmq.metadata.service.cache;
 
+import com.automq.rocketmq.metadata.dao.S3Object;
 import com.automq.rocketmq.metadata.dao.S3StreamObject;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -136,7 +138,21 @@ public class S3StreamObjectCache {
         } finally {
             lock.readLock().unlock();
         }
+    }
 
+    public long streamStartTime(long streamId) {
+        List<S3StreamObject> objs = s3StreamObjects.get(streamId);
+        long startTime = System.currentTimeMillis();
+        if (null == objs) {
+            return startTime;
+        }
+        for (S3StreamObject obj : objs) {
+            long ts = obj.getBaseDataTimestamp().getTime();
+            if (ts < startTime) {
+                startTime = ts;
+            }
+        }
+        return startTime;
     }
 
 }
