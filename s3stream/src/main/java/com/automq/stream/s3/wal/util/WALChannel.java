@@ -40,8 +40,8 @@ public interface WALChannel {
      *
      * @param reader the reader to get the capacity of the channel
      * @throws WALCapacityMismatchException if the capacity of the channel does not match the expected capacity
-     * @throws WALNotInitializedException if try to open an un-initialized channel in recovery mode
-     * @throws IOException if any I/O error happens
+     * @throws WALNotInitializedException   if try to open an un-initialized channel in recovery mode
+     * @throws IOException                  if any I/O error happens
      */
     void open(CapacityReader reader) throws IOException;
 
