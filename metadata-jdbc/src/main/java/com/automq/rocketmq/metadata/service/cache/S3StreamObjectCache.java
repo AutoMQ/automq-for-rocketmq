@@ -17,13 +17,11 @@
 
 package com.automq.rocketmq.metadata.service.cache;
 
-import com.automq.rocketmq.metadata.dao.S3Object;
 import com.automq.rocketmq.metadata.dao.S3StreamObject;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.ReadWriteLock;
