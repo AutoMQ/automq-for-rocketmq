@@ -43,6 +43,11 @@ public class WALBlockDeviceChannel implements WALChannel {
      * 0 means no limit
      */
     final int maxTempBufferSize;
+    /**
+     * Flag indicating whether unaligned write is allowed.
+     * Currently, it is only allowed when testing.
+     */
+    public boolean unalignedWrite = false;
 
     long capacityFact = 0;
     DirectRandomAccessFile randomAccessFile;
@@ -192,7 +197,12 @@ public class WALBlockDeviceChannel implements WALChannel {
 
     @Override
     public void write(ByteBuf src, long position) throws IOException {
-        assert WALUtil.isAligned(position);
+        if (!WALUtil.isAligned(position)) {
+            // unaligned write, just used for testing
+            assert unalignedWrite;
+            unalignedWrite(src, position);
+            return;
+        }
 
         int alignedSize = (int) WALUtil.alignLargeByBlockSize(src.readableBytes());
         assert position + alignedSize <= capacity();
@@ -205,6 +215,30 @@ public class WALBlockDeviceChannel implements WALChannel {
         tmpBuf.position(0).limit(alignedSize);
 
         write(tmpBuf, position);
+    }
+
+    private void unalignedWrite(ByteBuf src, long position) throws IOException {
+        long start = position;
+        long end = position + src.readableBytes();
+        long alignedStart = WALUtil.alignSmallByBlockSize(start);
+        long alignedEnd = WALUtil.alignLargeByBlockSize(end);
+        int alignedSize = (int) (alignedEnd - alignedStart);
+
+        // read the data in the range [alignedStart, alignedEnd) to tmpBuf
+        ByteBuffer tmpBuf = getBuffer(alignedSize);
+        tmpBuf.position(0).limit(alignedSize);
+        read(tmpBuf, alignedStart);
+
+        // overwrite the data in the range [start, end) in tmpBuf
+        for (ByteBuffer buffer : src.nioBuffers()) {
+            tmpBuf.position((int) (start - alignedStart));
+            start += buffer.remaining();
+            tmpBuf.put(buffer);
+        }
+        tmpBuf.position(0).limit(alignedSize);
+
+        // write it
+        write(tmpBuf, alignedStart);
     }
 
     private int write(ByteBuffer src, long position) throws IOException {

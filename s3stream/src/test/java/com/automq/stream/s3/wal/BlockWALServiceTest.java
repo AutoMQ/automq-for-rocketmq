@@ -20,6 +20,7 @@ package com.automq.stream.s3.wal;
 import com.automq.stream.s3.DirectByteBufAlloc;
 import com.automq.stream.s3.TestUtils;
 import com.automq.stream.s3.wal.benchmark.WriteBench;
+import com.automq.stream.s3.wal.util.WALBlockDeviceChannel;
 import com.automq.stream.s3.wal.util.WALChannel;
 import com.automq.stream.s3.wal.util.WALUtil;
 import io.netty.buffer.ByteBuf;
@@ -960,21 +961,22 @@ class BlockWALServiceTest {
             resetBlockDevice(path, capacity);
         }
 
-        final WALChannel walChannel = WALChannel.builder(path)
-                .capacity(capacity)
-                // we may write to un-aligned position here, so we need to disable directIO
-                // TODO support directIO for un-aligned position
-                .direct(false)
-                .build();
+        WALChannel walChannel;
+        if (directIO) {
+            WALBlockDeviceChannel blockDeviceChannel = new WALBlockDeviceChannel(path, capacity);
+            blockDeviceChannel.unalignedWrite = true;
+            walChannel = blockDeviceChannel;
+        } else {
+            walChannel = WALChannel.builder(path)
+                    .capacity(capacity)
+                    .direct(false)
+                    .build();
+        }
 
         // Simulate disaster
         walChannel.open();
         writeWALHeader(walChannel, trimOffset, maxLength);
         for (long writeOffset : writeOffsets) {
-            if (directIO && TEST_BLOCK_DEVICE != null && writeOffset % WALUtil.BLOCK_SIZE != 0) {
-                // skip the test as we can't write to un-aligned position on block device
-                return;
-            }
             write(walChannel, writeOffset, recordSize);
         }
         walChannel.close();
