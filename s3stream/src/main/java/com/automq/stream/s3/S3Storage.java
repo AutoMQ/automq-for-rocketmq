@@ -363,17 +363,19 @@ public class S3Storage implements Storage {
      * Force upload stream WAL cache to S3. Use group upload to avoid generate too many S3 objects when broker shutdown.
      */
     @Override
-    public synchronized CompletableFuture<Void> forceUpload(long streamId) {
+    public CompletableFuture<Void> forceUpload(long streamId) {
         CompletableFuture<Void> cf = new CompletableFuture<>();
         List<CompletableFuture<Void>> inflightWALUploadTasks = new ArrayList<>(this.inflightWALUploadTasks);
         // await inflight stream set object upload tasks to group force upload tasks.
         CompletableFuture.allOf(inflightWALUploadTasks.toArray(new CompletableFuture[0])).whenCompleteAsync((nil, ex) -> {
-            deltaWALCache.setConfirmOffset(callbackSequencer.getWALConfirmOffset());
-            Optional<LogCache.LogCacheBlock> blockOpt = deltaWALCache.archiveCurrentBlockIfContains(streamId);
-            if (blockOpt.isPresent()) {
-                blockOpt.ifPresent(this::uploadDeltaWAL);
+            synchronized (this.inflightWALUploadTasks) {
+                deltaWALCache.setConfirmOffset(callbackSequencer.getWALConfirmOffset());
+                Optional<LogCache.LogCacheBlock> blockOpt = deltaWALCache.archiveCurrentBlockIfContains(streamId);
+                if (blockOpt.isPresent()) {
+                    blockOpt.ifPresent(this::uploadDeltaWAL);
+                }
+                FutureUtil.propagate(CompletableFuture.allOf(this.inflightWALUploadTasks.toArray(new CompletableFuture[0])), cf);
             }
-            FutureUtil.propagate(CompletableFuture.allOf(this.inflightWALUploadTasks.toArray(new CompletableFuture[0])), cf);
             mainWriteExecutor.execute(() -> callbackSequencer.tryFree(streamId));
         });
         return cf;
