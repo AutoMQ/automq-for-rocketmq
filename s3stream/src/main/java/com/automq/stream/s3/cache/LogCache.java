@@ -74,6 +74,10 @@ public class LogCache {
         this(capacity, cacheBlockMaxSize, maxCacheBlockStreamCount, DEFAULT_BLOCK_FREE_LISTENER);
     }
 
+    /**
+     * Put a record batch into the cache.
+     * record batched in the same stream should be put in order.
+     */
     public boolean put(StreamRecordBatch recordBatch) {
         TimerUtil timerUtil = new TimerUtil();
         tryRealFree();
