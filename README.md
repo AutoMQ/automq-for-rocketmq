@@ -48,3 +48,7 @@ Pre-requirements: docker and docker-compose
 [release-url]: https://github.com/AutoMQ/automq-for-rocketmq/releases
 [license-image]: https://img.shields.io/badge/license-Apache%202-4EB1BA.svg
 [license-url]: https://www.apache.org/licenses/LICENSE-2.0.html
+
+
+## How to Contribute
+Read our [contributing guide](docs/CONTRIBUTING.md) to learn about our development process.
