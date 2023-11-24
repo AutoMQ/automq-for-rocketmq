@@ -92,7 +92,7 @@ public class S3StreamStore implements StreamStore {
             streamConfig.s3ForcePathStyle(), streamConfig.s3AccessKey(), streamConfig.s3SecretKey(), networkInboundLimiter, networkOutboundLimiter, true);
 
         WriteAheadLog writeAheadLog = BlockWALService.builder(s3Config.walPath(), s3Config.walCapacity()).config(s3Config).build();
-        S3BlockCache blockCache = new DefaultS3BlockCache(s3Config.blockCacheSize(), objectManager, defaultOperator);
+        S3BlockCache blockCache = new DefaultS3BlockCache(s3Config, objectManager, defaultOperator);
 
         // Build the s3 storage
         this.storage = new S3Storage(s3Config, writeAheadLog, streamManager, objectManager, blockCache, defaultOperator);
