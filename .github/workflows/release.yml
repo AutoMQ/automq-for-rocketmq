@@ -3,9 +3,51 @@ name: Release Charts
 on:
   push:
     tags:
-      - 'v[0-9]+\.[0-9]+\.[0-9]+'
+      - 'helm-v[0-9]+\.[0-9]+\.[0-9]+'
+
+env:
+  DOCKER_REPO: automqinc/automq-for-rocketmq
 
 jobs:
+  build:
+    runs-on: ubuntu-latest
+    if: always()
+    timeout-minutes: 30
+    outputs:
+      version-json: ${{ steps.build_images.outputs.nightly-version }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: Install flatc
+        run: sudo bash install_flatc.sh
+      - uses: actions/setup-java@v3
+        with:
+          distribution: "temurin"
+          java-version: "17"
+          cache: "maven"
+      - name: Build with Maven
+        run: |
+          mvn -Prelease-all clean install -U
+      - name: docker-login
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USER }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build and save docker images
+        id: build_images
+        working-directory: ./distribution/docker
+        env:
+          DOCKER_REPO: ${{ env.DOCKER_REPO }}
+          DOCKER_NIGHTLY_VERSION: ${{ env.DOCKER_NIGHTLY_VERSION }}
+        run: |
+          FULL_NODE_VERSION=$(git ls-remote --tags | awk -F '/' 'END{print $3}')
+          VERSION=${FULL_NODE_VERSION}
+          sh build-ci.sh ${DOCKER_REPO} ${VERSION}
+          docker push ${DOCKER_REPO}:${VERSION}
+  
+
   release:
     permissions:
       contents: write
