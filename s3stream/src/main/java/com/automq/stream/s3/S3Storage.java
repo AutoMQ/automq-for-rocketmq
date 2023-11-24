@@ -382,10 +382,11 @@ public class S3Storage implements Storage {
     }
 
     private void handleAppendCallback(WalWriteRequest request) {
-        mainWriteExecutor.execute(() -> handleAppendCallback0(request));
+        TimerUtil timer = new TimerUtil();
+        mainWriteExecutor.execute(() -> handleAppendCallback0(request, timer));
     }
 
-    private void handleAppendCallback0(WalWriteRequest request) {
+    private void handleAppendCallback0(WalWriteRequest request, TimerUtil startTimer) {
         List<WalWriteRequest> waitingAckRequests = callbackSequencer.after(request);
         waitingAckRequests.forEach(r -> r.record.retain());
         for (WalWriteRequest waitingAckRequest : waitingAckRequests) {
@@ -397,6 +398,7 @@ public class S3Storage implements Storage {
         for (WalWriteRequest waitingAckRequest : waitingAckRequests) {
             waitingAckRequest.cf.complete(null);
         }
+        OperationMetricsStats.getHistogram(S3Operation.APPEND_STORAGE_APPEND_CALLBACK).update(startTimer.elapsedAs(TimeUnit.NANOSECONDS));
     }
 
     @SuppressWarnings("UnusedReturnValue")
