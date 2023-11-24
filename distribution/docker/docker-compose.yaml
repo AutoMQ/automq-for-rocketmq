@@ -31,7 +31,7 @@ services:
       - /bin/bash
       - -c
       - |
-        BUCKET_EXISTS=$(aws s3api create-bucket --bucket bucket-name --endpoint=http://11.6.0.2:9000 2>&1 || true);
+        BUCKET_EXISTS=$$(aws s3api create-bucket --bucket bucket-name --endpoint=http://11.6.0.2:9000 2>&1 || true);
         if [ ! -z "$BUCKET_EXISTS"]; then 
           aws s3api create-bucket --bucket bucket-name --endpoint=http://11.6.0.2:9000
         fi
