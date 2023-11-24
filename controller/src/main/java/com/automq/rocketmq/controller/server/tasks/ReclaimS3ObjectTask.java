@@ -17,7 +17,6 @@
 
 package com.automq.rocketmq.controller.server.tasks;
 
-import apache.rocketmq.common.v1.Code;
 import apache.rocketmq.controller.v1.S3ObjectState;
 import com.automq.rocketmq.controller.MetadataStore;
 import com.automq.rocketmq.common.exception.ControllerException;
@@ -28,7 +27,6 @@ import com.automq.rocketmq.metadata.mapper.S3StreamObjectMapper;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 import org.apache.ibatis.session.SqlSession;
 
@@ -50,17 +48,16 @@ public class ReclaimS3ObjectTask extends ControllerTask {
             }
 
             S3StreamObjectMapper streamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
-
             S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
-            int rows = s3ObjectMapper.rollback(new Date());
-            if (rows > 0) {
-                LOGGER.info("Rollback {} expired prepared S3 Object rows", rows);
-            }
-            List<S3Object> s3Objects = s3ObjectMapper.list(S3ObjectState.BOS_WILL_DELETE, null);
+            rollbackExpiredS3Object(session, s3ObjectMapper);
+
+            S3ObjectCriteria criteria = S3ObjectCriteria.newBuilder()
+                .withState(S3ObjectState.BOS_WILL_DELETE)
+                .build();
+            List<S3Object> s3Objects = s3ObjectMapper.list(criteria);
             List<Long> ids = s3Objects.stream().mapToLong(S3Object::getId).boxed().toList();
             if (!ids.isEmpty()) {
-                List<Long> result = metadataStore.getDataStore().batchDeleteS3Objects(ids).get();
-
+                List<Long> result = metadataStore.getDataStore().batchDeleteS3Objects(ids).join();
                 HashSet<Long> expired = new HashSet<>(ids);
                 result.forEach(expired::remove);
                 LOGGER.info("Reclaim {} S3 objects: deleted: [{}], expired but not deleted: [{}]",
@@ -75,10 +72,34 @@ public class ReclaimS3ObjectTask extends ControllerTask {
                 }
             }
             session.commit();
-        } catch (ExecutionException | InterruptedException e) {
-            LOGGER.error("Failed to batch delete S3 Objects", e);
-            throw new ControllerException(Code.INTERNAL_VALUE, e);
         }
+    }
 
+    public void rollbackExpiredS3Object(SqlSession session, S3ObjectMapper s3ObjectMapper) {
+        S3ObjectCriteria criteria = S3ObjectCriteria.newBuilder()
+            .withState(S3ObjectState.BOS_PREPARED)
+            .withExpiredTimestamp(new Date())
+            .build();
+        List<S3Object> toRollback = s3ObjectMapper.list(criteria);
+        if (!toRollback.isEmpty()) {
+            List<Long> toRollbackObjectIds = toRollback.stream().map(S3Object::getId).collect(Collectors.toList());
+            LOGGER.info("Going to rollback expired prepared S3 Object: {}", toRollbackObjectIds);
+            try {
+                List<Long> deleted = metadataStore.getDataStore().batchDeleteS3Objects(toRollbackObjectIds).join();
+                if (deleted.size() < toRollbackObjectIds.size()) {
+                    LOGGER.warn("DataStore failed to delete all expired prepared S3 Object. Expired={}, Deleted={}",
+                        toRollbackObjectIds, deleted);
+                }
+                S3ObjectCriteria deleteCriteria = S3ObjectCriteria.newBuilder()
+                    .withState(S3ObjectState.BOS_PREPARED)
+                    .addObjectIds(deleted)
+                    .build();
+                int cnt = s3ObjectMapper.deleteByCriteria(deleteCriteria);
+                LOGGER.info("Deleted {} expired prepared S3 Object: {}", cnt, toRollbackObjectIds);
+                session.commit();
+            } catch (Throwable e) {
+                LOGGER.error("Failed to deleted expired prepared S3 Object: {}", toRollbackObjectIds, e);
+            }
+        }
     }
 }

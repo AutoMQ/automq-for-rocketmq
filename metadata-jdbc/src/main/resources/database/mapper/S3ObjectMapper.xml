@@ -46,6 +46,12 @@
         FROM s3object
         <where>
             <if test="null != criteria.streamId">stream_id = #{criteria.streamId}</if>
+            <if test="null != criteria.state">AND state = #{criteria.state}</if>
+            <if test="null != criteria.expiredTimestamp">
+                <![CDATA[
+                   AND expired_timestamp < #{criteria.expiredTimestamp}
+                ]]>
+            </if>
             <if test="null != criteria.ids">
                 <foreach item="item" collection="criteria.ids" open="AND id IN (" close=")" separator=",">
                     #{item}
@@ -73,8 +79,14 @@
         marked_for_deletion_timestamp, state
         FROM s3object
         <where>
-            <if test="null != state">state = #{state}</if>
-            <if test="null != streamId">AND stream_id = #{streamId}</if>
+            <if test="null != criteria.state">state = #{criteria.state}</if>
+            <if test="null != criteria.streamId">AND stream_id = #{criteria.streamId}</if>
+            <if test="null != criteria.expiredTimestamp">
+                <![CDATA[
+                   AND expired_timestamp < #{criteria.expiredTimestamp}
+                ]]>
+            </if>
+
         </where>
     </select>
 

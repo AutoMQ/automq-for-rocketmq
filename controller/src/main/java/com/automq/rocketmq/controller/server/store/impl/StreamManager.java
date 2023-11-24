@@ -537,12 +537,14 @@ public class StreamManager {
             S3StreamObjectMapper streamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
             streamObjectMapper.delete(null, streamId, null);
             S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
-            List<S3Object> list = s3ObjectMapper.list(null, streamId);
+            S3ObjectCriteria criteria = S3ObjectCriteria.newBuilder()
+                .withStreamId(streamId)
+                .build();
+            List<S3Object> list = s3ObjectMapper.list(criteria);
             List<Long> objectIds = new ArrayList<>();
             for (S3Object s3Object : list) {
                 objectIds.add(s3Object.getId());
             }
-
             while (!objectIds.isEmpty()) {
                 List<Long> deleted = metadataStore.getDataStore().batchDeleteS3Objects(objectIds).join();
                 objectIds.removeAll(deleted);
@@ -551,9 +553,7 @@ public class StreamManager {
                     s3ObjectMapper.deleteByCriteria(S3ObjectCriteria.newBuilder().addObjectIds(deleted).build());
                 }
             }
-
             s3ObjectMapper.deleteByCriteria(S3ObjectCriteria.newBuilder().withStreamId(streamId).build());
-
             session.commit();
         }
     }

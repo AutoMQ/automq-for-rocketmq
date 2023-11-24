@@ -17,14 +17,20 @@
 
 package com.automq.rocketmq.metadata.dao;
 
+import apache.rocketmq.controller.v1.S3ObjectState;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Date;
 import java.util.List;
 
 public class S3ObjectCriteria {
     Long streamId;
 
     List<Long> ids;
+
+    S3ObjectState state;
+
+    Date expiredTimestamp;
 
     public static class S3ObjectCriteriaBuilder {
         S3ObjectCriteriaBuilder() {
@@ -47,6 +53,16 @@ public class S3ObjectCriteria {
                 criteria.ids = new ArrayList<>();
             }
             criteria.ids.addAll(ids);
+            return this;
+        }
+
+        public S3ObjectCriteriaBuilder withState(S3ObjectState state) {
+            criteria.state = state;
+            return this;
+        }
+
+        public S3ObjectCriteriaBuilder withExpiredTimestamp(Date expiredTimestamp) {
+            criteria.expiredTimestamp = expiredTimestamp;
             return this;
         }
     }
