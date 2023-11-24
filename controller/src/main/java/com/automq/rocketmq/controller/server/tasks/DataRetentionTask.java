@@ -35,7 +35,6 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import org.apache.ibatis.session.SqlSession;
 
 /**
@@ -102,22 +101,13 @@ public class DataRetentionTask extends ControllerTask {
         }
 
         // Request data store to trim streams
-        List<CompletableFuture<Void>> futures = new ArrayList<>();
         trimTo.forEach((streamId, offset) -> {
             try {
-                futures.add(metadataStore.getDataStore().trimStream(streamId, offset));
+                metadataStore.getDataStore().trimStream(streamId, offset).join();
                 LOGGER.debug("Trim stream[stream-id={}] to {}", streamId, offset);
             } catch (Throwable e) {
                 LOGGER.warn("DataStore fails to trim stream[stream-id={}] to {}", streamId, offset, e);
             }
         });
-
-        for (CompletableFuture<Void> future : futures) {
-            try {
-                future.join();
-            } catch (Throwable e) {
-                LOGGER.warn("DataStore fails to trim stream", e);
-            }
-        }
     }
 }

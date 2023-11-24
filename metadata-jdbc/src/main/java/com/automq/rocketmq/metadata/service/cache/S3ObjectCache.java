@@ -19,6 +19,7 @@ package com.automq.rocketmq.metadata.service.cache;
 
 import apache.rocketmq.controller.v1.S3ObjectState;
 import com.automq.rocketmq.metadata.dao.S3Object;
+import com.automq.rocketmq.metadata.dao.S3ObjectCriteria;
 import com.automq.rocketmq.metadata.mapper.S3ObjectMapper;
 import java.util.Collection;
 import java.util.List;
@@ -40,7 +41,11 @@ public class S3ObjectCache {
     public void onStreamOpen(long streamId) {
         try (SqlSession session = sessionFactory.openSession()) {
             S3ObjectMapper mapper = session.getMapper(S3ObjectMapper.class);
-            List<S3Object> list = mapper.list(S3ObjectState.BOS_COMMITTED, streamId);
+            S3ObjectCriteria criteria = S3ObjectCriteria.newBuilder()
+                .withState(S3ObjectState.BOS_COMMITTED)
+                .withStreamId(streamId)
+                .build();
+            List<S3Object> list = mapper.list(criteria);
             cache.computeIfAbsent(streamId, k -> {
                 ConcurrentMap<Long, S3Object> map = new ConcurrentHashMap<>();
                 list.forEach(obj -> map.put(obj.getId(), obj));

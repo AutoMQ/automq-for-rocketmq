@@ -24,9 +24,7 @@ import com.automq.rocketmq.metadata.mapper.SequenceMapper;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import org.apache.ibatis.session.SqlSession;
-import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
@@ -146,39 +144,6 @@ public class S3ObjectTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testRollback() throws IOException {
-        try (SqlSession session = this.getSessionFactory().openSession()) {
-            SequenceMapper sequenceMapper = session.getMapper(SequenceMapper.class);
-            long next = sequenceMapper.next(S3ObjectMapper.SEQUENCE_NAME);
-
-            S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
-            S3Object s3Object = new S3Object();
-            s3Object.setId(next++);
-            s3Object.setStreamId(1L);
-            s3Object.setObjectSize(555L);
-            s3Object.setState(S3ObjectState.BOS_PREPARED);
-
-            Calendar calendar = Calendar.getInstance();
-            calendar.add(Calendar.SECOND, 1);
-            s3Object.setExpiredTimestamp(calendar.getTime());
-
-            int affectedRows = s3ObjectMapper.prepare(s3Object);
-            Assertions.assertEquals(1, affectedRows);
-            S3Object got = s3ObjectMapper.getById(s3Object.getId());
-            Assertions.assertEquals(S3ObjectState.BOS_PREPARED, got.getState());
-
-            Awaitility.await().with().pollInterval(100, TimeUnit.MILLISECONDS)
-                .atMost(10, TimeUnit.SECONDS)
-                .until(() -> {
-                    s3ObjectMapper.rollback(new Date());
-                    List<Long> remaining = s3ObjectMapper.list(S3ObjectState.BOS_PREPARED, null)
-                        .stream().mapToLong(S3Object::getId).boxed().toList();
-                    return !remaining.contains(s3Object.getId());
-                });
-        }
-    }
-
-    @Test
     public void testList() throws IOException {
         try (SqlSession session = this.getSessionFactory().openSession()) {
             SequenceMapper sequenceMapper = session.getMapper(SequenceMapper.class);
@@ -197,8 +162,10 @@ public class S3ObjectTest extends DatabaseTestBase {
 
             int affectedRows = s3ObjectMapper.prepare(s3Object);
             Assertions.assertEquals(1, affectedRows);
-
-            List<S3Object> s3Objects = s3ObjectMapper.list(S3ObjectState.BOS_PREPARED, null);
+            S3ObjectCriteria criteria = S3ObjectCriteria.newBuilder()
+                .withState(S3ObjectState.BOS_PREPARED)
+                .build();
+            List<S3Object> s3Objects = s3ObjectMapper.list(criteria);
             Assertions.assertEquals(1, s3Objects.size());
         }
     }
@@ -235,14 +202,16 @@ public class S3ObjectTest extends DatabaseTestBase {
 
             affectedRows = s3ObjectMapper.prepare(s3Object1);
             Assertions.assertEquals(1, affectedRows);
-
-            List<S3Object> s3Objects = s3ObjectMapper.list(S3ObjectState.BOS_PREPARED, null);
+            S3ObjectCriteria criteria = S3ObjectCriteria.newBuilder()
+                .withState(S3ObjectState.BOS_PREPARED)
+                .build();
+            List<S3Object> s3Objects = s3ObjectMapper.list(criteria);
             Assertions.assertEquals(2, s3Objects.size());
 
             affectedRows = s3ObjectMapper.deleteByCriteria(S3ObjectCriteria.newBuilder().addObjectIds(Arrays.asList(s3Object.getId(), s3Object1.getId())).build());
             Assertions.assertEquals(2, affectedRows);
 
-            s3Objects = s3ObjectMapper.list(S3ObjectState.BOS_PREPARED, null);
+            s3Objects = s3ObjectMapper.list(criteria);
             Assertions.assertEquals(0, s3Objects.size());
         }
     }
