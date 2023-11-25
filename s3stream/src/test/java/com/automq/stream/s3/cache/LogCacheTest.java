@@ -19,7 +19,6 @@ package com.automq.stream.s3.cache;
 
 import com.automq.stream.s3.TestUtils;
 import com.automq.stream.s3.model.StreamRecordBatch;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
