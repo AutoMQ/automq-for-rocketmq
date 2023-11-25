@@ -413,7 +413,7 @@ public class S3Storage implements Storage {
     }
 
     private Lock getStreamCallbackLock(long streamId) {
-        return streamCallbackLocks[(int) (streamId % NUM_STREAM_CALLBACK_LOCKS)];
+        return streamCallbackLocks[(int) (Math.abs(streamId) % NUM_STREAM_CALLBACK_LOCKS)];
     }
 
     @SuppressWarnings("UnusedReturnValue")
