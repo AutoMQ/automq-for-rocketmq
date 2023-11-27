@@ -417,6 +417,7 @@ public class StreamManager {
                 CloseStreamRequest request = CloseStreamRequest.newBuilder()
                     .setStreamId(streamId)
                     .setStreamEpoch(streamEpoch)
+                    .setBrokerId(nodeId)
                     .build();
                 return metadataStore.controllerClient()
                     .closeStream(leaderAddress.get(), request)
