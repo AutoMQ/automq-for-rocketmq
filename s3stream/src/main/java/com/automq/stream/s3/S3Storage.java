@@ -48,6 +48,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Queue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -380,8 +381,9 @@ public class S3Storage implements Storage {
         CompletableFuture.allOf(inflightWALUploadTasks.toArray(new CompletableFuture[0])).whenCompleteAsync((nil, ex) -> {
             uploadDeltaWAL(streamId);
             FutureUtil.propagate(CompletableFuture.allOf(this.inflightWALUploadTasks.toArray(new CompletableFuture[0])), cf);
-            // FIXME: concurrent use here, lock it
-            callbackSequencer.tryFree(streamId);
+            if (LogCache.MATCH_ALL_STREAMS != streamId) {
+                callbackSequencer.tryFree(streamId);
+            }
         });
         return cf;
     }
@@ -579,7 +581,6 @@ public class S3Storage implements Storage {
 
         /**
          * Try free stream related resources.
-         * It should not be called concurrently with {@link #before} and {@link #after} with the same streamId.
          */
         public void tryFree(long streamId) {
             StreamRequestQueue queue = stream2requests.get(streamId);
@@ -604,7 +605,7 @@ public class S3Storage implements Storage {
          * Every request in the queue has the same streamId and is ordered by offset.
          */
         static class StreamRequestQueue {
-            private final Queue<WalWriteRequest> queue = new LinkedList<>();
+            private final BlockingQueue<WalWriteRequest> queue = new LinkedBlockingQueue<>();
             private long confirmOffset;
 
             public StreamRequestQueue(long confirmOffset) {
@@ -613,7 +614,6 @@ public class S3Storage implements Storage {
 
             /**
              * Add a request to the queue.
-             * Note: this method is NOT thread safe.
              */
             public void add(WalWriteRequest request) {
                 queue.add(request);
@@ -622,7 +622,7 @@ public class S3Storage implements Storage {
             /**
              * Try to pop sequential persisted requests from the queue.
              * It returns an empty list if the first request in the queue's offset is not equal to the given offset.
-             * Note: this method is NOT thread safe.
+             * Note: this method can be called with {@link #add} concurrently but NOT with itself.
              */
             public List<WalWriteRequest> popSequentialRequests(long offset) {
                 List<WalWriteRequest> rst = new LinkedList<>();
@@ -631,7 +631,12 @@ public class S3Storage implements Storage {
                     return Collections.emptyList();
                 }
                 assert peek.persisted;
-                rst.add(queue.poll());
+                if (queue.remove(peek)) {
+                    rst.add(peek);
+                } else {
+                    // Should not happen.
+                    assert false;
+                }
 
                 // Try to pop following sequential persisted requests.
                 for (; ; ) {
@@ -641,7 +646,12 @@ public class S3Storage implements Storage {
                     }
                     assert peek.offset > offset;
                     offset = peek.offset;
-                    rst.add(queue.poll());
+                    if (queue.remove(peek)) {
+                        rst.add(peek);
+                    } else {
+                        // Should not happen.
+                        assert false;
+                    }
                 }
                 confirmOffset = offset;
                 return rst;
