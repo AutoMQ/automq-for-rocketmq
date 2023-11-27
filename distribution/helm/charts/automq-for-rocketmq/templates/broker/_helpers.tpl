@@ -17,13 +17,6 @@ limitations under the License.
 */}}
 
 {{/*
-Expand the name of the chart.
-*/}}
-{{- define "rocketmq-broker.name" -}}
-{{- default .Chart.Name .Values.broker.nameOverride | trunc 63 | trimSuffix "-" }}
-{{- end }}
-
-{{/*
 Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
@@ -31,13 +24,8 @@ If release name contains chart name it will be used as a full name.
 {{- define "rocketmq-broker.fullname" -}}
 {{- if .Values.broker.fullnameOverride }}
 {{- .Values.broker.fullnameOverride | trunc 63 | trimSuffix "-" }}
-{{- else }}
-{{- $name := default .Chart.Name .Values.broker.nameOverride }}
-{{- if contains $name .Release.Name }}
-{{- .Release.Name | trunc 63 | trimSuffix "-" }}
-{{- else }}
-{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
-{{- end }}
+{{- else -}}
+rocketmq-broker
 {{- end }}
 {{- end }}
 
@@ -72,7 +60,7 @@ app.kubernetes.io/cluster: {{ include "rocketmq-broker.clusterName" . }}
 {{- if .Values.broker.conf.clusterNameOverride }}
 {{- .Values.broker.conf.clusterNameOverride | trunc 63 | trimSuffix "-" }}
 {{- else -}}
-DefaultCluster
+{{ .Release.Name }}
 {{- end }}
 {{- end }}
 

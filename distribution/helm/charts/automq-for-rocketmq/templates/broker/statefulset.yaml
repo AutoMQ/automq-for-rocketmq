@@ -16,10 +16,10 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "rocketmq-broker.fullname" . }}
+  name: {{ include "rocketmq-broker.clusterName" . }}-{{ include "rocketmq-broker.fullname" . }}
 spec:
   replicas: {{ .Values.broker.replicaCount }}
-  serviceName: {{ include "rocketmq-broker.fullname" . }}
+  serviceName: {{ include "rocketmq-broker.clusterName" . }}-{{ include "rocketmq-broker.fullname" . }}
   selector:
     matchLabels:
       {{- include "rocketmq-broker.selectorLabels" . | nindent 6 }}
@@ -38,7 +38,7 @@ spec:
           imagePullPolicy: {{ $.Values.broker.image.pullPolicy }}
         {{- end }}
           command: [ "/bin/sh" ]
-          args: [ "-c", "./run-server.sh com.automq.rocketmq.broker.BrokerStartup -c /home/rocketmq/automq-for-rocketmq/conf/broker/$(CLUSTER_NAME)-$(POD_NAME)" ]
+          args: [ "-c", "./run-server.sh com.automq.rocketmq.broker.BrokerStartup -c /home/rocketmq/automq-for-rocketmq/conf/broker/$(POD_NAME)" ]
           env:
             - name: POD_NAME
               valueFrom:
@@ -47,7 +47,7 @@ spec:
             - name: CLUSTER_NAME
               valueFrom:
                 fieldRef:
-                  fieldPath: metadata.labels['app.kubernetes.io/cluster']
+                  fieldPath: metadata.labels['app.kubernetes.io/instance']
             - name: INSTANCE_NAME
               valueFrom:
                 fieldRef:

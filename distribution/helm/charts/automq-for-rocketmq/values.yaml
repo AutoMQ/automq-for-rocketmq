@@ -22,13 +22,12 @@ broker:
   image:
     pullPolicy: IfNotPresent
     repository: "automqinc/automq-for-rocketmq"
-    tag: "v0.0.2-alpha"
+    tag: "v0.0.3-alpha"
 
   persistence:
     enabled: false
     size: 8Gi
 
-  nameOverride: "broker"
   fullnameOverride: ""
 
   conf:
