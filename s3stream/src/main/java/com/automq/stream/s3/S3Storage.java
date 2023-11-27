@@ -48,7 +48,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Queue;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -57,6 +56,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
@@ -380,6 +380,7 @@ public class S3Storage implements Storage {
         CompletableFuture.allOf(inflightWALUploadTasks.toArray(new CompletableFuture[0])).whenCompleteAsync((nil, ex) -> {
             uploadDeltaWAL(streamId);
             FutureUtil.propagate(CompletableFuture.allOf(this.inflightWALUploadTasks.toArray(new CompletableFuture[0])), cf);
+            // FIXME: concurrent use here, lock it
             callbackSequencer.tryFree(streamId);
         });
         return cf;
@@ -529,9 +530,17 @@ public class S3Storage implements Storage {
      */
     static class WALCallbackSequencer {
         public static final long NOOP_OFFSET = -1L;
-        private final Map<Long, BlockingQueue<WalWriteRequest>> stream2requests = new ConcurrentHashMap<>();
-        private final BlockingQueue<WalWriteRequest> walRequests = new LinkedBlockingQueue<>();
-        private long walConfirmOffset = NOOP_OFFSET;
+        private final Map<Long, StreamRequestQueue> stream2requests = new ConcurrentHashMap<>();
+        /**
+         * The offset before and including which all requests have been confirmed.
+         * Note: it is updated by {@link #updateWALConfirmOffset}, and it is not real-time.
+         */
+        private final AtomicLong walConfirmOffset = new AtomicLong(NOOP_OFFSET);
+
+        public WALCallbackSequencer() {
+            Threads.newSingleThreadScheduledExecutor(ThreadUtils.createThreadFactory("wal-callback-sequencer-update-confirm-offset", true), LOGGER)
+                    .scheduleAtFixedRate(this::updateWALConfirmOffset, 1, 1, TimeUnit.SECONDS);
+        }
 
         /**
          * Add request to stream sequence queue.
@@ -541,10 +550,8 @@ public class S3Storage implements Storage {
          */
         public void before(WalWriteRequest request) {
             try {
-                walRequests.put(request);
-                Queue<WalWriteRequest> streamRequests = stream2requests.computeIfAbsent(request.record.getStreamId(), s -> new LinkedBlockingQueue<>());
-                assert streamRequests.isEmpty() || streamRequests.peek().offset < request.offset;
-                streamRequests.add(request);
+                StreamRequestQueue queue = stream2requests.computeIfAbsent(request.record.getStreamId(), s -> new StreamRequestQueue());
+                queue.add(request);
             } catch (Throwable ex) {
                 request.cf.completeExceptionally(ex);
             }
@@ -559,48 +566,22 @@ public class S3Storage implements Storage {
          */
         public List<WalWriteRequest> after(WalWriteRequest request) {
             request.persisted = true;
-            // move the WAL inclusive confirm offset.
-            // FIXME: requests in walRequests may not be in order.
-            for (; ; ) {
-                WalWriteRequest peek = walRequests.peek();
-                if (peek == null || !peek.persisted) {
-                    break;
-                }
-                walRequests.poll();
-                walConfirmOffset = peek.offset;
-            }
-
-            // pop sequence success stream request.
             long streamId = request.record.getStreamId();
-            BlockingQueue<WalWriteRequest> streamRequests = stream2requests.get(streamId);
-            WalWriteRequest peek = streamRequests.peek();
-            if (peek == null || peek.offset != request.offset) {
-                return Collections.emptyList();
-            }
-            List<WalWriteRequest> rst = new ArrayList<>();
-            if (streamRequests.remove(request)) {
-                rst.add(request);
-            } else {
-                // Should not happen.
-                LOGGER.error("request was removed by other thread after it was persisted. streamId={}, offset={}",
-                        streamId, request.offset);
-                assert false;
-            }
-            for (; ; ) {
-                peek = streamRequests.peek();
-                if (peek == null || !peek.persisted) {
-                    break;
-                }
-                if (streamRequests.remove(peek)) {
-                    rst.add(peek);
-                } else {
-                    // Should not happen.
-                    LOGGER.error("request was removed by other thread after it was persisted. streamId={}, offset={}, peekOffset={}",
-                            streamId, request.offset, peek.offset);
-                    assert false;
-                }
-            }
-            return rst;
+            StreamRequestQueue queue = stream2requests.get(streamId);
+            return queue.popSequentialRequests(request.offset);
+        }
+
+        /**
+         * Update WAL inclusive confirm offset.
+         * It is thread safe.
+         */
+        public void updateWALConfirmOffset() {
+            // FIXME: in some stream, `after` may have not been called, so the confirm offset is not updated.
+            stream2requests.values().stream()
+                    .mapToLong(StreamRequestQueue::getConfirmOffset)
+                    .filter(offset -> offset != NOOP_OFFSET)
+                    .min()
+                    .ifPresent(walConfirmOffset::set);
         }
 
         /**
@@ -609,16 +590,73 @@ public class S3Storage implements Storage {
          * @return inclusive confirm offset.
          */
         public long getWALConfirmOffset() {
-            return walConfirmOffset;
+            return walConfirmOffset.get();
         }
 
         /**
          * Try free stream related resources.
+         * It should not be called concurrently with {@link #before} and {@link #after} with the same streamId.
          */
         public void tryFree(long streamId) {
-            Queue<?> queue = stream2requests.get(streamId);
+            StreamRequestQueue queue = stream2requests.get(streamId);
             if (queue != null && queue.isEmpty()) {
                 stream2requests.remove(streamId, queue);
+            }
+        }
+
+        /**
+         * StreamRequestQueue contains a queue of requests for a stream.
+         * Every request in the queue has the same streamId and is ordered by offset.
+         */
+        static class StreamRequestQueue {
+            private final Queue<WalWriteRequest> queue = new LinkedList<>();
+            private long confirmOffset = NOOP_OFFSET;
+
+            /**
+             * Add a request to the queue.
+             * Note: this method is NOT thread safe.
+             */
+            public void add(WalWriteRequest request) {
+                queue.add(request);
+            }
+
+            /**
+             * Try to pop sequential persisted requests from the queue.
+             * It returns an empty list if the first request in the queue's offset is not equal to the given offset.
+             * Note: this method is NOT thread safe.
+             */
+            public List<WalWriteRequest> popSequentialRequests(long offset) {
+                List<WalWriteRequest> rst = new LinkedList<>();
+                WalWriteRequest peek = queue.peek();
+                if (peek == null || peek.offset != offset) {
+                    return Collections.emptyList();
+                }
+                assert peek.persisted;
+                rst.add(queue.poll());
+
+                // Try to pop following sequential persisted requests.
+                for (; ; ) {
+                    peek = queue.peek();
+                    if (peek == null || !peek.persisted) {
+                        break;
+                    }
+                    assert peek.offset > offset;
+                    offset = peek.offset;
+                    rst.add(queue.poll());
+                }
+                confirmOffset = offset;
+                return rst;
+            }
+
+            /**
+             * It returns {@link #NOOP_OFFSET} if no request has been confirmed.
+             */
+            public long getConfirmOffset() {
+                return confirmOffset;
+            }
+
+            public boolean isEmpty() {
+                return queue.isEmpty();
             }
         }
     }
