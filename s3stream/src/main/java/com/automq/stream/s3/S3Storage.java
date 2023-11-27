@@ -637,12 +637,13 @@ public class S3Storage implements Storage {
              * Note: this method can be called with {@link #add} concurrently but NOT with itself.
              */
             public List<WalWriteRequest> popSequentialRequests(long offset) {
-                List<WalWriteRequest> rst = new LinkedList<>();
                 WalWriteRequest peek = queue.peek();
                 if (peek == null || peek.offset != offset) {
                     return Collections.emptyList();
                 }
                 assert peek.persisted;
+
+                List<WalWriteRequest> rst = new LinkedList<>();
                 if (queue.remove(peek)) {
                     rst.add(peek);
                 } else {
