@@ -281,6 +281,7 @@ public class S3Storage implements Storage {
             appendResult = deltaWAL.append(streamRecord.encoded());
         } catch (WriteAheadLog.OverCapacityException e) {
             // the WAL write data align with block, 'WAL is full but LogCacheBlock is not full' may happen.
+            callbackSequencer.updateWALConfirmOffset();
             forceUpload(LogCache.MATCH_ALL_STREAMS);
             if (!fromBackoff) {
                 backoffRecords.offer(request);
@@ -539,6 +540,11 @@ public class S3Storage implements Storage {
          */
         private final AtomicLong walConfirmOffset = new AtomicLong(NOOP_OFFSET);
 
+        public WALCallbackSequencer() {
+            Threads.newSingleThreadScheduledExecutor(ThreadUtils.createThreadFactory("wal-callback-sequencer-update-confirm-offset", true), LOGGER)
+                    .scheduleAtFixedRate(this::updateWALConfirmOffset, 1, 1, TimeUnit.SECONDS);
+        }
+
         /**
          * Add request to stream sequence queue.
          * When the {@code request.record.getStreamId()} is different, concurrent calls are allowed.
@@ -570,12 +576,29 @@ public class S3Storage implements Storage {
         }
 
         /**
+         * Update WAL inclusive confirm offset.
+         * It is thread safe.
+         */
+        public void updateWALConfirmOffset() {
+            long minUnconfirmedOffset = stream2requests.values().stream()
+                    .mapToLong(StreamRequestQueue::unconfirmedOffset)
+                    .min()
+                    .orElse(Long.MAX_VALUE);
+            stream2requests.values().stream()
+                    .mapToLong(StreamRequestQueue::confirmOffset)
+                    .filter(offset -> offset < minUnconfirmedOffset)
+                    .max()
+                    .ifPresent(walConfirmOffset::set);
+        }
+
+        /**
          * Get WAL inclusive confirm offset.
+         * Note: it is not real-time.
+         * @see #updateWALConfirmOffset
          *
          * @return inclusive confirm offset.
          */
         public long getWALConfirmOffset() {
-            updateWALConfirmOffset();
             return walConfirmOffset.get();
         }
 
@@ -587,22 +610,6 @@ public class S3Storage implements Storage {
             if (queue != null && queue.isEmpty()) {
                 stream2requests.remove(streamId, queue);
             }
-        }
-
-        /**
-         * Update WAL inclusive confirm offset.
-         * It is thread safe.
-         */
-        private void updateWALConfirmOffset() {
-            long minUnconfirmedOffset = stream2requests.values().stream()
-                    .mapToLong(StreamRequestQueue::unconfirmedOffset)
-                    .min()
-                    .orElse(Long.MAX_VALUE);
-            stream2requests.values().stream()
-                    .mapToLong(StreamRequestQueue::confirmOffset)
-                    .filter(offset -> offset < minUnconfirmedOffset)
-                    .max()
-                    .ifPresent(walConfirmOffset::set);
         }
 
         /**
