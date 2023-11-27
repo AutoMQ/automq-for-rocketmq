@@ -595,6 +595,7 @@ public class S3Storage implements Storage {
          */
         private void updateWALConfirmOffset() {
             stream2requests.values().stream()
+                    .filter(q -> !q.isEmpty())
                     .mapToLong(StreamRequestQueue::getConfirmOffset)
                     .min()
                     .ifPresent(walConfirmOffset::set);
