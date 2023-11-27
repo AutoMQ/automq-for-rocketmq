@@ -33,8 +33,12 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.lang3.tuple.Pair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class DefaultStoreMetadataService implements StoreMetadataService {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(DefaultStoreMetadataService.class);
 
     private final MetadataStore metadataStore;
 
@@ -133,6 +137,7 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
             .thenApply(res -> {
                 loop.set(false);
                 s3MetadataService.onStreamOpen(streamId);
+                LOGGER.info("Open Stream[stream-id={}, epoch={}] returns metadata: {}", streamId, streamEpoch, res);
                 return res;
             }), MoreExecutors.directExecutor());
     }

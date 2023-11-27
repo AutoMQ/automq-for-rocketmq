@@ -112,22 +112,24 @@ public class GroupManager {
                     groupCache.apply(List.of(group));
                     future.complete(group.getId());
                 }
+                return future;
             } else {
                 Optional<String> leaderAddress = metadataStore.electionService().leaderAddress();
                 if (leaderAddress.isEmpty()) {
                     return CompletableFuture.failedFuture(new ControllerException(Code.NO_LEADER_VALUE, "No leader is elected yet"));
                 }
-                metadataStore.controllerClient().createGroup(leaderAddress.get(), request).whenComplete((reply, e) -> {
-                    if (null != e) {
-                        future.completeExceptionally(e);
-                    } else {
-                        future.complete(reply.getGroupId());
-                    }
-                });
+                return metadataStore.controllerClient()
+                    .createGroup(leaderAddress.get(), request)
+                    .thenApply(reply -> {
+                        if (reply.getStatus().getCode() == Code.OK) {
+                            return reply.getGroupId();
+                        } else {
+                            throw new CompletionException(new ControllerException(reply.getStatus().getCode().getNumber(),
+                                reply.getStatus().getMessage()));
+                        }
+                    });
             }
-            break;
         }
-        return future;
     }
 
     private void completeDescription(@Nonnull ConsumerGroup group) {
