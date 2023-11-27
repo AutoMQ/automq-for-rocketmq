@@ -13,7 +13,7 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-    if: always()
+    if: github.repository == 'AutoMQ/automq-for-rocketmq'
     timeout-minutes: 30
     outputs:
       version-json: ${{ steps.build_images.outputs.nightly-version }}
