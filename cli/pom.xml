@@ -51,8 +51,26 @@
         </dependency>
         <dependency>
             <groupId>org.apache.rocketmq</groupId>
-            <artifactId>rocketmq-client-java</artifactId>
-            <version>5.0.4</version>
+            <artifactId>rocketmq-client-java-noshade</artifactId>
+            <version>5.0.5</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>io.opentelemetry</groupId>
+                    <artifactId>opentelemetry-api</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.opentelemetry</groupId>
+                    <artifactId>opentelemetry-sdk</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.opentelemetry</groupId>
+                    <artifactId>opentelemetry-exporter-otlp-common</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.opentelemetry</groupId>
+                    <artifactId>opentelemetry-sdk-metrics</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>io.dropwizard.metrics</groupId>
