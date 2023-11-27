@@ -22,9 +22,7 @@ import apache.rocketmq.controller.v1.CloseStreamRequest;
 import apache.rocketmq.controller.v1.DescribeStreamReply;
 import apache.rocketmq.controller.v1.DescribeStreamRequest;
 import apache.rocketmq.controller.v1.GroupStatus;
-import apache.rocketmq.controller.v1.ListOpenStreamsReply;
 import apache.rocketmq.controller.v1.ListOpenStreamsRequest;
-import apache.rocketmq.controller.v1.OpenStreamReply;
 import apache.rocketmq.controller.v1.OpenStreamRequest;
 import apache.rocketmq.controller.v1.Status;
 import apache.rocketmq.controller.v1.StreamMetadata;
@@ -333,9 +331,17 @@ public class StreamManager {
                 OpenStreamRequest request = OpenStreamRequest.newBuilder()
                     .setStreamId(streamId)
                     .setStreamEpoch(epoch)
+                    .setBrokerId(nodeId)
                     .build();
-                return metadataStore.controllerClient().openStream(leaderAddress.get(), request)
-                    .thenApply(OpenStreamReply::getStreamMetadata);
+                return metadataStore.controllerClient()
+                    .openStream(leaderAddress.get(), request)
+                    .thenApply(reply -> {
+                        if (reply.getStatus().getCode() == Code.OK) {
+                            return reply.getStreamMetadata();
+                        }
+                        throw new CompletionException(new ControllerException(reply.getStatus().getCode().getNumber(),
+                            reply.getStatus().getMessage()));
+                    });
             }
         }
     }
@@ -412,14 +418,15 @@ public class StreamManager {
                     .setStreamId(streamId)
                     .setStreamEpoch(streamEpoch)
                     .build();
-                metadataStore.controllerClient().closeStream(leaderAddress.get(), request).whenComplete(((reply, e) -> {
-                    if (null != e) {
-                        future.completeExceptionally(e);
-                    } else {
-                        future.complete(null);
-                    }
-                }));
-                break;
+                return metadataStore.controllerClient()
+                    .closeStream(leaderAddress.get(), request)
+                    .thenApply(reply -> {
+                        if (reply.getStatus().getCode() == Code.OK) {
+                            return null;
+                        }
+                        throw new CompletionException(new ControllerException(reply.getStatus().getCode().getNumber(),
+                            reply.getStatus().getMessage()));
+                    });
             }
         }
         return future;
@@ -465,8 +472,15 @@ public class StreamManager {
                 ListOpenStreamsRequest request = ListOpenStreamsRequest.newBuilder()
                     .setBrokerId(nodeId)
                     .build();
-                return metadataStore.controllerClient().listOpenStreams(leaderAddress.get(), request)
-                    .thenApply((ListOpenStreamsReply::getStreamMetadataList));
+                return metadataStore.controllerClient()
+                    .listOpenStreams(leaderAddress.get(), request)
+                    .thenApply(reply -> {
+                        if (reply.getStatus().getCode() == Code.OK) {
+                            return reply.getStreamMetadataList();
+                        }
+                        throw new CompletionException(new ControllerException(reply.getStatus().getCode().getNumber(),
+                            reply.getStatus().getMessage()));
+                    });
             }
         }
         return future;
