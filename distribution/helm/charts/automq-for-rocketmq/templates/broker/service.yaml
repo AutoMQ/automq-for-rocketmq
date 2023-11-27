@@ -16,7 +16,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "rocketmq-broker.fullname" . }}
+  name: {{ include "rocketmq-broker.clusterName" . }}-{{ include "rocketmq-broker.fullname" . }}
   labels:
     {{- include "rocketmq-broker.labels" . | nindent 4 }}
 spec:
