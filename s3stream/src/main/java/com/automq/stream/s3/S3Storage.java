@@ -594,10 +594,14 @@ public class S3Storage implements Storage {
          * It is thread safe.
          */
         private void updateWALConfirmOffset() {
-            stream2requests.values().stream()
-                    .filter(q -> !q.isEmpty())
-                    .mapToLong(StreamRequestQueue::getConfirmOffset)
+            long minUnconfirmedOffset = stream2requests.values().stream()
+                    .mapToLong(StreamRequestQueue::unconfirmedOffset)
                     .min()
+                    .orElse(Long.MAX_VALUE);
+            stream2requests.values().stream()
+                    .mapToLong(StreamRequestQueue::confirmOffset)
+                    .filter(offset -> offset < minUnconfirmedOffset)
+                    .max()
                     .ifPresent(walConfirmOffset::set);
         }
 
@@ -659,10 +663,23 @@ public class S3Storage implements Storage {
             }
 
             /**
-             * It returns {@link #NOOP_OFFSET} if no request has been confirmed.
+             * It returns the maximum offset of all persisted requests in the queue.
+             * It returns {@link #confirmOffset} initialized in {@link #StreamRequestQueue} if there has not been any persisted request.
              */
-            public long getConfirmOffset() {
+            public long confirmOffset() {
                 return confirmOffset;
+            }
+
+            /**
+             * It returns the minimum offset of all un-persisted requests in the queue.
+             * It returns {@link Long#MAX_VALUE} if there is no un-persisted request in the queue.
+             */
+            public long unconfirmedOffset() {
+                WalWriteRequest peek = queue.peek();
+                if (peek == null) {
+                    return Long.MAX_VALUE;
+                }
+                return peek.offset;
             }
 
             public boolean isEmpty() {
