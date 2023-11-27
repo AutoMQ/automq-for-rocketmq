@@ -21,6 +21,7 @@ import com.automq.stream.api.AppendResult;
 import com.automq.stream.api.CreateStreamOptions;
 import com.automq.stream.api.FetchResult;
 import com.automq.stream.api.OpenStreamOptions;
+import com.automq.stream.api.ReadOptions;
 import com.automq.stream.api.RecordBatch;
 import com.automq.stream.api.RecordBatchWithContext;
 import com.automq.stream.api.Stream;
@@ -105,7 +106,7 @@ public class MemoryStreamClient implements StreamClient {
         }
 
         @Override
-        public CompletableFuture<FetchResult> fetch(long startOffset, long endOffset, int maxBytesHint) {
+        public CompletableFuture<FetchResult> fetch(long startOffset, long endOffset, int maxBytesHint, ReadOptions readOptions) {
             List<RecordBatchWithContext> records = new ArrayList<>(recordMap.subMap(startOffset, endOffset).values());
             return CompletableFuture.completedFuture(() -> records);
         }
