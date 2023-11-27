@@ -138,6 +138,29 @@ public class S3StorageTest {
     }
 
     @Test
+    public void testWALCallbackSequencerUnordered() {
+        S3Storage.WALCallbackSequencer seq = new S3Storage.WALCallbackSequencer();
+        WalWriteRequest r0 = new WalWriteRequest(newRecord(233L, 10L), 100L, new CompletableFuture<>());
+        WalWriteRequest r1 = new WalWriteRequest(newRecord(233L, 11L), 101L, new CompletableFuture<>());
+        WalWriteRequest r2 = new WalWriteRequest(newRecord(234L, 20L), 102L, new CompletableFuture<>());
+        WalWriteRequest r3 = new WalWriteRequest(newRecord(234L, 21L), 103L, new CompletableFuture<>());
+
+        seq.before(r0);
+        seq.before(r2);
+        seq.before(r1);
+        seq.before(r3);
+
+        assertEquals(Collections.emptyList(), seq.after(r1));
+        assertEquals(-1L, seq.getWALConfirmOffset());
+        assertEquals(List.of(r0, r1), seq.after(r0));
+        assertEquals(101L, seq.getWALConfirmOffset());
+        assertEquals(Collections.emptyList(), seq.after(r3));
+        assertEquals(101L, seq.getWALConfirmOffset());
+        assertEquals(List.of(r2, r3), seq.after(r2));
+        assertEquals(103L, seq.getWALConfirmOffset());
+    }
+
+    @Test
     public void testUploadWALObject_sequence() throws ExecutionException, InterruptedException, TimeoutException {
         List<CompletableFuture<Long>> objectIdCfList = List.of(new CompletableFuture<>(), new CompletableFuture<>());
         AtomicInteger objectCfIndex = new AtomicInteger();
