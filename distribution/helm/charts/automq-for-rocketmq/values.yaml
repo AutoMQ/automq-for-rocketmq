@@ -40,7 +40,7 @@ broker:
       secretKey: "rocketmq"
 
     s3Stream:
-      s3WALPath: "/tmp/s3rocketmq/wal"
+      s3WALPath: "/root/logs/rocketmqlogs"
       s3Endpoint: "http://minio.local:9000"
       s3Bucket: "bucket-name"
       s3Region: "us-east-1"
@@ -60,7 +60,7 @@ broker:
       dumpHeapOnError: true
     metrics:
       exporterType: "OTLP_GRPC"
-      grpcExporterTarget: "http://10.129.63.127:4317"
+      grpcExporterTarget: "http://localhost:4317"
       grpcExporterHeader: ""
       grpcExporterTimeOutInMills: 31000
       periodicExporterIntervalInMills: 30000
