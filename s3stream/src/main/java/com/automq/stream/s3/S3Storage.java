@@ -602,6 +602,7 @@ public class S3Storage implements Storage {
          */
         synchronized private long calculate() {
             Lock lock = rwLock.writeLock();
+            lock.lock();
             try {
                 // Insert a flag.
                 queue.add(WalWriteRequestWrapper.flag());
