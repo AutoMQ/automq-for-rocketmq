@@ -45,7 +45,7 @@ public class ConsoleHelper {
         return calendar.getTime();
     }
 
-    static void alignCentral(AT_Row row) {
+    public static void alignCentral(AT_Row row) {
         for (AT_Cell cell : row.getCells()) {
             cell.getContext().setTextAlignment(TextAlignment.CENTER);
         }

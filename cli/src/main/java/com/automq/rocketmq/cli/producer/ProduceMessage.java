@@ -15,12 +15,14 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.cli;
+package com.automq.rocketmq.cli.producer;
 
 import apache.rocketmq.controller.v1.AcceptTypes;
 import apache.rocketmq.common.v1.Code;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.MessageType;
+import com.automq.rocketmq.cli.CliClientConfig;
+import com.automq.rocketmq.cli.MQAdmin;
 import com.automq.rocketmq.cli.tools.CliUtils;
 import com.automq.rocketmq.common.PrefixThreadFactory;
 import com.automq.rocketmq.common.exception.ControllerException;
@@ -141,7 +143,7 @@ public class ProduceMessage implements Callable<Void> {
                 .setAcceptTypes(AcceptTypes.newBuilder().addTypes(messageType).build())
                 .build();
 
-            CompletableFuture<Long> topicCf = client.createTopic(mqAdmin.endpoint, request);
+            CompletableFuture<Long> topicCf = client.createTopic(mqAdmin.getEndpoint(), request);
 
             topicCf = topicCf.exceptionally(throwable -> {
                 Throwable t = CliUtils.getRealException(throwable);
@@ -162,10 +164,10 @@ public class ProduceMessage implements Callable<Void> {
 
     private Producer prepareProducer(ClientServiceProvider provider) {
         StaticSessionCredentialsProvider staticSessionCredentialsProvider =
-            new StaticSessionCredentialsProvider(mqAdmin.accessKey, mqAdmin.secretKey);
+            new StaticSessionCredentialsProvider(mqAdmin.getAccessKey(), mqAdmin.getSecretKey());
 
         ClientConfiguration clientConfiguration = ClientConfiguration.newBuilder()
-            .setEndpoints(mqAdmin.endpoint)
+            .setEndpoints(mqAdmin.getEndpoint())
             .setCredentialProvider(staticSessionCredentialsProvider)
             .setRequestTimeout(Duration.ofSeconds(10))
             .build();

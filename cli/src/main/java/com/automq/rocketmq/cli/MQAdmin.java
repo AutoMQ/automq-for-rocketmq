@@ -17,12 +17,27 @@
 
 package com.automq.rocketmq.cli;
 
+import com.automq.rocketmq.cli.broker.DescribeCluster;
+import com.automq.rocketmq.cli.broker.TerminateNode;
+import com.automq.rocketmq.cli.consumer.ConsumeMessage;
+import com.automq.rocketmq.cli.consumer.CreateGroup;
+import com.automq.rocketmq.cli.consumer.DeleteGroup;
+import com.automq.rocketmq.cli.consumer.DescribeGroup;
+import com.automq.rocketmq.cli.consumer.ListGroup;
+import com.automq.rocketmq.cli.consumer.UpdateGroup;
+import com.automq.rocketmq.cli.producer.ProduceMessage;
+import com.automq.rocketmq.cli.stream.DescribeStream;
+import com.automq.rocketmq.cli.topic.CreateTopic;
+import com.automq.rocketmq.cli.topic.DeleteTopic;
+import com.automq.rocketmq.cli.topic.DescribeTopic;
+import com.automq.rocketmq.cli.topic.ListTopic;
+import com.automq.rocketmq.cli.topic.UpdateTopic;
 import picocli.CommandLine;
 
 @CommandLine.Command(name = "mqadmin",
     mixinStandardHelpOptions = true,
-    version = "S3RocketMQ 1.0",
-    description = "Command line tools for S3RocketMQ",
+    version = "AutoMQ for RocketMQ 1.0",
+    description = "Command line tools for AutoMQ for RocketMQ",
     showDefaultValues = true,
     subcommands = {
         DescribeCluster.class,
@@ -54,6 +69,19 @@ public class MQAdmin implements Runnable {
 
     @CommandLine.Option(names = {"-s", "--secret-key"}, description = "The authentication secret key")
     String secretKey = "";
+
+    public String getEndpoint() {
+        return endpoint;
+    }
+
+
+    public String getAccessKey() {
+        return accessKey;
+    }
+
+    public String getSecretKey() {
+        return secretKey;
+    }
 
     public void run() {
         throw new CommandLine.ParameterException(spec.commandLine(), "Missing required subcommand");

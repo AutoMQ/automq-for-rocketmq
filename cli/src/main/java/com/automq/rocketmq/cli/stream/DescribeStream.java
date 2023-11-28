@@ -15,30 +15,40 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.cli;
+package com.automq.rocketmq.cli.stream;
 
+import apache.rocketmq.common.v1.Code;
+import apache.rocketmq.controller.v1.DescribeStreamReply;
+import apache.rocketmq.controller.v1.DescribeStreamRequest;
+import com.automq.rocketmq.cli.CliClientConfig;
+import com.automq.rocketmq.cli.ConsoleHelper;
+import com.automq.rocketmq.cli.MQAdmin;
 import com.automq.rocketmq.controller.ControllerClient;
 import com.automq.rocketmq.controller.client.GrpcControllerClient;
 import java.util.concurrent.Callable;
 import picocli.CommandLine;
 
-@CommandLine.Command(name = "deleteGroup", mixinStandardHelpOptions = true, showDefaultValues = true)
-public class DeleteGroup implements Callable<Void> {
-
-    @CommandLine.Option(names = {"-i", "--id"}, description = "Group ID", required = true)
-    long id;
+@CommandLine.Command(name = "describeStream", mixinStandardHelpOptions = true, showDefaultValues = true)
+public class DescribeStream implements Callable<Void> {
 
     @CommandLine.ParentCommand
     MQAdmin mqAdmin;
 
+    @CommandLine.Option(names = {"-i", "--streamId"}, description = "Stream ID", required = true)
+    long streamId;
+
     @Override
     public Void call() throws Exception {
         try (ControllerClient client = new GrpcControllerClient(new CliClientConfig())) {
-            client.deleteGroup(mqAdmin.endpoint, id)
-                .thenRun(() -> {
-                    System.out.println("Deleted group whose group-id=" + id);
-                })
-                .join();
+            DescribeStreamRequest request = DescribeStreamRequest.newBuilder()
+                .setStreamId(streamId)
+                .build();
+            DescribeStreamReply reply = client.describeStream(mqAdmin.getEndpoint(), request).join();
+            if (reply.getStatus().getCode() == Code.OK) {
+                ConsoleHelper.printStream(reply.getStream(), reply.getRangesList());
+            } else {
+                System.err.println(reply.getStatus().getMessage());
+            }
         }
         return null;
     }

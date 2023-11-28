@@ -15,11 +15,13 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.cli;
+package com.automq.rocketmq.cli.topic;
 
 import apache.rocketmq.controller.v1.AcceptTypes;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.MessageType;
+import com.automq.rocketmq.cli.CliClientConfig;
+import com.automq.rocketmq.cli.MQAdmin;
 import com.automq.rocketmq.common.util.DurationUtil;
 import com.automq.rocketmq.controller.client.GrpcControllerClient;
 import java.util.concurrent.Callable;
@@ -68,7 +70,7 @@ public class CreateTopic implements Callable<Void> {
             .setRetentionHours((int) retentionHours)
             .build();
 
-        Long topicId = client.createTopic(mqAdmin.endpoint, request).join();
+        Long topicId = client.createTopic(mqAdmin.getEndpoint(), request).join();
         System.out.println("Topic created: " + topicId);
         client.close();
         return null;

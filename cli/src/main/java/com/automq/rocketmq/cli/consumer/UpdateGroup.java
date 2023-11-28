@@ -15,10 +15,12 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.cli;
+package com.automq.rocketmq.cli.consumer;
 
 import apache.rocketmq.controller.v1.GroupType;
 import apache.rocketmq.controller.v1.UpdateGroupRequest;
+import com.automq.rocketmq.cli.CliClientConfig;
+import com.automq.rocketmq.cli.MQAdmin;
 import com.automq.rocketmq.controller.ControllerClient;
 import com.automq.rocketmq.controller.client.GrpcControllerClient;
 import com.google.common.base.Strings;
@@ -66,7 +68,7 @@ public class UpdateGroup implements Callable<Void> {
                 builder.setGroupType(groupType);
             }
 
-            client.updateGroup(mqAdmin.endpoint, builder.build()).join();
+            client.updateGroup(mqAdmin.getEndpoint(), builder.build()).join();
         }
         return null;
     }

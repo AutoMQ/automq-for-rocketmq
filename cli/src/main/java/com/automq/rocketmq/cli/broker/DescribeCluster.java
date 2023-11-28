@@ -15,10 +15,13 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.cli;
+package com.automq.rocketmq.cli.broker;
 
 import apache.rocketmq.controller.v1.Cluster;
 import apache.rocketmq.controller.v1.DescribeClusterRequest;
+import com.automq.rocketmq.cli.CliClientConfig;
+import com.automq.rocketmq.cli.ConsoleHelper;
+import com.automq.rocketmq.cli.MQAdmin;
 import com.automq.rocketmq.controller.ControllerClient;
 import com.automq.rocketmq.controller.client.GrpcControllerClient;
 import java.util.concurrent.Callable;
@@ -35,7 +38,7 @@ public class DescribeCluster implements Callable<Void> {
         try (ControllerClient client = new GrpcControllerClient(new CliClientConfig())) {
             DescribeClusterRequest request = DescribeClusterRequest.newBuilder()
                 .build();
-            Cluster cluster = client.describeCluster(mqAdmin.endpoint, request).join();
+            Cluster cluster = client.describeCluster(mqAdmin.getEndpoint(), request).join();
             ConsoleHelper.printCluster(cluster);
         }
         return null;

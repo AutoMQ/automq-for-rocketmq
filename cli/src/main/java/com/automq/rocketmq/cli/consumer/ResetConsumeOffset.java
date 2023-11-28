@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.cli;
+package com.automq.rocketmq.cli.consumer;
 
 import apache.rocketmq.controller.v1.Cluster;
 import apache.rocketmq.controller.v1.DescribeClusterRequest;
@@ -24,6 +24,8 @@ import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.Node;
 import apache.rocketmq.controller.v1.Topic;
 import apache.rocketmq.proxy.v1.ResetConsumeOffsetRequest;
+import com.automq.rocketmq.cli.CliClientConfig;
+import com.automq.rocketmq.cli.MQAdmin;
 import com.automq.rocketmq.controller.client.GrpcControllerClient;
 import com.automq.rocketmq.proxy.grpc.client.GrpcProxyClient;
 import com.google.protobuf.TextFormat;
@@ -57,9 +59,9 @@ public class ResetConsumeOffset implements Callable<Void> {
         // TODO: support retrying when failed because of cluster's state change at the same time
         GrpcControllerClient controllerClient = new GrpcControllerClient(new CliClientConfig());
         GrpcProxyClient proxyClient = new GrpcProxyClient(new CliClientConfig());
-        CompletableFuture<Cluster> clusterCf = controllerClient.describeCluster(mqAdmin.endpoint, DescribeClusterRequest.newBuilder().build());
+        CompletableFuture<Cluster> clusterCf = controllerClient.describeCluster(mqAdmin.getEndpoint(), DescribeClusterRequest.newBuilder().build());
 
-        CompletableFuture<Topic> topicCf = controllerClient.describeTopic(mqAdmin.endpoint, null, topicName);
+        CompletableFuture<Topic> topicCf = controllerClient.describeTopic(mqAdmin.getEndpoint(), null, topicName);
         clusterCf.thenCombine(topicCf, Pair::of)
             .thenComposeAsync(pair -> {
                 Cluster cluster = pair.getLeft();

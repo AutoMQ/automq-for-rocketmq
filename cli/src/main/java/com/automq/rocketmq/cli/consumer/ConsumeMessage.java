@@ -15,13 +15,15 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.cli;
+package com.automq.rocketmq.cli.consumer;
 
 import apache.rocketmq.common.v1.Code;
 import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.GroupType;
 import apache.rocketmq.controller.v1.SubscriptionMode;
+import com.automq.rocketmq.cli.CliClientConfig;
+import com.automq.rocketmq.cli.MQAdmin;
 import com.automq.rocketmq.cli.tools.CliUtils;
 import com.automq.rocketmq.common.PrefixThreadFactory;
 import com.automq.rocketmq.common.exception.ControllerException;
@@ -179,7 +181,7 @@ public class ConsumeMessage implements Callable<Void> {
             .setSubMode(SubscriptionMode.SUB_MODE_POP)
             .build();
 
-        CompletableFuture<CreateGroupReply> groupCf = client.createGroup(mqAdmin.endpoint, request);
+        CompletableFuture<CreateGroupReply> groupCf = client.createGroup(mqAdmin.getEndpoint(), request);
         groupCf = groupCf.exceptionally(throwable -> {
             Throwable t = CliUtils.getRealException(throwable);
             if (t instanceof ControllerException controllerException) {
@@ -200,10 +202,10 @@ public class ConsumeMessage implements Callable<Void> {
     }
     private SimpleConsumer prepareConsumer(ClientServiceProvider provider, String consumerGroup) {
         StaticSessionCredentialsProvider staticSessionCredentialsProvider =
-            new StaticSessionCredentialsProvider(mqAdmin.accessKey, mqAdmin.secretKey);
+            new StaticSessionCredentialsProvider(mqAdmin.getAccessKey(), mqAdmin.getSecretKey());
 
         ClientConfiguration clientConfiguration = ClientConfiguration.newBuilder()
-            .setEndpoints(mqAdmin.endpoint)
+            .setEndpoints(mqAdmin.getEndpoint())
             .setCredentialProvider(staticSessionCredentialsProvider)
             .setRequestTimeout(Duration.ofSeconds(10))
             .build();

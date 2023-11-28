@@ -15,8 +15,10 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.cli;
+package com.automq.rocketmq.cli.topic;
 
+import com.automq.rocketmq.cli.CliClientConfig;
+import com.automq.rocketmq.cli.MQAdmin;
 import com.automq.rocketmq.controller.ControllerClient;
 import com.automq.rocketmq.controller.client.GrpcControllerClient;
 import java.util.concurrent.Callable;
@@ -34,7 +36,7 @@ public class DeleteTopic implements Callable<Void> {
     @Override
     public Void call() throws Exception {
         try (ControllerClient client = new GrpcControllerClient(new CliClientConfig())) {
-            client.deleteTopic(mqAdmin.endpoint, id)
+            client.deleteTopic(mqAdmin.getEndpoint(), id)
                 .thenRun(() -> {
                     System.out.println("Deleted topic whose topic-id=" + id);
                 })

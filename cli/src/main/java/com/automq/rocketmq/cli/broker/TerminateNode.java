@@ -15,10 +15,12 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.cli;
+package com.automq.rocketmq.cli.broker;
 
 import apache.rocketmq.controller.v1.TerminateNodeReply;
 import apache.rocketmq.controller.v1.TerminateNodeRequest;
+import com.automq.rocketmq.cli.CliClientConfig;
+import com.automq.rocketmq.cli.MQAdmin;
 import com.automq.rocketmq.controller.ControllerClient;
 import com.automq.rocketmq.controller.client.GrpcControllerClient;
 import io.grpc.stub.StreamObserver;
@@ -41,7 +43,7 @@ public class TerminateNode implements Callable<Void> {
         final CountDownLatch latch = new CountDownLatch(1);
         try (ControllerClient client = new GrpcControllerClient(new CliClientConfig())) {
             TerminateNodeRequest request = TerminateNodeRequest.newBuilder().setNodeId(nodeId).build();
-            client.terminateNode(mqAdmin.endpoint, request, new StreamObserver<>() {
+            client.terminateNode(mqAdmin.getEndpoint(), request, new StreamObserver<>() {
                 @Override
                 public void onNext(TerminateNodeReply value) {
                     switch (value.getStatus().getCode()) {
