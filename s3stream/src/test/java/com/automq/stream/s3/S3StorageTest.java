@@ -129,13 +129,9 @@ public class S3StorageTest {
         seq.before(r3);
 
         assertEquals(Collections.emptyList(), seq.after(r3));
-        assertEquals(-1L, seq.getWALConfirmOffset());
         assertEquals(List.of(r2, r3), seq.after(r2));
-        assertEquals(-1L, seq.getWALConfirmOffset());
         assertEquals(List.of(r0), seq.after(r0));
-        assertEquals(100L, seq.getWALConfirmOffset());
         assertEquals(List.of(r1), seq.after(r1));
-        assertEquals(103L, seq.getWALConfirmOffset());
     }
 
     @Test
