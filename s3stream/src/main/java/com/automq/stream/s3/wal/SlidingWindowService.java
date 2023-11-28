@@ -336,11 +336,13 @@ public class SlidingWindowService {
     }
 
     private void writeBlockData(BlockBatch blocks) throws IOException {
+        TimerUtil timer = new TimerUtil();
         for (Block block : blocks.blocks()) {
             long position = WALUtil.recordOffsetToPosition(block.startOffset(), walChannel.capacity(), WAL_HEADER_TOTAL_CAPACITY);
             walChannel.write(block.data(), position);
         }
         walChannel.flush();
+        OperationMetricsStats.getHistogram(S3Operation.APPEND_STORAGE_WAL_WRITE).update(timer.elapsedAs(TimeUnit.NANOSECONDS));
     }
 
     private void makeWriteOffsetMatchWindow(long newWindowEndOffset) throws IOException, OverCapacityException {
@@ -520,13 +522,16 @@ public class SlidingWindowService {
 
     class WriteBlockProcessor implements Runnable {
         private final BlockBatch blocks;
+        private final TimerUtil timer;
 
         public WriteBlockProcessor(BlockBatch blocks) {
             this.blocks = blocks;
+            this.timer = new TimerUtil();
         }
 
         @Override
         public void run() {
+            OperationMetricsStats.getHistogram(S3Operation.APPEND_STORAGE_WAL_AWAIT).update(timer.elapsedAs(TimeUnit.NANOSECONDS));
             writeBlock(this.blocks);
         }
 
