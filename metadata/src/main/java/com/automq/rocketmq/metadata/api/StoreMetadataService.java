@@ -18,7 +18,7 @@
 package com.automq.rocketmq.metadata.api;
 
 import apache.rocketmq.controller.v1.S3StreamObject;
-import apache.rocketmq.controller.v1.S3WALObject;
+import apache.rocketmq.controller.v1.S3StreamSetObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
 import com.automq.rocketmq.common.config.ControllerConfig;
 import java.util.List;
@@ -121,16 +121,16 @@ public interface StoreMetadataService extends ResourceMetadataService {
     CompletableFuture<Long> prepareS3Objects(int count, int ttlInMinutes);
 
     /**
-     * Commit an uploaded or compacted S3 WAL object.
+     * Commit an uploaded or compacted S3 StreamSet object.
      * <p>
-     * This operation will be triggered by upload or compaction process.
+     * This operation will be triggered by an upload or compaction process.
      *
-     * @param walObject the new WAL object.
+     * @param streamSetObject the new WAL object.
      * @param streamObjects the stream objects that split from the compaction process.
      * @param compactedObjects the compacted objects that should be deleted.
      * @return {@link CompletableFuture} of commit operation.
      */
-    CompletableFuture<Void> commitWalObject(S3WALObject walObject, List<S3StreamObject> streamObjects,
+    CompletableFuture<Void> commitStreamSetObject(S3StreamSetObject streamSetObject, List<S3StreamObject> streamObjects,
         List<Long> compactedObjects);
 
     /**
@@ -142,25 +142,25 @@ public interface StoreMetadataService extends ResourceMetadataService {
      * @param compactedObjects the compacted objects that should be deleted.
      * @return {@link CompletableFuture} of commit operation.
      */
-    CompletableFuture<Void> commitStreamObject(S3StreamObject streamObject, List<Long> compactedObjects);
+    CompletableFuture<Void> compactStreamObject(S3StreamObject streamObject, List<Long> compactedObjects);
 
     /**
-     * List the WAL objects served by the current server.
+     * List the StreamSet objects served by the current server.
      *
-     * @return list of {@link S3WALObject}
+     * @return list of {@link S3StreamSetObject}
      */
-    CompletableFuture<List<S3WALObject>> listWALObjects();
+    CompletableFuture<List<S3StreamSetObject>> listStreamSetObjects();
 
     /**
-     * List the WAL objects by a specified stream range with a limit count.
+     * List the StreamSet objects by a specified stream range with a limit count.
      *
      * @param streamId the specified stream id
      * @param startOffset the start offset of the specified stream range.
      * @param endOffset the end offset of the specified stream range. NOOP_OFFSET(-1) represent endOffset is unlimited.
      * @param limit the limit count of the returned WAL objects.
-     * @return list of {@link S3WALObject}
+     * @return list of {@link S3StreamSetObject}
      */
-    CompletableFuture<List<S3WALObject>> listWALObjects(long streamId, long startOffset, long endOffset, int limit);
+    CompletableFuture<List<S3StreamSetObject>> listStreamSetObjects(long streamId, long startOffset, long endOffset, int limit);
 
     /**
      * List stream objects by a specified stream range with a limit count.
@@ -179,9 +179,9 @@ public interface StoreMetadataService extends ResourceMetadataService {
      * @param startOffset the start offset of the specified stream range.
      * @param endOffset the end offset of the specified stream range. NOOP_OFFSET(-1) represent endOffset is unlimited.
      * @param limit the limit count of the returned stream objects.
-     * @return list of {@link S3StreamObject} and {@link S3WALObject}
+     * @return list of {@link S3StreamObject} and {@link S3StreamSetObject}
      */
-    CompletableFuture<Pair<List<S3StreamObject>, List<S3WALObject>>> listObjects(long streamId, long startOffset,
+    CompletableFuture<Pair<List<S3StreamObject>, List<S3StreamSetObject>>> listObjects(long streamId, long startOffset,
         long endOffset, int limit);
 
     Optional<Integer> ownerNode(long topicId, int queueId);

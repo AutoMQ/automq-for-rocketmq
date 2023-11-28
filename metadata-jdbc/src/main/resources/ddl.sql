@@ -157,7 +157,7 @@ CREATE TABLE IF NOT EXISTS s3streamobject
     INDEX idx_s3_stream_object_stream_id (stream_id, start_offset)
 );
 
-CREATE TABLE IF NOT EXISTS s3walobject
+CREATE TABLE IF NOT EXISTS s3streamsetobject
 (
     object_id           BIGINT NOT NULL,
     object_size         BIGINT NOT NULL,
@@ -167,8 +167,8 @@ CREATE TABLE IF NOT EXISTS s3walobject
     base_data_timestamp TIMESTAMP(3),
     committed_timestamp TIMESTAMP(3),
     created_timestamp   TIMESTAMP(3),
-    UNIQUE INDEX uk_s3_wal_object_node_sequence_id (node_id, sequence_id),
-    INDEX idx_s3_wal_object_object_id (object_id)
+    UNIQUE INDEX uk_s3_stream_set_object_node_sequence_id (node_id, sequence_id),
+    INDEX idx_s3_stream_set_object_object_id (object_id)
 );
 
 CREATE TABLE IF NOT EXISTS sequence

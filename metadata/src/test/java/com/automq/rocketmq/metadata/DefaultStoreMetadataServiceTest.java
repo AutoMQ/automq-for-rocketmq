@@ -19,7 +19,7 @@ package com.automq.rocketmq.metadata;
 
 import apache.rocketmq.common.v1.Code;
 import apache.rocketmq.controller.v1.S3StreamObject;
-import apache.rocketmq.controller.v1.S3WALObject;
+import apache.rocketmq.controller.v1.S3StreamSetObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.StreamRole;
 import com.automq.rocketmq.common.config.ControllerConfig;
@@ -55,16 +55,16 @@ class DefaultStoreMetadataServiceTest {
     @Test
     public void testCommitWalObject() {
         DefaultStoreMetadataService service = new DefaultStoreMetadataService(metadataStore, s3MetadataService);
-        S3WALObject walObject = S3WALObject.newBuilder().setObjectId(1L).setBrokerId(10).build();
+        S3StreamSetObject streamSetObject = S3StreamSetObject.newBuilder().setObjectId(1L).setBrokerId(10).build();
         int nodeId = 100;
         when(metadataStore.config()).thenReturn(config);
         when(config.nodeId()).thenReturn(nodeId);
-        when(s3MetadataService.commitWalObject(ArgumentMatchers.any(), ArgumentMatchers.anyList(), ArgumentMatchers.anyList()))
+        when(s3MetadataService.commitStreamSetObject(ArgumentMatchers.any(), ArgumentMatchers.anyList(), ArgumentMatchers.anyList()))
             .thenReturn(CompletableFuture.completedFuture(null));
-        service.commitWalObject(walObject, new ArrayList<>(), new ArrayList<>());
+        service.commitStreamSetObject(streamSetObject, new ArrayList<>(), new ArrayList<>());
         // Verify the arguments passed to metadataStore.commitWalObject().
-        S3WALObject newWal = S3WALObject.newBuilder(walObject).setBrokerId(nodeId).build();
-        Mockito.verify(s3MetadataService).commitWalObject(ArgumentMatchers.eq(newWal), ArgumentMatchers.anyList(), ArgumentMatchers.anyList());
+        S3StreamSetObject newWal = S3StreamSetObject.newBuilder(streamSetObject).setBrokerId(nodeId).build();
+        Mockito.verify(s3MetadataService).commitStreamSetObject(ArgumentMatchers.eq(newWal), ArgumentMatchers.anyList(), ArgumentMatchers.anyList());
     }
 
     @Test
@@ -155,11 +155,11 @@ class DefaultStoreMetadataServiceTest {
         when(metadataStore.config()).thenReturn(config);
         when(config.nodeId()).thenReturn(1);
         S3MetadataService metadataService = Mockito.mock(S3MetadataService.class);
-        Mockito.when(metadataService.commitWalObject(ArgumentMatchers.any(), ArgumentMatchers.anyList(), ArgumentMatchers.anyList()))
+        Mockito.when(metadataService.commitStreamSetObject(ArgumentMatchers.any(), ArgumentMatchers.anyList(), ArgumentMatchers.anyList()))
             .thenReturn(CompletableFuture.failedFuture(new ControllerException(Code.MOCK_FAILURE_VALUE, "Mocked Failure")))
             .thenReturn(CompletableFuture.completedFuture(null));
         StoreMetadataService svc = new DefaultStoreMetadataService(metadataStore, metadataService);
-        Assertions.assertDoesNotThrow(() -> svc.commitWalObject(S3WALObject.newBuilder().build(),
+        Assertions.assertDoesNotThrow(() -> svc.commitStreamSetObject(S3StreamSetObject.newBuilder().build(),
             new ArrayList<>(), new ArrayList<>()).join());
     }
 
@@ -170,7 +170,7 @@ class DefaultStoreMetadataServiceTest {
             .thenReturn(CompletableFuture.failedFuture(new ControllerException(Code.MOCK_FAILURE_VALUE, "Mocked Failure")))
             .thenReturn(CompletableFuture.completedFuture(null));
         StoreMetadataService svc = new DefaultStoreMetadataService(metadataStore, metadataService);
-        Assertions.assertDoesNotThrow(() -> svc.commitStreamObject(S3StreamObject.newBuilder().build(),
+        Assertions.assertDoesNotThrow(() -> svc.compactStreamObject(S3StreamObject.newBuilder().build(),
             new ArrayList<>()).join());
     }
 

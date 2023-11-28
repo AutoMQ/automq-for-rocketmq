@@ -17,24 +17,24 @@
 
 package com.automq.rocketmq.metadata.mapper;
 
-import com.automq.rocketmq.metadata.dao.S3WalObject;
+import com.automq.rocketmq.metadata.dao.S3StreamSetObject;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
-public interface S3WalObjectMapper {
+public interface S3StreamSetObjectMapper {
 
-    int create(S3WalObject s3WALObject);
+    int create(S3StreamSetObject s3StreamSetObject);
 
-    S3WalObject getByObjectId(long objectId);
+    S3StreamSetObject getByObjectId(long objectId);
 
     int delete(@Param("objectId") Long objectId,
         @Param("nodeId") Integer nodeId,
         @Param("sequenceId") Long sequenceId);
 
-    List<S3WalObject> list(@Param("nodeId") Integer nodeId, @Param("sequenceId") Long sequenceId);
+    List<S3StreamSetObject> list(@Param("nodeId") Integer nodeId, @Param("sequenceId") Long sequenceId);
 
-    int commit(S3WalObject s3WALObject);
+    int commit(S3StreamSetObject s3StreamSetObject);
 
     boolean streamExclusive(@Param("nodeId") int nodeId, @Param("streamId") long streamId);
 }

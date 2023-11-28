@@ -17,28 +17,27 @@
 
 package com.automq.rocketmq.metadata.service;
 
-import apache.rocketmq.controller.v1.S3WALObject;
 import apache.rocketmq.controller.v1.SubStreams;
 import com.automq.rocketmq.common.system.S3Constants;
-import com.automq.rocketmq.metadata.dao.S3WalObject;
+import com.automq.rocketmq.metadata.dao.S3StreamSetObject;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 
 public final class Helper {
 
-    public static S3WALObject buildS3WALObject(S3WalObject s3WalObject) throws InvalidProtocolBufferException {
-        return buildS3WALObject(s3WalObject, decode(s3WalObject.getSubStreams()));
+    public static apache.rocketmq.controller.v1.S3StreamSetObject buildS3StreamSetObject(S3StreamSetObject s3StreamSetObject) throws InvalidProtocolBufferException {
+        return buildS3StreamSetObject(s3StreamSetObject, decode(s3StreamSetObject.getSubStreams()));
     }
 
-    static S3WALObject buildS3WALObject(S3WalObject s3WalObject, SubStreams subStreams) {
-        return S3WALObject.newBuilder()
-            .setObjectId(s3WalObject.getObjectId())
-            .setObjectSize(s3WalObject.getObjectSize())
-            .setBrokerId(s3WalObject.getNodeId())
-            .setSequenceId(s3WalObject.getSequenceId())
-            .setBaseDataTimestamp(s3WalObject.getBaseDataTimestamp().getTime())
-            .setCommittedTimestamp(s3WalObject.getCommittedTimestamp() != null ?
-                s3WalObject.getCommittedTimestamp().getTime() : S3Constants.NOOP_OBJECT_COMMIT_TIMESTAMP)
+    static apache.rocketmq.controller.v1.S3StreamSetObject buildS3StreamSetObject(S3StreamSetObject s3StreamSetObject, SubStreams subStreams) {
+        return apache.rocketmq.controller.v1.S3StreamSetObject.newBuilder()
+            .setObjectId(s3StreamSetObject.getObjectId())
+            .setObjectSize(s3StreamSetObject.getObjectSize())
+            .setBrokerId(s3StreamSetObject.getNodeId())
+            .setSequenceId(s3StreamSetObject.getSequenceId())
+            .setBaseDataTimestamp(s3StreamSetObject.getBaseDataTimestamp().getTime())
+            .setCommittedTimestamp(s3StreamSetObject.getCommittedTimestamp() != null ?
+                s3StreamSetObject.getCommittedTimestamp().getTime() : S3Constants.NOOP_OBJECT_COMMIT_TIMESTAMP)
             .setSubStreams(subStreams)
             .build();
     }

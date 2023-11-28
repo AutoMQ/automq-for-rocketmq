@@ -19,7 +19,7 @@ package com.automq.rocketmq.metadata.service;
 
 import apache.rocketmq.controller.v1.S3ObjectState;
 import apache.rocketmq.controller.v1.S3StreamObject;
-import apache.rocketmq.controller.v1.S3WALObject;
+import apache.rocketmq.controller.v1.S3StreamSetObject;
 import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.StreamState;
 import apache.rocketmq.controller.v1.SubStream;
@@ -28,12 +28,11 @@ import com.automq.rocketmq.common.system.StreamConstants;
 import com.automq.rocketmq.metadata.DatabaseTestBase;
 import com.automq.rocketmq.metadata.dao.Range;
 import com.automq.rocketmq.metadata.dao.S3Object;
-import com.automq.rocketmq.metadata.dao.S3WalObject;
 import com.automq.rocketmq.metadata.dao.Stream;
 import com.automq.rocketmq.metadata.mapper.RangeMapper;
 import com.automq.rocketmq.metadata.mapper.S3ObjectMapper;
 import com.automq.rocketmq.metadata.mapper.S3StreamObjectMapper;
-import com.automq.rocketmq.metadata.mapper.S3WalObjectMapper;
+import com.automq.rocketmq.metadata.mapper.S3StreamSetObjectMapper;
 import com.automq.rocketmq.metadata.mapper.StreamMapper;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -108,11 +107,11 @@ public class DefaultS3MetadataServiceTest extends DatabaseTestBase {
             range.setNodeId(1);
             rangeMapper.create(range);
 
-            S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
+            S3StreamSetObjectMapper s3StreamSetObjectMapper = session.getMapper(S3StreamSetObjectMapper.class);
             buildS3WalObjs(1, 1).stream().peek(s3WalObject -> {
                 Map<Long, SubStream> subStreams = buildWalSubStreams(4, 0, 10);
                 s3WalObject.setSubStreams(toJson(subStreams));
-            }).forEach(s3WALObjectMapper::create);
+            }).forEach(s3StreamSetObjectMapper::create);
 
             session.commit();
         }
@@ -120,20 +119,20 @@ public class DefaultS3MetadataServiceTest extends DatabaseTestBase {
         Map<Long, SubStream> expectedSubStream = buildWalSubStreams(1, 0, 10);
 
         try (S3MetadataService service = new DefaultS3MetadataService(config, getSessionFactory(), executorService)) {
-            List<S3WALObject> s3WALObjects = service.listWALObjects(streamId, startOffset, endOffset, limit).get();
+            List<S3StreamSetObject> s3StreamSetObjects = service.listStreamSetObjects(streamId, startOffset, endOffset, limit).get();
 
-            Assertions.assertFalse(s3WALObjects.isEmpty());
-            S3WALObject s3WALObject = s3WALObjects.get(0);
-            Assertions.assertEquals(1, s3WALObject.getObjectId());
-            Assertions.assertEquals(100, s3WALObject.getObjectSize());
-            Assertions.assertEquals(1, s3WALObject.getBrokerId());
-            Assertions.assertEquals(1, s3WALObject.getSequenceId());
-            Assertions.assertEquals(expectedSubStream, s3WALObject.getSubStreams().getSubStreamsMap());
+            Assertions.assertFalse(s3StreamSetObjects.isEmpty());
+            S3StreamSetObject s3StreamSetObject = s3StreamSetObjects.get(0);
+            Assertions.assertEquals(1, s3StreamSetObject.getObjectId());
+            Assertions.assertEquals(100, s3StreamSetObject.getObjectSize());
+            Assertions.assertEquals(1, s3StreamSetObject.getBrokerId());
+            Assertions.assertEquals(1, s3StreamSetObject.getSequenceId());
+            Assertions.assertEquals(expectedSubStream, s3StreamSetObject.getSubStreams().getSubStreamsMap());
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
-            S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
-            s3WALObjectMapper.delete(123L, 1, null);
+            S3StreamSetObjectMapper s3StreamSetObjectMapper = session.getMapper(S3StreamSetObjectMapper.class);
+            s3StreamSetObjectMapper.delete(123L, 1, null);
             session.commit();
         }
     }
@@ -141,12 +140,12 @@ public class DefaultS3MetadataServiceTest extends DatabaseTestBase {
     @Test
     public void testListWALObjects_NotParams() throws IOException, ExecutionException, InterruptedException {
         try (SqlSession session = getSessionFactory().openSession()) {
-            S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
+            S3StreamSetObjectMapper s3StreamSetObjectMapper = session.getMapper(S3StreamSetObjectMapper.class);
 
             buildS3WalObjs(1, 1).stream().peek(s3WalObject1 -> {
                 Map<Long, SubStream> subStreams = buildWalSubStreams(4, 0, 10);
                 s3WalObject1.setSubStreams(toJson(subStreams));
-            }).forEach(s3WALObjectMapper::create);
+            }).forEach(s3StreamSetObjectMapper::create);
 
             session.commit();
         }
@@ -154,20 +153,20 @@ public class DefaultS3MetadataServiceTest extends DatabaseTestBase {
         Map<Long, SubStream> subStreams = buildWalSubStreams(4, 0, 10);
 
         try (S3MetadataService service = new DefaultS3MetadataService(config, getSessionFactory(), executorService)) {
-            List<S3WALObject> s3WALObjects = service.listWALObjects().get();
+            List<S3StreamSetObject> s3StreamSetObjects = service.listStreamSetObjects().get();
 
-            Assertions.assertFalse(s3WALObjects.isEmpty());
-            S3WALObject s3WALObject = s3WALObjects.get(0);
-            Assertions.assertEquals(1, s3WALObject.getObjectId());
-            Assertions.assertEquals(100, s3WALObject.getObjectSize());
-            Assertions.assertEquals(1, s3WALObject.getBrokerId());
-            Assertions.assertEquals(1, s3WALObject.getSequenceId());
-            Assertions.assertEquals(subStreams, s3WALObject.getSubStreams().getSubStreamsMap());
+            Assertions.assertFalse(s3StreamSetObjects.isEmpty());
+            S3StreamSetObject s3StreamSetObject = s3StreamSetObjects.get(0);
+            Assertions.assertEquals(1, s3StreamSetObject.getObjectId());
+            Assertions.assertEquals(100, s3StreamSetObject.getObjectSize());
+            Assertions.assertEquals(1, s3StreamSetObject.getBrokerId());
+            Assertions.assertEquals(1, s3StreamSetObject.getSequenceId());
+            Assertions.assertEquals(subStreams, s3StreamSetObject.getSubStreams().getSubStreamsMap());
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
-            S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
-            s3WALObjectMapper.delete(123L, 1, null);
+            S3StreamSetObjectMapper s3StreamSetObjectMapper = session.getMapper(S3StreamSetObjectMapper.class);
+            s3StreamSetObjectMapper.delete(123L, 1, null);
             session.commit();
         }
     }
@@ -180,12 +179,12 @@ public class DefaultS3MetadataServiceTest extends DatabaseTestBase {
         int limit = 3;
 
         try (SqlSession session = getSessionFactory().openSession()) {
-            S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
+            S3StreamSetObjectMapper s3StreamSetObjectMapper = session.getMapper(S3StreamSetObjectMapper.class);
 
             buildS3WalObjs(1, 1).stream().peek(s3WalObject1 -> {
                 Map<Long, SubStream> subStreams = buildWalSubStreams(4, 10, 10);
                 s3WalObject1.setSubStreams(toJson(subStreams));
-            }).forEach(s3WALObjectMapper::create);
+            }).forEach(s3StreamSetObjectMapper::create);
 
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
             buildS3StreamObjs(5, 1, 0, 10).forEach(s3StreamObjectMapper::create);
@@ -193,7 +192,7 @@ public class DefaultS3MetadataServiceTest extends DatabaseTestBase {
         }
 
         try (DefaultS3MetadataService service = new DefaultS3MetadataService(config, getSessionFactory(), executorService)) {
-            Pair<List<S3StreamObject>, List<S3WALObject>> listPair = service.listObjects(1, startOffset, endOffset, limit).get();
+            Pair<List<S3StreamObject>, List<S3StreamSetObject>> listPair = service.listObjects(1, startOffset, endOffset, limit).get();
 
             Assertions.assertFalse(listPair.getLeft().isEmpty());
             Assertions.assertTrue(listPair.getRight().isEmpty());
@@ -221,11 +220,11 @@ public class DefaultS3MetadataServiceTest extends DatabaseTestBase {
         int limit = 3;
 
         try (SqlSession session = getSessionFactory().openSession()) {
-            S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
+            S3StreamSetObjectMapper s3StreamSetObjectMapper = session.getMapper(S3StreamSetObjectMapper.class);
             buildS3WalObjs(1, 1).stream().peek(s3WalObject1 -> {
                 Map<Long, SubStream> subStreams = buildWalSubStreams(4, 10, 10);
                 s3WalObject1.setSubStreams(toJson(subStreams));
-            }).forEach(s3WALObjectMapper::create);
+            }).forEach(s3StreamSetObjectMapper::create);
 
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
             buildS3StreamObjs(5, 1, 0, 10).forEach(s3StreamObjectMapper::create);
@@ -235,22 +234,22 @@ public class DefaultS3MetadataServiceTest extends DatabaseTestBase {
         Map<Long, SubStream> subStreams = buildWalSubStreams(1, 10, 10);
 
         try (S3MetadataService service = new DefaultS3MetadataService(config, getSessionFactory(), executorService)) {
-            Pair<List<S3StreamObject>, List<S3WALObject>> listPair = service.listObjects(streamId, startOffset, endOffset, limit).get();
+            Pair<List<S3StreamObject>, List<S3StreamSetObject>> listPair = service.listObjects(streamId, startOffset, endOffset, limit).get();
 
             Assertions.assertTrue(listPair.getLeft().isEmpty());
             Assertions.assertFalse(listPair.getRight().isEmpty());
 
-            S3WALObject s3WALObject = listPair.getRight().get(0);
-            Assertions.assertEquals(1, s3WALObject.getObjectId());
-            Assertions.assertEquals(100, s3WALObject.getObjectSize());
-            Assertions.assertEquals(1, s3WALObject.getBrokerId());
-            Assertions.assertEquals(1, s3WALObject.getSequenceId());
-            Assertions.assertEquals(subStreams, s3WALObject.getSubStreams().getSubStreamsMap());
+            S3StreamSetObject s3StreamSetObject = listPair.getRight().get(0);
+            Assertions.assertEquals(1, s3StreamSetObject.getObjectId());
+            Assertions.assertEquals(100, s3StreamSetObject.getObjectSize());
+            Assertions.assertEquals(1, s3StreamSetObject.getBrokerId());
+            Assertions.assertEquals(1, s3StreamSetObject.getSequenceId());
+            Assertions.assertEquals(subStreams, s3StreamSetObject.getSubStreams().getSubStreamsMap());
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
-            S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
-            s3WALObjectMapper.delete(123L, 1, null);
+            S3StreamSetObjectMapper s3StreamSetObjectMapper = session.getMapper(S3StreamSetObjectMapper.class);
+            s3StreamSetObjectMapper.delete(123L, 1, null);
             session.commit();
         }
     }
@@ -264,11 +263,11 @@ public class DefaultS3MetadataServiceTest extends DatabaseTestBase {
         int limit = 3;
 
         try (SqlSession session = getSessionFactory().openSession()) {
-            S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
+            S3StreamSetObjectMapper s3StreamSetObjectMapper = session.getMapper(S3StreamSetObjectMapper.class);
             buildS3WalObjs(1, 1).stream().peek(s3WalObject1 -> {
                 Map<Long, SubStream> subStreams = buildWalSubStreams(4, 10, 10);
                 s3WalObject1.setSubStreams(toJson(subStreams));
-            }).forEach(s3WALObjectMapper::create);
+            }).forEach(s3StreamSetObjectMapper::create);
 
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
             buildS3StreamObjs(5, 1, 0, 10).forEach(s3StreamObjectMapper::create);
@@ -279,7 +278,7 @@ public class DefaultS3MetadataServiceTest extends DatabaseTestBase {
         Map<Long, SubStream> subStreams = buildWalSubStreams(1, 10, 10);
 
         try (S3MetadataService service = new DefaultS3MetadataService(config, getSessionFactory(), executorService)) {
-            Pair<List<S3StreamObject>, List<S3WALObject>> listPair = service.listObjects(streamId, startOffset, endOffset, limit).get();
+            Pair<List<S3StreamObject>, List<S3StreamSetObject>> listPair = service.listObjects(streamId, startOffset, endOffset, limit).get();
 
             Assertions.assertFalse(listPair.getLeft().isEmpty());
             Assertions.assertFalse(listPair.getRight().isEmpty());
@@ -290,17 +289,17 @@ public class DefaultS3MetadataServiceTest extends DatabaseTestBase {
             Assertions.assertEquals(0, s3StreamObject.getStartOffset());
             Assertions.assertEquals(10, s3StreamObject.getEndOffset());
 
-            S3WALObject s3WALObject = listPair.getRight().get(0);
-            Assertions.assertEquals(1, s3WALObject.getObjectId());
-            Assertions.assertEquals(100, s3WALObject.getObjectSize());
-            Assertions.assertEquals(1, s3WALObject.getBrokerId());
-            Assertions.assertEquals(1, s3WALObject.getSequenceId());
-            Assertions.assertEquals(subStreams, s3WALObject.getSubStreams().getSubStreamsMap());
+            S3StreamSetObject s3StreamSetObject = listPair.getRight().get(0);
+            Assertions.assertEquals(1, s3StreamSetObject.getObjectId());
+            Assertions.assertEquals(100, s3StreamSetObject.getObjectSize());
+            Assertions.assertEquals(1, s3StreamSetObject.getBrokerId());
+            Assertions.assertEquals(1, s3StreamSetObject.getSequenceId());
+            Assertions.assertEquals(subStreams, s3StreamSetObject.getSubStreams().getSubStreamsMap());
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
-            S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
-            s3WALObjectMapper.delete(123L, 1, null);
+            S3StreamSetObjectMapper s3StreamSetObjectMapper = session.getMapper(S3StreamSetObjectMapper.class);
+            s3StreamSetObjectMapper.delete(123L, 1, null);
 
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
             s3StreamObjectMapper.delete(null, streamId, 122L);
@@ -317,16 +316,16 @@ public class DefaultS3MetadataServiceTest extends DatabaseTestBase {
         int limit = 3;
 
         try (SqlSession session = getSessionFactory().openSession()) {
-            S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
+            S3StreamSetObjectMapper s3StreamSetObjectMapper = session.getMapper(S3StreamSetObjectMapper.class);
             buildS3WalObjs(1, 1).stream().peek(s3WalObject -> {
                 Map<Long, SubStream> subStreams = buildWalSubStreams(1, 0, 10);
                 s3WalObject.setSubStreams(toJson(subStreams));
-            }).forEach(s3WALObjectMapper::create);
+            }).forEach(s3StreamSetObjectMapper::create);
 
             buildS3WalObjs(2, 1).stream().peek(s3WalObject -> {
                 Map<Long, SubStream> subStreams = buildWalSubStreams(1, 20, 20);
                 s3WalObject.setSubStreams(toJson(subStreams));
-            }).forEach(s3WALObjectMapper::create);
+            }).forEach(s3StreamSetObjectMapper::create);
 
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
             buildS3StreamObjs(5, 1, 10, 10).forEach(s3StreamObjectMapper::create);
@@ -339,7 +338,7 @@ public class DefaultS3MetadataServiceTest extends DatabaseTestBase {
         Map<Long, SubStream> subStreams2 = buildWalSubStreams(1, 20, 20);
 
         try (S3MetadataService service = new DefaultS3MetadataService(config, getSessionFactory(), executorService)) {
-            Pair<List<S3StreamObject>, List<S3WALObject>> listPair = service.listObjects(streamId, startOffset, endOffset, limit).get();
+            Pair<List<S3StreamObject>, List<S3StreamSetObject>> listPair = service.listObjects(streamId, startOffset, endOffset, limit).get();
 
             Assertions.assertFalse(listPair.getLeft().isEmpty());
             Assertions.assertFalse(listPair.getRight().isEmpty());
@@ -353,28 +352,28 @@ public class DefaultS3MetadataServiceTest extends DatabaseTestBase {
             Assertions.assertEquals(10, s3StreamObject.getStartOffset());
             Assertions.assertEquals(20, s3StreamObject.getEndOffset());
 
-            List<S3WALObject> s3WALObjects = listPair.getRight();
-            Assertions.assertEquals(2, s3WALObjects.size());
-            S3WALObject s3WALObject = s3WALObjects.get(0);
+            List<S3StreamSetObject> s3StreamSetObjects = listPair.getRight();
+            Assertions.assertEquals(2, s3StreamSetObjects.size());
+            S3StreamSetObject s3StreamSetObject = s3StreamSetObjects.get(0);
 
-            Assertions.assertEquals(1, s3WALObject.getObjectId());
-            Assertions.assertEquals(100, s3WALObject.getObjectSize());
-            Assertions.assertEquals(1, s3WALObject.getBrokerId());
-            Assertions.assertEquals(1, s3WALObject.getSequenceId());
-            Assertions.assertEquals(subStreams1, s3WALObject.getSubStreams().getSubStreamsMap());
+            Assertions.assertEquals(1, s3StreamSetObject.getObjectId());
+            Assertions.assertEquals(100, s3StreamSetObject.getObjectSize());
+            Assertions.assertEquals(1, s3StreamSetObject.getBrokerId());
+            Assertions.assertEquals(1, s3StreamSetObject.getSequenceId());
+            Assertions.assertEquals(subStreams1, s3StreamSetObject.getSubStreams().getSubStreamsMap());
 
-            S3WALObject s3WALObject1 = s3WALObjects.get(1);
-            Assertions.assertEquals(2, s3WALObject1.getObjectId());
-            Assertions.assertEquals(100, s3WALObject1.getObjectSize());
-            Assertions.assertEquals(1, s3WALObject1.getBrokerId());
-            Assertions.assertEquals(2, s3WALObject1.getSequenceId());
-            Assertions.assertEquals(subStreams2, s3WALObject1.getSubStreams().getSubStreamsMap());
+            S3StreamSetObject s3StreamSetObject1 = s3StreamSetObjects.get(1);
+            Assertions.assertEquals(2, s3StreamSetObject1.getObjectId());
+            Assertions.assertEquals(100, s3StreamSetObject1.getObjectSize());
+            Assertions.assertEquals(1, s3StreamSetObject1.getBrokerId());
+            Assertions.assertEquals(2, s3StreamSetObject1.getSequenceId());
+            Assertions.assertEquals(subStreams2, s3StreamSetObject1.getSubStreams().getSubStreamsMap());
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
-            S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
-            s3WALObjectMapper.delete(1L, 1, null);
-            s3WALObjectMapper.delete(2L, 2, null);
+            S3StreamSetObjectMapper s3StreamSetObjectMapper = session.getMapper(S3StreamSetObjectMapper.class);
+            s3StreamSetObjectMapper.delete(1L, 1, null);
+            s3StreamSetObjectMapper.delete(2L, 2, null);
 
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
             s3StreamObjectMapper.delete(null, streamId, 122L);
@@ -623,14 +622,14 @@ public class DefaultS3MetadataServiceTest extends DatabaseTestBase {
             throw new RuntimeException(e);
         }
 
-        S3WALObject walObject = S3WALObject.newBuilder()
+        S3StreamSetObject walObject = S3StreamSetObject.newBuilder()
             .setObjectId(objectId + 4)
             .setObjectSize(222L)
             .setBrokerId(nodeId)
             .build();
 
         try (SqlSession session = this.getSessionFactory().openSession()) {
-            S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
+            S3StreamSetObjectMapper s3StreamSetObjectMapper = session.getMapper(S3StreamSetObjectMapper.class);
 
             LongStream.range(1, 3).forEach(streamId -> {
                 insertStream(session, streamId, StreamState.OPEN);
@@ -640,12 +639,12 @@ public class DefaultS3MetadataServiceTest extends DatabaseTestBase {
             buildS3WalObjs(objectId + 2, 1).stream().peek(s3WalObject -> {
                 Map<Long, SubStream> subStreams = buildWalSubStreams(1, 20L, 10L);
                 s3WalObject.setSubStreams(toJson(subStreams));
-            }).forEach(s3WALObjectMapper::create);
+            }).forEach(s3StreamSetObjectMapper::create);
 
             buildS3WalObjs(objectId + 3, 1).stream().peek(s3WalObject -> {
                 Map<Long, SubStream> subStreams = buildWalSubStreams(1, 30L, 10L);
                 s3WalObject.setSubStreams(toJson(subStreams));
-            }).forEach(s3WALObjectMapper::create);
+            }).forEach(s3StreamSetObjectMapper::create);
 
             session.commit();
         }
@@ -665,7 +664,7 @@ public class DefaultS3MetadataServiceTest extends DatabaseTestBase {
                 .build()).toList();
 
         try (S3MetadataService manager = new DefaultS3MetadataService(config, getSessionFactory(), executorService)) {
-            manager.commitWalObject(walObject, s3StreamObjects, compactedObjects).get();
+            manager.commitStreamSetObject(walObject, s3StreamObjects, compactedObjects).get();
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {
@@ -690,8 +689,8 @@ public class DefaultS3MetadataServiceTest extends DatabaseTestBase {
             Assertions.assertEquals(222L, s3Object.getObjectSize());
             Assertions.assertEquals(StreamConstants.NOOP_STREAM_ID, s3Object.getStreamId());
 
-            S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
-            S3WalObject object = s3WALObjectMapper.getByObjectId(objectId + 4);
+            S3StreamSetObjectMapper s3StreamSetObjectMapper = session.getMapper(S3StreamSetObjectMapper.class);
+            com.automq.rocketmq.metadata.dao.S3StreamSetObject object = s3StreamSetObjectMapper.getByObjectId(objectId + 4);
             Assertions.assertEquals(objectId + 2, object.getSequenceId());
             Assertions.assertTrue(object.getBaseDataTimestamp().getTime() > 0);
             Assertions.assertTrue(object.getCommittedTimestamp().getTime() > 0);
@@ -703,7 +702,7 @@ public class DefaultS3MetadataServiceTest extends DatabaseTestBase {
         long streamId, startOffset = 0, endOffset = 10;
         Integer nodeId = 1;
 
-        S3WALObject walObject = S3WALObject.newBuilder()
+        S3StreamSetObject walObject = S3StreamSetObject.newBuilder()
             .setObjectId(3)
             .setBrokerId(-1)
             .build();
@@ -739,7 +738,7 @@ public class DefaultS3MetadataServiceTest extends DatabaseTestBase {
         List<Long> compactedObjects = new ArrayList<>();
         try (S3MetadataService manager = new DefaultS3MetadataService(config, getSessionFactory(), executorService)) {
             List<S3StreamObject> s3StreamObjects = manager.listStreamObjects(streamId, startOffset, endOffset, 2).get();
-            Assertions.assertThrows(ExecutionException.class, () -> manager.commitWalObject(walObject, s3StreamObjects, compactedObjects).get());
+            Assertions.assertThrows(ExecutionException.class, () -> manager.commitStreamSetObject(walObject, s3StreamObjects, compactedObjects).get());
         }
 
     }
@@ -751,7 +750,7 @@ public class DefaultS3MetadataServiceTest extends DatabaseTestBase {
         long objectId;
         Calendar calendar = Calendar.getInstance();
 
-        S3WALObject walObject = S3WALObject.newBuilder()
+        S3StreamSetObject walObject = S3StreamSetObject.newBuilder()
             .setObjectId(-1)
             .setSequenceId(-1)
             .setBrokerId(-1)
@@ -809,7 +808,7 @@ public class DefaultS3MetadataServiceTest extends DatabaseTestBase {
 
             List<S3StreamObject> s3StreamObjects = new ArrayList<>();
             s3StreamObjects.add(streamObject);
-            manager.commitWalObject(walObject, s3StreamObjects, compactedObjects).get();
+            manager.commitStreamSetObject(walObject, s3StreamObjects, compactedObjects).get();
         }
 
         try (SqlSession session = getSessionFactory().openSession()) {

@@ -19,7 +19,7 @@ package com.automq.rocketmq.metadata;
 
 import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.S3StreamObject;
-import apache.rocketmq.controller.v1.S3WALObject;
+import apache.rocketmq.controller.v1.S3StreamSetObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.Topic;
@@ -174,14 +174,14 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
     }
 
     @Override
-    public CompletableFuture<Void> commitWalObject(S3WALObject walObject, List<S3StreamObject> streamObjects,
+    public CompletableFuture<Void> commitStreamSetObject(S3StreamSetObject streamSetObject, List<S3StreamObject> streamObjects,
         List<Long> compactedObjects) {
-        // The underlying storage layer does not know the current node id when constructing the WAL object.
+        // The underlying storage layer does not know the current node id when constructing the StreamSet object.
         // So we should fill it here.
-        S3WALObject newWal = S3WALObject.newBuilder(walObject).setBrokerId(metadataStore.config().nodeId()).build();
+        S3StreamSetObject newStreamSetObject = S3StreamSetObject.newBuilder(streamSetObject).setBrokerId(metadataStore.config().nodeId()).build();
         AtomicBoolean loop = new AtomicBoolean(true);
         return Futures.loop(loop::get,
-            () -> s3MetadataService.commitWalObject(newWal, streamObjects, compactedObjects)
+            () -> s3MetadataService.commitStreamSetObject(newStreamSetObject, streamObjects, compactedObjects)
                 .thenApply(res -> {
                     loop.set(false);
                     return res;
@@ -190,7 +190,7 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
     }
 
     @Override
-    public CompletableFuture<Void> commitStreamObject(S3StreamObject streamObject, List<Long> compactedObjects) {
+    public CompletableFuture<Void> compactStreamObject(S3StreamObject streamObject, List<Long> compactedObjects) {
         AtomicBoolean loop = new AtomicBoolean(true);
         return Futures.loop(loop::get,
             () -> s3MetadataService.commitStreamObject(streamObject, compactedObjects)
@@ -202,9 +202,9 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
     }
 
     @Override
-    public CompletableFuture<List<S3WALObject>> listWALObjects() {
+    public CompletableFuture<List<S3StreamSetObject>> listStreamSetObjects() {
         AtomicBoolean loop = new AtomicBoolean(true);
-        return Futures.loop(loop::get, () -> s3MetadataService.listWALObjects()
+        return Futures.loop(loop::get, () -> s3MetadataService.listStreamSetObjects()
             .thenApply(res -> {
                 loop.set(false);
                 return res;
@@ -212,10 +212,10 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
     }
 
     @Override
-    public CompletableFuture<List<S3WALObject>> listWALObjects(long streamId, long startOffset, long endOffset,
+    public CompletableFuture<List<S3StreamSetObject>> listStreamSetObjects(long streamId, long startOffset, long endOffset,
         int limit) {
         AtomicBoolean loop = new AtomicBoolean(true);
-        return Futures.loop(loop::get, () -> s3MetadataService.listWALObjects(streamId, startOffset, endOffset, limit)
+        return Futures.loop(loop::get, () -> s3MetadataService.listStreamSetObjects(streamId, startOffset, endOffset, limit)
             .thenApply(res -> {
                 loop.set(false);
                 return res;
@@ -234,7 +234,7 @@ public class DefaultStoreMetadataService implements StoreMetadataService {
     }
 
     @Override
-    public CompletableFuture<Pair<List<S3StreamObject>, List<S3WALObject>>> listObjects(long streamId, long startOffset,
+    public CompletableFuture<Pair<List<S3StreamObject>, List<S3StreamSetObject>>> listObjects(long streamId, long startOffset,
         long endOffset, int limit) {
         AtomicBoolean loop = new AtomicBoolean(true);
         return Futures.loop(loop::get, () -> s3MetadataService.listObjects(streamId, startOffset, endOffset, limit)

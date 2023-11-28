@@ -19,7 +19,7 @@ package com.automq.rocketmq.store.mock;
 
 import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.S3StreamObject;
-import apache.rocketmq.controller.v1.S3WALObject;
+import apache.rocketmq.controller.v1.S3StreamSetObject;
 import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.common.config.BrokerConfig;
@@ -109,23 +109,23 @@ public class MockStoreMetadataService implements StoreMetadataService {
     }
 
     @Override
-    public CompletableFuture<Void> commitWalObject(S3WALObject walObject, List<S3StreamObject> streamObjects,
+    public CompletableFuture<Void> commitStreamSetObject(S3StreamSetObject streamSetObject, List<S3StreamObject> streamObjects,
         List<Long> compactedObjects) {
         return null;
     }
 
     @Override
-    public CompletableFuture<Void> commitStreamObject(S3StreamObject streamObject, List<Long> compactedObjects) {
+    public CompletableFuture<Void> compactStreamObject(S3StreamObject streamObject, List<Long> compactedObjects) {
         return null;
     }
 
     @Override
-    public CompletableFuture<List<S3WALObject>> listWALObjects() {
+    public CompletableFuture<List<S3StreamSetObject>> listStreamSetObjects() {
         return null;
     }
 
     @Override
-    public CompletableFuture<List<S3WALObject>> listWALObjects(long streamId, long startOffset, long endOffset,
+    public CompletableFuture<List<S3StreamSetObject>> listStreamSetObjects(long streamId, long startOffset, long endOffset,
         int limit) {
         return null;
     }
@@ -137,7 +137,7 @@ public class MockStoreMetadataService implements StoreMetadataService {
     }
 
     @Override
-    public CompletableFuture<Pair<List<S3StreamObject>, List<S3WALObject>>> listObjects(long streamId, long startOffset,
+    public CompletableFuture<Pair<List<S3StreamObject>, List<S3StreamSetObject>>> listObjects(long streamId, long startOffset,
         long endOffset, int limit) {
         return null;
     }

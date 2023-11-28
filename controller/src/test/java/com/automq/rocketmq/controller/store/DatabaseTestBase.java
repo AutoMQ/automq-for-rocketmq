@@ -30,7 +30,7 @@ import com.automq.rocketmq.metadata.dao.Group;
 import com.automq.rocketmq.metadata.dao.Lease;
 import com.automq.rocketmq.metadata.dao.QueueAssignment;
 import com.automq.rocketmq.metadata.dao.S3ObjectCriteria;
-import com.automq.rocketmq.metadata.dao.S3WalObject;
+import com.automq.rocketmq.metadata.dao.S3StreamSetObject;
 import com.automq.rocketmq.metadata.mapper.GroupMapper;
 import com.automq.rocketmq.metadata.mapper.GroupProgressMapper;
 import com.automq.rocketmq.metadata.mapper.LeaseMapper;
@@ -39,7 +39,7 @@ import com.automq.rocketmq.metadata.mapper.QueueAssignmentMapper;
 import com.automq.rocketmq.metadata.mapper.RangeMapper;
 import com.automq.rocketmq.metadata.mapper.S3ObjectMapper;
 import com.automq.rocketmq.metadata.mapper.S3StreamObjectMapper;
-import com.automq.rocketmq.metadata.mapper.S3WalObjectMapper;
+import com.automq.rocketmq.metadata.mapper.S3StreamSetObjectMapper;
 import com.automq.rocketmq.metadata.mapper.StreamMapper;
 import com.automq.rocketmq.metadata.mapper.TopicMapper;
 
@@ -163,7 +163,7 @@ public class DatabaseTestBase {
             session.getMapper(RangeMapper.class).delete(null, null);
             session.getMapper(S3ObjectMapper.class).deleteByCriteria(S3ObjectCriteria.newBuilder().build());
             session.getMapper(S3StreamObjectMapper.class).delete(null, null, null);
-            session.getMapper(S3WalObjectMapper.class).delete(null, null, null);
+            session.getMapper(S3StreamSetObjectMapper.class).delete(null, null, null);
 
             LeaseMapper mapper = session.getMapper(LeaseMapper.class);
             Lease lease = mapper.currentWithWriteLock();
@@ -204,11 +204,11 @@ public class DatabaseTestBase {
         return s3StreamObjects;
     }
 
-    protected List<S3WalObject> buildS3WalObjs(long objectId, int count) {
-        List<S3WalObject> s3StreamObjects = new ArrayList<>();
+    protected List<S3StreamSetObject> buildS3WalObjs(long objectId, int count) {
+        List<S3StreamSetObject> s3StreamObjects = new ArrayList<>();
 
         for (long i = 0; i < count; i++) {
-            S3WalObject s3StreamObject = new S3WalObject();
+            S3StreamSetObject s3StreamObject = new S3StreamSetObject();
             s3StreamObject.setObjectId(objectId + i);
             s3StreamObject.setObjectSize(100 + i);
             s3StreamObject.setSequenceId(objectId + i);

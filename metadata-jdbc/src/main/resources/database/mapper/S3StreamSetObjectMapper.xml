@@ -20,11 +20,11 @@
 <!DOCTYPE mapper
     PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.automq.rocketmq.metadata.mapper.S3WalObjectMapper">
+<mapper namespace="com.automq.rocketmq.metadata.mapper.S3StreamSetObjectMapper">
 
-    <insert id="create" parameterType="S3WalObject">
+    <insert id="create" parameterType="S3StreamSetObject">
         INSERT INTO
-        s3walobject (object_id, object_size, node_id, sequence_id, sub_streams, base_data_timestamp, committed_timestamp, created_timestamp)
+        s3streamsetobject (object_id, object_size, node_id, sequence_id, sub_streams, base_data_timestamp, committed_timestamp, created_timestamp)
         VALUES (
         #{objectId},
         #{objectSize},
@@ -37,8 +37,8 @@
         )
     </insert>
 
-    <update id="commit" parameterType="S3WalObject">
-        UPDATE s3walobject
+    <update id="commit" parameterType="S3StreamSetObject">
+        UPDATE s3streamsetobject
         SET committed_timestamp = #{committedTimestamp}
         <where>
             <if test="null != objectId">object_id = #{objectId}</if>
@@ -47,15 +47,15 @@
         </where>
     </update>
 
-    <select id="getByObjectId" resultType="S3WalObject">
+    <select id="getByObjectId" resultType="S3StreamSetObject">
         SELECT object_id, object_size, node_id, sequence_id, sub_streams, base_data_timestamp, committed_timestamp
-        FROM s3walobject
+        FROM s3streamsetobject
         WHERE object_id = #{objectId}
     </select>
 
     <delete id="delete">
         DELETE
-        FROM s3walobject
+        FROM s3streamsetobject
         <where>
             <if test="null != objectId">object_id = #{objectId}</if>
             <if test="null != nodeId">AND node_id = #{nodeId}</if>
@@ -63,9 +63,9 @@
         </where>
     </delete>
 
-    <select id="list" resultType="S3WalObject">
+    <select id="list" resultType="S3StreamSetObject">
         SELECT object_id, object_size, node_id, sequence_id, sub_streams, base_data_timestamp, committed_timestamp
-        FROM s3walobject
+        FROM s3streamsetobject
         <where>
             <if test="null != nodeId">node_id = #{nodeId}</if>
             <if test="null != sequenceId">AND sequence_id = #{sequenceId}</if>
@@ -76,7 +76,7 @@
         SELECT COUNT(node_id) = 0 AS exclusive
         FROM
             (SELECT node_id, JSON_EXTRACT(sub_streams, '$.subStreams.*.streamId') AS ids
-            FROM s3walobject
+            FROM s3streamsetobject
             WHERE node_id != #{nodeId}) t
         WHERE CONVERT(#{streamId}, CHAR)  MEMBER OF(t.ids)
     </select>

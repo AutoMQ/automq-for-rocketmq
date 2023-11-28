@@ -21,11 +21,11 @@ import com.automq.rocketmq.metadata.DatabaseTestBase;
 import java.io.IOException;
 import org.junit.jupiter.api.Test;
 
-class S3WalObjectCacheTest extends DatabaseTestBase {
+class S3StreamSetObjectCacheTest extends DatabaseTestBase {
 
     @Test
     public void testLoad() throws IOException {
-        S3WalObjectCache cache = new S3WalObjectCache(getSessionFactory());
+        S3StreamSetObjectCache cache = new S3StreamSetObjectCache(getSessionFactory());
         cache.load(1);
     }
 }
