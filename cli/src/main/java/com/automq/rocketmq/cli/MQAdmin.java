@@ -70,36 +70,17 @@ public class MQAdmin implements Runnable {
     @CommandLine.Option(names = {"-s", "--secret-key"}, description = "The authentication secret key")
     String secretKey = "";
 
-    public CommandLine.Model.CommandSpec getSpec() {
-        return spec;
-    }
-
-    public void setSpec(CommandLine.Model.CommandSpec spec) {
-        this.spec = spec;
-    }
-
     public String getEndpoint() {
         return endpoint;
     }
 
-    public void setEndpoint(String endpoint) {
-        this.endpoint = endpoint;
-    }
 
     public String getAccessKey() {
         return accessKey;
     }
 
-    public void setAccessKey(String accessKey) {
-        this.accessKey = accessKey;
-    }
-
     public String getSecretKey() {
         return secretKey;
-    }
-
-    public void setSecretKey(String secretKey) {
-        this.secretKey = secretKey;
     }
 
     public void run() {
