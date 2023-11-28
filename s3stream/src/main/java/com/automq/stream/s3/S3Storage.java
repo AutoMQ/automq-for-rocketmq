@@ -549,6 +549,9 @@ public class S3Storage implements Storage {
         deltaWALCache.markFree(cacheBlock);
     }
 
+    /**
+     * WALConfirmOffsetCalculator is used to calculate the confirmed offset of WAL.
+     */
     static class WALConfirmOffsetCalculator {
         public static final long NOOP_OFFSET = -1L;
         private final ReadWriteLock rwLock = new ReentrantReadWriteLock();
@@ -556,26 +559,35 @@ public class S3Storage implements Storage {
         private final AtomicLong confirmOffset = new AtomicLong(NOOP_OFFSET);
 
         public WALConfirmOffsetCalculator() {
-            Threads.newSingleThreadScheduledExecutor(ThreadUtils.createThreadFactory("wal-callback-sequencer-update-confirm-offset", true), LOGGER)
+            // Update the confirmed offset periodically.
+            Threads.newSingleThreadScheduledExecutor(ThreadUtils.createThreadFactory("wal-calculator-update-confirm-offset", true), LOGGER)
                     .scheduleAtFixedRate(this::update, 100, 100, TimeUnit.MILLISECONDS);
         }
 
+        /**
+         * Lock of {@link #add}.
+         * Operations of assigning offsets, for example {@link WriteAheadLog#append}, need to be performed while holding the lock.
+         */
         public Lock addLock() {
             return rwLock.readLock();
         }
 
         public void add(WalWriteRequest request) {
+            assert null != request;
             queue.add(new WalWriteRequestWrapper(request));
         }
 
         /**
          * Return the offset before and including which all records have been persisted.
-         * Note: The returned offset may be stale.
+         * Note: It is updated by {@link #update} periodically, and is not real-time.
          */
         public Long get() {
             return confirmOffset.get();
         }
 
+        /**
+         * Calculate and update the confirmed offset.
+         */
         public void update() {
             long offset = calculate();
             if (offset != NOOP_OFFSET) {
@@ -585,63 +597,52 @@ public class S3Storage implements Storage {
 
         /**
          * Calculate the offset before and including which all records have been persisted.
+         * All records whose offset is not larger than the returned offset will be removed from the queue.
          * It returns {@link #NOOP_OFFSET} if the first record is not persisted yet.
          */
         synchronized private long calculate() {
             Lock lock = rwLock.writeLock();
             try {
                 // Insert a flag.
-                queue.add(new WalWriteRequestWrapper(null));
+                queue.add(WalWriteRequestWrapper.flag());
             } finally {
                 lock.unlock();
             }
 
-            Long minUnconfirmedOffset = null;
-            long maxPersistedOffset = NOOP_OFFSET;
+            long minUnconfirmedOffset = Long.MAX_VALUE;
             boolean reachFlag = false;
             for (WalWriteRequestWrapper wrapper : queue) {
                 // Iterate the queue to find the min unconfirmed offset.
-                if (wrapper.request == null) {
+                if (wrapper.isFlag()) {
                     // Reach the flag.
                     reachFlag = true;
                     break;
                 }
                 WalWriteRequest request = wrapper.request;
                 assert request.offset != NOOP_OFFSET;
-                if (request.persisted) {
-                    maxPersistedOffset = Math.max(maxPersistedOffset, request.offset);
-                } else {
-                    minUnconfirmedOffset = minUnconfirmedOffset == null ? request.offset : Math.min(minUnconfirmedOffset, request.offset);
+                if (!request.persisted) {
+                    minUnconfirmedOffset = Math.min(minUnconfirmedOffset, request.offset);
                 }
             }
             assert reachFlag;
 
-            if (null == minUnconfirmedOffset) {
-                // All offsets are confirmed.
-                return maxPersistedOffset;
-            }
-
-            Long confirmedOffset = null;
-            while (true) {
-                // Iterate and poll the queue to find the max offset less than minUnconfirmedOffset.
-                WalWriteRequestWrapper wrapper = queue.poll();
-                assert wrapper != null;
-                if (wrapper.request == null) {
-                    // Reach the flag.
+            long confirmedOffset = NOOP_OFFSET;
+            // Iterate the queue to find the max offset less than minUnconfirmedOffset.
+            // Remove all records whose offset is less than minUnconfirmedOffset.
+            for (Iterator<WalWriteRequestWrapper> iterator = queue.iterator(); iterator.hasNext(); ) {
+                WalWriteRequestWrapper wrapper = iterator.next();
+                if (wrapper.isFlag()) {
+                    /// Reach and remove the flag.
+                    iterator.remove();
                     break;
                 }
                 WalWriteRequest request = wrapper.request;
                 if (request.persisted && request.offset < minUnconfirmedOffset) {
-                    confirmedOffset = confirmedOffset == null ? request.offset : Math.max(confirmedOffset, request.offset);
+                    confirmedOffset = Math.max(confirmedOffset, request.offset);
+                    iterator.remove();
                 }
             }
-
-            if (confirmedOffset == null) {
-                // The first record has not been persisted yet.
-                return NOOP_OFFSET;
-            } else {
-                return confirmedOffset;
-            }
+            return confirmedOffset;
         }
 
         /**
@@ -649,6 +650,14 @@ public class S3Storage implements Storage {
          * When the {@code request} is null, it is used as a flag.
          */
         record WalWriteRequestWrapper(WalWriteRequest request) {
+
+            static WalWriteRequestWrapper flag() {
+                return new WalWriteRequestWrapper(null);
+            }
+
+            public boolean isFlag() {
+                return request == null;
+            }
         }
     }
 
