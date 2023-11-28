@@ -15,10 +15,13 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.cli;
+package com.automq.rocketmq.cli.topic;
 
 import apache.rocketmq.controller.v1.Topic;
 import apache.rocketmq.controller.v1.UpdateTopicRequest;
+import com.automq.rocketmq.cli.CliClientConfig;
+import com.automq.rocketmq.cli.ConsoleHelper;
+import com.automq.rocketmq.cli.MQAdmin;
 import com.automq.rocketmq.controller.ControllerClient;
 import com.automq.rocketmq.controller.client.GrpcControllerClient;
 import com.google.common.base.Strings;
@@ -43,7 +46,7 @@ public class UpdateTopic implements Callable<Void> {
     @Override
     public Void call() throws Exception {
         try (ControllerClient client = new GrpcControllerClient(new CliClientConfig())) {
-            Topic topic = client.describeTopic(mqAdmin.endpoint, topicId, null)
+            Topic topic = client.describeTopic(mqAdmin.getEndpoint(), topicId, null)
                 .join();
             if (null == topic) {
                 System.err.printf("Topic '%s' is not found%n%n", topicName);
@@ -59,8 +62,8 @@ public class UpdateTopic implements Callable<Void> {
             if (!Strings.isNullOrEmpty(topicName)) {
                 builder.setName(topicName);
             }
-            client.updateTopic(mqAdmin.endpoint, builder.build()).join();
-            topic = client.describeTopic(mqAdmin.endpoint, topicId, null).join();
+            client.updateTopic(mqAdmin.getEndpoint(), builder.build()).join();
+            topic = client.describeTopic(mqAdmin.getEndpoint(), topicId, null).join();
             ConsoleHelper.printTable(topic);
         }
         return null;

@@ -15,11 +15,14 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.cli;
+package com.automq.rocketmq.cli.consumer;
 
 import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.ListGroupReply;
 import apache.rocketmq.controller.v1.ListGroupRequest;
+import com.automq.rocketmq.cli.CliClientConfig;
+import com.automq.rocketmq.cli.ConsoleHelper;
+import com.automq.rocketmq.cli.MQAdmin;
 import com.automq.rocketmq.controller.ControllerClient;
 import com.automq.rocketmq.controller.client.GrpcControllerClient;
 import de.vandermeer.asciitable.AT_Row;
@@ -49,7 +52,7 @@ public class ListGroup implements Callable<Void> {
             ConsoleHelper.alignCentral(row);
             listGroups.addRule();
 
-            client.listGroups(mqAdmin.endpoint, request, new StreamObserver<>() {
+            client.listGroups(mqAdmin.getEndpoint(), request, new StreamObserver<>() {
                 @Override
                 public void onNext(ListGroupReply value) {
                     ConsumerGroup group = value.getGroup();

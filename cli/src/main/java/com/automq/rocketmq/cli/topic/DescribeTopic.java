@@ -15,9 +15,12 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.cli;
+package com.automq.rocketmq.cli.topic;
 
 import apache.rocketmq.controller.v1.Topic;
+import com.automq.rocketmq.cli.CliClientConfig;
+import com.automq.rocketmq.cli.ConsoleHelper;
+import com.automq.rocketmq.cli.MQAdmin;
 import com.automq.rocketmq.controller.ControllerClient;
 import com.automq.rocketmq.controller.client.GrpcControllerClient;
 import java.util.concurrent.Callable;
@@ -35,7 +38,7 @@ public class DescribeTopic implements Callable<Void> {
     @Override
     public Void call() throws Exception {
         try (ControllerClient client = new GrpcControllerClient(new CliClientConfig())) {
-            Topic topic = client.describeTopic(mqAdmin.endpoint, null, topicName)
+            Topic topic = client.describeTopic(mqAdmin.getEndpoint(), null, topicName)
                 .join();
             if (null == topic) {
                 System.err.printf("Topic '%s' is not found%n%n", topicName);

@@ -15,9 +15,11 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.cli;
+package com.automq.rocketmq.cli.consumer;
 
 import apache.rocketmq.controller.v1.ConsumerGroup;
+import com.automq.rocketmq.cli.CliClientConfig;
+import com.automq.rocketmq.cli.MQAdmin;
 import com.automq.rocketmq.controller.ControllerClient;
 import com.automq.rocketmq.controller.client.GrpcControllerClient;
 import de.vandermeer.asciitable.AT_Row;
@@ -40,7 +42,7 @@ public class DescribeGroup implements Callable<Void> {
     @Override
     public Void call() throws Exception {
         try (ControllerClient client = new GrpcControllerClient(new CliClientConfig())) {
-            ConsumerGroup group = client.describeGroup(mqAdmin.endpoint, groupName)
+            ConsumerGroup group = client.describeGroup(mqAdmin.getEndpoint(), groupName)
                 .join();
             if (null == group) {
                 System.err.printf("Group '%s' is not found%n%n", groupName);

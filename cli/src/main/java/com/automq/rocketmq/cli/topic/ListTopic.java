@@ -15,12 +15,15 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.cli;
+package com.automq.rocketmq.cli.topic;
 
 import apache.rocketmq.controller.v1.ListTopicsReply;
 import apache.rocketmq.controller.v1.ListTopicsRequest;
 import apache.rocketmq.controller.v1.MessageType;
 import apache.rocketmq.controller.v1.Topic;
+import com.automq.rocketmq.cli.CliClientConfig;
+import com.automq.rocketmq.cli.ConsoleHelper;
+import com.automq.rocketmq.cli.MQAdmin;
 import com.automq.rocketmq.controller.ControllerClient;
 import com.automq.rocketmq.controller.client.GrpcControllerClient;
 import de.vandermeer.asciitable.AT_Row;
@@ -51,7 +54,7 @@ public class ListTopic implements Callable<Void> {
 
             CWC_LongestLine cwc = new CWC_LongestLine();
 
-            client.listTopics(mqAdmin.endpoint, request, new StreamObserver<>() {
+            client.listTopics(mqAdmin.getEndpoint(), request, new StreamObserver<>() {
                 @Override
                 public void onNext(ListTopicsReply reply) {
                     Topic topic = reply.getTopic();

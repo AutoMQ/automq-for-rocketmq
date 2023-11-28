@@ -15,12 +15,14 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.cli;
+package com.automq.rocketmq.cli.consumer;
 
 import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.GroupType;
 import apache.rocketmq.controller.v1.SubscriptionMode;
+import com.automq.rocketmq.cli.CliClientConfig;
+import com.automq.rocketmq.cli.MQAdmin;
 import com.automq.rocketmq.controller.ControllerClient;
 import com.automq.rocketmq.controller.client.GrpcControllerClient;
 import java.util.concurrent.Callable;
@@ -53,7 +55,7 @@ public class CreateGroup implements Callable<Void> {
                 .setSubMode(subMode)
                 .build();
 
-            CreateGroupReply groupReply = client.createGroup(mqAdmin.endpoint, request).join();
+            CreateGroupReply groupReply = client.createGroup(mqAdmin.getEndpoint(), request).join();
             System.out.println("Group created: " + groupReply.getGroupId());
         }
         return null;
