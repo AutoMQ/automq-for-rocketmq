@@ -18,7 +18,7 @@
 package com.automq.rocketmq.metadata.service;
 
 import apache.rocketmq.controller.v1.S3StreamObject;
-import apache.rocketmq.controller.v1.S3WALObject;
+import apache.rocketmq.controller.v1.S3StreamSetObject;
 import java.io.Closeable;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -33,20 +33,20 @@ public interface S3MetadataService extends Closeable {
 
     CompletableFuture<Long> prepareS3Objects(int count, int ttlInMinutes);
 
-    CompletableFuture<Void> commitWalObject(S3WALObject walObject, List<S3StreamObject> streamObjects,
+    CompletableFuture<Void> commitStreamSetObject(S3StreamSetObject walObject, List<S3StreamObject> streamObjects,
         List<Long> compactedObjects);
 
 
-    CompletableFuture<Void> commitStreamObject(apache.rocketmq.controller.v1.S3StreamObject streamObject,
+    CompletableFuture<Void> commitStreamObject(S3StreamObject streamObject,
         List<Long> compactedObjects);
 
-    CompletableFuture<List<S3WALObject>> listWALObjects();
+    CompletableFuture<List<S3StreamSetObject>> listStreamSetObjects();
 
-    CompletableFuture<List<S3WALObject>> listWALObjects(long streamId, long startOffset, long endOffset, int limit);
+    CompletableFuture<List<S3StreamSetObject>> listStreamSetObjects(long streamId, long startOffset, long endOffset, int limit);
 
     CompletableFuture<List<S3StreamObject>> listStreamObjects(long streamId, long startOffset, long endOffset, int limit);
 
-    CompletableFuture<Pair<List<S3StreamObject>, List<S3WALObject>>> listObjects(long streamId, long startOffset,
+    CompletableFuture<Pair<List<S3StreamObject>, List<S3StreamSetObject>>> listObjects(long streamId, long startOffset,
         long endOffset, int limit);
 
     CompletableFuture<Void> trimStream(long streamId, long streamEpoch, long newStartOffset);

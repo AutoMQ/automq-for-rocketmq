@@ -42,12 +42,12 @@ public class S3StreamConfig {
     private int walCacheSize = 1024 * 1024 * 1024;
     private int blockCacheSize = 1024 * 1024 * 1024;
 
-    private int walObjectCompactionInterval = 20;
-    private long walObjectCompactionCacheSize = 200 * 1024 * 1024;
-    private int walObjectCompactionUploadConcurrency = 8;
-    private long walObjectCompactionStreamSplitSize = 16 * 1024 * 1024;
-    private int walObjectCompactionForceSplitPeriod = 120;
-    private int walObjectCompactionMaxObjectNum = 500;
+    private int streamSetObjectCompactionInterval = 20;
+    private long streamSetObjectCompactionCacheSize = 200 * 1024 * 1024;
+    private int streamSetObjectCompactionUploadConcurrency = 8;
+    private long streamSetObjectCompactionStreamSplitSize = 16 * 1024 * 1024;
+    private int streamSetObjectCompactionForceSplitPeriod = 120;
+    private int streamSetObjectCompactionMaxObjectNum = 500;
     private int streamSplitSizeThreshold = 16777216;
 
     public String s3Endpoint() {
@@ -114,28 +114,28 @@ public class S3StreamConfig {
         return blockCacheSize;
     }
 
-    public int walObjectCompactionInterval() {
-        return walObjectCompactionInterval;
+    public int streamSetObjectCompactionInterval() {
+        return streamSetObjectCompactionInterval;
     }
 
-    public long walObjectCompactionCacheSize() {
-        return walObjectCompactionCacheSize;
+    public long streamSetObjectCompactionCacheSize() {
+        return streamSetObjectCompactionCacheSize;
     }
 
-    public int walObjectCompactionUploadConcurrency() {
-        return walObjectCompactionUploadConcurrency;
+    public int streamSetObjectCompactionUploadConcurrency() {
+        return streamSetObjectCompactionUploadConcurrency;
     }
 
-    public long walObjectCompactionStreamSplitSize() {
-        return walObjectCompactionStreamSplitSize;
+    public long streamSetObjectCompactionStreamSplitSize() {
+        return streamSetObjectCompactionStreamSplitSize;
     }
 
-    public int walObjectCompactionForceSplitPeriod() {
-        return walObjectCompactionForceSplitPeriod;
+    public int streamSetObjectCompactionForceSplitPeriod() {
+        return streamSetObjectCompactionForceSplitPeriod;
     }
 
-    public int walObjectCompactionMaxObjectNum() {
-        return walObjectCompactionMaxObjectNum;
+    public int streamSetObjectCompactionMaxObjectNum() {
+        return streamSetObjectCompactionMaxObjectNum;
     }
 
     public int streamSplitSizeThreshold() {

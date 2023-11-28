@@ -20,7 +20,7 @@ package com.automq.rocketmq.metadata.service;
 import apache.rocketmq.common.v1.Code;
 import apache.rocketmq.controller.v1.S3ObjectState;
 import apache.rocketmq.controller.v1.S3StreamObject;
-import apache.rocketmq.controller.v1.S3WALObject;
+import apache.rocketmq.controller.v1.S3StreamSetObject;
 import apache.rocketmq.controller.v1.StreamState;
 import apache.rocketmq.controller.v1.SubStream;
 import apache.rocketmq.controller.v1.SubStreams;
@@ -30,17 +30,16 @@ import com.automq.rocketmq.common.system.S3Constants;
 import com.automq.rocketmq.common.system.StreamConstants;
 import com.automq.rocketmq.metadata.dao.Range;
 import com.automq.rocketmq.metadata.dao.S3Object;
-import com.automq.rocketmq.metadata.dao.S3WalObject;
 import com.automq.rocketmq.metadata.dao.Stream;
 import com.automq.rocketmq.metadata.mapper.RangeMapper;
 import com.automq.rocketmq.metadata.mapper.S3ObjectMapper;
 import com.automq.rocketmq.metadata.mapper.S3StreamObjectMapper;
-import com.automq.rocketmq.metadata.mapper.S3WalObjectMapper;
+import com.automq.rocketmq.metadata.mapper.S3StreamSetObjectMapper;
 import com.automq.rocketmq.metadata.mapper.SequenceMapper;
 import com.automq.rocketmq.metadata.mapper.StreamMapper;
 import com.automq.rocketmq.metadata.service.cache.S3ObjectCache;
 import com.automq.rocketmq.metadata.service.cache.S3StreamObjectCache;
-import com.automq.rocketmq.metadata.service.cache.S3WalObjectCache;
+import com.automq.rocketmq.metadata.service.cache.S3StreamSetObjectCache;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.TextFormat;
 import com.google.protobuf.util.JsonFormat;
@@ -82,7 +81,7 @@ public class DefaultS3MetadataService implements S3MetadataService {
 
     private final S3ObjectCache s3ObjectCache;
 
-    private final S3WalObjectCache s3WalObjectCache;
+    private final S3StreamSetObjectCache s3StreamSetObjectCache;
 
     public DefaultS3MetadataService(ControllerConfig nodeConfig, SqlSessionFactory sessionFactory,
         ExecutorService asyncExecutorService) {
@@ -91,19 +90,19 @@ public class DefaultS3MetadataService implements S3MetadataService {
         this.asyncExecutorService = asyncExecutorService;
         this.s3StreamObjectCache = new S3StreamObjectCache();
         this.s3ObjectCache = new S3ObjectCache(sessionFactory);
-        this.s3WalObjectCache = new S3WalObjectCache(sessionFactory);
+        this.s3StreamSetObjectCache = new S3StreamSetObjectCache(sessionFactory);
     }
 
     public void start() {
-        this.s3WalObjectCache.load(nodeConfig.nodeId());
+        this.s3StreamSetObjectCache.load(nodeConfig.nodeId());
     }
 
     public S3ObjectCache getS3ObjectCache() {
         return s3ObjectCache;
     }
 
-    public S3WalObjectCache getS3WalObjectCache() {
-        return s3WalObjectCache;
+    public S3StreamSetObjectCache getS3StreamSetObjectCache() {
+        return s3StreamSetObjectCache;
     }
 
     public CompletableFuture<Long> prepareS3Objects(int count, int ttlInMinutes) {
@@ -145,16 +144,16 @@ public class DefaultS3MetadataService implements S3MetadataService {
         }
     }
 
-    public CompletableFuture<Void> commitWalObject(S3WALObject walObject,
+    public CompletableFuture<Void> commitStreamSetObject(S3StreamSetObject streamSetObject,
         List<S3StreamObject> streamObjects, List<Long> compactedObjects) {
-        if (Objects.isNull(walObject)) {
-            LOGGER.error("S3WALObject is unexpectedly null");
-            ControllerException e = new ControllerException(Code.INTERNAL_VALUE, "S3WALObject is unexpectedly null");
+        if (Objects.isNull(streamSetObject)) {
+            LOGGER.error("S3StreamSetObject is unexpectedly null");
+            ControllerException e = new ControllerException(Code.INTERNAL_VALUE, "S3StreamSetObject is unexpectedly null");
             return CompletableFuture.failedFuture(e);
         }
 
-        LOGGER.info("commitWalObject with walObject=[{}], streamObjects=[{}], compactedObjects={}",
-            TextFormat.shortDebugString(walObject),
+        LOGGER.info("commitStreamSetObject with StreamSetObject=[{}], streamObjects=[{}], compactedObjects={}",
+            TextFormat.shortDebugString(streamSetObject),
             streamObjects.stream()
                 .map(TextFormat::shortDebugString)
                 .collect(Collectors.joining()), compactedObjects
@@ -173,12 +172,12 @@ public class DefaultS3MetadataService implements S3MetadataService {
 
         CompletableFuture<Void> future = new CompletableFuture<>();
         try (SqlSession session = sessionFactory.openSession()) {
-            S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
+            S3StreamSetObjectMapper s3StreamSetObjectMapper = session.getMapper(S3StreamSetObjectMapper.class);
             S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
 
-            int brokerId = walObject.getBrokerId();
-            long objectId = walObject.getObjectId();
+            int brokerId = streamSetObject.getBrokerId();
+            long objectId = streamSetObject.getObjectId();
 
             Map<Long, List<Pair<Long, Long>>> streamSegments = new HashMap<>();
             for (S3StreamObject item : streamObjects) {
@@ -188,7 +187,7 @@ public class DefaultS3MetadataService implements S3MetadataService {
                 streamSegments.get(item.getStreamId()).add(new ImmutablePair<>(item.getStartOffset(), item.getEndOffset()));
             }
 
-            walObject.getSubStreams().getSubStreamsMap()
+            streamSetObject.getSubStreams().getSubStreamsMap()
                 .forEach((key, value) -> {
                     if (!streamSegments.containsKey(key)) {
                         streamSegments.put(key, new ArrayList<>());
@@ -215,9 +214,9 @@ public class DefaultS3MetadataService implements S3MetadataService {
             extendRange(session, reduced);
 
             // commit S3 object
-            if (objectId != S3Constants.NOOP_OBJECT_ID && !commitObject(objectId, StreamConstants.NOOP_STREAM_ID, walObject.getObjectSize(), session)) {
+            if (objectId != S3Constants.NOOP_OBJECT_ID && !commitObject(objectId, StreamConstants.NOOP_STREAM_ID, streamSetObject.getObjectSize(), session)) {
                 ControllerException e = new ControllerException(Code.ILLEGAL_STATE_VALUE,
-                    String.format("S3WALObject[object-id=%d] is not ready for commit", walObject.getObjectId()));
+                    String.format("S3StreamSetObject[object-id=%d] is not ready for commit", streamSetObject.getObjectId()));
                 future.completeExceptionally(e);
                 return future;
             }
@@ -225,7 +224,7 @@ public class DefaultS3MetadataService implements S3MetadataService {
             long dataTs = System.currentTimeMillis();
             long sequenceId = objectId;
             if (!Objects.isNull(compactedObjects) && !compactedObjects.isEmpty()) {
-                List<S3WalObject> s3WalObjects = compactedObjects.stream()
+                List<com.automq.rocketmq.metadata.dao.S3StreamSetObject> s3StreamSetObjects = compactedObjects.stream()
                     .map(id -> {
                         // mark destroy compacted object
                         S3Object object = s3ObjectMapper.getById(id);
@@ -233,18 +232,18 @@ public class DefaultS3MetadataService implements S3MetadataService {
                         object.setMarkedForDeletionTimestamp(new Date());
                         s3ObjectMapper.markToDelete(object.getId(), new Date());
 
-                        return s3WALObjectMapper.getByObjectId(id);
+                        return s3StreamSetObjectMapper.getByObjectId(id);
                     })
                     .toList();
 
-                if (!s3WalObjects.isEmpty()) {
+                if (!s3StreamSetObjects.isEmpty()) {
                     // update dataTs to the min compacted object's dataTs
-                    dataTs = s3WalObjects.stream()
-                        .map(S3WalObject::getBaseDataTimestamp)
+                    dataTs = s3StreamSetObjects.stream()
+                        .map(com.automq.rocketmq.metadata.dao.S3StreamSetObject::getBaseDataTimestamp)
                         .map(Date::getTime)
                         .min(Long::compareTo).get();
                     // update sequenceId to the min compacted object's sequenceId
-                    sequenceId = s3WalObjects.stream().mapToLong(S3WalObject::getSequenceId).min().getAsLong();
+                    sequenceId = s3StreamSetObjects.stream().mapToLong(com.automq.rocketmq.metadata.dao.S3StreamSetObject::getSequenceId).min().getAsLong();
                 }
             }
 
@@ -282,27 +281,27 @@ public class DefaultS3MetadataService implements S3MetadataService {
 
             // generate compacted objects' remove record ...
             if (!Objects.isNull(compactedObjects) && !compactedObjects.isEmpty()) {
-                compactedObjects.forEach(id -> s3WALObjectMapper.delete(id, null, null));
+                compactedObjects.forEach(id -> s3StreamSetObjectMapper.delete(id, null, null));
             }
 
-            // update broker's wal object
+            // update broker's StreamSet object
             if (objectId != S3Constants.NOOP_OBJECT_ID) {
-                // generate broker's wal object record
-                S3WalObject s3WALObject = new S3WalObject();
-                s3WALObject.setObjectId(objectId);
-                s3WALObject.setObjectSize(walObject.getObjectSize());
-                s3WALObject.setBaseDataTimestamp(new Date(dataTs));
-                s3WALObject.setCommittedTimestamp(new Date());
-                s3WALObject.setNodeId(brokerId);
-                s3WALObject.setSequenceId(sequenceId);
-                String subStreams = JsonFormat.printer().print(walObject.getSubStreams());
-                s3WALObject.setSubStreams(subStreams);
-                s3WALObjectMapper.create(s3WALObject);
+                // generate broker's StreamSet object record
+                com.automq.rocketmq.metadata.dao.S3StreamSetObject s3StreamSetObject = new com.automq.rocketmq.metadata.dao.S3StreamSetObject();
+                s3StreamSetObject.setObjectId(objectId);
+                s3StreamSetObject.setObjectSize(streamSetObject.getObjectSize());
+                s3StreamSetObject.setBaseDataTimestamp(new Date(dataTs));
+                s3StreamSetObject.setCommittedTimestamp(new Date());
+                s3StreamSetObject.setNodeId(brokerId);
+                s3StreamSetObject.setSequenceId(sequenceId);
+                String subStreams = JsonFormat.printer().print(streamSetObject.getSubStreams());
+                s3StreamSetObject.setSubStreams(subStreams);
+                s3StreamSetObjectMapper.create(s3StreamSetObject);
 
-                // Cache WAL object
-                s3WalObjectCache.onCommit(walObject.toBuilder()
-                    .setBaseDataTimestamp(s3WALObject.getBaseDataTimestamp().getTime())
-                    .setCommittedTimestamp(s3WALObject.getCommittedTimestamp().getTime())
+                // Cache StreamSet object
+                s3StreamSetObjectCache.onCommit(streamSetObject.toBuilder()
+                    .setBaseDataTimestamp(s3StreamSetObject.getBaseDataTimestamp().getTime())
+                    .setCommittedTimestamp(s3StreamSetObject.getCommittedTimestamp().getTime())
                     .setSequenceId(sequenceId)
                     .build());
             }
@@ -313,13 +312,13 @@ public class DefaultS3MetadataService implements S3MetadataService {
                 : toCache.entrySet()) {
                 s3StreamObjectCache.cache(entry.getKey(), entry.getValue());
             }
-            s3WalObjectCache.onCompact(compactedObjects);
-            LOGGER.info("broker[broke-id={}] commit wal object[object-id={}] success, compacted objects[{}], stream objects[{}]",
-                brokerId, walObject.getObjectId(), compactedObjects, streamObjects);
+            s3StreamSetObjectCache.onCompact(compactedObjects);
+            LOGGER.info("broker[broke-id={}] commit StreamSet object[object-id={}] success, compacted objects[{}], stream objects[{}]",
+                brokerId, streamSetObject.getObjectId(), compactedObjects, streamObjects);
             future.complete(null);
         } catch (Exception e) {
-            LOGGER.error("CommitWalObject failed", e);
-            ControllerException ex = new ControllerException(Code.INTERNAL_VALUE, "CommitWalObject failed" + e.getMessage());
+            LOGGER.error("CommitStreamSetObject failed", e);
+            ControllerException ex = new ControllerException(Code.INTERNAL_VALUE, "CommitStreamSetObject failed" + e.getMessage());
             future.completeExceptionally(ex);
         }
         return future;
@@ -409,14 +408,14 @@ public class DefaultS3MetadataService implements S3MetadataService {
         return future;
     }
 
-    public CompletableFuture<List<S3WALObject>> listWALObjects() {
-        CompletableFuture<List<S3WALObject>> future = new CompletableFuture<>();
+    public CompletableFuture<List<S3StreamSetObject>> listStreamSetObjects() {
+        CompletableFuture<List<S3StreamSetObject>> future = new CompletableFuture<>();
         try (SqlSession session = sessionFactory.openSession()) {
-            S3WalObjectMapper s3WalObjectMapper = session.getMapper(S3WalObjectMapper.class);
-            List<S3WALObject> walObjects = s3WalObjectMapper.list(nodeConfig.nodeId(), null).stream()
-                .map(s3WALObject -> {
+            S3StreamSetObjectMapper s3StreamSetObjectMapper = session.getMapper(S3StreamSetObjectMapper.class);
+            List<S3StreamSetObject> streamSetObjects = s3StreamSetObjectMapper.list(nodeConfig.nodeId(), null).stream()
+                .map(s3StreamSetObject -> {
                     try {
-                        return Helper.buildS3WALObject(s3WALObject, Helper.decode(s3WALObject.getSubStreams()));
+                        return Helper.buildS3StreamSetObject(s3StreamSetObject, Helper.decode(s3StreamSetObject.getSubStreams()));
                     } catch (InvalidProtocolBufferException e) {
                         LOGGER.error("Failed to deserialize SubStreams", e);
                         return null;
@@ -424,14 +423,14 @@ public class DefaultS3MetadataService implements S3MetadataService {
                 })
                 .filter(Objects::nonNull)
                 .toList();
-            future.complete(walObjects);
+            future.complete(streamSetObjects);
         }
         return future;
     }
 
-    public CompletableFuture<List<S3WALObject>> listWALObjects(long streamId, long startOffset,
+    public CompletableFuture<List<S3StreamSetObject>> listStreamSetObjects(long streamId, long startOffset,
         long endOffset, int limit) {
-        CompletableFuture<List<S3WALObject>> future = new CompletableFuture<>();
+        CompletableFuture<List<S3StreamSetObject>> future = new CompletableFuture<>();
         try (SqlSession session = sessionFactory.openSession()) {
             RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
 
@@ -443,14 +442,14 @@ public class DefaultS3MetadataService implements S3MetadataService {
                 .boxed()
                 .toList();
 
-            S3WalObjectMapper s3WalObjectMapper = session.getMapper(S3WalObjectMapper.class);
-            List<S3WALObject> s3WALObjects = new ArrayList<>();
+            S3StreamSetObjectMapper s3StreamSetObjectMapper = session.getMapper(S3StreamSetObjectMapper.class);
+            List<S3StreamSetObject> finalStreamSetObjects = new ArrayList<>();
             for (int nodeId : nodes) {
-                List<S3WalObject> s3WalObjects = s3WalObjectMapper.list(nodeId, null);
-                s3WalObjects.stream()
-                    .map(s3WalObject -> {
+                List<com.automq.rocketmq.metadata.dao.S3StreamSetObject> streamSetObjects = s3StreamSetObjectMapper.list(nodeId, null);
+                streamSetObjects.stream()
+                    .map(s3StreamSetObject -> {
                         try {
-                            Map<Long, SubStream> subStreams = Helper.decode(s3WalObject.getSubStreams()).getSubStreamsMap();
+                            Map<Long, SubStream> subStreams = Helper.decode(s3StreamSetObject.getSubStreams()).getSubStreamsMap();
                             Map<Long, SubStream> streamsRecords = new HashMap<>();
                             if (subStreams.containsKey(streamId)) {
                                 SubStream subStream = subStreams.get(streamId);
@@ -459,7 +458,7 @@ public class DefaultS3MetadataService implements S3MetadataService {
                                 }
                             }
                             if (!streamsRecords.isEmpty()) {
-                                return Helper.buildS3WALObject(s3WalObject, SubStreams.newBuilder()
+                                return Helper.buildS3StreamSetObject(s3StreamSetObject, SubStreams.newBuilder()
                                     .putAllSubStreams(streamsRecords)
                                     .build());
                             }
@@ -469,17 +468,17 @@ public class DefaultS3MetadataService implements S3MetadataService {
                         return null;
                     })
                     .filter(Objects::nonNull)
-                    .forEach(s3WALObjects::add);
+                    .forEach(finalStreamSetObjects::add);
             }
 
             // Sort by start-offset of the given stream
-            s3WALObjects.sort((l, r) -> {
+            finalStreamSetObjects.sort((l, r) -> {
                 long lhs = l.getSubStreams().getSubStreamsMap().get(streamId).getStartOffset();
                 long rhs = r.getSubStreams().getSubStreamsMap().get(streamId).getStartOffset();
                 return Long.compare(lhs, rhs);
             });
 
-            future.complete(s3WALObjects.stream().limit(limit).toList());
+            future.complete(finalStreamSetObjects.stream().limit(limit).toList());
         }
         return future;
     }
@@ -501,8 +500,8 @@ public class DefaultS3MetadataService implements S3MetadataService {
             new CompletableFuture<>();
         try (SqlSession session = sessionFactory.openSession()) {
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
-            S3WalObjectMapper s3WalObjectMapper = session.getMapper(S3WalObjectMapper.class);
-            if (!skipCache && s3WalObjectMapper.streamExclusive(nodeConfig.nodeId(), streamId)) {
+            S3StreamSetObjectMapper s3StreamSetObjectMapper = session.getMapper(S3StreamSetObjectMapper.class);
+            if (!skipCache && s3StreamSetObjectMapper.streamExclusive(nodeConfig.nodeId(), streamId)) {
                 s3StreamObjectCache.makeStreamExclusive(streamId);
                 List<com.automq.rocketmq.metadata.dao.S3StreamObject> list =
                     s3StreamObjectMapper.listByStreamId(streamId);
@@ -607,27 +606,27 @@ public class DefaultS3MetadataService implements S3MetadataService {
         }
     }
 
-    public CompletableFuture<Pair<List<S3StreamObject>, List<S3WALObject>>> listObjects(
+    public CompletableFuture<Pair<List<S3StreamObject>, List<S3StreamSetObject>>> listObjects(
         long streamId, long startOffset, long endOffset, int limit) {
         return CompletableFuture.supplyAsync(() -> {
             try (SqlSession session = sessionFactory.openSession()) {
-                S3WalObjectMapper s3WalObjectMapper = session.getMapper(S3WalObjectMapper.class);
+                S3StreamSetObjectMapper s3StreamSetObjectMapper = session.getMapper(S3StreamSetObjectMapper.class);
 
                 List<S3StreamObject> s3StreamObjects =
                     listStreamObjects(streamId, startOffset, endOffset, limit).join();
 
-                List<S3WALObject> walObjects = new ArrayList<>();
-                s3WalObjectMapper.list(null, null)
+                List<S3StreamSetObject> streamSetObjects = new ArrayList<>();
+                s3StreamSetObjectMapper.list(null, null)
                     .stream()
-                    .map(s3WalObject -> {
+                    .map(s3StreamSetObject -> {
                         try {
-                            Map<Long, SubStream> subStreams = Helper.decode(s3WalObject.getSubStreams()).getSubStreamsMap();
+                            Map<Long, SubStream> subStreams = Helper.decode(s3StreamSetObject.getSubStreams()).getSubStreamsMap();
                             Map<Long, SubStream> streamsRecords = new HashMap<>();
                             subStreams.entrySet().stream()
                                 .filter(entry -> !Objects.isNull(entry) && entry.getKey().equals(streamId))
                                 .filter(entry -> entry.getValue().getStartOffset() <= endOffset && entry.getValue().getEndOffset() > startOffset)
                                 .forEach(entry -> streamsRecords.put(entry.getKey(), entry.getValue()));
-                            return streamsRecords.isEmpty() ? null : Helper.buildS3WALObject(s3WalObject,
+                            return streamsRecords.isEmpty() ? null : Helper.buildS3StreamSetObject(s3StreamSetObject,
                                 SubStreams.newBuilder().putAllSubStreams(streamsRecords).build());
                         } catch (InvalidProtocolBufferException e) {
                             LOGGER.error("Failed to deserialize SubStreams", e);
@@ -636,10 +635,10 @@ public class DefaultS3MetadataService implements S3MetadataService {
                     })
                     .filter(Objects::nonNull)
                     .limit(limit)
-                    .forEach(walObjects::add);
+                    .forEach(streamSetObjects::add);
 
-                if (!walObjects.isEmpty()) {
-                    walObjects.sort((l, r) -> {
+                if (!streamSetObjects.isEmpty()) {
+                    streamSetObjects.sort((l, r) -> {
                         long lhs = l.getSubStreams().getSubStreamsMap().get(streamId).getStartOffset();
                         long rhs = r.getSubStreams().getSubStreamsMap().get(streamId).getStartOffset();
                         return Long.compare(lhs, rhs);
@@ -654,11 +653,11 @@ public class DefaultS3MetadataService implements S3MetadataService {
                                 s3StreamObject.getStartOffset(),
                                 s3StreamObject.getEndOffset()
                             }),
-                        walObjects.stream()
-                            .map(s3WALObject -> new long[] {
-                                s3WALObject.getObjectId(),
-                                s3WALObject.getSubStreams().getSubStreamsMap().get(streamId).getStartOffset(),
-                                s3WALObject.getSubStreams().getSubStreamsMap().get(streamId).getEndOffset()
+                        streamSetObjects.stream()
+                            .map(s3StreamSetObject -> new long[] {
+                                s3StreamSetObject.getObjectId(),
+                                s3StreamSetObject.getSubStreams().getSubStreamsMap().get(streamId).getStartOffset(),
+                                s3StreamSetObject.getSubStreams().getSubStreamsMap().get(streamId).getEndOffset()
                             })
                     ).sorted((l, r) -> {
                         if (l[1] == r[1]) {
@@ -673,11 +672,11 @@ public class DefaultS3MetadataService implements S3MetadataService {
                     .filter(s3StreamObject -> objectIds.contains(s3StreamObject.getObjectId()))
                     .toList();
 
-                List<S3WALObject> limitedWalObjectList = walObjects.stream()
-                    .filter(s3WALObject -> objectIds.contains(s3WALObject.getObjectId()))
+                List<S3StreamSetObject> limitedStreamSetObjectList = streamSetObjects.stream()
+                    .filter(s3StreamSetObject -> objectIds.contains(s3StreamSetObject.getObjectId()))
                     .toList();
 
-                return new ImmutablePair<>(limitedStreamObjects, limitedWalObjectList);
+                return new ImmutablePair<>(limitedStreamObjects, limitedStreamSetObjectList);
             }
         }, asyncExecutorService);
     }
@@ -688,7 +687,7 @@ public class DefaultS3MetadataService implements S3MetadataService {
             StreamMapper streamMapper = session.getMapper(StreamMapper.class);
             RangeMapper rangeMapper = session.getMapper(RangeMapper.class);
             S3StreamObjectMapper s3StreamObjectMapper = session.getMapper(S3StreamObjectMapper.class);
-            S3WalObjectMapper s3WALObjectMapper = session.getMapper(S3WalObjectMapper.class);
+            S3StreamSetObjectMapper s3StreamSetObjectMapper = session.getMapper(S3StreamSetObjectMapper.class);
             S3ObjectMapper s3ObjectMapper = session.getMapper(S3ObjectMapper.class);
 
             Stream stream = streamMapper.getByStreamId(streamId);
@@ -767,23 +766,23 @@ public class DefaultS3MetadataService implements S3MetadataService {
                 }
             });
 
-            // remove wal object or remove sub-stream range in wal object
-            s3WALObjectMapper.list(stream.getDstNodeId(), null).stream()
-                .map(s3WALObject -> {
+            // remove StreamSet object or remove sub-stream range in StreamSet object
+            s3StreamSetObjectMapper.list(stream.getDstNodeId(), null).stream()
+                .map(s3StreamSetObject -> {
                     try {
-                        return Helper.buildS3WALObject(s3WALObject, Helper.decode(s3WALObject.getSubStreams()));
+                        return Helper.buildS3StreamSetObject(s3StreamSetObject, Helper.decode(s3StreamSetObject.getSubStreams()));
                     } catch (InvalidProtocolBufferException e) {
                         LOGGER.error("Failed to decode");
                         return null;
                     }
                 })
                 .filter(Objects::nonNull)
-                .filter(s3WALObject -> s3WALObject.getSubStreams().getSubStreamsMap().containsKey(streamId))
-                .filter(s3WALObject -> s3WALObject.getSubStreams().getSubStreamsMap().get(streamId).getEndOffset() <= newStartOffset)
-                .forEach(s3WALObject -> {
-                    if (s3WALObject.getSubStreams().getSubStreamsMap().size() == 1) {
-                        // only this range, but we will remove this range, so now we can remove this wal object
-                        S3Object s3Object = s3ObjectMapper.getById(s3WALObject.getObjectId());
+                .filter(s3StreamSetObject -> s3StreamSetObject.getSubStreams().getSubStreamsMap().containsKey(streamId))
+                .filter(s3StreamSetObject -> s3StreamSetObject.getSubStreams().getSubStreamsMap().get(streamId).getEndOffset() <= newStartOffset)
+                .forEach(s3StreamSetObject -> {
+                    if (s3StreamSetObject.getSubStreams().getSubStreamsMap().size() == 1) {
+                        // only this range, but we will remove this range, so now we can remove this StreamSet object
+                        S3Object s3Object = s3ObjectMapper.getById(s3StreamSetObject.getObjectId());
                         s3Object.setMarkedForDeletionTimestamp(new Date());
                         s3ObjectMapper.markToDelete(s3Object.getId(), new Date());
                     }
@@ -808,13 +807,13 @@ public class DefaultS3MetadataService implements S3MetadataService {
 
     @Override
     public long streamDataSize(long streamId) {
-        return s3WalObjectCache.streamDataSize(streamId) + s3ObjectCache.streamDataSize(streamId);
+        return s3StreamSetObjectCache.streamDataSize(streamId) + s3ObjectCache.streamDataSize(streamId);
     }
 
     @Override
     public long streamStartTime(long streamId) {
         return Long.min(s3StreamObjectCache.streamStartTime(streamId),
-            Long.min(s3ObjectCache.streamStartTime(streamId), s3WalObjectCache.streamStartTime(streamId)));
+            Long.min(s3ObjectCache.streamStartTime(streamId), s3StreamSetObjectCache.streamStartTime(streamId)));
     }
 
     @Override

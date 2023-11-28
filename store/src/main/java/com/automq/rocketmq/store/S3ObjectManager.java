@@ -18,7 +18,7 @@
 package com.automq.rocketmq.store;
 
 import apache.rocketmq.controller.v1.S3StreamObject;
-import apache.rocketmq.controller.v1.S3WALObject;
+import apache.rocketmq.controller.v1.S3StreamSetObject;
 import apache.rocketmq.controller.v1.SubStream;
 import apache.rocketmq.controller.v1.SubStreams;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
@@ -64,7 +64,7 @@ public class S3ObjectManager implements ObjectManager {
     @Override
     public CompletableFuture<CommitStreamSetObjectResponse> commitStreamSetObject(CommitStreamSetObjectRequest request) {
         // Build S3WALObject
-        S3WALObject.Builder builder = S3WALObject.newBuilder();
+        S3StreamSetObject.Builder builder = S3StreamSetObject.newBuilder();
         builder.setObjectId(request.getObjectId());
         builder.setSequenceId(request.getOrderId());
         builder.setObjectSize(request.getObjectSize());
@@ -83,7 +83,7 @@ public class S3ObjectManager implements ObjectManager {
                 }));
 
         builder.setSubStreams(SubStreams.newBuilder().putAllSubStreams(subStreams).build());
-        S3WALObject walObject = builder.build();
+        S3StreamSetObject streamSetObject = builder.build();
 
         // Build stream objects
         List<S3StreamObject> streamObjects = request.getStreamObjects().stream().map(streamObject -> {
@@ -97,10 +97,10 @@ public class S3ObjectManager implements ObjectManager {
         }).toList();
 
         LOGGER.debug("Commit WAL object: {}, along with split stream objects: {}, compacted objects: {}",
-            walObject, streamObjects, request.getCompactedObjectIds());
+            streamSetObject, streamObjects, request.getCompactedObjectIds());
 
         // Build compacted objects
-        return metaService.commitWalObject(walObject, streamObjects, request.getCompactedObjectIds())
+        return metaService.commitStreamSetObject(streamSetObject, streamObjects, request.getCompactedObjectIds())
             .thenApply(resp -> new CommitStreamSetObjectResponse());
     }
 
@@ -117,7 +117,7 @@ public class S3ObjectManager implements ObjectManager {
 
         LOGGER.info("Commit stream object: {}, compacted objects: {}", object, request.getSourceObjectIds());
 
-        return metaService.commitStreamObject(object, request.getSourceObjectIds());
+        return metaService.compactStreamObject(object, request.getSourceObjectIds());
     }
 
     static class S3ObjectMetadataWrapper {
@@ -146,8 +146,8 @@ public class S3ObjectManager implements ObjectManager {
 
     @Override
     public CompletableFuture<List<S3ObjectMetadata>> getObjects(long streamId, long startOffset, long endOffset, int limit) {
-        CompletableFuture<Pair<List<S3StreamObject>, List<S3WALObject>>> cf = metaService.listObjects(streamId, startOffset, endOffset, limit);
-        // Retrieve S3ObjectMetadata from stream objects and wal objects
+        CompletableFuture<Pair<List<S3StreamObject>, List<S3StreamSetObject>>> cf = metaService.listObjects(streamId, startOffset, endOffset, limit);
+        // Retrieve S3ObjectMetadata from stream objects and StreamSet objects
         return cf.thenApply(pair -> {
             // Sort the streamObjects in ascending order of startOffset
             Queue<S3ObjectMetadataWrapper> streamObjects = pair.getLeft().stream()
@@ -158,8 +158,8 @@ public class S3ObjectManager implements ObjectManager {
                 })
                 .sorted((Comparator.comparingLong(S3ObjectMetadataWrapper::getStartOffset)))
                 .collect(Collectors.toCollection(LinkedList::new));
-            // Sort the walObjects in ascending order of startOffset
-            Queue<S3ObjectMetadataWrapper> walObjects = pair.getRight().stream()
+            // Sort the StreamSet objects in ascending order of startOffset
+            Queue<S3ObjectMetadataWrapper> streamSetObjects = pair.getRight().stream()
                 .map(obj -> {
                     long start = obj.getSubStreams().getSubStreamsMap().get(streamId).getStartOffset();
                     long end = obj.getSubStreams().getSubStreamsMap().get(streamId).getEndOffset();
@@ -173,13 +173,13 @@ public class S3ObjectManager implements ObjectManager {
             int need = limit;
             while (need > 0
                 && nextStartOffset < endOffset
-                && (!streamObjects.isEmpty() || !walObjects.isEmpty())) {
+                && (!streamObjects.isEmpty() || !streamSetObjects.isEmpty())) {
                 S3ObjectMetadataWrapper cur;
-                if (walObjects.isEmpty() || !streamObjects.isEmpty() && streamObjects.peek().getStartOffset() <= walObjects.peek().getStartOffset()) {
+                if (streamSetObjects.isEmpty() || !streamObjects.isEmpty() && streamObjects.peek().getStartOffset() <= streamSetObjects.peek().getStartOffset()) {
                     // Stream object has higher priority
                     cur = streamObjects.poll();
                 } else {
-                    cur = walObjects.poll();
+                    cur = streamSetObjects.poll();
                 }
                 // Skip the object if it is not in the range
                 if (null == cur || cur.getEndOffset() <= nextStartOffset) {
@@ -188,8 +188,8 @@ public class S3ObjectManager implements ObjectManager {
                 if (cur.getStartOffset() > nextStartOffset) {
                     // No object can be added, break the loop
                     // Consider we need [100, 300), but the first object is [200, 300), then we need to break the loop
-                    LOGGER.error("Found a hole in the returned S3Object list, streamId: {}, startOffset: {}, streamObjects: {}, walObjects: {}",
-                        streamId, startOffset, streamObjects, walObjects);
+                    LOGGER.error("Found a hole in the returned S3Object list, streamId: {}, startOffset: {}, streamObjects: {}, streamSetObject: {}",
+                        streamId, startOffset, streamObjects, streamSetObjects);
                     // Throw exception to trigger the retry
                     throw new RuntimeException("Found a hole in the returned S3Object list for current getObjects request");
                 }
@@ -205,9 +205,9 @@ public class S3ObjectManager implements ObjectManager {
 
     @Override
     public CompletableFuture<List<S3ObjectMetadata>> getServerObjects() {
-        CompletableFuture<List<S3WALObject>> walObjects = metaService.listWALObjects();
+        CompletableFuture<List<S3StreamSetObject>> streamSetObject = metaService.listStreamSetObjects();
         // Covert to the list of S3ObjectMetadata
-        return walObjects.thenApply(objects -> objects.stream().map(this::convertFrom).toList());
+        return streamSetObject.thenApply(objects -> objects.stream().map(this::convertFrom).toList());
     }
 
     @Override
@@ -223,7 +223,7 @@ public class S3ObjectManager implements ObjectManager {
             object.getCommittedTimestamp(), object.getObjectSize(), S3StreamConstant.INVALID_ORDER_ID);
     }
 
-    private S3ObjectMetadata convertFrom(S3WALObject object) {
+    private S3ObjectMetadata convertFrom(S3StreamSetObject object) {
         List<StreamOffsetRange> offsetRanges = object.getSubStreams().getSubStreamsMap().values()
             .stream()
             .map(subStream -> new StreamOffsetRange(subStream.getStreamId(), subStream.getStartOffset(), subStream.getEndOffset())).toList();

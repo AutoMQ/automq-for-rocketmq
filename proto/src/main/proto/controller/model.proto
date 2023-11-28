@@ -229,23 +229,23 @@ message S3StreamObject {
   int64 committed_timestamp = 7;
 }
 
-// Each broker WAL consists of a sequence of WAL objects.
-message S3WALObject {
+// Each StreamSet object contains a set of sub-streams from multiple streams.
+message S3StreamSetObject {
   // The broker that the WAL object belongs to.
   // Each WAL only owned by a fixed broker, although it may be shared or replicated to other brokers.
   int32 broker_id = 1;
   // The id of the S3 object.
   int64 object_id = 2;
-  // The sequence id of the WAL object.
+  // The sequence id of the StreamSet object.
   int64 sequence_id = 3;
-  // A rough base data timestamp of the WAL object.
+  // A rough base data timestamp of the StreamSet object.
   int64 base_data_timestamp = 4;
   // The committed timestamp in milliseconds of the object.
   int64 committed_timestamp = 5;
   // The size of the object.
   int64 object_size = 6;
 
-  // The data of the WAL object may contain multiple sub-streams.
+  // The data of the StreamSet object may contain multiple sub-streams.
   SubStreams sub_streams = 7;
 }
 

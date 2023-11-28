@@ -78,6 +78,6 @@
         <mapper resource="database/mapper/TopicMapper.xml" />
         <mapper resource="database/mapper/QueueAssignmentMapper.xml" />
         <mapper resource="database/mapper/S3StreamObjectMapper.xml" />
-        <mapper resource="database/mapper/S3WalObjectMapper.xml" />
+        <mapper resource="database/mapper/S3StreamSetObjectMapper.xml" />
     </mappers>
 </configuration>
