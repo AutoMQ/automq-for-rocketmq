@@ -16,9 +16,8 @@
 broker:
   replicaCount: 1
   conf:
-    clusterNameOverride: "automq"
     s3Stream:
-      s3WALPath: "/tmp/s3rocketmq/wal"
+      s3WALPath: "/root/logs/rocketmqlogs/s3rocketmq/wal"
       s3Endpoint: "http://s3-localstack:4566"
       s3Bucket: "ros"
       s3Region: "eu-west-2"
@@ -29,7 +28,7 @@ broker:
       refillPeriodMs: 100
 
     store:
-      kvPath: "/tmp/s3rocketmq/kvstore"
+      kvPath: "/root/logs/rocketmqlogs/s3rocketmq/kvstore"
     db:
       url: "jdbc:mysql://mysql:3306/metadata"
       userName: "root"
@@ -37,13 +36,3 @@ broker:
     controller:
       recycleS3IntervalInSecs: 360
       dumpHeapOnError: true
-    metrics:
-      exporterType: "OTLP_GRPC"
-      grpcExporterTarget: "http://10.129.63.127:4317"
-      grpcExporterHeader: ""
-      grpcExporterTimeOutInMills: 31000
-      periodicExporterIntervalInMills: 30000
-      promExporterPort: 5557
-      promExporterHost: "localhost"
-      labels: ""
-      exportInDelta: false
