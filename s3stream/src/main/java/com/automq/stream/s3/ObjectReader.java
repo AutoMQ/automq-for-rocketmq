@@ -17,7 +17,6 @@
 
 package com.automq.stream.s3;
 
-import com.automq.stream.s3.metrics.TimerUtil;
 import com.automq.stream.s3.network.ThrottleStrategy;
 import com.automq.stream.utils.CloseableIterator;
 import com.automq.stream.api.exceptions.ErrorCode;
@@ -37,7 +36,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.automq.stream.s3.ObjectWriter.Footer.FOOTER_SIZE;
