@@ -37,6 +37,17 @@ jobs:
           echo "version=${version}"
           ls versionlist/
           sh build-ci.sh ${DOCKER_REPO} ${version}
+      - name: Build and export
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          tags: ${DOCKER_REPO}:${version}
+          outputs: type=docker,dest=/tmp/automq-for-rocketmq.tar
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: automq-for-rocketmq
+          path: /tmp/automq-for-rocketmq.tar
       - uses: actions/upload-artifact@v3
         name: Upload distribution versionlist
         with:
@@ -63,6 +74,7 @@ jobs:
           a=(`ls versionlist`)
           printf '%s\n' "${a[@]}" | jq -R . | jq -s .
           echo version-json=`printf '%s\n' "${a[@]}" | jq -R . | jq -s .` >> $GITHUB_OUTPUT
+
   deploy:
     if: ${{ success() }}
     name: Deploy RocketMQ
@@ -88,6 +100,15 @@ jobs:
           NAMESPACE=${REPO_NAME}-${GITHUB_RUN_ID}-${JOB_INDEX}
           kubectl create namespace $NAMESPACE
           echo "namespace=$NAMESPACE" >> $GITHUB_OUTPUT
+      - name: Download artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: automq-for-rocketmq
+          path: /tmp
+      - name: Load image
+        run: |
+          docker load --input /tmp/automq-for-rocketmq.tar
+          docker image ls -a
       - name: Deploy RocketMQ
         working-directory: distribution/helm
         env:
