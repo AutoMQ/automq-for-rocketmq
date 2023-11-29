@@ -59,6 +59,7 @@ import apache.rocketmq.controller.v1.OpenStreamRequest;
 import apache.rocketmq.controller.v1.ReassignMessageQueueReply;
 import apache.rocketmq.controller.v1.ReassignMessageQueueRequest;
 import apache.rocketmq.controller.v1.StreamDescription;
+import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.TerminateNodeReply;
 import apache.rocketmq.controller.v1.TerminateNodeRequest;
 import apache.rocketmq.controller.v1.Topic;
@@ -665,7 +666,7 @@ public class GrpcControllerClient implements ControllerClient {
     }
 
     @Override
-    public CompletableFuture<OpenStreamReply> openStream(String target,
+    public CompletableFuture<StreamMetadata> openStream(String target,
         OpenStreamRequest request) {
         ControllerServiceGrpc.ControllerServiceFutureStub stub;
         try {
@@ -674,11 +675,16 @@ public class GrpcControllerClient implements ControllerClient {
             return CompletableFuture.failedFuture(e);
         }
 
-        CompletableFuture<OpenStreamReply> future = new CompletableFuture<>();
+        CompletableFuture<StreamMetadata> future = new CompletableFuture<>();
         Futures.addCallback(stub.openStream(request), new FutureCallback<>() {
             @Override
             public void onSuccess(OpenStreamReply result) {
-                future.complete(result);
+                if (result.getStatus().getCode() == Code.OK) {
+                    future.complete(result.getStreamMetadata());
+                } else {
+                    future.completeExceptionally(new ControllerException(result.getStatus().getCodeValue(),
+                        result.getStatus().getMessage()));
+                }
             }
 
             @Override

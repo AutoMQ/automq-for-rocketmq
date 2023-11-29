@@ -31,9 +31,9 @@ import apache.rocketmq.controller.v1.ListOpenStreamsReply;
 import apache.rocketmq.controller.v1.ListOpenStreamsRequest;
 import apache.rocketmq.controller.v1.ListTopicsReply;
 import apache.rocketmq.controller.v1.ListTopicsRequest;
-import apache.rocketmq.controller.v1.OpenStreamReply;
 import apache.rocketmq.controller.v1.OpenStreamRequest;
 import apache.rocketmq.controller.v1.StreamDescription;
+import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.TerminateNodeReply;
 import apache.rocketmq.controller.v1.TerminateNodeRequest;
 import apache.rocketmq.controller.v1.Topic;
@@ -78,7 +78,7 @@ public interface ControllerClient extends Closeable {
 
     CompletableFuture<Void> commitOffset(String target, long groupId, long topicId, int queueId, long offset);
 
-    CompletableFuture<OpenStreamReply> openStream(String target, OpenStreamRequest request);
+    CompletableFuture<StreamMetadata> openStream(String target, OpenStreamRequest request);
 
     CompletableFuture<CloseStreamReply> closeStream(String target, CloseStreamRequest request);
 
