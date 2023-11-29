@@ -10,7 +10,7 @@ env:
 
 jobs:
   docker:
-    runs-on: private-k3s
+    runs-on: ubuntu-latest
     if: always()
     timeout-minutes: 30
     strategy:
@@ -58,7 +58,7 @@ jobs:
     if: always()
     name: List version
     needs: [docker]
-    runs-on: private-k3s
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:
       version-json: ${{ steps.show_versions.outputs.version-json }}
