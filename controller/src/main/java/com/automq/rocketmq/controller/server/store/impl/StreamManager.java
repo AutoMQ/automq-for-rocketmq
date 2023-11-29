@@ -458,15 +458,7 @@ public class StreamManager {
                 ListOpenStreamsRequest request = ListOpenStreamsRequest.newBuilder()
                     .setBrokerId(nodeId)
                     .build();
-                return metadataStore.controllerClient()
-                    .listOpenStreams(leaderAddress.get(), request)
-                    .thenApply(reply -> {
-                        if (reply.getStatus().getCode() == Code.OK) {
-                            return reply.getStreamMetadataList();
-                        }
-                        throw new CompletionException(new ControllerException(reply.getStatus().getCode().getNumber(),
-                            reply.getStatus().getMessage()));
-                    });
+                return metadataStore.controllerClient().listOpenStreams(leaderAddress.get(), request);
             }
         }
         return future;

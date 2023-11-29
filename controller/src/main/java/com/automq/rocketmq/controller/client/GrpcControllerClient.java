@@ -84,6 +84,7 @@ import io.grpc.ManagedChannel;
 
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -726,7 +727,7 @@ public class GrpcControllerClient implements ControllerClient {
     }
 
     @Override
-    public CompletableFuture<ListOpenStreamsReply> listOpenStreams(String target, ListOpenStreamsRequest request) {
+    public CompletableFuture<List<StreamMetadata>> listOpenStreams(String target, ListOpenStreamsRequest request) {
         ControllerServiceGrpc.ControllerServiceFutureStub stub;
         try {
             stub = getOrCreateStubForTarget(target);
@@ -734,11 +735,16 @@ public class GrpcControllerClient implements ControllerClient {
             return CompletableFuture.failedFuture(e);
         }
 
-        CompletableFuture<ListOpenStreamsReply> future = new CompletableFuture<>();
+        CompletableFuture<List<StreamMetadata>> future = new CompletableFuture<>();
         Futures.addCallback(stub.listOpenStreams(request), new FutureCallback<>() {
             @Override
             public void onSuccess(ListOpenStreamsReply result) {
-                future.complete(result);
+                if (result.getStatus().getCode() == Code.OK) {
+                    future.complete(result.getStreamMetadataList());
+                } else {
+                    future.completeExceptionally(new ControllerException(result.getStatus().getCodeValue(),
+                        result.getStatus().getMessage()));
+                }
             }
 
             @Override

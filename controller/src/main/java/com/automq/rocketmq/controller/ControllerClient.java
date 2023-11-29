@@ -26,7 +26,6 @@ import apache.rocketmq.controller.v1.DescribeClusterRequest;
 import apache.rocketmq.controller.v1.DescribeStreamRequest;
 import apache.rocketmq.controller.v1.ListGroupReply;
 import apache.rocketmq.controller.v1.ListGroupRequest;
-import apache.rocketmq.controller.v1.ListOpenStreamsReply;
 import apache.rocketmq.controller.v1.ListOpenStreamsRequest;
 import apache.rocketmq.controller.v1.ListTopicsReply;
 import apache.rocketmq.controller.v1.ListTopicsRequest;
@@ -43,6 +42,7 @@ import com.automq.rocketmq.metadata.dao.Node;
 
 import io.grpc.stub.StreamObserver;
 import java.io.Closeable;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 public interface ControllerClient extends Closeable {
@@ -81,7 +81,7 @@ public interface ControllerClient extends Closeable {
 
     CompletableFuture<Void> closeStream(String target, CloseStreamRequest request);
 
-    CompletableFuture<ListOpenStreamsReply> listOpenStreams(String target, ListOpenStreamsRequest request);
+    CompletableFuture<List<StreamMetadata>> listOpenStreams(String target, ListOpenStreamsRequest request);
 
     CompletableFuture<StreamDescription> describeStream(String target, DescribeStreamRequest request);
 
