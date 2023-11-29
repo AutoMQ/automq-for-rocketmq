@@ -115,6 +115,8 @@ jobs:
         run: |
           docker load --input /tmp/automq-for-rocketmq.tar
           docker image ls -a
+          docker login
+          docker push ${{ env.DOCKER_REPO }}:${{ matrix.version }}
       - name: Deploy RocketMQ
         working-directory: distribution/helm
         env:
