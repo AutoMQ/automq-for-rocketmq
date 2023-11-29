@@ -51,11 +51,9 @@ jobs:
           sh build-ci.sh ${DOCKER_REPO} ${VERSION}
           
           docker tag ${DOCKER_REPO}:${VERSION} ${DOCKER_REPO}:${NIGHT_VERSION}
-          docker tag ${DOCKER_REPO}:${VERSION} ${DOCKER_REPO}:latest
           
           docker push ${DOCKER_REPO}:${NIGHT_VERSION}
           docker push ${DOCKER_REPO}:${VERSION}
-          docker push ${DOCKER_REPO}:latest
           
           echo "nightly-version=$NIGHT_VERSION" >> $GITHUB_OUTPUT
 
