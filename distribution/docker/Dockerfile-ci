@@ -52,3 +52,5 @@ RUN chmod a+x ${ROCKETMQ_HOME}/bin/run-server.sh
 RUN export JAVA_OPT=" -Duser.home=/opt"
 
 WORKDIR ${ROCKETMQ_HOME}/bin
+
+CMD ["./start-broker.sh"]

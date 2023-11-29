@@ -22,6 +22,6 @@ cd "$REPO_DIR" || exit 1
 mvn package -Dmaven.test.skip=true
 cp distribution/target/automq-for-rocketmq.tar.gz "$SCRIPT_DIR"
 cd "$SCRIPT_DIR" || exit 1
-docker build -t automq-for-rocketmq:0.0.1 -f Dockerfile .
+docker build -t automqinc/automq-for-rocketmq:v0.0.3-alpha -f Dockerfile .
 
 
