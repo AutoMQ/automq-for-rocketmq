@@ -39,10 +39,12 @@ jobs:
           echo "version=${version}" >> $GITHUB_OUTPUT
           ls versionlist/
           sh build-ci.sh ${DOCKER_REPO} ${version}
+          rm Dockerfile
+          mv Dockerfile-ci Dockerfile
       - name: Docker export
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./distribution/docker
           tags: ${{ env.DOCKER_REPO }}:${{ steps.build-images.outputs.version }}
           outputs: type=docker,dest=/tmp/automq-for-rocketmq.tar
       - name: Upload artifact
