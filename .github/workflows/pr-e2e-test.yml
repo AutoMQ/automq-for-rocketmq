@@ -37,8 +37,11 @@ jobs:
           echo "version=${version}"
           ls versionlist/
           sh build-ci.sh ${DOCKER_REPO} ${version}
-      - name: Build and export
+      - name: Docker export
         uses: docker/build-push-action@v5
+        env:
+          DOCKER_REPO: ${{ env.DOCKER_REPO }}
+          version: ${{ steps.build-images.outputs.version }}
         with:
           context: .
           tags: ${DOCKER_REPO}:${version}
