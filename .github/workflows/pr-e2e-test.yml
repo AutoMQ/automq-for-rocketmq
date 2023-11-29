@@ -34,17 +34,14 @@ jobs:
           commit_version=$(git rev-parse --short HEAD)
           version=${full_node_version}-${commit_version}
           touch versionlist/"${version}"
-          echo "version=${version}"
+          echo "version=${version}" >> $GITHUB_OUTPUT
           ls versionlist/
           sh build-ci.sh ${DOCKER_REPO} ${version}
       - name: Docker export
         uses: docker/build-push-action@v5
-        env:
-          DOCKER_REPO: ${{ env.DOCKER_REPO }}
-          version: ${{ steps.build-images.outputs.version }}
         with:
           context: .
-          tags: ${DOCKER_REPO}:${version}
+          tags: ${{ env.DOCKER_REPO }}:${{ steps.build-images.outputs.version }}
           outputs: type=docker,dest=/tmp/automq-for-rocketmq.tar
       - name: Upload artifact
         uses: actions/upload-artifact@v3
