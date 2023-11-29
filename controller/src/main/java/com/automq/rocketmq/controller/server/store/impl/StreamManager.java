@@ -25,6 +25,7 @@ import apache.rocketmq.controller.v1.GroupStatus;
 import apache.rocketmq.controller.v1.ListOpenStreamsRequest;
 import apache.rocketmq.controller.v1.OpenStreamRequest;
 import apache.rocketmq.controller.v1.Status;
+import apache.rocketmq.controller.v1.StreamDescription;
 import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.StreamState;
@@ -527,15 +528,18 @@ public class StreamManager {
                     if (endOffset.isPresent()) {
                         streamBuilder.setEndOffset(endOffset.getAsLong());
                     }
-                    builder.setStream(streamBuilder);
 
-                    builder.addAllRanges(ranges.stream().map(r -> apache.rocketmq.controller.v1.Range.newBuilder()
-                        .setStreamId(r.getStreamId())
-                        .setStartOffset(r.getStartOffset())
-                        .setEndOffset(r.getEndOffset())
-                        .setBrokerId(r.getNodeId())
-                        .setEpoch(r.getEpoch())
-                        .build()).collect(Collectors.toList()));
+                    StreamDescription streamDescription = StreamDescription.newBuilder()
+                        .setStream(streamBuilder)
+                        .addAllRanges(ranges.stream().map(r -> apache.rocketmq.controller.v1.Range.newBuilder()
+                            .setStreamId(r.getStreamId())
+                            .setStartOffset(r.getStartOffset())
+                            .setEndOffset(r.getEndOffset())
+                            .setBrokerId(r.getNodeId())
+                            .setEpoch(r.getEpoch())
+                            .build()).collect(Collectors.toList()))
+                        .build();
+                    builder.setDescription(streamDescription);
                     return builder.build();
                 } else {
                     return DescribeStreamReply.newBuilder()
