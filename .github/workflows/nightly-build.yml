@@ -13,7 +13,7 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-    if: always()
+    if: github.repository == 'AutoMQ/automq-for-rocketmq'
     timeout-minutes: 30
     outputs:
       version-json: ${{ steps.build_images.outputs.nightly-version }}
@@ -46,10 +46,16 @@ jobs:
         run: |
           FULL_NODE_VERSION=$(git ls-remote --tags | awk -F '/' 'END{print $3}')
           COMMIT_VERSION=$(git rev-parse --short HEAD)
-          VERSION=${FULL_NODE_VERSION}-${COMMIT_VERSION}-${DOCKER_NIGHTLY_VERSION}
+          NIGHT_VERSION=${FULL_NODE_VERSION}-${COMMIT_VERSION}-${DOCKER_NIGHTLY_VERSION}
+          VERSION=${FULL_NODE_VERSION}
           sh build-ci.sh ${DOCKER_REPO} ${VERSION}
+          
+          docker tag ${DOCKER_REPO}:${VERSION} ${DOCKER_REPO}:${NIGHT_VERSION}
+          
+          docker push ${DOCKER_REPO}:${NIGHT_VERSION}
           docker push ${DOCKER_REPO}:${VERSION}
-          echo "nightly-version=$VERSION" >> $GITHUB_OUTPUT
+          
+          echo "nightly-version=$NIGHT_VERSION" >> $GITHUB_OUTPUT
 
   deploy:
     if: ${{ success() }}
