@@ -1,13 +1,5 @@
 name: E2E test for pull request
 
-# read-write repo token
-# access to secrets
-#on:
-#  workflow_run:
-#    workflows: ["BUILD-CI"]
-#    types:
-#      - completed
-#    branches: ['**']
 on:
   workflow_call:
 
@@ -18,11 +10,8 @@ env:
 
 jobs:
   docker:
-    runs-on: ubuntu-latest
+    runs-on: private-k3s
     if: always()
-#    if: >
-#      github.event.workflow_run.event == 'pull_request' &&
-#      github.event.workflow_run.conclusion == 'success'
     timeout-minutes: 30
     strategy:
       matrix:
@@ -36,12 +25,6 @@ jobs:
         with:
           name: rocketmq
           path: ${{github.workspace}}/distribution/target
-      - name: docker-login
-        uses: docker/login-action@v2
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ secrets.DOCKERHUB_USER }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build and save docker images
         id: build-images
         working-directory: ./distribution/docker
@@ -54,7 +37,6 @@ jobs:
           echo "version=${version}"
           ls versionlist/
           sh build-ci.sh ${DOCKER_REPO} ${version}
-          docker push ${DOCKER_REPO}:${version}
       - uses: actions/upload-artifact@v3
         name: Upload distribution versionlist
         with:
@@ -97,12 +79,6 @@ jobs:
         uses: actions/checkout@v3
         with:
           submodules: true
-      - name: Get kubeconfig
-        env:
-          KUBECONFIG_FILE: '${{ secrets.KUBE_CONFIG }}'
-        run: |
-          mkdir -p ~/.kube
-          echo $KUBECONFIG_FILE | base64 -d > ~/.kube/config
       - name: Create Namespace
         id: create_namespace
         env:
@@ -160,12 +136,6 @@ jobs:
           annotate_only: true
           include_passed: true
           detailed_summary: true
-      - uses: actions/upload-artifact@v3
-        if: always()
-        name: Upload test log
-        with:
-          name: test-e2e-grpc-java-log.txt
-          path: testlog.txt
 
   test-e2e-remoting-java:
     if: ${{ success() }}
@@ -212,12 +182,6 @@ jobs:
           annotate_only: true
           include_passed: true
           detailed_summary: true
-      - uses: actions/upload-artifact@v3
-        if: always()
-        name: Upload test log
-        with:
-          name: test-e2e-remoting-java-log.txt
-          path: testlog.txt
 
   clean:
     if: always()
@@ -229,17 +193,10 @@ jobs:
       matrix:
         version: ${{ fromJSON(needs.list-version.outputs.version-json) }}
     steps:
-      - uses: apache/rocketmq-test-tool@7d84d276ad7755b1dc5cf9657a7a9bff6ae6d288
-        name: clean
-        with:
-          action: "clean"
-          ask-config: "${{ secrets.KUBE_CONFIG }}"
-          test-version: "${{ matrix.version }}"
-          job-id: ${{ strategy.job-index }}
-      - name: clean Rocketmq
+      - name: clean deployment
         working-directory: distribution/helm
         env:
           NAMESPACE: ${{ needs.deploy.outputs.namespace }}
-          DOCKER_REPO: ${{ env.DOCKER_REPO }}
         run: |
           sh clean-ci.sh ${NAMESPACE}
+          kubectl delete namespace $NAMESPACE
