@@ -80,6 +80,17 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
+                <groupId>org.apache.rocketmq</groupId>
+                <artifactId>rocketmq-client-java-noshade</artifactId>
+                <version>5.0.5</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>io.opentelemetry</groupId>
+                        <artifactId>*</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <dependency>
                 <groupId>io.grpc</groupId>
                 <artifactId>grpc-bom</artifactId>
                 <version>${grpc.version}</version>
