@@ -42,7 +42,7 @@ services:
       - rocketmq_net
 
   broker-1:
-    image: "automq-for-rocketmq:0.0.1"
+    image: "automqinc/automq-for-rocketmq:v0.0.3-alpha"
     # https://docs.docker.com/compose/compose-file/05-services/#entrypoint
     environment:
       - ROCKETMQ_NODE_NAME=broker-1
@@ -65,7 +65,7 @@ services:
       rocketmq_net:
         ipv4_address: 11.6.0.3
   broker-2:
-    image: "automq-for-rocketmq:0.0.1"
+    image: "automqinc/automq-for-rocketmq:v0.0.3-alpha"
     # https://docs.docker.com/compose/compose-file/05-services/#entrypoint
     environment:
       - ROCKETMQ_NODE_NAME=broker-2
