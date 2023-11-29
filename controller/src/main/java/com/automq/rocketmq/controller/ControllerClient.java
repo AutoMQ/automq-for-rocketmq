@@ -20,7 +20,6 @@ package com.automq.rocketmq.controller;
 import apache.rocketmq.controller.v1.CloseStreamRequest;
 import apache.rocketmq.controller.v1.Cluster;
 import apache.rocketmq.controller.v1.ConsumerGroup;
-import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.DescribeClusterRequest;
 import apache.rocketmq.controller.v1.DescribeStreamRequest;
@@ -65,7 +64,7 @@ public interface ControllerClient extends Closeable {
 
     CompletableFuture<Void> notifyQueueClose(String target, long topicId, int queueId);
 
-    CompletableFuture<CreateGroupReply> createGroup(String target, CreateGroupRequest request);
+    CompletableFuture<Long> createGroup(String target, CreateGroupRequest request);
 
     CompletableFuture<ConsumerGroup> describeGroup(String target, String groupName);
 

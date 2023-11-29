@@ -23,7 +23,6 @@ import apache.rocketmq.controller.v1.CloseStreamRequest;
 import apache.rocketmq.common.v1.Code;
 import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.ControllerServiceGrpc;
-import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.CreateTopicReply;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
@@ -446,9 +445,8 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
                 String target = String.format("localhost:%d", port);
 
-                CreateGroupReply reply = client.createGroup(target, request).get();
-                Assertions.assertEquals(reply.getStatus().getCode(), Code.OK);
-                Assertions.assertTrue(reply.getGroupId() > 0);
+                long groupId = client.createGroup(target, request).get();
+                Assertions.assertTrue(groupId > 0);
 
                 // Test duplication
                 client.createGroup(target, request).whenComplete(
@@ -913,7 +911,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testCloseStream_NotFound() throws IOException, ExecutionException, InterruptedException {
+    public void testCloseStream_NotFound() throws IOException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
 
         long topicId = 1;

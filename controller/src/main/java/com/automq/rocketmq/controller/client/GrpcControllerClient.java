@@ -472,7 +472,7 @@ public class GrpcControllerClient implements ControllerClient {
     }
 
     @Override
-    public CompletableFuture<CreateGroupReply> createGroup(String target, CreateGroupRequest request) {
+    public CompletableFuture<Long> createGroup(String target, CreateGroupRequest request) {
         ControllerServiceGrpc.ControllerServiceFutureStub stub;
         try {
             stub = getOrCreateStubForTarget(target);
@@ -480,12 +480,12 @@ public class GrpcControllerClient implements ControllerClient {
             return CompletableFuture.failedFuture(e);
         }
 
-        CompletableFuture<CreateGroupReply> future = new CompletableFuture<>();
+        CompletableFuture<Long> future = new CompletableFuture<>();
         Futures.addCallback(stub.createGroup(request), new FutureCallback<>() {
             @Override
             public void onSuccess(CreateGroupReply result) {
                 switch (result.getStatus().getCode()) {
-                    case OK -> future.complete(result);
+                    case OK -> future.complete(result.getGroupId());
                     case DUPLICATED -> {
                         LOGGER.info("Group name {} has been taken", request.getName());
                         ControllerException e = new ControllerException(result.getStatus().getCodeValue(),
