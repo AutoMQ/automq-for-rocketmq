@@ -17,23 +17,20 @@
 
 package com.automq.rocketmq.controller;
 
-import apache.rocketmq.controller.v1.CloseStreamReply;
 import apache.rocketmq.controller.v1.CloseStreamRequest;
 import apache.rocketmq.controller.v1.Cluster;
 import apache.rocketmq.controller.v1.ConsumerGroup;
-import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.DescribeClusterRequest;
-import apache.rocketmq.controller.v1.DescribeStreamReply;
 import apache.rocketmq.controller.v1.DescribeStreamRequest;
 import apache.rocketmq.controller.v1.ListGroupReply;
 import apache.rocketmq.controller.v1.ListGroupRequest;
-import apache.rocketmq.controller.v1.ListOpenStreamsReply;
 import apache.rocketmq.controller.v1.ListOpenStreamsRequest;
 import apache.rocketmq.controller.v1.ListTopicsReply;
 import apache.rocketmq.controller.v1.ListTopicsRequest;
-import apache.rocketmq.controller.v1.OpenStreamReply;
 import apache.rocketmq.controller.v1.OpenStreamRequest;
+import apache.rocketmq.controller.v1.StreamDescription;
+import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.TerminateNodeReply;
 import apache.rocketmq.controller.v1.TerminateNodeRequest;
 import apache.rocketmq.controller.v1.Topic;
@@ -44,6 +41,7 @@ import com.automq.rocketmq.metadata.dao.Node;
 
 import io.grpc.stub.StreamObserver;
 import java.io.Closeable;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 public interface ControllerClient extends Closeable {
@@ -66,7 +64,7 @@ public interface ControllerClient extends Closeable {
 
     CompletableFuture<Void> notifyQueueClose(String target, long topicId, int queueId);
 
-    CompletableFuture<CreateGroupReply> createGroup(String target, CreateGroupRequest request);
+    CompletableFuture<Long> createGroup(String target, CreateGroupRequest request);
 
     CompletableFuture<ConsumerGroup> describeGroup(String target, String groupName);
 
@@ -78,13 +76,13 @@ public interface ControllerClient extends Closeable {
 
     CompletableFuture<Void> commitOffset(String target, long groupId, long topicId, int queueId, long offset);
 
-    CompletableFuture<OpenStreamReply> openStream(String target, OpenStreamRequest request);
+    CompletableFuture<StreamMetadata> openStream(String target, OpenStreamRequest request);
 
-    CompletableFuture<CloseStreamReply> closeStream(String target, CloseStreamRequest request);
+    CompletableFuture<Void> closeStream(String target, CloseStreamRequest request);
 
-    CompletableFuture<ListOpenStreamsReply> listOpenStreams(String target, ListOpenStreamsRequest request);
+    CompletableFuture<List<StreamMetadata>> listOpenStreams(String target, ListOpenStreamsRequest request);
 
-    CompletableFuture<DescribeStreamReply> describeStream(String target, DescribeStreamRequest request);
+    CompletableFuture<StreamDescription> describeStream(String target, DescribeStreamRequest request);
 
     CompletableFuture<Topic> updateTopic(String target, UpdateTopicRequest request);
 

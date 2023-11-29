@@ -411,10 +411,14 @@ message DescribeStreamRequest {
   int64 stream_id = 2;
 }
 
+message StreamDescription {
+  StreamMetadata stream = 1;
+  repeated Range ranges = 2;
+}
+
 message DescribeStreamReply {
   Status status = 1;
-  StreamMetadata stream = 2;
-  repeated Range ranges = 3;
+  StreamDescription description = 2;
 }
 
 service ControllerService {

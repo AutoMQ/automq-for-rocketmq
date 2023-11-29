@@ -58,6 +58,8 @@ import apache.rocketmq.controller.v1.OpenStreamReply;
 import apache.rocketmq.controller.v1.OpenStreamRequest;
 import apache.rocketmq.controller.v1.ReassignMessageQueueReply;
 import apache.rocketmq.controller.v1.ReassignMessageQueueRequest;
+import apache.rocketmq.controller.v1.StreamDescription;
+import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.TerminateNodeReply;
 import apache.rocketmq.controller.v1.TerminateNodeRequest;
 import apache.rocketmq.controller.v1.Topic;
@@ -82,6 +84,7 @@ import io.grpc.ManagedChannel;
 
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -469,7 +472,7 @@ public class GrpcControllerClient implements ControllerClient {
     }
 
     @Override
-    public CompletableFuture<CreateGroupReply> createGroup(String target, CreateGroupRequest request) {
+    public CompletableFuture<Long> createGroup(String target, CreateGroupRequest request) {
         ControllerServiceGrpc.ControllerServiceFutureStub stub;
         try {
             stub = getOrCreateStubForTarget(target);
@@ -477,12 +480,12 @@ public class GrpcControllerClient implements ControllerClient {
             return CompletableFuture.failedFuture(e);
         }
 
-        CompletableFuture<CreateGroupReply> future = new CompletableFuture<>();
+        CompletableFuture<Long> future = new CompletableFuture<>();
         Futures.addCallback(stub.createGroup(request), new FutureCallback<>() {
             @Override
             public void onSuccess(CreateGroupReply result) {
                 switch (result.getStatus().getCode()) {
-                    case OK -> future.complete(result);
+                    case OK -> future.complete(result.getGroupId());
                     case DUPLICATED -> {
                         LOGGER.info("Group name {} has been taken", request.getName());
                         ControllerException e = new ControllerException(result.getStatus().getCodeValue(),
@@ -664,7 +667,7 @@ public class GrpcControllerClient implements ControllerClient {
     }
 
     @Override
-    public CompletableFuture<OpenStreamReply> openStream(String target,
+    public CompletableFuture<StreamMetadata> openStream(String target,
         OpenStreamRequest request) {
         ControllerServiceGrpc.ControllerServiceFutureStub stub;
         try {
@@ -673,11 +676,16 @@ public class GrpcControllerClient implements ControllerClient {
             return CompletableFuture.failedFuture(e);
         }
 
-        CompletableFuture<OpenStreamReply> future = new CompletableFuture<>();
+        CompletableFuture<StreamMetadata> future = new CompletableFuture<>();
         Futures.addCallback(stub.openStream(request), new FutureCallback<>() {
             @Override
             public void onSuccess(OpenStreamReply result) {
-                future.complete(result);
+                if (result.getStatus().getCode() == Code.OK) {
+                    future.complete(result.getStreamMetadata());
+                } else {
+                    future.completeExceptionally(new ControllerException(result.getStatus().getCodeValue(),
+                        result.getStatus().getMessage()));
+                }
             }
 
             @Override
@@ -690,7 +698,7 @@ public class GrpcControllerClient implements ControllerClient {
     }
 
     @Override
-    public CompletableFuture<CloseStreamReply> closeStream(String target,
+    public CompletableFuture<Void> closeStream(String target,
         CloseStreamRequest request) {
         ControllerServiceGrpc.ControllerServiceFutureStub stub;
         try {
@@ -698,11 +706,16 @@ public class GrpcControllerClient implements ControllerClient {
         } catch (ControllerException e) {
             return CompletableFuture.failedFuture(e);
         }
-        CompletableFuture<CloseStreamReply> future = new CompletableFuture<>();
+        CompletableFuture<Void> future = new CompletableFuture<>();
         Futures.addCallback(stub.closeStream(request), new FutureCallback<>() {
             @Override
             public void onSuccess(CloseStreamReply result) {
-                future.complete(result);
+                if (result.getStatus().getCode() == Code.OK) {
+                    future.complete(null);
+                } else {
+                    future.completeExceptionally(new ControllerException(result.getStatus().getCodeValue(),
+                        result.getStatus().getMessage()));
+                }
             }
 
             @Override
@@ -714,7 +727,7 @@ public class GrpcControllerClient implements ControllerClient {
     }
 
     @Override
-    public CompletableFuture<ListOpenStreamsReply> listOpenStreams(String target, ListOpenStreamsRequest request) {
+    public CompletableFuture<List<StreamMetadata>> listOpenStreams(String target, ListOpenStreamsRequest request) {
         ControllerServiceGrpc.ControllerServiceFutureStub stub;
         try {
             stub = getOrCreateStubForTarget(target);
@@ -722,11 +735,16 @@ public class GrpcControllerClient implements ControllerClient {
             return CompletableFuture.failedFuture(e);
         }
 
-        CompletableFuture<ListOpenStreamsReply> future = new CompletableFuture<>();
+        CompletableFuture<List<StreamMetadata>> future = new CompletableFuture<>();
         Futures.addCallback(stub.listOpenStreams(request), new FutureCallback<>() {
             @Override
             public void onSuccess(ListOpenStreamsReply result) {
-                future.complete(result);
+                if (result.getStatus().getCode() == Code.OK) {
+                    future.complete(result.getStreamMetadataList());
+                } else {
+                    future.completeExceptionally(new ControllerException(result.getStatus().getCodeValue(),
+                        result.getStatus().getMessage()));
+                }
             }
 
             @Override
@@ -738,18 +756,23 @@ public class GrpcControllerClient implements ControllerClient {
     }
 
     @Override
-    public CompletableFuture<DescribeStreamReply> describeStream(String target, DescribeStreamRequest request) {
+    public CompletableFuture<StreamDescription> describeStream(String target, DescribeStreamRequest request) {
         ControllerServiceGrpc.ControllerServiceFutureStub stub;
         try {
             stub = getOrCreateStubForTarget(target);
         } catch (ControllerException e) {
             return CompletableFuture.failedFuture(e);
         }
-        CompletableFuture<DescribeStreamReply> future = new CompletableFuture<>();
+        CompletableFuture<StreamDescription> future = new CompletableFuture<>();
         Futures.addCallback(stub.describeStream(request), new FutureCallback<>() {
             @Override
             public void onSuccess(DescribeStreamReply result) {
-                future.complete(result);
+                if (result.getStatus().getCode() == Code.OK) {
+                    future.complete(result.getDescription());
+                } else {
+                    future.completeExceptionally(new ControllerException(result.getStatus().getCodeValue(),
+                        result.getStatus().getMessage()));
+                }
             }
 
             @Override

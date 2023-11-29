@@ -18,7 +18,6 @@
 package com.automq.rocketmq.cli.consumer;
 
 import apache.rocketmq.common.v1.Code;
-import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.GroupType;
 import apache.rocketmq.controller.v1.SubscriptionMode;
@@ -181,7 +180,7 @@ public class ConsumeMessage implements Callable<Void> {
             .setSubMode(SubscriptionMode.SUB_MODE_POP)
             .build();
 
-        CompletableFuture<CreateGroupReply> groupCf = client.createGroup(mqAdmin.getEndpoint(), request);
+        CompletableFuture<Long> groupCf = client.createGroup(mqAdmin.getEndpoint(), request);
         groupCf = groupCf.exceptionally(throwable -> {
             Throwable t = CliUtils.getRealException(throwable);
             if (t instanceof ControllerException controllerException) {

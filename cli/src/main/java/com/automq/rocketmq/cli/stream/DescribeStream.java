@@ -17,9 +17,8 @@
 
 package com.automq.rocketmq.cli.stream;
 
-import apache.rocketmq.common.v1.Code;
-import apache.rocketmq.controller.v1.DescribeStreamReply;
 import apache.rocketmq.controller.v1.DescribeStreamRequest;
+import apache.rocketmq.controller.v1.StreamDescription;
 import com.automq.rocketmq.cli.CliClientConfig;
 import com.automq.rocketmq.cli.ConsoleHelper;
 import com.automq.rocketmq.cli.MQAdmin;
@@ -43,12 +42,8 @@ public class DescribeStream implements Callable<Void> {
             DescribeStreamRequest request = DescribeStreamRequest.newBuilder()
                 .setStreamId(streamId)
                 .build();
-            DescribeStreamReply reply = client.describeStream(mqAdmin.getEndpoint(), request).join();
-            if (reply.getStatus().getCode() == Code.OK) {
-                ConsoleHelper.printStream(reply.getStream(), reply.getRangesList());
-            } else {
-                System.err.println(reply.getStatus().getMessage());
-            }
+            StreamDescription description = client.describeStream(mqAdmin.getEndpoint(), request).join();
+            ConsoleHelper.printStream(description.getStream(), description.getRangesList());
         }
         return null;
     }

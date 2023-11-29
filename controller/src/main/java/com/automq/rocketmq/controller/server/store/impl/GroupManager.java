@@ -118,16 +118,7 @@ public class GroupManager {
                 if (leaderAddress.isEmpty()) {
                     return CompletableFuture.failedFuture(new ControllerException(Code.NO_LEADER_VALUE, "No leader is elected yet"));
                 }
-                return metadataStore.controllerClient()
-                    .createGroup(leaderAddress.get(), request)
-                    .thenApply(reply -> {
-                        if (reply.getStatus().getCode() == Code.OK) {
-                            return reply.getGroupId();
-                        } else {
-                            throw new CompletionException(new ControllerException(reply.getStatus().getCode().getNumber(),
-                                reply.getStatus().getMessage()));
-                        }
-                    });
+                return metadataStore.controllerClient().createGroup(leaderAddress.get(), request);
             }
         }
     }

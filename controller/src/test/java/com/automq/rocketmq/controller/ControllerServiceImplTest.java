@@ -19,12 +19,10 @@ package com.automq.rocketmq.controller;
 
 import apache.rocketmq.controller.v1.AcceptTypes;
 import apache.rocketmq.controller.v1.AssignmentStatus;
-import apache.rocketmq.controller.v1.CloseStreamReply;
 import apache.rocketmq.controller.v1.CloseStreamRequest;
 import apache.rocketmq.common.v1.Code;
 import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.ControllerServiceGrpc;
-import apache.rocketmq.controller.v1.CreateGroupReply;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.CreateTopicReply;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
@@ -40,7 +38,6 @@ import apache.rocketmq.controller.v1.ListTopicsRequest;
 import apache.rocketmq.controller.v1.MessageType;
 import apache.rocketmq.controller.v1.NodeRegistrationReply;
 import apache.rocketmq.controller.v1.NodeRegistrationRequest;
-import apache.rocketmq.controller.v1.OpenStreamReply;
 import apache.rocketmq.controller.v1.OpenStreamRequest;
 import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.StreamRole;
@@ -448,9 +445,8 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
 
                 String target = String.format("localhost:%d", port);
 
-                CreateGroupReply reply = client.createGroup(target, request).get();
-                Assertions.assertEquals(reply.getStatus().getCode(), Code.OK);
-                Assertions.assertTrue(reply.getGroupId() > 0);
+                long groupId = client.createGroup(target, request).get();
+                Assertions.assertTrue(groupId > 0);
 
                 // Test duplication
                 client.createGroup(target, request).whenComplete(
@@ -716,7 +712,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testOpenStream_NotFound() throws IOException, ExecutionException, InterruptedException {
+    public void testOpenStream_NotFound() throws IOException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
 
         long topicId = 1;
@@ -769,14 +765,18 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                     .setStreamEpoch(1)
                     .setBrokerEpoch(1)
                     .build();
-                OpenStreamReply reply = client.openStream(String.format("localhost:%d", port), request).get();
-                Assertions.assertEquals(Code.NOT_FOUND, reply.getStatus().getCode());
+                try {
+                    client.openStream(String.format("localhost:%d", port), request).get();
+                } catch (ExecutionException e) {
+                    ControllerException cause = (ControllerException) e.getCause();
+                    Assertions.assertEquals(Code.NOT_FOUND_VALUE, cause.getErrorCode());
+                }
             }
         }
     }
 
     @Test
-    public void testOpenStream_Fenced() throws IOException, ExecutionException, InterruptedException {
+    public void testOpenStream_Fenced() throws IOException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
 
         long topicId = 1;
@@ -829,8 +829,12 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                     .setStreamEpoch(0)
                     .setBrokerId(2)
                     .build();
-                OpenStreamReply reply = client.openStream(String.format("localhost:%d", port), request).get();
-                Assertions.assertEquals(Code.FENCED, reply.getStatus().getCode());
+                try {
+                    client.openStream(String.format("localhost:%d", port), request).get();
+                } catch (ExecutionException e) {
+                    ControllerException cause = (ControllerException) e.getCause();
+                    Assertions.assertEquals(Code.FENCED_VALUE, cause.getErrorCode());
+                }
             }
         }
     }
@@ -907,7 +911,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testCloseStream_NotFound() throws IOException, ExecutionException, InterruptedException {
+    public void testCloseStream_NotFound() throws IOException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
 
         long topicId = 1;
@@ -961,8 +965,12 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                     .setStreamEpoch(1)
                     .setBrokerEpoch(1)
                     .build();
-                CloseStreamReply reply = client.closeStream(String.format("localhost:%d", port), request).get();
-                Assertions.assertEquals(Code.NOT_FOUND, reply.getStatus().getCode());
+                try {
+                    client.closeStream(String.format("localhost:%d", port), request).get();
+                } catch (ExecutionException e) {
+                    ControllerException cause = (ControllerException) e.getCause();
+                    Assertions.assertEquals(Code.NOT_FOUND_VALUE, cause.getErrorCode());
+                }
             }
         }
     }
@@ -1010,7 +1018,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
     }
 
     @Test
-    public void testCreateTopic_OpenStream_CloseStream() throws IOException, ExecutionException, InterruptedException, ControllerException {
+    public void testCreateTopic_OpenStream_CloseStream() throws IOException, ExecutionException, InterruptedException {
         ControllerClient controllerClient = Mockito.mock(ControllerClient.class);
 
         long streamId;
@@ -1068,8 +1076,7 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                     .setBrokerId(nodeId)
                     .build();
 
-                OpenStreamReply reply = client.openStream(String.format("localhost:%d", port), request).get();
-                StreamMetadata openStream = reply.getStreamMetadata();
+                StreamMetadata openStream = client.openStream(String.format("localhost:%d", port), request).get();
                 Assertions.assertEquals(0, openStream.getStartOffset());
                 Assertions.assertEquals(metadata.getEpoch() + 1, openStream.getEpoch());
                 Assertions.assertEquals(0, openStream.getRangeId());

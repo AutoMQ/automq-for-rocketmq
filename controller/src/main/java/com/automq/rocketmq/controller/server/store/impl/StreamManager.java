@@ -25,6 +25,7 @@ import apache.rocketmq.controller.v1.GroupStatus;
 import apache.rocketmq.controller.v1.ListOpenStreamsRequest;
 import apache.rocketmq.controller.v1.OpenStreamRequest;
 import apache.rocketmq.controller.v1.Status;
+import apache.rocketmq.controller.v1.StreamDescription;
 import apache.rocketmq.controller.v1.StreamMetadata;
 import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.StreamState;
@@ -333,15 +334,7 @@ public class StreamManager {
                     .setStreamEpoch(epoch)
                     .setBrokerId(nodeId)
                     .build();
-                return metadataStore.controllerClient()
-                    .openStream(leaderAddress.get(), request)
-                    .thenApply(reply -> {
-                        if (reply.getStatus().getCode() == Code.OK) {
-                            return reply.getStreamMetadata();
-                        }
-                        throw new CompletionException(new ControllerException(reply.getStatus().getCode().getNumber(),
-                            reply.getStatus().getMessage()));
-                    });
+                return metadataStore.controllerClient().openStream(leaderAddress.get(), request);
             }
         }
     }
@@ -419,15 +412,7 @@ public class StreamManager {
                     .setStreamEpoch(streamEpoch)
                     .setBrokerId(nodeId)
                     .build();
-                return metadataStore.controllerClient()
-                    .closeStream(leaderAddress.get(), request)
-                    .thenApply(reply -> {
-                        if (reply.getStatus().getCode() == Code.OK) {
-                            return null;
-                        }
-                        throw new CompletionException(new ControllerException(reply.getStatus().getCode().getNumber(),
-                            reply.getStatus().getMessage()));
-                    });
+                return metadataStore.controllerClient().closeStream(leaderAddress.get(), request);
             }
         }
         return future;
@@ -473,15 +458,7 @@ public class StreamManager {
                 ListOpenStreamsRequest request = ListOpenStreamsRequest.newBuilder()
                     .setBrokerId(nodeId)
                     .build();
-                return metadataStore.controllerClient()
-                    .listOpenStreams(leaderAddress.get(), request)
-                    .thenApply(reply -> {
-                        if (reply.getStatus().getCode() == Code.OK) {
-                            return reply.getStreamMetadataList();
-                        }
-                        throw new CompletionException(new ControllerException(reply.getStatus().getCode().getNumber(),
-                            reply.getStatus().getMessage()));
-                    });
+                return metadataStore.controllerClient().listOpenStreams(leaderAddress.get(), request);
             }
         }
         return future;
@@ -527,15 +504,18 @@ public class StreamManager {
                     if (endOffset.isPresent()) {
                         streamBuilder.setEndOffset(endOffset.getAsLong());
                     }
-                    builder.setStream(streamBuilder);
 
-                    builder.addAllRanges(ranges.stream().map(r -> apache.rocketmq.controller.v1.Range.newBuilder()
-                        .setStreamId(r.getStreamId())
-                        .setStartOffset(r.getStartOffset())
-                        .setEndOffset(r.getEndOffset())
-                        .setBrokerId(r.getNodeId())
-                        .setEpoch(r.getEpoch())
-                        .build()).collect(Collectors.toList()));
+                    StreamDescription streamDescription = StreamDescription.newBuilder()
+                        .setStream(streamBuilder)
+                        .addAllRanges(ranges.stream().map(r -> apache.rocketmq.controller.v1.Range.newBuilder()
+                            .setStreamId(r.getStreamId())
+                            .setStartOffset(r.getStartOffset())
+                            .setEndOffset(r.getEndOffset())
+                            .setBrokerId(r.getNodeId())
+                            .setEpoch(r.getEpoch())
+                            .build()).collect(Collectors.toList()))
+                        .build();
+                    builder.setDescription(streamDescription);
                     return builder.build();
                 } else {
                     return DescribeStreamReply.newBuilder()
