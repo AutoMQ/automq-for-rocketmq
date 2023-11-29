@@ -47,7 +47,7 @@ jobs:
     if: always()
     name: List version
     needs: [docker]
-    runs-on: ubuntu-latest
+    runs-on: private-k3s
     timeout-minutes: 30
     outputs:
       version-json: ${{ steps.show_versions.outputs.version-json }}
