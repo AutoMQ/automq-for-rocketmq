@@ -697,7 +697,7 @@ public class GrpcControllerClient implements ControllerClient {
     }
 
     @Override
-    public CompletableFuture<CloseStreamReply> closeStream(String target,
+    public CompletableFuture<Void> closeStream(String target,
         CloseStreamRequest request) {
         ControllerServiceGrpc.ControllerServiceFutureStub stub;
         try {
@@ -705,11 +705,16 @@ public class GrpcControllerClient implements ControllerClient {
         } catch (ControllerException e) {
             return CompletableFuture.failedFuture(e);
         }
-        CompletableFuture<CloseStreamReply> future = new CompletableFuture<>();
+        CompletableFuture<Void> future = new CompletableFuture<>();
         Futures.addCallback(stub.closeStream(request), new FutureCallback<>() {
             @Override
             public void onSuccess(CloseStreamReply result) {
-                future.complete(result);
+                if (result.getStatus().getCode() == Code.OK) {
+                    future.complete(null);
+                } else {
+                    future.completeExceptionally(new ControllerException(result.getStatus().getCodeValue(),
+                        result.getStatus().getMessage()));
+                }
             }
 
             @Override

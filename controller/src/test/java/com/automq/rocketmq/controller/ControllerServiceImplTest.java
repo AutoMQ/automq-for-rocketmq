@@ -19,7 +19,6 @@ package com.automq.rocketmq.controller;
 
 import apache.rocketmq.controller.v1.AcceptTypes;
 import apache.rocketmq.controller.v1.AssignmentStatus;
-import apache.rocketmq.controller.v1.CloseStreamReply;
 import apache.rocketmq.controller.v1.CloseStreamRequest;
 import apache.rocketmq.common.v1.Code;
 import apache.rocketmq.controller.v1.ConsumerGroup;
@@ -968,8 +967,12 @@ public class ControllerServiceImplTest extends DatabaseTestBase {
                     .setStreamEpoch(1)
                     .setBrokerEpoch(1)
                     .build();
-                CloseStreamReply reply = client.closeStream(String.format("localhost:%d", port), request).get();
-                Assertions.assertEquals(Code.NOT_FOUND, reply.getStatus().getCode());
+                try {
+                    client.closeStream(String.format("localhost:%d", port), request).get();
+                } catch (ExecutionException e) {
+                    ControllerException cause = (ControllerException) e.getCause();
+                    Assertions.assertEquals(Code.NOT_FOUND_VALUE, cause.getErrorCode());
+                }
             }
         }
     }

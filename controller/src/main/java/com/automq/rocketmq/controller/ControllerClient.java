@@ -17,7 +17,6 @@
 
 package com.automq.rocketmq.controller;
 
-import apache.rocketmq.controller.v1.CloseStreamReply;
 import apache.rocketmq.controller.v1.CloseStreamRequest;
 import apache.rocketmq.controller.v1.Cluster;
 import apache.rocketmq.controller.v1.ConsumerGroup;
@@ -80,7 +79,7 @@ public interface ControllerClient extends Closeable {
 
     CompletableFuture<StreamMetadata> openStream(String target, OpenStreamRequest request);
 
-    CompletableFuture<CloseStreamReply> closeStream(String target, CloseStreamRequest request);
+    CompletableFuture<Void> closeStream(String target, CloseStreamRequest request);
 
     CompletableFuture<ListOpenStreamsReply> listOpenStreams(String target, ListOpenStreamsRequest request);
 

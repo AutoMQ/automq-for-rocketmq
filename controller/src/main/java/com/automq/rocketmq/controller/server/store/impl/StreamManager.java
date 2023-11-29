@@ -412,15 +412,7 @@ public class StreamManager {
                     .setStreamEpoch(streamEpoch)
                     .setBrokerId(nodeId)
                     .build();
-                return metadataStore.controllerClient()
-                    .closeStream(leaderAddress.get(), request)
-                    .thenApply(reply -> {
-                        if (reply.getStatus().getCode() == Code.OK) {
-                            return null;
-                        }
-                        throw new CompletionException(new ControllerException(reply.getStatus().getCode().getNumber(),
-                            reply.getStatus().getMessage()));
-                    });
+                return metadataStore.controllerClient().closeStream(leaderAddress.get(), request);
             }
         }
         return future;
