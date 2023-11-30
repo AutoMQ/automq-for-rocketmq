@@ -22,9 +22,8 @@ MAINTAINER automq
 USER root
 
  # Install dependency
-# RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
+#RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
 RUN apk add --no-cache bash gettext nmap-ncat openssl busybox-extras libc6-compat libgcc libstdc++
-
 
 ARG version
 
