@@ -109,13 +109,13 @@ public class WALUtil {
      */
     public static long getBlockDeviceCapacity(String path) throws ExecutionException {
         String[] cmd = new String[]{
-                "lsblk",
-                "--bytes",
-                "--nodeps",
-                "--output", "SIZE",
-                "--noheadings",
-                "--raw",
-                path
+            "lsblk",
+            "--bytes",
+            "--nodeps",
+            "--output", "SIZE",
+            "--noheadings",
+            "--raw",
+            path
         };
         CommandResult result = CommandUtils.run(cmd);
         if (!result.success()) {
