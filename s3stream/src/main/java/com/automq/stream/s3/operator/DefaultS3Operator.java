@@ -81,6 +81,7 @@ import static com.automq.stream.utils.FutureUtil.cause;
 
 public class DefaultS3Operator implements S3Operator {
     private static final Logger LOGGER = LoggerFactory.getLogger(DefaultS3Operator.class);
+    public static final Float MAX_MERGE_READ_SPARSITY_RATE = 0.5f;
     private final String bucket;
     private final S3AsyncClient writeS3Client;
     private final S3AsyncClient readS3Client;
@@ -227,8 +228,15 @@ public class DefaultS3Operator implements S3Operator {
             }
         }
         mergedReadTasks.forEach(
-                mergedReadTask -> mergedRangeRead(mergedReadTask.path, mergedReadTask.start, mergedReadTask.end)
-                        .whenComplete((rst, ex) -> FutureUtil.suppress(() -> mergedReadTask.handleReadCompleted(rst, ex), LOGGER))
+                mergedReadTask -> {
+                    if (LOGGER.isDebugEnabled()) {
+                        LOGGER.debug("[S3BlockCache] merge read: {}, {}-{}, size: {}, sparsityRate: {}",
+                                mergedReadTask.path, mergedReadTask.start, mergedReadTask.end,
+                                mergedReadTask.end - mergedReadTask.start, mergedReadTask.dataSparsityRate);
+                    }
+                    mergedRangeRead(mergedReadTask.path, mergedReadTask.start, mergedReadTask.end)
+                            .whenComplete((rst, ex) -> FutureUtil.suppress(() -> mergedReadTask.handleReadCompleted(rst, ex), LOGGER));
+                }
         );
     }
 
@@ -646,6 +654,8 @@ public class DefaultS3Operator implements S3Operator {
         final List<ReadTask> readTasks = new ArrayList<>();
         long start;
         long end;
+        long uniqueDataSize = 0L;
+        float dataSparsityRate = 0f;
 
         MergedReadTask(ReadTask readTask) {
             this.path = readTask.path;
@@ -655,15 +665,43 @@ public class DefaultS3Operator implements S3Operator {
         }
 
         boolean tryMerge(ReadTask readTask) {
-            //TODO: add data sparse rate check, 50%?
-            if (!path.equals(readTask.path)) {
+            if (!path.equals(readTask.path) || dataSparsityRate >= MAX_MERGE_READ_SPARSITY_RATE) {
                 return false;
             }
+
             long newStart = Math.min(start, readTask.start);
             long newEnd = Math.max(end, readTask.end);
             boolean merge = newEnd - newStart <= MAX_MERGE_READ_SIZE;
             if (merge) {
-                readTasks.add(readTask);
+                // insert read task in order
+                int i = 0;
+                long overlap = 0L;
+                for (; i < readTasks.size(); i++) {
+                    ReadTask task = readTasks.get(i);
+                    if (task.start >= readTask.start) {
+                        readTasks.add(i, readTask);
+                        // calculate data overlap
+                        ReadTask prev = i > 0 ? readTasks.get(i - 1) : null;
+                        ReadTask next = readTasks.get(i + 1);
+
+                        if (prev != null && readTask.start < prev.end) {
+                            overlap += prev.end - readTask.start;
+                        }
+                        if (readTask.end > next.start) {
+                            overlap += readTask.end - next.start;
+                        }
+                        break;
+                    }
+                }
+                if (i == readTasks.size()) {
+                    readTasks.add(readTask);
+                    ReadTask prev = i >= 1 ? readTasks.get(i - 1) : null;
+                    if (prev != null && readTask.start < prev.end) {
+                        overlap += prev.end - readTask.start;
+                    }
+                }
+                uniqueDataSize += readTask.end - readTask.start - overlap;
+                dataSparsityRate =  (float) uniqueDataSize / (newEnd - newStart);
                 start = newStart;
                 end = newEnd;
             }
@@ -682,18 +720,7 @@ public class DefaultS3Operator implements S3Operator {
         }
     }
 
-    static class ReadTask {
-        final String path;
-        final long start;
-        final long end;
-        final CompletableFuture<ByteBuf> cf;
-
-        public ReadTask(String path, long start, long end, CompletableFuture<ByteBuf> cf) {
-            this.path = path;
-            this.start = start;
-            this.end = end;
-            this.cf = cf;
-        }
+    record ReadTask(String path, long start, long end, CompletableFuture<ByteBuf> cf) {
     }
 
     public static class Builder {
