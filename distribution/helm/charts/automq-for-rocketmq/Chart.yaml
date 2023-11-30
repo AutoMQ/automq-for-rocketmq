@@ -38,3 +38,15 @@ version: 0.0.3
 # follow Semantic Versioning. They should reflect the version the application is using.
 # It is recommended to use it with quotes.
 appVersion: "0.0.3"
+
+
+dependencies:
+  - name: mysql
+    version: "9.14.1"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: mysql.enabled
+
+  - name: localstack
+    version: "0.6.5"
+    repository: "https://localstack.github.io/helm-charts"
+    condition: localstack.enabled

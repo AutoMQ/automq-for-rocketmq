@@ -36,3 +36,9 @@ broker:
     controller:
       recycleS3IntervalInSecs: 360
       dumpHeapOnError: true
+
+mysql:
+  enabled: false
+
+localstack:
+  enabled: false

@@ -67,6 +67,8 @@ helm install mysql bitnami/mysql -f deploy/mysql.yaml --namespace $NAMESPACE
 # Wait for mysql to be ready
 kubectl rollout status --watch --timeout=120s statefulset/mysql --namespace $NAMESPACE
 
+helm dependency build ./charts/automq-for-rocketmq
+
 # deploy automq-for-rocketmq
 helm install automq-for-rocketmq ./charts/automq-for-rocketmq  -f deploy/helm_sample_values.yaml --set broker.image.repository=$ROCKETMQ_REPO --set broker.image.tag=$ROCKETMQ_VERSION --namespace $NAMESPACE
 
