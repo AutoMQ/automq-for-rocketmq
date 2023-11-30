@@ -40,21 +40,21 @@ broker:
       secretKey: "rocketmq"
 
     s3Stream:
-      s3WALPath: "/root/logs/rocketmqlogs"
-      s3Endpoint: "http://minio.local:9000"
-      s3Bucket: "bucket-name"
-      s3Region: "us-east-1"
+      s3WALPath: "/root/logs/rocketmqlogs/s3rocketmq/wal"
+      s3Endpoint: "http://automq-for-rocketmq-localstack:4566"
+      s3Bucket: "automq-for-rocketmq"
+      s3Region: "eu-west-2"
       s3ForcePathStyle: true
       s3AccessKey: "access-key"
       s3SecretKey: "secret-key"
       networkBaselineBandwidth: 5242880
       refillPeriodMs: 100
     db:
-      url: "jdbc:mysql://mysql-server:3306/metadata"
+      url: "jdbc:mysql://automq-for-rocketmq-mysql:3306/metadata"
       userName: "root"
-      password: "password"
+      password: "automq"
     store:
-      kvPath: "/tmp/s3rocketmq/kvstore"
+      kvPath: "/root/logs/rocketmqlogs/s3rocketmq/kvstore"
     controller:
       recycleS3IntervalInSecs: 360
       dumpHeapOnError: true
@@ -84,4 +84,51 @@ broker:
   nodeSelector: { }
 
   tolerations: [ ]
+
+mysql:
+  enabled: true
+  image:
+    tag: 8.0.35
+
+  auth:
+    rootPassword: "automq"
+    createDatabase: true
+    database: metadata
+
+  service:
+    type: LoadBalancer
+
+  primary:
+    extraVolumeMounts: |
+      - name: init
+        mountPath: /docker-entrypoint-initdb.d/
+    extraVolumes: |
+      - name: init
+        configMap:
+          name: mysql-initdb-config
+
+localstack:
+  enabled: true
+  enableStartupScripts: true
+
+  service:
+    type: ClusterIP
+
+  startupScriptContent: |
+    #!/bin/bash
+    set -e
+    export TERM=ansi
+    export AWS_ACCESS_KEY_ID=access-key
+    export AWS_SECRET_ACCESS_KEY=secret-keys
+    export AWS_DEFAULT_REGION=eu-west-2
+    export AWS_DEFAULT_BUCKETS=automq-for-rocketmq
+    export AWS_S3_ENDPOINT=http://localhost:4566
+    export PAGER=
+    
+    echo "S3 Configuration started"
+    
+    aws --endpoint-url=$AWS_S3_ENDPOINT s3 mb s3://$AWS_DEFAULT_BUCKETS
+    aws --endpoint-url=$AWS_S3_ENDPOINT s3 cp /tmp/localstack/test-data/ s3://$AWS_DEFAULT_BUCKETS/chart --recursive
+    
+    echo "S3 Configured"
 
