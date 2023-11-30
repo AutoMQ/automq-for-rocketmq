@@ -18,9 +18,9 @@
 package com.automq.stream.s3.cache;
 
 import com.automq.stream.s3.metrics.stats.BlockCacheMetricsStats;
-import com.automq.stream.s3.operator.DefaultS3Operator;
 import com.automq.stream.utils.ThreadUtils;
 import com.automq.stream.utils.Threads;
+import com.automq.stream.utils.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,7 +49,7 @@ public class InflightReadThrottle implements Runnable {
     private int remainingInflightReadBytes;
 
     public InflightReadThrottle() {
-        this((int) (MAX_INFLIGHT_READ_SIZE * DefaultS3Operator.MAX_MERGE_READ_SPARSITY_RATE));
+        this((int) (MAX_INFLIGHT_READ_SIZE * Utils.getMaxMergeReadSparsityRate()));
     }
 
     public InflightReadThrottle(int maxInflightReadBytes) {
