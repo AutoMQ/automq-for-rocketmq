@@ -49,7 +49,7 @@ public class InflightReadThrottle implements Runnable {
     private int remainingInflightReadBytes;
 
     public InflightReadThrottle() {
-        this((int) (MAX_INFLIGHT_READ_SIZE * Utils.getMaxMergeReadSparsityRate()));
+        this((int) (MAX_INFLIGHT_READ_SIZE * (1 - Utils.getMaxMergeReadSparsityRate())));
     }
 
     public InflightReadThrottle(int maxInflightReadBytes) {
