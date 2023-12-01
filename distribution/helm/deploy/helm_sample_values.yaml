@@ -15,27 +15,18 @@
 
 broker:
   replicaCount: 1
-  conf:
-    s3Stream:
-      s3WALPath: "/root/logs/rocketmqlogs/s3rocketmq/wal"
-      s3Endpoint: "http://s3-localstack:4566"
-      s3Bucket: "ros"
-      s3Region: "eu-west-2"
-      s3ForcePathStyle: true
-      s3AccessKey: "foot"
-      s3SecretKey: "bar"
-      networkBaselineBandwidth: 5242880
-      refillPeriodMs: 100
+  db:
+    url: "jdbc:mysql://mysql:3306/metadata"
+    userName: "root"
+    password: "passward"
 
-    store:
-      kvPath: "/root/logs/rocketmqlogs/s3rocketmq/kvstore"
-    db:
-      url: "jdbc:mysql://mysql:3306/metadata"
-      userName: "root"
-      password: "passward"
-    controller:
-      recycleS3IntervalInSecs: 360
-      dumpHeapOnError: true
+  storage:
+    s3:
+      endpoint: "http://s3-localstack:4566"
+      bucket: "ros"
+      region: "eu-west-2"
+      accessKey: "foot"
+      secretKey: "bar"
 
 mysql:
   enabled: false

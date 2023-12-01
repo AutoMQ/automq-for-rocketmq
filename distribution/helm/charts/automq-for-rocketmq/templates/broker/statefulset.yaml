@@ -38,8 +38,12 @@ spec:
           imagePullPolicy: {{ $.Values.broker.image.pullPolicy }}
         {{- end }}
           command: [ "/bin/sh" ]
-          args: [ "-c", "./run-server.sh com.automq.rocketmq.broker.BrokerStartup -c /home/rocketmq/automq-for-rocketmq/conf/broker/$(POD_NAME)" ]
+          args: [ "-c", "./run-server.sh com.automq.rocketmq.broker.BrokerStartup -c /etc/automq-for-rocketmq/broker.conf" ]
           env:
+            - name: ROCKETMQ_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
             - name: POD_NAME
               valueFrom:
                 fieldRef:
@@ -56,24 +60,22 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.podIP
-            - name: BROKER_MEM
-              value: {{ .Values.broker.jvmMemory }}
           ports:
             - name: broker
               containerPort: {{ .Values.broker.service.port }}
               protocol: TCP
           readinessProbe:
-            failureThreshold: 3
-            initialDelaySeconds: 60
-            periodSeconds: 15
+            failureThreshold: 10
+            initialDelaySeconds: 5
+            periodSeconds: 5
             successThreshold: 1
             tcpSocket:
               port: {{ .Values.broker.service.port }}
             timeoutSeconds: 1
           livenessProbe:
-            failureThreshold: 3
-            initialDelaySeconds: 60
-            periodSeconds: 15
+            failureThreshold: 10
+            initialDelaySeconds: 5
+            periodSeconds: 5
             successThreshold: 1
             tcpSocket:
               port: {{ .Values.broker.service.port }}
@@ -81,10 +83,12 @@ spec:
           resources:
             {{- toYaml .Values.broker.resources | nindent 12 }}
           volumeMounts:
-            - mountPath: /home/rocketmq/automq-for-rocketmq/conf/broker
+            - mountPath: /etc/automq-for-rocketmq
               name: broker-config
-            - mountPath: /root/logs/rocketmqlogs
+            {{- if .Values.broker.storage.local.persistence.enabled }}
+            - mountPath: /root/logs
               name: broker-storage
+            {{- end }}
       {{- with .Values.broker.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -92,8 +96,18 @@ spec:
       volumes:
         - name: broker-config
           configMap:
-            name: broker-conf
-        - name: broker-storage
-          hostPath:
-            path: /root/logs/rocketmqlogs
-            type: DirectoryOrCreate
+            name: {{ include "rocketmq-broker.clusterName" . }}-broker-conf
+{{- if .Values.broker.storage.local.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: broker-storage
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        {{- if .Values.broker.storage.local.persistence.storageClass }}
+        storageClassName: {{ .Values.broker.storage.local.persistence.storageClass }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.broker.storage.local.persistence.size }}
+{{- end }}
