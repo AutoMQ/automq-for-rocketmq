@@ -18,15 +18,11 @@
 package com.automq.stream.s3.cache;
 
 import com.automq.stream.s3.TestUtils;
-import com.automq.stream.s3.metrics.TimerUtil;
 import com.automq.stream.s3.model.StreamRecordBatch;
-import com.automq.stream.utils.Threads;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
