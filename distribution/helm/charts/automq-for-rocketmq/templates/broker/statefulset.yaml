@@ -96,7 +96,7 @@ spec:
       volumes:
         - name: broker-config
           configMap:
-            name: broker-conf
+            name: {{ include "rocketmq-broker.clusterName" . }}-broker
 {{- if .Values.broker.storage.local.persistence.enabled }}
   volumeClaimTemplates:
     - metadata:
