@@ -16,7 +16,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "rocketmq-broker.clusterName" . }}-broker
+  name: {{ include "rocketmq-broker.clusterName" . }}-broker-conf
   labels:
     {{- include "rocketmq-broker.labels" . | nindent 4 }}
 data:
