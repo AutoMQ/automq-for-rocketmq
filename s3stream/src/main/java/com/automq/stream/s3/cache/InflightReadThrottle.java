@@ -56,18 +56,29 @@ public class InflightReadThrottle implements Runnable {
         this.maxInflightReadBytes = maxInflightReadBytes;
         this.remainingInflightReadBytes = maxInflightReadBytes;
         executorService.execute(this);
-        BlockCacheMetricsStats.registerAvailableInflightReadSize(() -> {
-            lock.lock();
-            try {
-                return remainingInflightReadBytes;
-            } finally {
-                lock.unlock();
-            }
-        });
+        BlockCacheMetricsStats.registerAvailableInflightReadSize(this::getRemainingInflightReadBytes);
     }
 
     public void shutdown() {
         executorService.shutdown();
+    }
+
+    public int getInflightQueueSize() {
+        lock.lock();
+        try {
+            return inflightReadQueue.size();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public int getRemainingInflightReadBytes() {
+        lock.lock();
+        try {
+            return remainingInflightReadBytes;
+        } finally {
+            lock.unlock();
+        }
     }
 
     public CompletableFuture<Void> acquire(UUID uuid, int readSize) {

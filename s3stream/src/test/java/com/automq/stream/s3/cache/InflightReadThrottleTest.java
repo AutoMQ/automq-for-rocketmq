@@ -17,6 +17,7 @@
 
 package com.automq.stream.s3.cache;
 
+import com.automq.stream.utils.Threads;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -29,11 +30,16 @@ public class InflightReadThrottleTest {
         InflightReadThrottle throttle = new InflightReadThrottle(1024);
         UUID uuid = UUID.randomUUID();
         CompletableFuture<Void> cf = throttle.acquire(uuid, 512);
+        Assertions.assertEquals(512, throttle.getRemainingInflightReadBytes());
         Assertions.assertTrue(cf.isDone());
         UUID uuid2 = UUID.randomUUID();
         CompletableFuture<Void> cf2 = throttle.acquire(uuid2, 600);
+        Assertions.assertEquals(512, throttle.getRemainingInflightReadBytes());
+        Assertions.assertEquals(1, throttle.getInflightQueueSize());
         Assertions.assertFalse(cf2.isDone());
         throttle.release(uuid);
+        Threads.sleep(1000);
+        Assertions.assertEquals(424, throttle.getRemainingInflightReadBytes());
         Assertions.assertTrue(cf2.isDone());
     }
 }
