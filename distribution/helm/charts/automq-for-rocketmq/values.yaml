@@ -24,55 +24,36 @@ broker:
     repository: "automqinc/automq-for-rocketmq"
     tag: "v0.0.3-alpha"
 
-  persistence:
-    enabled: false
-    size: 8Gi
+  db:
+    url: ""
+    userName: "root"
+    password: "automq"
 
-  fullnameOverride: ""
-
-  conf:
-    name: ""
-    clusterNameOverride: ""
-    brokerNamePrefixOverride: ""
-
-    inner:
-      accessKey: "automq"
-      secretKey: "rocketmq"
-
-    s3Stream:
-      s3WALPath: "/root/logs/rocketmqlogs/s3rocketmq/wal"
-      s3Endpoint: "http://automq-for-rocketmq-localstack:4566"
-      s3Bucket: "automq-for-rocketmq"
-      s3Region: "eu-west-2"
-      s3ForcePathStyle: true
-      s3AccessKey: "access-key"
-      s3SecretKey: "secret-key"
+  storage:
+    local:
+      persistence:
+        enabled: true
+        storageClass: ""
+        size: 10Gi
+    s3:
+      endpoint: ""
+      bucket: "automq-for-rocketmq"
+      region: "eu-west-2"
+      forcePathStyle: true
+      accessKey: "access-key"
+      secretKey: "secret-key"
       networkBaselineBandwidth: 5242880
       refillPeriodMs: 100
-    db:
-      url: "jdbc:mysql://automq-for-rocketmq-mysql:3306/metadata"
-      userName: "root"
-      password: "automq"
-    store:
-      kvPath: "/root/logs/rocketmqlogs/s3rocketmq/kvstore"
-    controller:
-      recycleS3IntervalInSecs: 360
-      dumpHeapOnError: true
-    metrics:
-      exporterType: "OTLP_GRPC"
-      grpcExporterTarget: "http://localhost:4317"
-      grpcExporterHeader: ""
-      grpcExporterTimeOutInMills: 31000
-      periodicExporterIntervalInMills: 30000
-      promExporterPort: 5557
-      promExporterHost: "localhost"
-      labels: ""
-      exportInDelta: false
+
+  metrics:
+    enabled: false
+
+  fullnameOverride: ""
+  clusterNameOverride: ""
 
   service:
     port: 8081
 
-  jvmMemory: " -Xms4g -Xmx4g -Xmn2g -XX:MaxDirectMemorySize=8g "
   resources:
     limits:
       cpu: 4
@@ -106,10 +87,19 @@ mysql:
       - name: init
         configMap:
           name: mysql-initdb-config
+    persistence:
+      enabled: true
+      storageClass: ""
+      size: 10Gi
 
 localstack:
   enabled: true
   enableStartupScripts: true
+
+  persistence:
+    enabled: true
+    storageClass: ""
+    size: 10Gi
 
   service:
     type: ClusterIP

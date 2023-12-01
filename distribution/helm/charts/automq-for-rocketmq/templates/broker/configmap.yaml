@@ -20,7 +20,52 @@ metadata:
   labels:
     {{- include "rocketmq-broker.labels" . | nindent 4 }}
 data:
-{{- include "rocketmq-broker.config" . }}
+  broker.conf: |
+    instanceId: "{{- include "rocketmq-broker.clusterName" . }}"
+    bindAddress: 0.0.0.0:8081
+
+    innerAccessKey: ""
+    innerSecretKey: ""
+
+    s3Stream:
+      s3WALPath: "/root/logs/wal"
+      s3Endpoint: "{{- if .Values.localstack.enabled }}http://{{ .Release.Name }}-localstack:4566{{- else }}{{- .Values.broker.storage.s3.endpoint }}{{- end }}"
+      s3Bucket: "{{ .Values.broker.storage.s3.bucket }}"
+      s3Region: "{{ .Values.broker.storage.s3.region }}"
+      s3ForcePathStyle: {{ .Values.broker.storage.s3.forcePathStyle }}
+      s3AccessKey: "{{ .Values.broker.storage.s3.accessKey }}"
+      s3SecretKey: "{{ .Values.broker.storage.s3.secretKey }}"
+      networkBaselineBandwidth: {{ int .Values.broker.storage.s3.networkBaselineBandwidth }}
+      refillPeriodMs: {{ .Values.broker.storage.s3.refillPeriodMs }}
+
+    db:
+      url: "{{- if .Values.mysql.enabled }}jdbc:mysql://{{ .Release.Name }}-mysql:3306/{{ .Values.mysql.auth.database }}{{- else }}{{- .Values.broker.db.url }}{{- end }}"
+      userName: "{{ .Values.broker.db.userName }}"
+      password: "{{ .Values.broker.db.password }}"
+
+    store:
+      kvPath: "/root/logs/kvstore"
+
+    controller:
+      recycleS3IntervalInSecs: 360
+      dumpHeapOnError: true
+
+   {{- if .Values.broker.metrics.enabled }}
+    metrics:
+      exporterType: "OTLP_GRPC"
+      grpcExporterTarget: "http://localhost:4317"
+      grpcExporterHeader: ""
+      grpcExporterTimeOutInMills: 31000
+      periodicExporterIntervalInMills: 30000
+      promExporterPort: 5557
+      promExporterHost: "localhost"
+      labels: ""
+      exportInDelta: false
+   {{- else }}
+    metrics:
+      exporterType: "DISABLE"
+   {{- end }}
+
 
 ---
 {{- if .Values.mysql.enabled }}

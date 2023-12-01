@@ -57,18 +57,10 @@ app.kubernetes.io/cluster: {{ include "rocketmq-broker.clusterName" . }}
 {{- end }}
 
 {{- define "rocketmq-broker.clusterName" -}}
-{{- if .Values.broker.conf.clusterNameOverride }}
-{{- .Values.broker.conf.clusterNameOverride | trunc 63 | trimSuffix "-" }}
+{{- if .Values.broker.clusterNameOverride }}
+{{- .Values.broker.clusterNameOverride | trunc 63 | trimSuffix "-" }}
 {{- else -}}
 {{ .Release.Name }}
-{{- end }}
-{{- end }}
-
-{{- define "rocketmq-broker.brokerNamePrefix" -}}
-{{- if .Values.broker.conf.brokerNamePrefixOverride }}
-{{- .Values.broker.conf.brokerNamePrefixOverride | trunc 63 | trimSuffix "-" }}
-{{- else }}
-{{- include "rocketmq-broker.fullname" . }}
 {{- end }}
 {{- end }}
 
