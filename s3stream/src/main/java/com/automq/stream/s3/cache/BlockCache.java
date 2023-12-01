@@ -125,6 +125,9 @@ public class BlockCache implements DirectByteBufAlloc.OOMHandler {
         }
 
         // ensure the cache size.
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("[S3BlockCache] block cache size: {}/{}, ensure size: {} ", this.size.get(), maxSize, size);
+        }
         ensureCapacity(size);
 
         // split to 1MB cache blocks which one block contains sequential records.
@@ -332,10 +335,6 @@ public class BlockCache implements DirectByteBufAlloc.OOMHandler {
     }
 
     private int ensureCapacity0(int size, boolean forceEvict) {
-        if (LOGGER.isDebugEnabled()) {
-            LOGGER.debug("[S3BlockCache] block cache size: {}/{}, ensure size: {} ", this.size.get(), maxSize, size);
-        }
-
         if (!forceEvict && (maxSize - this.size.get() >= size)) {
             return 0;
         }
@@ -355,8 +354,8 @@ public class BlockCache implements DirectByteBufAlloc.OOMHandler {
                 if (cacheBlock == null) {
                     LOGGER.error("[BUG] Cannot find stream cache block: {} {}", entry.getKey().streamId, entry.getKey().startOffset);
                 } else {
-                    if (LOGGER.isDebugEnabled()) {
-                        LOGGER.debug("[S3BlockCache] evict block, stream={}, {}-{}, total bytes: {} ", entry.getKey().streamId, cacheBlock.firstOffset, cacheBlock.lastOffset, cacheBlock.size);
+                    if (LOGGER.isTraceEnabled()) {
+                        LOGGER.trace("[S3BlockCache] evict block, stream={}, {}-{}, total bytes: {} ", entry.getKey().streamId, cacheBlock.firstOffset, cacheBlock.lastOffset, cacheBlock.size);
                     }
                     cacheBlock.free();
                     evictBytes += cacheBlock.size;
@@ -403,11 +402,14 @@ public class BlockCache implements DirectByteBufAlloc.OOMHandler {
 
     @Override
     public int handle(int memoryRequired) {
+        writeLock.lock();
         try {
             return ensureCapacity0(memoryRequired, true);
         } catch (Throwable e) {
             LOGGER.error("[UNEXPECTED] handle OOM failed", e);
             return 0;
+        } finally {
+            writeLock.unlock();
         }
     }
 
