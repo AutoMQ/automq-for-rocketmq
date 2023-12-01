@@ -22,7 +22,7 @@ broker:
   image:
     pullPolicy: IfNotPresent
     repository: "automqinc/automq-for-rocketmq"
-    tag: "v0.0.3-alpha"
+    tag: ""
 
   db:
     url: ""
