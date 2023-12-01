@@ -123,14 +123,8 @@ public class InflightReadThrottle implements Runnable {
         while (true) {
             lock.lock();
             try {
-                while (remainingInflightReadBytes <= 0 || inflightReadQueue.isEmpty()) {
+                while (inflightReadQueue.isEmpty() || inflightReadQueue.peek().readSize > remainingInflightReadBytes) {
                     condition.await();
-                    if (!inflightReadQueue.isEmpty()) {
-                        InflightReadItem inflightReadItem = inflightReadQueue.peek();
-                        if (inflightReadItem.readSize < remainingInflightReadBytes) {
-                            break;
-                        }
-                    }
                 }
                 InflightReadItem inflightReadItem = inflightReadQueue.poll();
                 if (inflightReadItem == null) {
