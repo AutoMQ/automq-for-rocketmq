@@ -286,8 +286,8 @@ public class MetricsExporter implements Lifecycle {
         MetricsExporterType metricsExporterType = MetricsExporterType.valueOf(metricsConfig.exporterType());
         if (metricsExporterType != MetricsExporterType.DISABLE) {
             initDynamicMetrics();
+            this.started = true;
         }
-        this.started = true;
     }
 
     private void registerMetricsView(SdkMeterProviderBuilder providerBuilder) {
