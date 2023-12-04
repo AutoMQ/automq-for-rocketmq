@@ -58,7 +58,7 @@ helm repo add localstack-charts https://localstack.github.io/helm-charts
 helm install s3-localstack localstack-charts/localstack -f deploy/localstack_s3.yaml --namespace $NAMESPACE
 
 # Wait for s3-localstack to be ready
-kubectl rollout status --watch --timeout=120s statefulset/s3-localstack --namespace $NAMESPACE
+kubectl rollout status --watch --timeout=120s replicaset/s3-localstack --namespace $NAMESPACE
 
 # deploy mysql
 helm repo add bitnami https://charts.bitnami.com/bitnami
@@ -67,9 +67,12 @@ helm install mysql bitnami/mysql -f deploy/mysql.yaml --namespace $NAMESPACE
 # Wait for mysql to be ready
 kubectl rollout status --watch --timeout=120s statefulset/mysql --namespace $NAMESPACE
 
-helm dependency build ./charts/automq-for-rocketmq
+helm repo add automq http://charts.automq.com/
 
 # deploy automq-for-rocketmq
-helm install automq-for-rocketmq ./charts/automq-for-rocketmq  -f deploy/helm_sample_values.yaml --set broker.image.repository=$ROCKETMQ_REPO --set broker.image.tag=$ROCKETMQ_VERSION --namespace $NAMESPACE
+helm install automq-for-rocketmq automq/automq-for-rocketmq -f deploy/helm_sample_values.yaml  \
+  --set broker.image.repository=$ROCKETMQ_REPO  \
+  --set broker.image.tag=$ROCKETMQ_VERSION  \
+  --namespace $NAMESPACE
 
 kubectl rollout status --watch --timeout=360s statefulset/automq-for-rocketmq-rocketmq-broker --namespace $NAMESPACE
