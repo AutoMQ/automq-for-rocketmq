@@ -121,7 +121,7 @@ public class MockMessageStore implements MessageStore {
         FlatMessageExt messageExt = FlatMessageExt.Builder.builder().message(message).offset(offset).build();
         List<FlatMessageExt> messageList = messageMap.computeIfAbsent(message.topicId() + message.queueId(), v -> new ArrayList<>());
         messageList.add(messageExt);
-        return CompletableFuture.completedFuture(new PutResult(PutResult.Status.PUT_OK, offset, null));
+        return CompletableFuture.completedFuture(new PutResult(PutResult.Status.PUT_OK, offset));
     }
 
     @Override

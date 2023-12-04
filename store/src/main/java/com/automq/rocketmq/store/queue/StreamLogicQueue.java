@@ -212,7 +212,7 @@ public class StreamLogicQueue extends LogicQueue {
         }
 
         return streamStore.append(context, dataStreamId, new SingleRecord(flatMessage.getByteBuffer()))
-            .thenApply(appendResult -> new PutResult(PutResult.Status.PUT_OK, appendResult.baseOffset(), null));
+            .thenApply(appendResult -> new PutResult(PutResult.Status.PUT_OK, appendResult.baseOffset()));
     }
 
     @Override
@@ -230,7 +230,7 @@ public class StreamLogicQueue extends LogicQueue {
         CompletableFuture<Long> retryStreamIdCf = retryStreamId(consumerGroupId);
         return retryStreamIdCf.thenCompose(streamId ->
             streamStore.append(context, streamId, new SingleRecord(flatMessage.getByteBuffer()))
-                .thenApply(appendResult -> new PutResult(PutResult.Status.PUT_OK, appendResult.baseOffset(), null)));
+                .thenApply(appendResult -> new PutResult(PutResult.Status.PUT_OK, appendResult.baseOffset())));
     }
 
     private CompletableFuture<Long> retryStreamId(long consumerGroupId) {

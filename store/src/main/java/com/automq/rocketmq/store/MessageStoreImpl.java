@@ -189,7 +189,7 @@ public class MessageStoreImpl implements MessageStore {
         if (deliveryTimestamp > 0 && deliveryTimestamp - System.currentTimeMillis() > 1000) {
             try {
                 timerService.enqueue(deliveryTimestamp, TimerHandlerType.TIMER_MESSAGE, FlatMessageUtil.flatBufferToByteArray(message));
-                return CompletableFuture.completedFuture(new PutResult(PutResult.Status.PUT_DELAYED, -1, null));
+                return CompletableFuture.completedFuture(new PutResult(PutResult.Status.PUT_DELAYED, -1));
             } catch (Exception e) {
                 return CompletableFuture.failedFuture(e);
             }

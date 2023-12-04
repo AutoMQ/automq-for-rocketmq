@@ -175,7 +175,7 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
                     });
                     return consumerGroupOf(groupName)
                         .thenCompose(group -> deadLetterService.send(contextExt, group.getGroupId(), flatMessageExt))
-                        .thenApply(ignore -> new PutResult(PutResult.Status.PUT_OK, 0, null));
+                        .thenApply(ignore -> new PutResult(PutResult.Status.PUT_OK, 0));
                 } else {
                     String groupName = requestHeader.getTopic().replace(MixAll.RETRY_GROUP_TOPIC_PREFIX, "");
                     contextExt.span().ifPresent(span -> {
