@@ -17,9 +17,38 @@
 
 package com.automq.rocketmq.store.model.message;
 
-public record PutResult(Status status, long offset) {
+public class PutResult {
+    private final Status status;
+    private final long offset;
+    private final String transactionId;
+
+    public PutResult(Status status, long offset) {
+        this.status = status;
+        this.offset = offset;
+        this.transactionId = "";
+    }
+
+    public PutResult(Status status, long offset, String transactionId) {
+        this.status = status;
+        this.offset = offset;
+        this.transactionId = transactionId;
+    }
+
+    public Status status() {
+        return status;
+    }
+
+    public long offset() {
+        return offset;
+    }
+
+    public String transactionId() {
+        return transactionId;
+    }
+
     public enum Status {
         PUT_OK,
         PUT_DELAYED,
+        PUT_TRANSACTION_PREPARED,
     }
 }

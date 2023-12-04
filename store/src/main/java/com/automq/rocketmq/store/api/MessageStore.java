@@ -19,7 +19,9 @@ package com.automq.rocketmq.store.api;
 
 import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.common.util.Lifecycle;
+import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.StoreContext;
+import com.automq.rocketmq.store.model.generated.TimerTag;
 import com.automq.rocketmq.store.model.message.AckResult;
 import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
 import com.automq.rocketmq.store.model.message.ClearRetryMessagesResult;
@@ -29,6 +31,7 @@ import com.automq.rocketmq.store.model.message.PullResult;
 import com.automq.rocketmq.store.model.message.PutResult;
 import com.automq.rocketmq.store.model.message.ResetConsumeOffsetResult;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 
 public interface MessageStore extends Lifecycle {
 
@@ -149,4 +152,11 @@ public interface MessageStore extends Lifecycle {
      * @param listener message arrive listener
      */
     void registerMessageArriveListener(MessageArrivalListener listener);
+
+    /**
+     * Register a hanler for checking transaction status.
+     *
+     * @param handler transaction status check handler
+     */
+    void registerTransactionCheckHandler(Consumer<TimerTag> handler) throws StoreException;
 }

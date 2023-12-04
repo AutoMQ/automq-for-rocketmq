@@ -50,7 +50,7 @@
         <protobuf.version>3.24.0</protobuf.version>
         <protoc.version>3.24.0</protoc.version>
         <rocksdb.version>8.6.7</rocksdb.version>
-        <guava.version>32.0.1-jre</guava.version>
+        <guava.version>32.1.3-jre</guava.version>
         <slf4j.version>2.0.9</slf4j.version>
         <snakeyaml.version>2.2</snakeyaml.version>
         <s3stream.version>0.6.6-SNAPSHOT</s3stream.version>
@@ -220,6 +220,18 @@
             <groupId>org.aspectj</groupId>
             <artifactId>aspectjweaver</artifactId>
             <version>${aspectj.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava-testlib</artifactId>
+            <version>${guava.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.google.errorprone</groupId>
+                    <artifactId>error_prone_annotations</artifactId>
+                </exclusion>
+            </exclusions>
+            <scope>test</scope>
         </dependency>
 
         <!-- Below dependencies are not directly used by the project, but are required by the dependencies of the project. -->

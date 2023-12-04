@@ -824,7 +824,7 @@ public class LogicQueueTest {
         List<ReceiptHandle> receiptHandleList = new ArrayList<>();
         try {
             // Iterate timer tag until now to find messages need to reconsume.
-            kvService.iterate(MessageStoreTest.KV_NAMESPACE_TIMER_TAG, (key, value) -> {
+            kvService.iterate(MessageStoreTest.KV_NAMESPACE_TIMER_TAG + "_tag", (key, value) -> {
                 ReceiptHandle receiptHandle = ReceiptHandle.getRootAsReceiptHandle(ByteBuffer.wrap(value));
                 receiptHandleList.add(receiptHandle);
             });

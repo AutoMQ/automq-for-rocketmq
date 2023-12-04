@@ -22,7 +22,9 @@ import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.store.api.LogicQueue;
 import com.automq.rocketmq.store.api.MessageArrivalListener;
 import com.automq.rocketmq.store.api.MessageStore;
+import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.StoreContext;
+import com.automq.rocketmq.store.model.generated.TimerTag;
 import com.automq.rocketmq.store.model.message.AckResult;
 import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
 import com.automq.rocketmq.store.model.message.ClearRetryMessagesResult;
@@ -40,6 +42,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 import org.apache.commons.lang3.tuple.Pair;
 
 public class MockMessageStore implements MessageStore {
@@ -186,5 +189,9 @@ public class MockMessageStore implements MessageStore {
 
     @Override
     public void registerMessageArriveListener(MessageArrivalListener listener) {
+    }
+
+    @Override
+    public void registerTransactionCheckHandler(Consumer<TimerTag> handler) throws StoreException {
     }
 }

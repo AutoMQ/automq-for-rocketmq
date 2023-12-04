@@ -30,6 +30,7 @@ import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.StoreContext;
 import com.automq.rocketmq.store.model.generated.ReceiptHandle;
 import com.automq.rocketmq.store.model.generated.TimerHandlerType;
+import com.automq.rocketmq.store.model.generated.TimerTag;
 import com.automq.rocketmq.store.model.message.AckResult;
 import com.automq.rocketmq.store.model.message.ChangeInvisibleDurationResult;
 import com.automq.rocketmq.store.model.message.ClearRetryMessagesResult;
@@ -43,6 +44,7 @@ import com.automq.rocketmq.store.service.MessageArrivalNotificationService;
 import com.automq.rocketmq.store.service.ReviveService;
 import com.automq.rocketmq.store.service.SnapshotService;
 import com.automq.rocketmq.store.service.TimerService;
+import com.automq.rocketmq.store.service.TransactionService;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.util.FlatMessageUtil;
 import io.opentelemetry.api.trace.SpanKind;
@@ -50,6 +52,7 @@ import io.opentelemetry.instrumentation.annotations.SpanAttribute;
 import io.opentelemetry.instrumentation.annotations.WithSpan;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 import static com.automq.rocketmq.store.util.SerializeUtil.decodeReceiptHandle;
 
@@ -71,12 +74,13 @@ public class MessageStoreImpl implements MessageStore {
     private final LogicQueueManager logicQueueManager;
     private final S3ObjectOperator s3ObjectOperator;
     private final MessageArrivalNotificationService messageArrivalNotificationService;
+    private final TransactionService transactionService;
 
     public MessageStoreImpl(StoreConfig config, StreamStore streamStore,
         StoreMetadataService metadataService, KVService kvService, TimerService timerService,
         InflightService inflightService, SnapshotService snapshotService, LogicQueueManager logicQueueManager,
         ReviveService reviveService, S3ObjectOperator s3ObjectOperator,
-        MessageArrivalNotificationService messageArrivalNotificationService) {
+        MessageArrivalNotificationService messageArrivalNotificationService, TransactionService transactionService) {
         this.config = config;
         this.streamStore = streamStore;
         this.metadataService = metadataService;
@@ -88,6 +92,7 @@ public class MessageStoreImpl implements MessageStore {
         this.reviveService = reviveService;
         this.s3ObjectOperator = s3ObjectOperator;
         this.messageArrivalNotificationService = messageArrivalNotificationService;
+        this.transactionService = transactionService;
     }
 
     public LogicQueueManager topicQueueManager() {
@@ -179,6 +184,7 @@ public class MessageStoreImpl implements MessageStore {
 
     @Override
     public CompletableFuture<PutResult> put(StoreContext context, FlatMessage message) {
+        // Deal with delay message
         long deliveryTimestamp = message.systemProperties().deliveryTimestamp();
         if (deliveryTimestamp > 0 && deliveryTimestamp - System.currentTimeMillis() > 1000) {
             try {
@@ -189,6 +195,17 @@ public class MessageStoreImpl implements MessageStore {
             }
         }
 
+        // Deal with transaction message
+        if (message.systemProperties().preparedTransactionMark()) {
+            try {
+                String transactionId = transactionService.prepareTransaction(message);
+                return CompletableFuture.completedFuture(new PutResult(PutResult.Status.PUT_TRANSACTION_PREPARED, -1, transactionId));
+            } catch (StoreException e) {
+                return CompletableFuture.failedFuture(e);
+            }
+        }
+
+        // Deal with normal message
         return logicQueueManager.getOrCreate(context, message.topicId(), message.queueId())
             .thenCompose(topicQueue -> topicQueue.put(context, message))
             .thenCompose(result ->
@@ -265,5 +282,10 @@ public class MessageStoreImpl implements MessageStore {
     @Override
     public void registerMessageArriveListener(MessageArrivalListener listener) {
         messageArrivalNotificationService.registerMessageArriveListener(listener);
+    }
+
+    @Override
+    public void registerTransactionCheckHandler(Consumer<TimerTag> handler) throws StoreException {
+        timerService.registerHandler(TimerHandlerType.TRANSACTION_MESSAGE, handler);
     }
 }

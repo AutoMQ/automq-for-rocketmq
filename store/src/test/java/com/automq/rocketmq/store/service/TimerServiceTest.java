@@ -21,30 +21,33 @@ import com.automq.rocketmq.store.MessageStoreTest;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.generated.TimerHandlerType;
 import com.automq.rocketmq.store.service.api.KVService;
+import com.google.common.testing.FakeTicker;
 import java.nio.ByteBuffer;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 class TimerServiceTest {
     private static final String PATH = "/tmp/test_timer_service";
 
     private KVService kvService;
     private TimerService timerService;
+    private FakeTicker ticker;
 
     @BeforeEach
     void setUp() throws StoreException {
         kvService = new RocksDBKVService(PATH);
-        timerService = new TimerService(MessageStoreTest.KV_NAMESPACE_TIMER_TAG, kvService);
+        ticker = new FakeTicker();
+        timerService = new TimerService(MessageStoreTest.KV_NAMESPACE_TIMER_TAG, kvService, ticker);
     }
 
     @AfterEach
@@ -81,10 +84,10 @@ class TimerServiceTest {
 
     @Test
     void enqueue_dequeue() throws StoreException {
-        long deliveryTimestamp = System.currentTimeMillis() + 10;
+        long deliveryTimestamp = System.currentTimeMillis() + 1000;
         AtomicInteger counter = new AtomicInteger(0);
         timerService.registerHandler(TimerHandlerType.TIMER_MESSAGE, (timerTag) -> {
-            assertTrue(timerTag.deliveryTimestamp() <= System.currentTimeMillis());
+            assertTrue(timerTag.deliveryTimestamp() <= ticker.read());
             assertEquals(TimerHandlerType.TIMER_MESSAGE, timerTag.handlerType());
 
             ByteBuffer payload = timerTag.payloadAsByteBuffer();
@@ -96,27 +99,27 @@ class TimerServiceTest {
 
         timerService.enqueue(deliveryTimestamp, "identity".getBytes(), TimerHandlerType.TIMER_MESSAGE, "payload".getBytes());
 
-        await().atMost(1, TimeUnit.SECONDS)
-            .until(() -> {
-                timerService.dequeue();
-                return counter.get() == 1;
-            });
+        byte[] timerTag = kvService.get(MessageStoreTest.KV_NAMESPACE_TIMER_TAG + "_tag", timerService.buildTimerTagKey(deliveryTimestamp, "identity".getBytes()));
+        assertNotNull(timerTag);
+
+        byte[] timerIndex = kvService.get(MessageStoreTest.KV_NAMESPACE_TIMER_TAG + "_index", "identity".getBytes());
+        assertNotNull(timerIndex);
+        assertEquals(deliveryTimestamp, ByteBuffer.wrap(timerIndex).getLong());
+
+        ticker.advance(deliveryTimestamp);
+        timerService.dequeue();
+        assertEquals(1, counter.get());
     }
 
     @Test
-    void enqueue_cancel() throws StoreException, InterruptedException {
-        long deliveryTimestamp = System.currentTimeMillis() + 50;
-        AtomicInteger counter = new AtomicInteger(0);
-        timerService.registerHandler(TimerHandlerType.TIMER_MESSAGE, (timerTag) -> {
-            assertTrue(timerTag.deliveryTimestamp() <= System.currentTimeMillis());
-            counter.incrementAndGet();
-        });
+    void enqueue_cancel() throws StoreException {
+        timerService.registerHandler(TimerHandlerType.TIMER_MESSAGE, (timerTag) -> fail("The timer tag should be canceled"));
 
+        long deliveryTimestamp = System.currentTimeMillis() + 1000;
         timerService.enqueue(deliveryTimestamp, "identity".getBytes(), TimerHandlerType.TIMER_MESSAGE, "payload".getBytes());
-        timerService.cancel(deliveryTimestamp, "identity".getBytes());
+        timerService.cancel("identity".getBytes());
 
-        Thread.sleep(100);
+        ticker.advance(Long.MAX_VALUE);
         timerService.dequeue();
-        assertEquals(0, counter.get());
     }
 }

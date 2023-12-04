@@ -34,6 +34,7 @@ import com.automq.rocketmq.store.service.SnapshotService;
 import com.automq.rocketmq.store.service.StreamOperationLogService;
 import com.automq.rocketmq.store.service.StreamReclaimService;
 import com.automq.rocketmq.store.service.TimerService;
+import com.automq.rocketmq.store.service.TransactionService;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.service.api.OperationLogService;
 import com.automq.stream.s3.metadata.ObjectUtils;
@@ -54,7 +55,7 @@ public class MessageStoreBuilder {
         OperationLogService operationLogService = new StreamOperationLogService(streamStore, snapshotService, storeConfig);
         StreamReclaimService streamReclaimService = new StreamReclaimService(streamStore);
         // TODO: We may have multiple timer service in the future.
-        TimerService timerService = new TimerService("timer_tag_0", kvService);
+        TimerService timerService = new TimerService("timer_0", kvService);
         LogicQueueManager logicQueueManager = new DefaultLogicQueueManager(storeConfig, streamStore, kvService, timerService,
             metadataService, operationLogService, inflightService, streamReclaimService);
         MessageArrivalNotificationService messageArrivalNotificationService = new MessageArrivalNotificationService();
@@ -66,6 +67,9 @@ public class MessageStoreBuilder {
             s3StreamConfig.s3ForcePathStyle(), s3StreamConfig.s3AccessKey(), s3StreamConfig.s3SecretKey());
         S3ObjectOperator objectOperator = new S3ObjectOperatorImpl(operator);
 
-        return new MessageStoreImpl(storeConfig, streamStore, metadataService, kvService, timerService, inflightService, snapshotService, logicQueueManager, reviveService, objectOperator, messageArrivalNotificationService);
+        TransactionService transactionService = new TransactionService(storeConfig, timerService);
+
+        return new MessageStoreImpl(storeConfig, streamStore, metadataService, kvService, timerService, inflightService,
+            snapshotService, logicQueueManager, reviveService, objectOperator, messageArrivalNotificationService, transactionService);
     }
 }
