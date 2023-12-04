@@ -15,6 +15,11 @@
 
 enableStartupScripts: true
 
+persistence:
+  enabled: true
+  storageClass: ""
+  size: 10Gi
+
 service:
   type: ClusterIP
 
@@ -28,10 +33,7 @@ startupScriptContent: |
     export AWS_DEFAULT_BUCKETS=ros
     export AWS_S3_ENDPOINT=http://localhost:4566
     export PAGER=
-
     echo "S3 Configuration started"
-
     aws --endpoint-url=$AWS_S3_ENDPOINT s3 mb s3://$AWS_DEFAULT_BUCKETS
     aws --endpoint-url=$AWS_S3_ENDPOINT s3 cp /tmp/localstack/test-data/ s3://$AWS_DEFAULT_BUCKETS/chart --recursive
-
     echo "S3 Configured"
