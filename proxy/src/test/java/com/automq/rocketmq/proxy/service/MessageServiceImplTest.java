@@ -29,6 +29,7 @@ import com.automq.rocketmq.proxy.util.FlatMessageUtil;
 import com.automq.rocketmq.proxy.util.ReceiptHandleUtil;
 import com.automq.rocketmq.store.api.DeadLetterSender;
 import com.automq.rocketmq.store.api.MessageStore;
+import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.StoreContext;
 import com.automq.rocketmq.store.model.message.TagFilter;
 import java.lang.reflect.Field;
@@ -95,7 +96,7 @@ class MessageServiceImplTest {
     }
 
     @BeforeEach
-    public void setUp() {
+    public void setUp() throws StoreException {
         metadataService = new MockProxyMetadataService();
         messageStore = new MockMessageStore();
         ProxyConfig config = new ProxyConfig();
