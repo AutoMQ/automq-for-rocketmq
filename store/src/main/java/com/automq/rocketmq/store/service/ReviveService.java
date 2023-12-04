@@ -71,8 +71,15 @@ public class ReviveService {
 
     public ReviveService(String checkPointNamespace, KVService kvService, TimerService timerService,
         StoreMetadataService metadataService, MessageArrivalNotificationService messageArrivalNotificationService,
-        LogicQueueManager logicQueueManager,
-        DeadLetterSender deadLetterSender) throws StoreException {
+        LogicQueueManager logicQueueManager, DeadLetterSender deadLetterSender) throws StoreException {
+        this(checkPointNamespace, kvService, timerService, metadataService, messageArrivalNotificationService,
+            logicQueueManager, deadLetterSender, Executors.newFixedThreadPool(1, ThreadUtils.createThreadFactory("revive-service-background", false)));
+    }
+
+    public ReviveService(String checkPointNamespace, KVService kvService, TimerService timerService,
+        StoreMetadataService metadataService, MessageArrivalNotificationService messageArrivalNotificationService,
+        LogicQueueManager logicQueueManager, DeadLetterSender deadLetterSender,
+        ExecutorService executorService) throws StoreException {
         this.checkPointNamespace = checkPointNamespace;
         this.kvService = kvService;
         this.metadataService = metadataService;
@@ -80,8 +87,7 @@ public class ReviveService {
         this.logicQueueManager = logicQueueManager;
         this.inflightRevive = new ConcurrentHashMap<>();
         this.deadLetterSender = deadLetterSender;
-        this.backgroundExecutor = Executors.newSingleThreadExecutor(
-            ThreadUtils.createThreadFactory("revive-service-background", false));
+        this.backgroundExecutor = executorService;
 
         timerService.registerHandler(TimerHandlerType.POP_REVIVE, this::tryRevive);
     }

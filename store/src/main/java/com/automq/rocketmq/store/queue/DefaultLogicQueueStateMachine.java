@@ -380,10 +380,12 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
             if (buffer == null) {
                 throw new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "Change invisible duration operation failed, check point not found");
             }
+
             // Delete last timer tag.
             CheckPoint checkPoint = CheckPoint.getRootAsCheckPoint(ByteBuffer.wrap(buffer));
-            BatchDeleteRequest timerCancelRequest = timerService.cancelRequest(checkPoint.nextVisibleTimestamp(),
+            List<BatchDeleteRequest> timerCancelRequestList = timerService.cancelRequest(checkPoint.nextVisibleTimestamp(),
                 buildReceiptHandleKey(checkPoint.topicId(), checkPoint.queueId(), checkPoint.operationId()));
+            List<BatchRequest> requestList = new ArrayList<>(timerCancelRequestList);
 
             // Write new check point and timer tag.
             BatchWriteRequest writeCheckPointRequest = new BatchWriteRequest(KV_NAMESPACE_CHECK_POINT,
@@ -391,11 +393,14 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
                 buildCheckPointValue(checkPoint.topicId(), checkPoint.queueId(), checkPoint.messageOffset(), checkPoint.count(),
                     checkPoint.consumerGroupId(), checkPoint.operationId(), PopOperation.PopOperationType.valueOf(checkPoint.popOperationType()),
                     checkPoint.deliveryTimestamp(), nextVisibleTimestamp));
+            requestList.add(writeCheckPointRequest);
 
             BatchWriteRequest timerEnqueueRequest = timerService.enqueueRequest(
                 nextVisibleTimestamp, buildReceiptHandleKey(checkPoint.topicId(), checkPoint.queueId(), checkPoint.operationId()),
                 TimerHandlerType.POP_REVIVE, buildReceiptHandle(checkPoint.consumerGroupId(), checkPoint.topicId(), checkPoint.queueId(), checkPoint.operationId()));
-            kvService.batch(timerCancelRequest, writeCheckPointRequest, timerEnqueueRequest);
+            requestList.add(timerEnqueueRequest);
+
+            kvService.batch(requestList.toArray(new BatchRequest[0]));
         } catch (StoreException e) {
             LOGGER.error("{}: Replay change invisible duration operation failed", identity, e);
             CompletableFuture.failedFuture(e);
@@ -467,9 +472,9 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
             buildCheckPointKey(checkPoint.topicId(), checkPoint.queueId(), checkPoint.consumerGroupId(), checkPoint.operationId()));
         requestList.add(deleteCheckPointRequest);
 
-        BatchDeleteRequest timerCancelRequest = timerService.cancelRequest(checkPoint.nextVisibleTimestamp(),
+        List<BatchDeleteRequest> timerCancelRequest = timerService.cancelRequest(checkPoint.nextVisibleTimestamp(),
             buildReceiptHandleKey(checkPoint.topicId(), checkPoint.queueId(), checkPoint.operationId()));
-        requestList.add(timerCancelRequest);
+        requestList.addAll(timerCancelRequest);
 
         if (checkPoint.popOperationType() == PopOperation.PopOperationType.POP_ORDER.value()) {
             long baseOffset = checkPoint.messageOffset() - checkPoint.count() + 1;

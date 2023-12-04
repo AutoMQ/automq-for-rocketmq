@@ -46,6 +46,7 @@ import com.automq.rocketmq.store.service.SnapshotService;
 import com.automq.rocketmq.store.service.StreamOperationLogService;
 import com.automq.rocketmq.store.service.StreamReclaimService;
 import com.automq.rocketmq.store.service.TimerService;
+import com.automq.rocketmq.store.service.TransactionService;
 import com.automq.rocketmq.store.service.api.KVService;
 import com.automq.rocketmq.store.service.api.OperationLogService;
 import com.automq.stream.s3.operator.MemoryS3Operator;
@@ -75,7 +76,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class MessageStoreTest {
     private static final String PATH = "/tmp/ros/message_store_test/";
-    public static final String KV_NAMESPACE_TIMER_TAG = "timer_tag";
+    public static final String KV_NAMESPACE_TIMER_TAG = "timer_0";
     private static final long TOPIC_ID = 1313;
     private static final int QUEUE_ID = 13;
     private static final long CONSUMER_GROUP_ID = 131313;
@@ -107,8 +108,11 @@ public class MessageStoreTest {
         MessageArrivalNotificationService messageArrivalNotificationService = new MessageArrivalNotificationService();
         reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, kvService, timerService, metadataService, messageArrivalNotificationService,
             logicQueueManager, deadLetterSender);
+        TransactionService transactionService = new TransactionService(config, timerService);
         S3ObjectOperator operator = new S3ObjectOperatorImpl(new MemoryS3Operator());
-        messageStore = new MessageStoreImpl(config, streamStore, metadataService, kvService, timerService, inflightService, snapshotService, logicQueueManager, reviveService, operator, messageArrivalNotificationService);
+        messageStore = new MessageStoreImpl(config, streamStore, metadataService, kvService, timerService,
+            inflightService, snapshotService, logicQueueManager, reviveService, operator,
+            messageArrivalNotificationService, transactionService);
         messageStore.start();
     }
 
@@ -535,7 +539,7 @@ public class MessageStoreTest {
         assertEquals(2, checkpointCount.get());
 
         AtomicInteger timerTagCount = new AtomicInteger();
-        kvService.iterate(KV_NAMESPACE_TIMER_TAG, (key, value) -> timerTagCount.getAndIncrement());
+        kvService.iterate(KV_NAMESPACE_TIMER_TAG + "_tag", (key, value) -> timerTagCount.getAndIncrement());
         assertEquals(2, timerTagCount.get());
 
         // check consume offset and retry message count after opening

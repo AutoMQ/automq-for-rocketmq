@@ -101,6 +101,7 @@ enum TimerHandlerType:short {
 
 table TimerTag {
    delivery_timestamp:long;
+   identity:[byte];
    handler_type:TimerHandlerType;
-   payload: [byte];
+   payload:[byte];
 }

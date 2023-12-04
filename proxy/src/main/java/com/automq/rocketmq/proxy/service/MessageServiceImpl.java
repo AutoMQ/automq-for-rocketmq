@@ -36,6 +36,7 @@ import com.automq.rocketmq.proxy.util.FlatMessageUtil;
 import com.automq.rocketmq.proxy.util.ReceiptHandleUtil;
 import com.automq.rocketmq.store.api.DeadLetterSender;
 import com.automq.rocketmq.store.api.MessageStore;
+import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.StoreContext;
 import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PutResult;
@@ -108,13 +109,16 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
     private final SuspendRequestService suspendRequestService;
 
     public MessageServiceImpl(ProxyConfig config, MessageStore store, ProxyMetadataService metadataService,
-        LockService lockService, DeadLetterSender deadLetterService) {
+        LockService lockService, DeadLetterSender deadLetterService) throws StoreException {
         this.config = config;
         this.store = store;
         this.metadataService = metadataService;
         this.deadLetterService = deadLetterService;
         this.lockService = lockService;
         this.suspendRequestService = SuspendRequestService.getInstance();
+        store.registerTransactionCheckHandler(timerTag -> {
+            // TODO check transaction status
+        });
     }
 
     public TopicMessageType getMessageType(SendMessageRequestHeader requestHeader) {
@@ -171,7 +175,7 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
                     });
                     return consumerGroupOf(groupName)
                         .thenCompose(group -> deadLetterService.send(contextExt, group.getGroupId(), flatMessageExt))
-                        .thenApply(ignore -> new PutResult(PutResult.Status.PUT_OK, 0));
+                        .thenApply(ignore -> new PutResult(PutResult.Status.PUT_OK, 0, null));
                 } else {
                     String groupName = requestHeader.getTopic().replace(MixAll.RETRY_GROUP_TOPIC_PREFIX, "");
                     contextExt.span().ifPresent(span -> {
@@ -193,6 +197,7 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
             SendResult result = new SendResult();
             result.setSendStatus(SendStatus.SEND_OK);
             result.setMsgId(messageId);
+            result.setTransactionId(putResult.transactionId());
             result.setMessageQueue(new MessageQueue(messageQueue.getMessageQueue()));
             result.setQueueOffset(putResult.offset());
             return Collections.singletonList(result);

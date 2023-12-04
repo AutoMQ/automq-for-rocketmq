@@ -52,4 +52,8 @@ table SystemProperties {
     dlq_original_topic_id: long;
     // For a dead letter message, this field is the original message id
     dlq_original_message_id: string;
+    // For a pending transaction message, this field is true
+    prepared_transaction_mark: bool;
+    // For a pending transaction message, this field is the first check time. If set to zero, the broker will use the default value
+    orphaned_transaction_recovery_seconds: long;
 }

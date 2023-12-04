@@ -251,6 +251,19 @@ public class FlatMessageUtil {
             systemPropertiesT.setDlqOriginalMessageId(dlqOriginalMessageId);
         }
 
+        String preparedTransactionMark = properties.remove(MessageConst.PROPERTY_TRANSACTION_PREPARED);
+        if ("true".equals(preparedTransactionMark)) {
+            systemPropertiesT.setPreparedTransactionMark(true);
+        }
+
+        String orphanedTransactionRecoverySeconds = properties.remove(MessageConst.PROPERTY_CHECK_IMMUNITY_TIME_IN_SECONDS);
+        if (!Strings.isNullOrEmpty(orphanedTransactionRecoverySeconds)) {
+            try {
+                systemPropertiesT.setOrphanedTransactionRecoverySeconds(Long.parseLong(orphanedTransactionRecoverySeconds));
+            } catch (NumberFormatException ignored) {
+            }
+        }
+
         // Remove all system properties
         for (String systemPropertyKey : MessageConst.STRING_HASH_SET) {
             properties.remove(systemPropertyKey);

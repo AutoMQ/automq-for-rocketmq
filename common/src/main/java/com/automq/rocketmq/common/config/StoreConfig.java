@@ -44,6 +44,8 @@ public class StoreConfig {
     private int workingThreadPoolNums = PROCESSOR_NUMBER;
     private int workingThreadQueueCapacity = 10000;
 
+    private long transactionTimeoutMillis = 6 * 1000;
+
     public int maxFetchCount() {
         return maxFetchCount;
     }
@@ -86,5 +88,9 @@ public class StoreConfig {
 
     public void setWorkingThreadQueueCapacity(int workingThreadQueueCapacity) {
         this.workingThreadQueueCapacity = workingThreadQueueCapacity;
+    }
+
+    public long transactionTimeoutMillis() {
+        return transactionTimeoutMillis;
     }
 }
