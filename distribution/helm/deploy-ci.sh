@@ -59,43 +59,21 @@ helm repo add bitnami https://charts.bitnami.com/bitnami
 helm repo add automq http://charts.automq.com/
 helm repo update
 
-max_retries=3
-retry_interval=5
 
 # deploy s3-localstack
-retry=0
-while [[ $retry -lt $max_retries ]]; do
-    if helm install s3-localstack localstack-charts/localstack -f deploy/localstack_s3.yaml --namespace $NAMESPACE; then
-        break
-    fi
-    retry=$((retry + 1))
-    sleep $retry_interval
-done
+helm install s3-localstack localstack-charts/localstack --version 0.6.5 -f deploy/localstack_s3.yaml --namespace $NAMESPACE
 
 # Wait for s3-localstack to be ready
 kubectl rollout status --watch --timeout=120s replicaset/s3-localstack --namespace $NAMESPACE
 
 # deploy mysql
-retry=0
-while [[ $retry -lt $max_retries ]]; do
-    if helm install mysql bitnami/mysql -f deploy/mysql.yaml --namespace $NAMESPACE; then
-        break
-    fi
-    retry=$((retry + 1))
-    sleep $retry_interval
-done
+helm install mysql bitnami/mysql --version 9.14.1 -f deploy/mysql.yaml --namespace $NAMESPACE
 
 # Wait for mysql to be ready
 kubectl rollout status --watch --timeout=120s statefulset/mysql --namespace $NAMESPACE
 
 # deploy automq-for-rocketmq
-retry=0
-while [[ $retry -lt $max_retries ]]; do
-    if helm install automq-for-rocketmq automq/automq-for-rocketmq -f deploy/helm_sample_values.yaml --set broker.image.repository=$ROCKETMQ_REPO --set broker.image.tag=$ROCKETMQ_VERSION --namespace $NAMESPACE; then
-        break
-    fi
-    retry=$((retry + 1))
-    sleep $retry_interval
-done
+helm install automq-for-rocketmq automq/automq-for-rocketmq -f deploy/helm_sample_values.yaml --set broker.image.repository=$ROCKETMQ_REPO --set broker.image.tag=$ROCKETMQ_VERSION --namespace $NAMESPACE
 
+# Wait for automq-for-rocketmq to be ready
 kubectl rollout status --watch --timeout=360s statefulset/automq-for-rocketmq-rocketmq-broker --namespace $NAMESPACE
