@@ -135,7 +135,7 @@ jobs:
           NAMESPACE: ${{ steps.create_namespace.outputs.namespace }}
           DOCKER_REPO: ${{ env.DOCKER_REPO }}
         run: |
-          sh deploy-ci.sh ${DOCKER_REPO} ${{ matrix.version }} ${NAMESPACE}
+          bash deploy-ci.sh ${DOCKER_REPO} ${{ matrix.version }} ${NAMESPACE}
 
   test-e2e-grpc-java:
     if: ${{ success() }}
@@ -237,5 +237,5 @@ jobs:
         env:
           NAMESPACE: ${{ needs.deploy.outputs.namespace }}
         run: |
-          sh clean-ci.sh ${NAMESPACE}
+          bash clean-ci.sh ${NAMESPACE}
           kubectl delete namespace $NAMESPACE
