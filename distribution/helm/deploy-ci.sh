@@ -53,26 +53,49 @@ echo "************************************"
 
 echo ${ROCKETMQ_REPO}:${ROCKETMQ_VERSION}: ${NAMESPACE} deploy start
 
-# deploy s3-localstack
+# add dependency repo
 helm repo add localstack-charts https://localstack.github.io/helm-charts
-helm install s3-localstack localstack-charts/localstack -f deploy/localstack_s3.yaml --namespace $NAMESPACE
+helm repo add bitnami https://charts.bitnami.com/bitnami
+helm repo add automq http://charts.automq.com/
+helm repo update
+
+max_retries=3
+retry_interval=5
+
+# deploy s3-localstack
+retry=0
+while [[ $retry -lt $max_retries ]]; do
+    if helm install s3-localstack localstack-charts/localstack -f deploy/localstack_s3.yaml --namespace $NAMESPACE; then
+        break
+    fi
+    retry=$((retry + 1))
+    sleep $retry_interval
+done
 
 # Wait for s3-localstack to be ready
 kubectl rollout status --watch --timeout=120s replicaset/s3-localstack --namespace $NAMESPACE
 
 # deploy mysql
-helm repo add bitnami https://charts.bitnami.com/bitnami
-helm install mysql bitnami/mysql -f deploy/mysql.yaml --namespace $NAMESPACE
+retry=0
+while [[ $retry -lt $max_retries ]]; do
+    if helm install mysql bitnami/mysql -f deploy/mysql.yaml --namespace $NAMESPACE; then
+        break
+    fi
+    retry=$((retry + 1))
+    sleep $retry_interval
+done
 
 # Wait for mysql to be ready
 kubectl rollout status --watch --timeout=120s statefulset/mysql --namespace $NAMESPACE
 
-helm repo add automq http://charts.automq.com/
-
 # deploy automq-for-rocketmq
-helm install automq-for-rocketmq automq/automq-for-rocketmq -f deploy/helm_sample_values.yaml  \
-  --set broker.image.repository=$ROCKETMQ_REPO  \
-  --set broker.image.tag=$ROCKETMQ_VERSION  \
-  --namespace $NAMESPACE
+retry=0
+while [[ $retry -lt $max_retries ]]; do
+    if helm install automq-for-rocketmq automq/automq-for-rocketmq -f deploy/helm_sample_values.yaml --set broker.image.repository=$ROCKETMQ_REPO --set broker.image.tag=$ROCKETMQ_VERSION --namespace $NAMESPACE; then
+        break
+    fi
+    retry=$((retry + 1))
+    sleep $retry_interval
+done
 
 kubectl rollout status --watch --timeout=360s statefulset/automq-for-rocketmq-rocketmq-broker --namespace $NAMESPACE
