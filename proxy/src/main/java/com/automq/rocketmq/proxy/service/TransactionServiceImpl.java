@@ -23,50 +23,51 @@ import org.apache.rocketmq.proxy.common.ProxyContext;
 import org.apache.rocketmq.proxy.service.transaction.EndTransactionRequestData;
 import org.apache.rocketmq.proxy.service.transaction.TransactionData;
 import org.apache.rocketmq.proxy.service.transaction.TransactionService;
+import org.apache.rocketmq.remoting.protocol.header.EndTransactionRequestHeader;
 
 public class TransactionServiceImpl implements TransactionService {
     @Override
     public void addTransactionSubscription(ProxyContext ctx, String group, List<String> topicList) {
-        throw new UnsupportedOperationException();
     }
 
     @Override
     public void addTransactionSubscription(ProxyContext ctx, String group, String topic) {
-        throw new UnsupportedOperationException();
     }
 
     @Override
     public void replaceTransactionSubscription(ProxyContext ctx, String group, List<String> topicList) {
-        throw new UnsupportedOperationException();
-
     }
 
     @Override
     public void unSubscribeAllTransactionTopic(ProxyContext ctx, String group) {
-        throw new UnsupportedOperationException();
     }
 
     @Override
     public TransactionData addTransactionDataByBrokerAddr(ProxyContext ctx, String brokerAddr, String producerGroup,
         long tranStateTableOffset, long commitLogOffset, String transactionId, Message message) {
-        throw new UnsupportedOperationException();
+        return null;
     }
 
     @Override
     public TransactionData addTransactionDataByBrokerName(ProxyContext ctx, String brokerName, String producerGroup,
         long tranStateTableOffset, long commitLogOffset, String transactionId, Message message) {
-        throw new UnsupportedOperationException();
+        return null;
     }
 
     @Override
     public EndTransactionRequestData genEndTransactionRequestHeader(ProxyContext ctx, String producerGroup,
         Integer commitOrRollback, boolean fromTransactionCheck, String msgId, String transactionId) {
-        throw new UnsupportedOperationException();
+        EndTransactionRequestHeader requestHeader = new EndTransactionRequestHeader();
+        requestHeader.setProducerGroup(producerGroup);
+        requestHeader.setCommitOrRollback(commitOrRollback);
+        requestHeader.setFromTransactionCheck(fromTransactionCheck);
+        requestHeader.setMsgId(msgId);
+        requestHeader.setTransactionId(transactionId);
+        return new EndTransactionRequestData("", requestHeader);
     }
 
     @Override
     public void onSendCheckTransactionStateFailed(ProxyContext context, String producerGroup,
         TransactionData transactionData) {
-        throw new UnsupportedOperationException();
     }
 }

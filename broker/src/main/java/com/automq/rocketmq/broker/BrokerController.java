@@ -63,6 +63,7 @@ import java.io.InputStream;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
+import org.apache.rocketmq.broker.client.ProducerManager;
 import org.apache.rocketmq.common.constant.LoggerName;
 import org.apache.rocketmq.common.thread.ThreadPoolMonitor;
 import org.apache.rocketmq.logging.org.slf4j.Logger;
@@ -117,10 +118,12 @@ public class BrokerController implements Lifecycle {
         metadataStore.setDataStore(dataStore);
 
         LockService lockService = new LockService(brokerConfig.proxy());
-        MessageServiceImpl messageServiceImpl = new MessageServiceImpl(brokerConfig.proxy(), messageStore, proxyMetadataService, lockService, dlqService);
+
+        ProducerManager producerManager = new ProducerManager();
+        MessageServiceImpl messageServiceImpl = new MessageServiceImpl(brokerConfig.proxy(), messageStore, proxyMetadataService, lockService, dlqService, producerManager);
         this.messageService = messageServiceImpl;
         this.extendMessageService = messageServiceImpl;
-        serviceManager = new DefaultServiceManager(brokerConfig, proxyMetadataService, dlqService, messageService, messageStore);
+        serviceManager = new DefaultServiceManager(brokerConfig, proxyMetadataService, dlqService, messageService, messageStore, producerManager);
 
         messagingProcessor = ExtendMessagingProcessor.createForS3RocketMQ(serviceManager, brokerConfig.proxy());
 

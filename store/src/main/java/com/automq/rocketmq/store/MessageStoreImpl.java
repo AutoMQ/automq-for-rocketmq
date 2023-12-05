@@ -39,6 +39,7 @@ import com.automq.rocketmq.store.model.message.PopResult;
 import com.automq.rocketmq.store.model.message.PullResult;
 import com.automq.rocketmq.store.model.message.PutResult;
 import com.automq.rocketmq.store.model.message.ResetConsumeOffsetResult;
+import com.automq.rocketmq.store.model.transaction.TransactionResolution;
 import com.automq.rocketmq.store.service.InflightService;
 import com.automq.rocketmq.store.service.MessageArrivalNotificationService;
 import com.automq.rocketmq.store.service.ReviveService;
@@ -50,6 +51,7 @@ import com.automq.rocketmq.store.util.FlatMessageUtil;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.instrumentation.annotations.SpanAttribute;
 import io.opentelemetry.instrumentation.annotations.WithSpan;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
@@ -188,7 +190,8 @@ public class MessageStoreImpl implements MessageStore {
         long deliveryTimestamp = message.systemProperties().deliveryTimestamp();
         if (deliveryTimestamp > 0 && deliveryTimestamp - System.currentTimeMillis() > 1000) {
             try {
-                timerService.enqueue(deliveryTimestamp, TimerHandlerType.TIMER_MESSAGE, FlatMessageUtil.flatBufferToByteArray(message));
+                String messageId = message.systemProperties().messageId();
+                timerService.enqueue(deliveryTimestamp, messageId.getBytes(StandardCharsets.UTF_8), TimerHandlerType.TIMER_MESSAGE, FlatMessageUtil.flatBufferToByteArray(message));
                 return CompletableFuture.completedFuture(new PutResult(PutResult.Status.PUT_DELAYED, -1));
             } catch (Exception e) {
                 return CompletableFuture.failedFuture(e);
@@ -198,7 +201,7 @@ public class MessageStoreImpl implements MessageStore {
         // Deal with transaction message
         if (message.systemProperties().preparedTransactionMark()) {
             try {
-                String transactionId = transactionService.prepareTransaction(message);
+                String transactionId = transactionService.begin(message);
                 return CompletableFuture.completedFuture(new PutResult(PutResult.Status.PUT_TRANSACTION_PREPARED, -1, transactionId));
             } catch (StoreException e) {
                 return CompletableFuture.failedFuture(e);
@@ -277,6 +280,39 @@ public class MessageStoreImpl implements MessageStore {
     public CompletableFuture<ClearRetryMessagesResult> clearRetryMessages(long consumerGroupId, long topicId,
         int queueId) {
         throw new UnsupportedOperationException("Not implemented yet");
+    }
+
+    @Override
+    public CompletableFuture<Boolean> cancelDelayMessage(String messageId) {
+        try {
+            boolean result = timerService.cancel(messageId.getBytes(StandardCharsets.UTF_8));
+            return CompletableFuture.completedFuture(result);
+        } catch (Exception e) {
+            return CompletableFuture.failedFuture(e);
+        }
+    }
+
+    @Override
+    public CompletableFuture<Void> endTransaction(String transactionId, TransactionResolution resolution) {
+        try {
+            if (resolution == TransactionResolution.COMMIT) {
+                transactionService.commit(transactionId)
+                    .ifPresent(message -> {
+                        message.systemProperties().mutatePreparedTransactionMark(false);
+                        put(StoreContext.EMPTY, message);
+                    });
+            } else {
+                transactionService.rollback(transactionId);
+            }
+            return CompletableFuture.completedFuture(null);
+        } catch (Exception e) {
+            return CompletableFuture.failedFuture(e);
+        }
+    }
+
+    @Override
+    public void scheduleCheckTransaction(FlatMessage message) throws StoreException {
+        transactionService.scheduleNextCheck(message);
     }
 
     @Override

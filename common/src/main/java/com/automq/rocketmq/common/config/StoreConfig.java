@@ -46,6 +46,10 @@ public class StoreConfig {
 
     private long transactionTimeoutMillis = 6 * 1000;
 
+    private long transactionCheckInterval = 30 * 1000;
+
+    private int transactionCheckMaxTimes = 15;
+
     public int maxFetchCount() {
         return maxFetchCount;
     }
@@ -92,5 +96,13 @@ public class StoreConfig {
 
     public long transactionTimeoutMillis() {
         return transactionTimeoutMillis;
+    }
+
+    public long transactionCheckInterval() {
+        return transactionCheckInterval;
+    }
+
+    public int transactionCheckMaxTimes() {
+        return transactionCheckMaxTimes;
     }
 }

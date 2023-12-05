@@ -254,6 +254,7 @@ public class FlatMessageUtil {
         String preparedTransactionMark = properties.remove(MessageConst.PROPERTY_TRANSACTION_PREPARED);
         if ("true".equals(preparedTransactionMark)) {
             systemPropertiesT.setPreparedTransactionMark(true);
+            systemPropertiesT.setOrphanedTransactionCheckTimes(0);
         }
 
         String orphanedTransactionRecoverySeconds = properties.remove(MessageConst.PROPERTY_CHECK_IMMUNITY_TIME_IN_SECONDS);

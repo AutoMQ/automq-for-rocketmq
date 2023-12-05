@@ -67,7 +67,7 @@ class TransactionServiceTest {
             counter.incrementAndGet();
         });
 
-        String transactionId = transactionService.prepareTransaction(message);
+        String transactionId = transactionService.begin(message);
         assertEquals(message.systemProperties().messageId(), transactionId);
 
         long dequeueTimestamp = System.currentTimeMillis() + config.transactionTimeoutMillis();
@@ -83,7 +83,7 @@ class TransactionServiceTest {
         ByteBuffer buffer = MockMessageUtil.buildMessage();
         FlatMessage message = FlatMessage.getRootAsFlatMessage(buffer);
 
-        String transactionId = transactionService.prepareTransaction(message);
+        String transactionId = transactionService.begin(message);
         transactionService.cancelCheck(transactionId);
 
         ticker.advance(Long.MAX_VALUE);

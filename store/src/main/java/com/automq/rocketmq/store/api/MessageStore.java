@@ -30,6 +30,7 @@ import com.automq.rocketmq.store.model.message.PopResult;
 import com.automq.rocketmq.store.model.message.PullResult;
 import com.automq.rocketmq.store.model.message.PutResult;
 import com.automq.rocketmq.store.model.message.ResetConsumeOffsetResult;
+import com.automq.rocketmq.store.model.transaction.TransactionResolution;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
@@ -145,6 +146,30 @@ public interface MessageStore extends Lifecycle {
      * @return clear result, see {@link ClearRetryMessagesResult}
      */
     CompletableFuture<ClearRetryMessagesResult> clearRetryMessages(long consumerGroupId, long topicId, int queueId);
+
+    /**
+     * Cancel delayed message.
+     *
+     * @param messageId message id to cancel
+     * @return cancel result
+     */
+    CompletableFuture<Boolean> cancelDelayMessage(String messageId);
+
+    /**
+     * End a transaction.
+     *
+     * @param transactionId transaction id
+     * @param resolution    transaction resolution
+     * @return end transaction result
+     */
+    CompletableFuture<Void> endTransaction(String transactionId, TransactionResolution resolution);
+
+    /**
+     * Schedule a check for transaction status.
+     *
+     * @param message transaction message
+     */
+    void scheduleCheckTransaction(FlatMessage message) throws StoreException;
 
     /**
      * Register a listener to be notified when a message arrives.

@@ -31,6 +31,7 @@ import com.google.flatbuffers.FlatBufferBuilder;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Consumer;
@@ -147,16 +148,17 @@ public class TimerService extends ServiceThread {
         return new BatchWriteRequest(timerTagNamespace, buildTimerTagKey(deliveryTimestamp, identity), buildTimerTagValue(deliveryTimestamp, identity, handlerType, payload));
     }
 
-    public void cancel(byte[] identity) throws StoreException {
+    public boolean cancel(byte[] identity) throws StoreException {
         byte[] value = kvService.get(timerIndexNamespace, identity);
         if (value == null || value.length != Long.SIZE / Byte.SIZE) {
-            return;
+            return false;
         }
 
         long deliveryTimestamp = ByteBuffer.wrap(value).getLong();
         BatchDeleteRequest deleteTagRequest = new BatchDeleteRequest(timerTagNamespace, buildTimerTagKey(deliveryTimestamp, identity));
         BatchDeleteRequest deleteIndexRequest = new BatchDeleteRequest(timerIndexNamespace, identity);
         kvService.batch(deleteTagRequest, deleteIndexRequest);
+        return true;
     }
 
     public List<BatchDeleteRequest> cancelRequest(long deliveryTimestamp, byte[] identity) {
@@ -164,6 +166,22 @@ public class TimerService extends ServiceThread {
         BatchDeleteRequest deleteIndexRequest = new BatchDeleteRequest(timerIndexNamespace, identity);
 
         return List.of(deleteTagRequest, deleteIndexRequest);
+    }
+
+    public Optional<TimerTag> get(byte[] identity) throws StoreException {
+        byte[] value = kvService.get(timerIndexNamespace, identity);
+        if (value == null || value.length != Long.SIZE / Byte.SIZE) {
+            return Optional.empty();
+        }
+
+        long deliveryTimestamp = ByteBuffer.wrap(value).getLong();
+        byte[] tagValue = kvService.get(timerTagNamespace, buildTimerTagKey(deliveryTimestamp, identity));
+        if (tagValue == null) {
+            return Optional.empty();
+        }
+
+        TimerTag timerTag = TimerTag.getRootAsTimerTag(ByteBuffer.wrap(tagValue));
+        return Optional.of(timerTag);
     }
 
     @Override
