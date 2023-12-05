@@ -297,10 +297,13 @@ public class DefaultMetadataStore implements MetadataStore {
                 if (this.isLeader()) {
                     try (SqlSession session = openSession()) {
                         NodeMapper nodeMapper = session.getMapper(NodeMapper.class);
-                        Node node = nodeMapper.get(null, name, instanceId, null);
+                        Node node = nodeMapper.get(null, name, null, null);
                         if (null != node) {
                             if (!Strings.isNullOrEmpty(address)) {
                                 node.setAddress(address);
+                            }
+                            if (!Strings.isNullOrEmpty(instanceId)) {
+                                node.setInstanceId(instanceId);
                             }
                             node.setEpoch(node.getEpoch() + 1);
                             nodeMapper.update(node);
