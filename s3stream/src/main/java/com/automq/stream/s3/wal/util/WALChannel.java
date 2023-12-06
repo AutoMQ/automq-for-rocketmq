@@ -137,7 +137,7 @@ public interface WALChannel {
         }
 
         public WALChannel build() {
-            String directNotAvailableMsg = WALBlockDeviceChannel.checkAvailable();
+            String directNotAvailableMsg = WALBlockDeviceChannel.checkAvailable(path);
             boolean useDirect = false;
             if (direct != null) {
                 // Set by user.
