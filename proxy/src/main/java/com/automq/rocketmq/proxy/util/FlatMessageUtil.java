@@ -265,6 +265,11 @@ public class FlatMessageUtil {
             }
         }
 
+        String orphanedTransactionProducer = properties.remove(MessageConst.PROPERTY_PRODUCER_GROUP);
+        if (!Strings.isNullOrEmpty(orphanedTransactionProducer)) {
+            systemPropertiesT.setOrphanedTransactionProducer(orphanedTransactionProducer);
+        }
+
         // Remove all system properties
         for (String systemPropertyKey : MessageConst.STRING_HASH_SET) {
             properties.remove(systemPropertyKey);
@@ -301,6 +306,9 @@ public class FlatMessageUtil {
         // TODO: set MessageConstants#PROPERTY_DLQ_ORIGIN_TOPIC
         if (systemProperties.dlqOriginalMessageId() != null) {
             MessageAccessor.putProperty(messageExt, MessageConst.PROPERTY_DLQ_ORIGIN_MESSAGE_ID, String.valueOf(systemProperties.dlqOriginalMessageId()));
+        }
+        if (systemProperties.orphanedTransactionProducer() != null) {
+            MessageAccessor.putProperty(messageExt, MessageConst.PROPERTY_PRODUCER_GROUP, systemProperties.orphanedTransactionProducer());
         }
     }
 }

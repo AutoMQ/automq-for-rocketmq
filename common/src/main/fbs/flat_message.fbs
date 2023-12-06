@@ -58,4 +58,6 @@ table SystemProperties {
     orphaned_transaction_recovery_seconds: long;
     // For a pending transaction message, this field records the check times.
     orphaned_transaction_check_times:int = -1;
+    // For a pending transaction message, this field records the producer group name.
+    orphaned_transaction_producer:string;
 }
