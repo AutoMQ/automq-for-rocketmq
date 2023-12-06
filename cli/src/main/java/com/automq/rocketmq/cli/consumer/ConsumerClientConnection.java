@@ -15,9 +15,9 @@
  * limitations under the License.
  */
 
-package com.automq.rocketmq.cli.producer;
+package com.automq.rocketmq.cli.consumer;
 
-import apache.rocketmq.proxy.v1.ProducerClientConnectionRequest;
+import apache.rocketmq.proxy.v1.ConsumerClientConnectionRequest;
 import com.automq.rocketmq.cli.CliClientConfig;
 import com.automq.rocketmq.cli.MQAdmin;
 import com.automq.rocketmq.proxy.grpc.client.GrpcProxyClient;
@@ -30,8 +30,8 @@ import java.util.concurrent.Callable;
 import java.util.stream.IntStream;
 import picocli.CommandLine;
 
-@CommandLine.Command(name = "producerClientConnection", mixinStandardHelpOptions = true, showDefaultValues = true)
-public class ProducerClientConnection implements Callable<Void> {
+@CommandLine.Command(name = "consumerClientConnection", mixinStandardHelpOptions = true, showDefaultValues = true)
+public class ConsumerClientConnection implements Callable<Void> {
     @CommandLine.ParentCommand
     MQAdmin mqAdmin;
 
@@ -42,7 +42,7 @@ public class ProducerClientConnection implements Callable<Void> {
     public Void call() throws Exception {
         GrpcProxyClient proxyClient = new GrpcProxyClient(new CliClientConfig());
 
-        List<apache.rocketmq.proxy.v1.ProducerClientConnection> connections = proxyClient.producerClientConnection(mqAdmin.getEndpoint(), ProducerClientConnectionRequest.newBuilder().setGroup(groupName).build()).get();
+        List<apache.rocketmq.proxy.v1.ConsumerClientConnection> connections = proxyClient.consumerClientConnection(mqAdmin.getEndpoint(), ConsumerClientConnectionRequest.newBuilder().setGroup(groupName).build()).get();
 
         AsciiTable groupTable = new AsciiTable();
         groupTable.addRule();
@@ -50,7 +50,7 @@ public class ProducerClientConnection implements Callable<Void> {
         centralize(row);
         groupTable.addRule();
 
-        for (apache.rocketmq.proxy.v1.ProducerClientConnection connection : connections) {
+        for (apache.rocketmq.proxy.v1.ConsumerClientConnection connection : connections) {
             row = groupTable.addRow(connection.getClientId(), connection.getProtocol(), connection.getVersion(), connection.getAddress(), connection.getLanguage());
             centralize(row);
             groupTable.addRule();

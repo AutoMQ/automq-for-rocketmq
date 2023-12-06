@@ -18,6 +18,9 @@
 package com.automq.rocketmq.proxy.grpc;
 
 import apache.rocketmq.common.v1.Code;
+import apache.rocketmq.proxy.v1.ConsumerClientConnection;
+import apache.rocketmq.proxy.v1.ConsumerClientConnectionReply;
+import apache.rocketmq.proxy.v1.ConsumerClientConnectionRequest;
 import apache.rocketmq.proxy.v1.ProducerClientConnection;
 import apache.rocketmq.proxy.v1.ProducerClientConnectionReply;
 import apache.rocketmq.proxy.v1.ProducerClientConnectionRequest;
@@ -36,6 +39,8 @@ import io.netty.channel.Channel;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.rocketmq.broker.client.ClientChannelInfo;
+import org.apache.rocketmq.broker.client.ConsumerGroupInfo;
+import org.apache.rocketmq.broker.client.ConsumerManager;
 import org.apache.rocketmq.broker.client.ProducerManager;
 import org.apache.rocketmq.common.MQVersion;
 import org.apache.rocketmq.common.utils.NetworkUtil;
@@ -49,10 +54,13 @@ public class ProxyServiceImpl extends ProxyServiceGrpc.ProxyServiceImplBase {
     private final ExtendMessageService messageService;
 
     private final ProducerManager producerManager;
+    private final ConsumerManager consumerManager;
 
-    public ProxyServiceImpl(ExtendMessageService messageService, ProducerManager producerManager) {
+    public ProxyServiceImpl(ExtendMessageService messageService, ProducerManager producerManager,
+        ConsumerManager consumerManager) {
         this.messageService = messageService;
         this.producerManager = producerManager;
+        this.consumerManager = consumerManager;
     }
 
     @Override
@@ -126,13 +134,13 @@ public class ProxyServiceImpl extends ProxyServiceGrpc.ProxyServiceImplBase {
     @Override
     public void producerClientConnection(ProducerClientConnectionRequest request,
         StreamObserver<ProducerClientConnectionReply> responseObserver) {
-        ConcurrentHashMap<Channel, ClientChannelInfo> map = producerManager.getGroupChannelTable().get(request.getProductionGroup());
+        ConcurrentHashMap<Channel, ClientChannelInfo> map = producerManager.getGroupChannelTable().get(request.getGroup());
         if (map == null) {
             responseObserver.onNext(ProducerClientConnectionReply.newBuilder()
                 .setStatus(Status
                     .newBuilder()
                     .setCode(Code.BAD_REQUEST)
-                    .setMessage("Producer group not found: " + request.getProductionGroup())
+                    .setMessage("Producer group not found: " + request.getGroup())
                     .build())
                 .build());
             responseObserver.onCompleted();
@@ -145,6 +153,40 @@ public class ProxyServiceImpl extends ProxyServiceGrpc.ProxyServiceImplBase {
                 protocolType = ChannelProtocolType.GRPC_V2.name();
             }
             builder.addConnection(ProducerClientConnection.newBuilder()
+                .setClientId(info.getClientId())
+                .setProtocol(protocolType)
+                .setAddress(NetworkUtil.socketAddress2String(info.getChannel().remoteAddress()))
+                .setLanguage(info.getLanguage().name())
+                .setVersion(MQVersion.getVersionDesc(info.getVersion()))
+                .setLastUpdateTime(info.getLastUpdateTimestamp())
+                .build());
+        }
+        responseObserver.onNext(builder.build());
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void consumerClientConnection(ConsumerClientConnectionRequest request,
+        StreamObserver<ConsumerClientConnectionReply> responseObserver) {
+        ConsumerGroupInfo groupInfo = consumerManager.getConsumerGroupInfo(request.getGroup(), true);
+        if (groupInfo == null) {
+            responseObserver.onNext(ConsumerClientConnectionReply.newBuilder()
+                .setStatus(Status
+                    .newBuilder()
+                    .setCode(Code.BAD_REQUEST)
+                    .setMessage("Consumer group not found: " + request.getGroup())
+                    .build())
+                .build());
+            responseObserver.onCompleted();
+            return;
+        }
+        ConsumerClientConnectionReply.Builder builder = ConsumerClientConnectionReply.newBuilder();
+        for (ClientChannelInfo info : groupInfo.getChannelInfoTable().values()) {
+            String protocolType = ChannelProtocolType.REMOTING.name();
+            if (info.getChannel() instanceof GrpcClientChannel) {
+                protocolType = ChannelProtocolType.GRPC_V2.name();
+            }
+            builder.addConnection(ConsumerClientConnection.newBuilder()
                 .setClientId(info.getClientId())
                 .setProtocol(protocolType)
                 .setAddress(NetworkUtil.socketAddress2String(info.getChannel().remoteAddress()))

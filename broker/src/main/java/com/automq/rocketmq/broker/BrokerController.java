@@ -63,6 +63,7 @@ import java.io.InputStream;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
+import org.apache.rocketmq.broker.client.ConsumerManager;
 import org.apache.rocketmq.broker.client.ProducerManager;
 import org.apache.rocketmq.common.constant.LoggerName;
 import org.apache.rocketmq.common.thread.ThreadPoolMonitor;
@@ -123,7 +124,8 @@ public class BrokerController implements Lifecycle {
         MessageServiceImpl messageServiceImpl = new MessageServiceImpl(brokerConfig.proxy(), messageStore, proxyMetadataService, lockService, dlqService, producerManager);
         this.messageService = messageServiceImpl;
         this.extendMessageService = messageServiceImpl;
-        serviceManager = new DefaultServiceManager(brokerConfig, proxyMetadataService, dlqService, messageService, messageStore, producerManager);
+        ConsumerManager consumerManager = new ConsumerManager(new DefaultServiceManager.ConsumerIdsChangeListenerImpl(), brokerConfig.proxy().channelExpiredTimeout());
+        serviceManager = new DefaultServiceManager(brokerConfig, proxyMetadataService, dlqService, messageService, messageStore, producerManager, consumerManager);
 
         messagingProcessor = ExtendMessagingProcessor.createForS3RocketMQ(serviceManager, brokerConfig.proxy());
 
@@ -194,7 +196,7 @@ public class BrokerController implements Lifecycle {
 
         // TODO: Split controller to a separate port
         ControllerServiceImpl controllerService = MetadataStoreBuilder.build(metadataStore);
-        ProxyServiceImpl proxyService = new ProxyServiceImpl(extendMessageService, producerManager);
+        ProxyServiceImpl proxyService = new ProxyServiceImpl(extendMessageService, producerManager, consumerManager);
         grpcServer = new GrpcProtocolServer(brokerConfig.proxy(), messagingProcessor, controllerService, proxyService);
         remotingServer = new RemotingProtocolServer(messagingProcessor);
     }
