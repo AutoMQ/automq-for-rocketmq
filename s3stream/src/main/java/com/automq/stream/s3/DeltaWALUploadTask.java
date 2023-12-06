@@ -185,7 +185,7 @@ public class DeltaWALUploadTask {
         private S3Operator s3Operator;
         private ExecutorService executor;
         private Boolean forceSplit;
-        private double rate = Integer.MAX_VALUE;
+        private double rate = Long.MAX_VALUE;
 
         public Builder config(Config config) {
             this.config = config;

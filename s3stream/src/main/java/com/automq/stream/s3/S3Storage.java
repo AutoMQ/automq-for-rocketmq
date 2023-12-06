@@ -503,7 +503,7 @@ public class S3Storage implements Storage {
         long elapsed = System.currentTimeMillis() - context.cache.createdTimestamp();
         double rate;
         if (elapsed <= 100L) {
-            rate = Integer.MAX_VALUE;
+            rate = Long.MAX_VALUE;
         } else {
             rate = context.cache.size() * 1000.0 / Math.min(5000L, elapsed);
             if (rate > maxDataWriteRate) {
