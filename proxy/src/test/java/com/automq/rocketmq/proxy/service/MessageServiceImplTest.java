@@ -356,7 +356,7 @@ class MessageServiceImplTest {
         assertEquals(PopStatus.FOUND, result.getPopStatus());
         assertEquals(2, result.getMsgFoundList().size());
         // All messages in queue 0 has been consumed
-        assertEquals(2, messageStore.getConsumeOffset(consumerGroupId, topicId, 0).join());
+        assertEquals(2, messageStore.getConsumeOffset(consumerGroupId, topicId, 0));
 
         // Pop again.
         result = messageService.popMessage(ProxyContextExt.create(), messageQueue, header, 0L).join();

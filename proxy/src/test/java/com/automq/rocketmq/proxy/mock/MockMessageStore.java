@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.proxy.mock;
 
+import apache.rocketmq.controller.v1.StreamRole;
 import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.store.api.LogicQueue;
@@ -160,19 +161,24 @@ public class MockMessageStore implements MessageStore {
     }
 
     @Override
-    public CompletableFuture<LogicQueue.QueueOffsetRange> getOffsetRange(long topicId, int queueId) {
+    public List<LogicQueue.StreamOffsetRange> getOffsetRange(long topicId, int queueId, long consumerGroupId) {
         long startOffset = 0;
         List<FlatMessageExt> messageList = messageMap.computeIfAbsent(topicId + queueId, v -> new ArrayList<>());
         if (!messageList.isEmpty()) {
             startOffset = messageList.get(0).offset();
         }
         long endOffset = offsetMap.computeIfAbsent(topicId + queueId, v -> new AtomicLong()).get();
-        return CompletableFuture.completedFuture(new LogicQueue.QueueOffsetRange(startOffset, endOffset));
+        return List.of(new LogicQueue.StreamOffsetRange(0, StreamRole.STREAM_ROLE_DATA, startOffset, endOffset));
     }
 
     @Override
-    public CompletableFuture<Long> getConsumeOffset(long consumerGroupId, long topicId, int queueId) {
-        return CompletableFuture.completedFuture(consumerOffsetMap.getOrDefault(Pair.of(topicId, queueId), 0L));
+    public long getConsumeOffset(long consumerGroupId, long topicId, int queueId) {
+        return consumerOffsetMap.getOrDefault(Pair.of(topicId, queueId), 0L);
+    }
+
+    @Override
+    public long getRetryConsumeOffset(long consumerGroupId, long topicId, int queueId) {
+        return 0;
     }
 
     @Override

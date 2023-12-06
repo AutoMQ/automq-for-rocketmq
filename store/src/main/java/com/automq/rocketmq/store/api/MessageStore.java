@@ -30,6 +30,7 @@ import com.automq.rocketmq.store.model.message.PopResult;
 import com.automq.rocketmq.store.model.message.PullResult;
 import com.automq.rocketmq.store.model.message.PutResult;
 import com.automq.rocketmq.store.model.message.ResetConsumeOffsetResult;
+import java.util.List;
 import com.automq.rocketmq.store.model.transaction.TransactionResolution;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
@@ -109,11 +110,12 @@ public interface MessageStore extends Lifecycle {
     /**
      * Get offset range in queue.
      *
-     * @param topicId topic id
-     * @param queueId queue id
-     * @return offset range, <code>[startOffset, endOffset)</code>
+     * @param topicId         topic id
+     * @param queueId         queue id
+     * @param consumerGroupId consumer group id
+     * @return offset range, <code>[startOffset, endOffset)</code> for streams
      */
-    CompletableFuture<LogicQueue.QueueOffsetRange> getOffsetRange(long topicId, int queueId);
+    List<LogicQueue.StreamOffsetRange> getOffsetRange(long topicId, int queueId, long consumerGroupId);
 
     /**
      * Get consume offset of specified consumer group.
@@ -123,7 +125,17 @@ public interface MessageStore extends Lifecycle {
      * @param queueId         queue id
      * @return consume offset
      */
-    CompletableFuture<Long> getConsumeOffset(long consumerGroupId, long topicId, int queueId);
+    long getConsumeOffset(long consumerGroupId, long topicId, int queueId);
+
+    /**
+     * Get retry offset of specified consumer group.
+     *
+     * @param consumerGroupId consumer group id
+     * @param topicId         topic id
+     * @param queueId         queue id
+     * @return ack offset
+     */
+    long getRetryConsumeOffset(long consumerGroupId, long topicId, int queueId);
 
     /**
      * Reset consume offset of specified consumer group.
