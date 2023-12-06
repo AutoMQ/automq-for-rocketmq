@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.store.api;
 
+import apache.rocketmq.controller.v1.StreamRole;
 import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.store.model.StoreContext;
 import com.automq.rocketmq.store.model.message.AckResult;
@@ -26,6 +27,7 @@ import com.automq.rocketmq.store.model.message.PopResult;
 import com.automq.rocketmq.store.model.message.PullResult;
 import com.automq.rocketmq.store.model.message.PutResult;
 import com.automq.rocketmq.store.model.message.ResetConsumeOffsetResult;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 public abstract class LogicQueue {
@@ -72,7 +74,7 @@ public abstract class LogicQueue {
 
     public abstract CompletableFuture<ResetConsumeOffsetResult> resetConsumeOffset(long consumerGroupId, long offset);
 
-    public abstract CompletableFuture<QueueOffsetRange> getOffsetRange();
+    public abstract List<StreamOffsetRange> getOffsetRange(long consumerGroupId);
 
     public abstract int getInflightStats(long consumerGroupId);
 
@@ -102,6 +104,6 @@ public abstract class LogicQueue {
         CLOSED
     }
 
-    public record QueueOffsetRange(long startOffset, long endOffset) {
+    public record StreamOffsetRange(long streamId, StreamRole streamRole, long startOffset, long endOffset) {
     }
 }

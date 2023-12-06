@@ -51,6 +51,8 @@ import com.automq.rocketmq.store.util.FlatMessageUtil;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.instrumentation.annotations.SpanAttribute;
 import io.opentelemetry.instrumentation.annotations.WithSpan;
+import java.util.List;
+import java.util.Optional;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -258,15 +260,36 @@ public class MessageStoreImpl implements MessageStore {
     }
 
     @Override
-    public CompletableFuture<LogicQueue.QueueOffsetRange> getOffsetRange(long topicId, int queueId) {
-        return logicQueueManager.getOrCreate(StoreContext.EMPTY, topicId, queueId)
-            .thenCompose(LogicQueue::getOffsetRange);
+    public List<LogicQueue.StreamOffsetRange> getOffsetRange(long topicId, int queueId, long consumerGroupId) {
+        CompletableFuture<Optional<LogicQueue>> future = logicQueueManager.get(topicId, queueId);
+        if (future.isDone()) {
+            return future.join()
+                .map(topicQueue -> topicQueue.getOffsetRange(consumerGroupId))
+                .orElse(List.of());
+        }
+        return List.of();
     }
 
     @Override
-    public CompletableFuture<Long> getConsumeOffset(long consumerGroupId, long topicId, int queueId) {
-        return logicQueueManager.getOrCreate(StoreContext.EMPTY, topicId, queueId)
-            .thenApply(topicQueue -> topicQueue.getConsumeOffset(consumerGroupId));
+    public long getConsumeOffset(long consumerGroupId, long topicId, int queueId) {
+        CompletableFuture<Optional<LogicQueue>> future = logicQueueManager.get(topicId, queueId);
+        if (future.isDone()) {
+            return future.join()
+                .map(topicQueue -> topicQueue.getConsumeOffset(consumerGroupId))
+                .orElse(0L);
+        }
+        return 0;
+    }
+
+    @Override
+    public long getRetryConsumeOffset(long consumerGroupId, long topicId, int queueId) {
+        CompletableFuture<Optional<LogicQueue>> future = logicQueueManager.get(topicId, queueId);
+        if (future.isDone()) {
+            return future.join()
+                .map(topicQueue -> topicQueue.getRetryConsumeOffset(consumerGroupId))
+                .orElse(0L);
+        }
+        return 0;
     }
 
     @Override

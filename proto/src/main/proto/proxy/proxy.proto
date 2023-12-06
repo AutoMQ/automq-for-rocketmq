@@ -3,6 +3,7 @@ syntax = "proto3";
 package apache.rocketmq.proxy.v1;
 
 import "common.proto";
+import "controller/model.proto";
 
 option java_multiple_files = true;
 option java_package = "apache.rocketmq.proxy.v1";
@@ -45,8 +46,48 @@ message ResetConsumeOffsetByTimestampRequest {
   int64 timestamp = 5;
 }
 
+message TopicStatsRequest {
+  ProxyRequestContext context = 1;
+  // Topic name, required
+  string topic = 2;
+  // Queue id, -1 means query all queue
+  int32 queue_id = 3;
+  // Consumer group name
+  string group = 4;
+}
+
+message StreamStats {
+  // Stream id
+  int64 stream_id = 1;
+  // Stream role
+  controller.v1.StreamRole role = 2;
+  // Min message offset
+  int64 min_offset = 3;
+  // Max message offset
+  int64 max_offset = 4;
+  // Consume offset, if consumer group name not specified, return -1
+  int64 consume_offset = 5;
+}
+
+message QueueStats {
+  // Queue id
+  int32 queue_id = 1;
+  // Stream stats which belong to this topic
+  repeated StreamStats stream_stats = 2;
+}
+
+message TopicStatsReply {
+  Status status = 1;
+  // Topic id
+  int64 id = 2;
+  // Topic name
+  string name = 3;
+  // Queue stats
+  repeated QueueStats queue_stats = 4;
+}
 
 service ProxyService {
   rpc resetConsumeOffset(ResetConsumeOffsetRequest) returns (ResetConsumeOffsetReply) {}
   rpc resetConsumeOffsetByTimestamp(ResetConsumeOffsetByTimestampRequest) returns (ResetConsumeOffsetReply) {}
+  rpc topicStats(TopicStatsRequest) returns (TopicStatsReply) {}
 }

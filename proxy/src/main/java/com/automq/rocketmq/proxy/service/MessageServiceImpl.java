@@ -19,8 +19,11 @@ package com.automq.rocketmq.proxy.service;
 
 import apache.rocketmq.common.v1.Code;
 import apache.rocketmq.controller.v1.ConsumerGroup;
+import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.SubscriptionMode;
 import apache.rocketmq.controller.v1.Topic;
+import apache.rocketmq.proxy.v1.QueueStats;
+import apache.rocketmq.proxy.v1.StreamStats;
 import com.automq.rocketmq.common.config.ProxyConfig;
 import com.automq.rocketmq.common.exception.ControllerException;
 import com.automq.rocketmq.common.model.FlatMessageExt;
@@ -35,6 +38,7 @@ import com.automq.rocketmq.proxy.util.ContextUtil;
 import com.automq.rocketmq.proxy.util.FlatMessageUtil;
 import com.automq.rocketmq.proxy.util.ReceiptHandleUtil;
 import com.automq.rocketmq.store.api.DeadLetterSender;
+import com.automq.rocketmq.store.api.LogicQueue;
 import com.automq.rocketmq.store.api.MessageStore;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.StoreContext;
@@ -57,6 +61,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -628,7 +633,7 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
                         pair.getRight().getTopicId(),
                         virtualQueue.physicalQueueId());
                 }
-                return store.getConsumeOffset(consumerGroup.getGroupId(), topic.getTopicId(), virtualQueue.physicalQueueId());
+                return CompletableFuture.completedFuture(store.getConsumeOffset(consumerGroup.getGroupId(), topic.getTopicId(), virtualQueue.physicalQueueId()));
             });
     }
 
@@ -782,15 +787,103 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
     @Override
     public CompletableFuture<Long> getMaxOffset(ProxyContext ctx, AddressableMessageQueue messageQueue,
         GetMaxOffsetRequestHeader requestHeader, long timeoutMillis) {
-        // TODO: Support in the next iteration
-        throw new UnsupportedOperationException();
+        String topic = requestHeader.getTopic();
+        int queueId = requestHeader.getQueueId();
+
+        return topicOf(topic).thenApply(topicMetadata -> {
+            Optional<LogicQueue.StreamOffsetRange> dataStreamRange = store.getOffsetRange(topicMetadata.getTopicId(), queueId, -1)
+                .stream()
+                .filter(offsetRange -> offsetRange.streamRole() == StreamRole.STREAM_ROLE_DATA)
+                .findFirst();
+            if (dataStreamRange.isEmpty()) {
+                throw new ProxyException(apache.rocketmq.v2.Code.BAD_REQUEST, "Topic is not opened in this node.");
+            }
+            return dataStreamRange.get().endOffset();
+        });
     }
 
     @Override
     public CompletableFuture<Long> getMinOffset(ProxyContext ctx, AddressableMessageQueue messageQueue,
         GetMinOffsetRequestHeader requestHeader, long timeoutMillis) {
-        // TODO: Support in the next iteration
-        throw new UnsupportedOperationException();
+        String topic = requestHeader.getTopic();
+        int queueId = requestHeader.getQueueId();
+
+        return topicOf(topic).thenApply(topicMetadata -> {
+            Optional<LogicQueue.StreamOffsetRange> dataStreamRange = store.getOffsetRange(topicMetadata.getTopicId(), queueId, -1)
+                .stream()
+                .filter(offsetRange -> offsetRange.streamRole() == StreamRole.STREAM_ROLE_DATA)
+                .findFirst();
+            if (dataStreamRange.isEmpty()) {
+                throw new ProxyException(apache.rocketmq.v2.Code.BAD_REQUEST, "Topic is not opened in this node.");
+            }
+            return dataStreamRange.get().startOffset();
+        });
+    }
+
+    private long getConsumerOffset(ConsumerGroup consumerGroup, Topic topic, int queueId, boolean retry) {
+        if (consumerGroup.getSubMode() == SubscriptionMode.SUB_MODE_PULL) {
+            if (retry) {
+                topicOf(MixAll.RETRY_GROUP_TOPIC_PREFIX + consumerGroup.getName())
+                    .thenCompose(retryTopic -> metadataService.consumerOffsetOf(consumerGroup.getGroupId(), retryTopic.getTopicId(), queueId));
+                return metadataService.consumerOffsetOf(consumerGroup.getGroupId(), topic.getTopicId(), queueId).join();
+            }
+            return metadataService.consumerOffsetOf(consumerGroup.getGroupId(), topic.getTopicId(), queueId).join();
+        }
+
+        if (retry) {
+            return store.getRetryConsumeOffset(consumerGroup.getGroupId(), topic.getTopicId(), queueId);
+        }
+        return store.getConsumeOffset(consumerGroup.getGroupId(), topic.getTopicId(), queueId);
+    }
+
+    private List<StreamStats> getStreamStats(Optional<ConsumerGroup> consumerGroup, Topic topic, int queueId) {
+        return store.getOffsetRange(topic.getTopicId(), queueId, consumerGroup.map(ConsumerGroup::getGroupId).orElse(-1L))
+            .stream().map(offsetRange -> {
+                long consumerOffset = 0;
+                if (consumerGroup.isPresent()) {
+                    if (offsetRange.streamRole() == StreamRole.STREAM_ROLE_DATA) {
+                        consumerOffset = getConsumerOffset(consumerGroup.get(), topic, queueId, false);
+                    } else if (offsetRange.streamRole() == StreamRole.STREAM_ROLE_RETRY) {
+                        consumerOffset = getConsumerOffset(consumerGroup.get(), topic, queueId, true);
+                    }
+                }
+                return StreamStats.newBuilder()
+                    .setStreamId(offsetRange.streamId())
+                    .setMinOffset(offsetRange.startOffset())
+                    .setMaxOffset(offsetRange.endOffset())
+                    .setRole(offsetRange.streamRole())
+                    .setConsumeOffset(consumerOffset)
+                    .build();
+            }).toList();
+    }
+
+    @Override
+    public CompletableFuture<Pair<Long, List<QueueStats>>> getTopicStats(String topic, int queueId,
+        String consumerGroup) {
+        CompletableFuture<Optional<ConsumerGroup>> groupIdFuture;
+        if (StringUtils.isBlank(consumerGroup)) {
+            groupIdFuture = CompletableFuture.completedFuture(Optional.empty());
+        } else {
+            groupIdFuture = metadataService.consumerGroupOf(consumerGroup).thenApply(Optional::of);
+        }
+        return topicOf(topic)
+            .thenCombine(groupIdFuture, (topicMetadata, groupMetadata) -> {
+                long topicId = topicMetadata.getTopicId();
+                List<QueueStats> queueStatsList = new ArrayList<>();
+                if (queueId != -1) {
+                    List<StreamStats> streamStatsList = getStreamStats(groupMetadata, topicMetadata, queueId);
+                    queueStatsList.add(QueueStats.newBuilder().setQueueId(queueId).addAllStreamStats(streamStatsList).build());
+                } else {
+                    int queueCount = topicMetadata.getCount();
+                    for (int i = 0; i < queueCount; i++) {
+                        List<StreamStats> streamStatsList = getStreamStats(groupMetadata, topicMetadata, i);
+                        if (!streamStatsList.isEmpty()) {
+                            queueStatsList.add(QueueStats.newBuilder().setQueueId(queueId).addAllStreamStats(streamStatsList).build());
+                        }
+                    }
+                }
+                return Pair.of(topicId, queueStatsList);
+            });
     }
 
     @Override

@@ -19,13 +19,17 @@ package com.automq.rocketmq.proxy.grpc;
 
 import apache.rocketmq.common.v1.Code;
 import apache.rocketmq.proxy.v1.ProxyServiceGrpc;
+import apache.rocketmq.proxy.v1.QueueStats;
 import apache.rocketmq.proxy.v1.ResetConsumeOffsetByTimestampRequest;
-import apache.rocketmq.proxy.v1.ResetConsumeOffsetRequest;
 import apache.rocketmq.proxy.v1.ResetConsumeOffsetReply;
+import apache.rocketmq.proxy.v1.ResetConsumeOffsetRequest;
 import apache.rocketmq.proxy.v1.Status;
+import apache.rocketmq.proxy.v1.TopicStatsReply;
+import apache.rocketmq.proxy.v1.TopicStatsRequest;
 import com.automq.rocketmq.proxy.service.ExtendMessageService;
 import com.google.protobuf.TextFormat;
 import io.grpc.stub.StreamObserver;
+import java.util.List;
 import org.slf4j.Logger;
 
 public class ProxyServiceImpl extends ProxyServiceGrpc.ProxyServiceImplBase {
@@ -74,6 +78,32 @@ public class ProxyServiceImpl extends ProxyServiceGrpc.ProxyServiceImplBase {
                         .setCode(Code.OK)
                         .build())
                     .build();
+                responseObserver.onNext(reply);
+                responseObserver.onCompleted();
+            });
+    }
+
+    @Override
+    public void topicStats(TopicStatsRequest request, StreamObserver<TopicStatsReply> responseObserver) {
+        messageService.getTopicStats(request.getTopic(), request.getQueueId(), request.getGroup())
+            .whenComplete((pair, e) -> {
+                if (e != null) {
+                    responseObserver.onError(e);
+                    return;
+                }
+
+                Long topicId = pair.getLeft();
+                List<QueueStats> queueStatsList = pair.getRight();
+                TopicStatsReply reply = TopicStatsReply.newBuilder()
+                    .setStatus(Status
+                        .newBuilder()
+                        .setCode(Code.OK)
+                        .build())
+                    .setId(topicId)
+                    .setName(request.getTopic())
+                    .addAllQueueStats(queueStatsList)
+                    .build();
+
                 responseObserver.onNext(reply);
                 responseObserver.onCompleted();
             });

@@ -17,6 +17,7 @@
 
 package com.automq.rocketmq.store.queue;
 
+import apache.rocketmq.controller.v1.StreamRole;
 import com.automq.rocketmq.common.config.StoreConfig;
 import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.model.generated.FlatMessage;
@@ -569,8 +570,40 @@ public class StreamLogicQueue extends LogicQueue {
     }
 
     @Override
-    public CompletableFuture<QueueOffsetRange> getOffsetRange() {
-        throw new UnsupportedOperationException();
+    public List<StreamOffsetRange> getOffsetRange(long consumerGroupId) {
+        if (state.get() != LogicQueue.State.OPENED) {
+            return List.of();
+        }
+
+        List<StreamOffsetRange> rangeList = new ArrayList<>();
+
+        StreamOffsetRange dataRange = new StreamOffsetRange(dataStreamId, StreamRole.STREAM_ROLE_DATA,
+            streamStore.startOffset(dataStreamId), streamStore.confirmOffset(dataStreamId));
+        rangeList.add(dataRange);
+
+        StreamOffsetRange operationRange = new StreamOffsetRange(operationStreamId, StreamRole.STREAM_ROLE_OPS,
+            streamStore.startOffset(operationStreamId), streamStore.confirmOffset(operationStreamId));
+        rangeList.add(operationRange);
+
+        StreamOffsetRange snapshotRange = new StreamOffsetRange(snapshotStreamId, StreamRole.STREAM_ROLE_SNAPSHOT,
+            streamStore.startOffset(snapshotStreamId), streamStore.confirmOffset(snapshotStreamId));
+        rangeList.add(snapshotRange);
+
+        if (consumerGroupId > 0) {
+            CompletableFuture<Long> retryStreamIdCf = retryStreamIdMap.get(consumerGroupId);
+            if (retryStreamIdCf != null) {
+                try {
+                    long retryStreamId = retryStreamIdCf.get();
+                    StreamOffsetRange retryRange = new StreamOffsetRange(retryStreamId, StreamRole.STREAM_ROLE_RETRY,
+                        streamStore.startOffset(retryStreamId), streamStore.confirmOffset(retryStreamId));
+                    rangeList.add(retryRange);
+                } catch (Exception e) {
+                    LOGGER.error("Failed to get retry stream id for consumer group: {}", consumerGroupId, e);
+                }
+            }
+        }
+
+        return rangeList;
     }
 
     @Override

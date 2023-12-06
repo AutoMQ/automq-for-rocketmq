@@ -494,8 +494,8 @@ public class MessageStoreTest {
         ResetConsumeOffsetResult resetConsumeOffsetResult = logicQueue.resetConsumeOffset(CONSUMER_GROUP_ID, 0).join();
         assertEquals(ResetConsumeOffsetResult.Status.SUCCESS, resetConsumeOffsetResult.status());
 
-        Long offset = messageStore.getConsumeOffset(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID).join();
-        assertEquals(0, offset.longValue());
+        long offset = messageStore.getConsumeOffset(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID);
+        assertEquals(0, offset);
 
         // 7. pop 1 message with long invisible duration
         popResult = messageStore.pop(StoreContext.EMPTY, CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID, Filter.DEFAULT_FILTER, 1, false, false, Long.MAX_VALUE).join();
@@ -513,8 +513,8 @@ public class MessageStoreTest {
         long nextVisibleTimestamp = System.currentTimeMillis() + 800;
 
         // check consume offset and retry message count before closing
-        offset = messageStore.getConsumeOffset(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID).join();
-        assertEquals(2, offset.longValue());
+        offset = messageStore.getConsumeOffset(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID);
+        assertEquals(2, offset);
 
         StreamMetadata retryStream = metadataService.retryStreamOf(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID).join();
         assertFalse(streamStore.isOpened(retryStream.getStreamId()));
@@ -543,8 +543,8 @@ public class MessageStoreTest {
         assertEquals(2, timerTagCount.get());
 
         // check consume offset and retry message count after opening
-        offset = messageStore.getConsumeOffset(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID).join();
-        assertEquals(2, offset.longValue());
+        offset = messageStore.getConsumeOffset(CONSUMER_GROUP_ID, TOPIC_ID, QUEUE_ID);
+        assertEquals(2, offset);
         assertFalse(streamStore.isOpened(retryStream.getStreamId()));
 
         await().atMost(Duration.ofSeconds(5))

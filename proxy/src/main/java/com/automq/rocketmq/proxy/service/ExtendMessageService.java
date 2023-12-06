@@ -17,7 +17,10 @@
 
 package com.automq.rocketmq.proxy.service;
 
+import apache.rocketmq.proxy.v1.QueueStats;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import org.apache.commons.lang3.tuple.Pair;
 
 public interface ExtendMessageService {
 
@@ -41,4 +44,13 @@ public interface ExtendMessageService {
      */
     CompletableFuture<Void> resetConsumeOffsetByTimestamp(String topic, int queueId, String consumerGroup, long timestamp);
 
+    /**
+     * Get the stats of the given topic.
+     *
+     * @param topic         The topic name.
+     * @param queueId       The queue id of the queue.
+     * @param consumerGroup The consumer group.
+     * @return The stats of the given topic.
+     */
+    CompletableFuture<Pair<Long, List<QueueStats>>> getTopicStats(String topic, int queueId, String consumerGroup);
 }
