@@ -37,7 +37,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import picocli.CommandLine;
 
-@CommandLine.Command(name = "resetConsumeOffset", description = "Reset consume offset", mixinStandardHelpOptions = true, showDefaultValues = true)
+@CommandLine.Command(name = "resetConsumeOffset", mixinStandardHelpOptions = true, showDefaultValues = true)
 public class ResetConsumeOffset implements Callable<Void> {
 
     @CommandLine.Option(names = {"-t", "--topic"}, description = "Topic name", required = true)
