@@ -17,12 +17,18 @@
 
 package com.automq.rocketmq.proxy.grpc;
 
+import apache.rocketmq.proxy.v1.QueueStats;
 import apache.rocketmq.proxy.v1.ResetConsumeOffsetByTimestampRequest;
 import apache.rocketmq.proxy.v1.ResetConsumeOffsetRequest;
+import apache.rocketmq.proxy.v1.TopicStatsRequest;
 import java.io.Closeable;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 public interface ProxyClient extends Closeable {
     CompletableFuture<Void> resetConsumeOffset(String target, ResetConsumeOffsetRequest request);
+
     CompletableFuture<Void> resetConsumeOffsetByTimestamp(String target, ResetConsumeOffsetByTimestampRequest request);
+
+    CompletableFuture<List<QueueStats>> getTopicStats(String target, TopicStatsRequest request);
 }

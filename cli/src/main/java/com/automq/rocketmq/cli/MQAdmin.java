@@ -32,6 +32,7 @@ import com.automq.rocketmq.cli.topic.CreateTopic;
 import com.automq.rocketmq.cli.topic.DeleteTopic;
 import com.automq.rocketmq.cli.topic.DescribeTopic;
 import com.automq.rocketmq.cli.topic.ListTopic;
+import com.automq.rocketmq.cli.topic.PrintTopicStats;
 import com.automq.rocketmq.cli.topic.UpdateTopic;
 import picocli.CommandLine;
 
@@ -56,7 +57,8 @@ import picocli.CommandLine;
         ProduceMessage.class,
         ConsumeMessage.class,
         TerminateNode.class,
-        ResetConsumeOffset.class
+        ResetConsumeOffset.class,
+        PrintTopicStats.class
     }
 )
 public class MQAdmin implements Runnable {

@@ -86,8 +86,6 @@ public class DescribeGroup implements Callable<Void> {
     }
 
     private void centralize(AT_Row row) {
-        row.getCells().forEach((cell -> {
-            cell.getContext().setTextAlignment(TextAlignment.CENTER);
-        }));
+        row.getCells().forEach((cell -> cell.getContext().setTextAlignment(TextAlignment.CENTER)));
     }
 }
