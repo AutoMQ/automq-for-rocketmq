@@ -20,7 +20,6 @@ package com.automq.stream.s3.utils;
 import com.automq.stream.utils.AsyncRateLimiter;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;

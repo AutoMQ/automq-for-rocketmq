@@ -31,14 +31,14 @@ import java.util.concurrent.TimeUnit;
 @SuppressWarnings("UnstableApiUsage")
 public class AsyncRateLimiter {
     private static final Logger LOGGER = LoggerFactory.getLogger(AsyncRateLimiter.class);
-    private static final ScheduledExecutorService scheduler = Threads.newSingleThreadScheduledExecutor("async-rate-limiter", true, LOGGER);
+    private static final ScheduledExecutorService SCHEDULER = Threads.newSingleThreadScheduledExecutor("async-rate-limiter", true, LOGGER);
     private final Queue<Acquire> acquireQueue = new ConcurrentLinkedQueue<>();
     private final RateLimiter rateLimiter;
     private final ScheduledFuture<?> tickTask;
 
     public AsyncRateLimiter(double bytesPerSec) {
         rateLimiter = RateLimiter.create(bytesPerSec, 100, TimeUnit.MILLISECONDS);
-        tickTask = scheduler.scheduleAtFixedRate(this::tick, 1, 1, TimeUnit.MILLISECONDS);
+        tickTask = SCHEDULER.scheduleAtFixedRate(this::tick, 1, 1, TimeUnit.MILLISECONDS);
     }
 
     public synchronized CompletableFuture<Void> acquire(int size) {
