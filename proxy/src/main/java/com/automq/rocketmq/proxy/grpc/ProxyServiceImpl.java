@@ -18,6 +18,9 @@
 package com.automq.rocketmq.proxy.grpc;
 
 import apache.rocketmq.common.v1.Code;
+import apache.rocketmq.proxy.v1.ProducerClientConnection;
+import apache.rocketmq.proxy.v1.ProducerClientConnectionReply;
+import apache.rocketmq.proxy.v1.ProducerClientConnectionRequest;
 import apache.rocketmq.proxy.v1.ProxyServiceGrpc;
 import apache.rocketmq.proxy.v1.QueueStats;
 import apache.rocketmq.proxy.v1.ResetConsumeOffsetByTimestampRequest;
@@ -29,7 +32,15 @@ import apache.rocketmq.proxy.v1.TopicStatsRequest;
 import com.automq.rocketmq.proxy.service.ExtendMessageService;
 import com.google.protobuf.TextFormat;
 import io.grpc.stub.StreamObserver;
+import io.netty.channel.Channel;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import org.apache.rocketmq.broker.client.ClientChannelInfo;
+import org.apache.rocketmq.broker.client.ProducerManager;
+import org.apache.rocketmq.common.MQVersion;
+import org.apache.rocketmq.common.utils.NetworkUtil;
+import org.apache.rocketmq.proxy.grpc.v2.channel.GrpcClientChannel;
+import org.apache.rocketmq.proxy.processor.channel.ChannelProtocolType;
 import org.slf4j.Logger;
 
 public class ProxyServiceImpl extends ProxyServiceGrpc.ProxyServiceImplBase {
@@ -37,8 +48,11 @@ public class ProxyServiceImpl extends ProxyServiceGrpc.ProxyServiceImplBase {
 
     private final ExtendMessageService messageService;
 
-    public ProxyServiceImpl(ExtendMessageService messageService) {
+    private final ProducerManager producerManager;
+
+    public ProxyServiceImpl(ExtendMessageService messageService, ProducerManager producerManager) {
         this.messageService = messageService;
+        this.producerManager = producerManager;
     }
 
     @Override
@@ -107,5 +121,39 @@ public class ProxyServiceImpl extends ProxyServiceGrpc.ProxyServiceImplBase {
                 responseObserver.onNext(reply);
                 responseObserver.onCompleted();
             });
+    }
+
+    @Override
+    public void producerClientConnection(ProducerClientConnectionRequest request,
+        StreamObserver<ProducerClientConnectionReply> responseObserver) {
+        ConcurrentHashMap<Channel, ClientChannelInfo> map = producerManager.getGroupChannelTable().get(request.getProductionGroup());
+        if (map == null) {
+            responseObserver.onNext(ProducerClientConnectionReply.newBuilder()
+                .setStatus(Status
+                    .newBuilder()
+                    .setCode(Code.BAD_REQUEST)
+                    .setMessage("Producer group not found: " + request.getProductionGroup())
+                    .build())
+                .build());
+            responseObserver.onCompleted();
+            return;
+        }
+        ProducerClientConnectionReply.Builder builder = ProducerClientConnectionReply.newBuilder();
+        for (ClientChannelInfo info : map.values()) {
+            String protocolType = ChannelProtocolType.REMOTING.name();
+            if (info.getChannel() instanceof GrpcClientChannel) {
+                protocolType = ChannelProtocolType.GRPC_V2.name();
+            }
+            builder.addConnection(ProducerClientConnection.newBuilder()
+                .setClientId(info.getClientId())
+                .setProtocol(protocolType)
+                .setAddress(NetworkUtil.socketAddress2String(info.getChannel().remoteAddress()))
+                .setLanguage(info.getLanguage().name())
+                .setVersion(MQVersion.getVersionDesc(info.getVersion()))
+                .setLastUpdateTime(info.getLastUpdateTimestamp())
+                .build());
+        }
+        responseObserver.onNext(builder.build());
+        responseObserver.onCompleted();
     }
 }

@@ -86,8 +86,38 @@ message TopicStatsReply {
   repeated QueueStats queue_stats = 4;
 }
 
+message ProducerClientConnectionRequest {
+  ProxyRequestContext context = 1;
+  // Producer client id
+  string production_group = 2;
+}
+
+message ProducerClientConnection {
+  // Producer client id
+  string client_id = 1;
+  // Protocol
+  string protocol = 2;
+  // Language
+  string language = 3;
+  // Version
+  string version = 4;
+  // Client address
+  string address = 5;
+  // Connected time
+  int64 connected_time = 6;
+  // Last update time
+  int64 last_update_time = 7;
+}
+
+message ProducerClientConnectionReply {
+  Status status = 1;
+  // Producer client connection
+  repeated ProducerClientConnection connection = 2;
+}
+
 service ProxyService {
   rpc resetConsumeOffset(ResetConsumeOffsetRequest) returns (ResetConsumeOffsetReply) {}
   rpc resetConsumeOffsetByTimestamp(ResetConsumeOffsetByTimestampRequest) returns (ResetConsumeOffsetReply) {}
   rpc topicStats(TopicStatsRequest) returns (TopicStatsReply) {}
+  rpc producerClientConnection(ProducerClientConnectionRequest) returns (ProducerClientConnectionReply) {}
 }

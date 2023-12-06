@@ -27,6 +27,7 @@ import com.automq.rocketmq.cli.consumer.ListGroup;
 import com.automq.rocketmq.cli.consumer.ResetConsumeOffset;
 import com.automq.rocketmq.cli.consumer.UpdateGroup;
 import com.automq.rocketmq.cli.producer.ProduceMessage;
+import com.automq.rocketmq.cli.producer.ProducerClientConnection;
 import com.automq.rocketmq.cli.stream.DescribeStream;
 import com.automq.rocketmq.cli.topic.CreateTopic;
 import com.automq.rocketmq.cli.topic.DeleteTopic;
@@ -58,7 +59,8 @@ import picocli.CommandLine;
         ConsumeMessage.class,
         TerminateNode.class,
         ResetConsumeOffset.class,
-        PrintTopicStats.class
+        PrintTopicStats.class,
+        ProducerClientConnection.class
     }
 )
 public class MQAdmin implements Runnable {
