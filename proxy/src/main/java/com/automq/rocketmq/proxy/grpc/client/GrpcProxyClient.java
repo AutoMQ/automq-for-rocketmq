@@ -19,9 +19,12 @@ package com.automq.rocketmq.proxy.grpc.client;
 
 import apache.rocketmq.common.v1.Code;
 import apache.rocketmq.proxy.v1.ProxyServiceGrpc;
+import apache.rocketmq.proxy.v1.QueueStats;
 import apache.rocketmq.proxy.v1.ResetConsumeOffsetByTimestampRequest;
 import apache.rocketmq.proxy.v1.ResetConsumeOffsetReply;
 import apache.rocketmq.proxy.v1.ResetConsumeOffsetRequest;
+import apache.rocketmq.proxy.v1.TopicStatsReply;
+import apache.rocketmq.proxy.v1.TopicStatsRequest;
 import com.automq.rocketmq.common.config.GrpcClientConfig;
 import com.automq.rocketmq.proxy.grpc.ProxyClient;
 import com.google.common.base.Strings;
@@ -34,6 +37,7 @@ import io.grpc.Grpc;
 import io.grpc.InsecureChannelCredentials;
 import io.grpc.ManagedChannel;
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -116,6 +120,30 @@ public class GrpcProxyClient implements ProxyClient {
                 }
             }, MoreExecutors.directExecutor());
         return cf;
+    }
+
+    @Override
+    public CompletableFuture<List<QueueStats>> getTopicStats(String target, TopicStatsRequest request) {
+        ProxyServiceGrpc.ProxyServiceFutureStub stub = getOrCreateStubForTarget(target);
+
+        CompletableFuture<List<QueueStats>> future = new CompletableFuture<>();
+        Futures.addCallback(stub.topicStats(request),
+            new FutureCallback<>() {
+                @Override
+                public void onSuccess(TopicStatsReply result) {
+                    if (result.getStatus().getCode() == Code.OK) {
+                        future.complete(result.getQueueStatsList());
+                    } else {
+                        future.completeExceptionally(new ProxyException(ProxyExceptionCode.INTERNAL_SERVER_ERROR, result.getStatus().getMessage()));
+                    }
+                }
+
+                @Override
+                public void onFailure(Throwable t) {
+                    future.completeExceptionally(t);
+                }
+            }, MoreExecutors.directExecutor());
+        return future;
     }
 
     @Override
