@@ -6,7 +6,7 @@ coverage:
       default:
         enabled: yes
         target: auto
-        threshold: 0%
+        threshold: 50%
         if_no_uploads: error
         if_not_found: success
         if_ci_failed: error
@@ -15,7 +15,7 @@ coverage:
       default:
         enabled: yes
         target: auto
-        threshold: 0%
+        threshold: 50%
         if_no_uploads: error
         if_not_found: success
         if_ci_failed: error
