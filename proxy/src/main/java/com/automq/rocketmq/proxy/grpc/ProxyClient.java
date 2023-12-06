@@ -17,6 +17,8 @@
 
 package com.automq.rocketmq.proxy.grpc;
 
+import apache.rocketmq.proxy.v1.ProducerClientConnection;
+import apache.rocketmq.proxy.v1.ProducerClientConnectionRequest;
 import apache.rocketmq.proxy.v1.QueueStats;
 import apache.rocketmq.proxy.v1.ResetConsumeOffsetByTimestampRequest;
 import apache.rocketmq.proxy.v1.ResetConsumeOffsetRequest;
@@ -31,4 +33,7 @@ public interface ProxyClient extends Closeable {
     CompletableFuture<Void> resetConsumeOffsetByTimestamp(String target, ResetConsumeOffsetByTimestampRequest request);
 
     CompletableFuture<List<QueueStats>> getTopicStats(String target, TopicStatsRequest request);
+
+    CompletableFuture<List<ProducerClientConnection>> producerClientConnection(String target,
+        ProducerClientConnectionRequest request);
 }

@@ -18,6 +18,9 @@
 package com.automq.rocketmq.proxy.grpc.client;
 
 import apache.rocketmq.common.v1.Code;
+import apache.rocketmq.proxy.v1.ProducerClientConnection;
+import apache.rocketmq.proxy.v1.ProducerClientConnectionReply;
+import apache.rocketmq.proxy.v1.ProducerClientConnectionRequest;
 import apache.rocketmq.proxy.v1.ProxyServiceGrpc;
 import apache.rocketmq.proxy.v1.QueueStats;
 import apache.rocketmq.proxy.v1.ResetConsumeOffsetByTimestampRequest;
@@ -133,6 +136,31 @@ public class GrpcProxyClient implements ProxyClient {
                 public void onSuccess(TopicStatsReply result) {
                     if (result.getStatus().getCode() == Code.OK) {
                         future.complete(result.getQueueStatsList());
+                    } else {
+                        future.completeExceptionally(new ProxyException(ProxyExceptionCode.INTERNAL_SERVER_ERROR, result.getStatus().getMessage()));
+                    }
+                }
+
+                @Override
+                public void onFailure(Throwable t) {
+                    future.completeExceptionally(t);
+                }
+            }, MoreExecutors.directExecutor());
+        return future;
+    }
+
+    @Override
+    public CompletableFuture<List<ProducerClientConnection>> producerClientConnection(String target,
+        ProducerClientConnectionRequest request) {
+        ProxyServiceGrpc.ProxyServiceFutureStub stub = getOrCreateStubForTarget(target);
+
+        CompletableFuture<List<ProducerClientConnection>> future = new CompletableFuture<>();
+        Futures.addCallback(stub.producerClientConnection(request),
+            new FutureCallback<>() {
+                @Override
+                public void onSuccess(ProducerClientConnectionReply result) {
+                    if (result.getStatus().getCode() == Code.OK) {
+                        future.complete(result.getConnectionList());
                     } else {
                         future.completeExceptionally(new ProxyException(ProxyExceptionCode.INTERNAL_SERVER_ERROR, result.getStatus().getMessage()));
                     }
