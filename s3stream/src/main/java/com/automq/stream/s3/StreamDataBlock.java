@@ -37,7 +37,6 @@ public class StreamDataBlock {
     private final ObjectReader.DataBlockIndex dataBlockIndex;
     private final CompletableFuture<ByteBuf> dataCf = new CompletableFuture<>();
     private final AtomicInteger refCount = new AtomicInteger(1);
-    private boolean isDataTransferred = false;
 
     public StreamDataBlock(long streamId, long startOffset, long endOffset, long objectId, ObjectReader.DataBlockIndex dataBlockIndex) {
         this.streamId = streamId;
@@ -104,18 +103,18 @@ public class StreamDataBlock {
         return this.dataCf;
     }
 
+    public void releaseRef() {
+        refCount.decrementAndGet();
+    }
+
     public void release() {
-        if (!isDataTransferred && refCount.decrementAndGet() == 0) {
+        if (refCount.decrementAndGet() == 0) {
             dataCf.thenAccept(buf -> {
                 if (buf != null) {
                     buf.release();
                 }
             });
         }
-    }
-
-    public void transferDataOwnership() {
-        isDataTransferred = true;
     }
 
     @Override
@@ -126,7 +125,6 @@ public class StreamDataBlock {
                 ", startOffset=" + startOffset +
                 ", endOffset=" + endOffset +
                 ", dataBlockIndex=" + dataBlockIndex +
-                ", isDataTransferred=" + isDataTransferred +
                 '}';
     }
 

@@ -122,7 +122,7 @@ public class DataBlockWriter {
         CompositeByteBuf buf = DirectByteBufAlloc.compositeByteBuffer();
         for (StreamDataBlock block : waitingUploadBlocks) {
             buf.addComponent(true, block.getDataCf().join());
-            block.transferDataOwnership();
+            block.releaseRef();
             completedBlocks.add(block);
             nextDataBlockPosition += block.getBlockSize();
         }
