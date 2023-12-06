@@ -47,6 +47,7 @@ public class ProxyRelayServiceImpl implements ProxyRelayService {
     @Override
     public RelayData<TransactionData, Void> processCheckTransactionState(ProxyContext context, RemotingCommand command,
         CheckTransactionStateRequestHeader header, MessageExt messageExt) {
-        throw new UnsupportedOperationException();
+        TransactionData transactionData = new TransactionData("", header.getTranStateTableOffset(), header.getCommitLogOffset(), header.getTransactionId(), System.currentTimeMillis(), 15_000L);
+        return new RelayData<>(transactionData, new CompletableFuture<>());
     }
 }

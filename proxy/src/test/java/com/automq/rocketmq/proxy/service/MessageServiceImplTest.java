@@ -38,6 +38,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
+import org.apache.rocketmq.broker.client.ProducerManager;
 import org.apache.rocketmq.client.consumer.AckResult;
 import org.apache.rocketmq.client.consumer.AckStatus;
 import org.apache.rocketmq.client.consumer.PopResult;
@@ -102,7 +103,7 @@ class MessageServiceImplTest {
         ProxyConfig config = new ProxyConfig();
         deadLetterSender = Mockito.mock(DeadLetterSender.class);
         Mockito.doReturn(CompletableFuture.completedFuture(null)).when(deadLetterSender).send(Mockito.any(), Mockito.anyLong(), Mockito.any());
-        messageService = new MessageServiceImpl(config, messageStore, metadataService, new LockService(config), deadLetterSender);
+        messageService = new MessageServiceImpl(config, messageStore, metadataService, new LockService(config), deadLetterSender, new ProducerManager());
     }
 
     @Test

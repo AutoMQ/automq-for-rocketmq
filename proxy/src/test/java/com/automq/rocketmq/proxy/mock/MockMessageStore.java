@@ -33,6 +33,7 @@ import com.automq.rocketmq.store.model.message.PopResult;
 import com.automq.rocketmq.store.model.message.PullResult;
 import com.automq.rocketmq.store.model.message.PutResult;
 import com.automq.rocketmq.store.model.message.ResetConsumeOffsetResult;
+import com.automq.rocketmq.store.model.transaction.TransactionResolution;
 import com.automq.rocketmq.store.service.InflightService;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -185,6 +186,20 @@ public class MockMessageStore implements MessageStore {
     public CompletableFuture<ClearRetryMessagesResult> clearRetryMessages(long consumerGroupId, long topicId,
         int queueId) {
         throw new UnsupportedOperationException("Not implemented yet");
+    }
+
+    @Override
+    public CompletableFuture<Boolean> cancelDelayMessage(String messageId) {
+        return CompletableFuture.completedFuture(true);
+    }
+
+    @Override
+    public CompletableFuture<Void> endTransaction(String transactionId, TransactionResolution resolution) {
+        return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public void scheduleCheckTransaction(FlatMessage message) throws StoreException {
     }
 
     @Override

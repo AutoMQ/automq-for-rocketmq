@@ -56,4 +56,6 @@ table SystemProperties {
     prepared_transaction_mark: bool;
     // For a pending transaction message, this field is the first check time. If set to zero, the broker will use the default value
     orphaned_transaction_recovery_seconds: long;
+    // For a pending transaction message, this field records the check times.
+    orphaned_transaction_check_times:int = -1;
 }

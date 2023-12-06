@@ -21,8 +21,11 @@ import com.automq.rocketmq.common.config.StoreConfig;
 import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.generated.TimerHandlerType;
+import com.automq.rocketmq.store.model.generated.TimerTag;
 import com.automq.rocketmq.store.util.FlatMessageUtil;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 import org.apache.rocketmq.logging.org.slf4j.Logger;
 import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
 
@@ -39,11 +42,38 @@ public class TransactionService {
         this.timerService = timerService;
     }
 
-    public String prepareTransaction(FlatMessage message) throws StoreException {
+    public String begin(FlatMessage message) throws StoreException {
         long duration = Math.max(config.transactionTimeoutMillis(), message.systemProperties().orphanedTransactionRecoverySeconds());
         long deliveryTimestamp = System.currentTimeMillis() + duration;
 
         return scheduleNextCheck(deliveryTimestamp, message);
+    }
+
+    public Optional<FlatMessage> commit(String transactionId) throws StoreException {
+        Optional<TimerTag> optional = timerService.get(transactionId.getBytes(StandardCharsets.UTF_8));
+        if (optional.isEmpty()) {
+            return Optional.empty();
+        }
+
+        cancelCheck(transactionId);
+
+        ByteBuffer buffer = optional.get().payloadAsByteBuffer();
+        FlatMessage message = FlatMessage.getRootAsFlatMessage(buffer);
+        return Optional.of(message);
+    }
+
+    public void rollback(String transactionId) throws StoreException {
+        cancelCheck(transactionId);
+    }
+
+    public boolean scheduleNextCheck(FlatMessage message) throws StoreException {
+        if (message.systemProperties().orphanedTransactionCheckTimes() >= config.transactionCheckMaxTimes()) {
+            return false;
+        }
+
+        long deliveryTimestamp = System.currentTimeMillis() + config.transactionCheckInterval();
+        scheduleNextCheck(deliveryTimestamp, message);
+        return true;
     }
 
     protected String scheduleNextCheck(long deliveryTimestamp, FlatMessage message) throws StoreException {

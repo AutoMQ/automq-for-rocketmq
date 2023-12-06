@@ -38,14 +38,18 @@ import com.automq.rocketmq.store.api.DeadLetterSender;
 import com.automq.rocketmq.store.api.MessageStore;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.StoreContext;
+import com.automq.rocketmq.store.model.generated.TimerTag;
 import com.automq.rocketmq.store.model.message.Filter;
 import com.automq.rocketmq.store.model.message.PutResult;
 import com.automq.rocketmq.store.model.message.ResetConsumeOffsetResult;
 import com.automq.rocketmq.store.model.message.SQLFilter;
 import com.automq.rocketmq.store.model.message.TagFilter;
+import com.automq.rocketmq.store.model.transaction.TransactionResolution;
+import io.netty.channel.Channel;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.instrumentation.annotations.SpanAttribute;
 import io.opentelemetry.instrumentation.annotations.WithSpan;
+import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -56,10 +60,12 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.rocketmq.broker.client.ProducerManager;
 import org.apache.rocketmq.client.consumer.AckResult;
 import org.apache.rocketmq.client.consumer.AckStatus;
 import org.apache.rocketmq.client.consumer.PopResult;
@@ -76,17 +82,23 @@ import org.apache.rocketmq.common.message.Message;
 import org.apache.rocketmq.common.message.MessageClientIDSetter;
 import org.apache.rocketmq.common.message.MessageConst;
 import org.apache.rocketmq.common.message.MessageDecoder;
+import org.apache.rocketmq.common.message.MessageExt;
 import org.apache.rocketmq.common.message.MessageQueue;
+import org.apache.rocketmq.common.sysflag.MessageSysFlag;
+import org.apache.rocketmq.common.thread.ThreadPoolMonitor;
 import org.apache.rocketmq.proxy.common.ProxyContext;
 import org.apache.rocketmq.proxy.common.utils.ExceptionUtils;
+import org.apache.rocketmq.proxy.remoting.common.RemotingConverter;
 import org.apache.rocketmq.proxy.service.message.MessageService;
 import org.apache.rocketmq.proxy.service.route.AddressableMessageQueue;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
+import org.apache.rocketmq.remoting.protocol.RequestCode;
 import org.apache.rocketmq.remoting.protocol.ResponseCode;
 import org.apache.rocketmq.remoting.protocol.body.LockBatchRequestBody;
 import org.apache.rocketmq.remoting.protocol.body.UnlockBatchRequestBody;
 import org.apache.rocketmq.remoting.protocol.header.AckMessageRequestHeader;
 import org.apache.rocketmq.remoting.protocol.header.ChangeInvisibleTimeRequestHeader;
+import org.apache.rocketmq.remoting.protocol.header.CheckTransactionStateRequestHeader;
 import org.apache.rocketmq.remoting.protocol.header.ConsumerSendMsgBackRequestHeader;
 import org.apache.rocketmq.remoting.protocol.header.EndTransactionRequestHeader;
 import org.apache.rocketmq.remoting.protocol.header.GetMaxOffsetRequestHeader;
@@ -107,18 +119,27 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
     private final LockService lockService;
     private final DeadLetterSender deadLetterService;
     private final SuspendRequestService suspendRequestService;
+    private final ProducerManager producerManager;
+    private final ExecutorService executorService = ThreadPoolMonitor.createAndMonitor(2, 5, 100, TimeUnit.SECONDS,
+        "Transaction-msg-check-thread", 2000);
 
     public MessageServiceImpl(ProxyConfig config, MessageStore store, ProxyMetadataService metadataService,
-        LockService lockService, DeadLetterSender deadLetterService) throws StoreException {
+        LockService lockService, DeadLetterSender deadLetterService,
+        ProducerManager producerManager) throws StoreException {
         this.config = config;
         this.store = store;
         this.metadataService = metadataService;
         this.deadLetterService = deadLetterService;
         this.lockService = lockService;
         this.suspendRequestService = SuspendRequestService.getInstance();
-        store.registerTransactionCheckHandler(timerTag -> {
-            // TODO check transaction status
-        });
+        this.producerManager = producerManager;
+        store.registerTransactionCheckHandler(timerTag -> executorService.execute(() -> {
+            try {
+                checkTransactionStatus(timerTag);
+            } catch (Throwable t) {
+                LOGGER.error("Error while check transaction status", t);
+            }
+        }));
     }
 
     public TopicMessageType getMessageType(SendMessageRequestHeader requestHeader) {
@@ -305,7 +326,53 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
     @Override
     public CompletableFuture<Void> endTransactionOneway(ProxyContext ctx, String brokerName,
         EndTransactionRequestHeader requestHeader, long timeoutMillis) {
-        throw new UnsupportedOperationException();
+        TransactionResolution resolution;
+        switch (requestHeader.getCommitOrRollback()) {
+            case MessageSysFlag.TRANSACTION_COMMIT_TYPE -> resolution = TransactionResolution.COMMIT;
+            case MessageSysFlag.TRANSACTION_ROLLBACK_TYPE, MessageSysFlag.TRANSACTION_NOT_TYPE ->
+                resolution = TransactionResolution.ROLLBACK;
+            default -> {
+                return CompletableFuture.failedFuture(new ProxyException(apache.rocketmq.v2.Code.BAD_REQUEST, "Unknown transaction resolution"));
+            }
+        }
+
+        return store.endTransaction(requestHeader.getTransactionId(), resolution);
+    }
+
+    private void checkTransactionStatus(TimerTag timerTag) {
+        ByteBuffer payload = timerTag.payloadAsByteBuffer();
+        FlatMessage message = FlatMessage.getRootAsFlatMessage(payload);
+        try {
+            message.systemProperties().mutateOrphanedTransactionCheckTimes(message.systemProperties().orphanedTransactionCheckTimes() + 1);
+            store.scheduleCheckTransaction(message);
+
+            Topic topic = metadataService.topicOf(message.topicId()).join();
+            Channel channel = producerManager.getAvailableChannel(topic.getName());
+            if (channel != null) {
+                CheckTransactionStateRequestHeader requestHeader = new CheckTransactionStateRequestHeader();
+                requestHeader.setCommitLogOffset(0L);
+                requestHeader.setOffsetMsgId("");
+                requestHeader.setTranStateTableOffset(0L);
+                requestHeader.setMsgId(message.systemProperties().messageId());
+                requestHeader.setTransactionId(message.systemProperties().messageId());
+
+                ByteBuffer buffer = timerTag.identityAsByteBuffer();
+                byte[] identity = new byte[buffer.remaining()];
+                buffer.get(identity);
+                requestHeader.setTransactionId(new String(identity));
+
+                RemotingCommand request = RemotingCommand.createRequestCommand(RequestCode.CHECK_TRANSACTION_STATE, requestHeader);
+                FlatMessageExt flatMessageExt = FlatMessageExt.Builder.builder()
+                    .offset(0L)
+                    .message(message)
+                    .build();
+                MessageExt messageExt = FlatMessageUtil.convertTo(flatMessageExt, topic.getName(), 0, config.hostName(), config.grpcListenPort());
+                request.setBody(RemotingConverter.getInstance().convertMsgToBytes(messageExt));
+                channel.writeAndFlush(request);
+            }
+        } catch (Exception e) {
+            LOGGER.error("Error while check transaction: message {}", message.systemProperties().messageId(), e);
+        }
     }
 
     record InnerPopResult(
