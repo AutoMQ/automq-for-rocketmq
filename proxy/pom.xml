@@ -62,9 +62,5 @@
                 </exclusion>
             </exclusions>
         </dependency>
-        <dependency>
-            <groupId>org.apache.rocketmq</groupId>
-            <artifactId>rocketmq-client-java-noshade</artifactId>
-        </dependency>
     </dependencies>
 </project>
