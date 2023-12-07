@@ -26,16 +26,22 @@ import apache.rocketmq.proxy.v1.ProducerClientConnectionReply;
 import apache.rocketmq.proxy.v1.ProducerClientConnectionRequest;
 import apache.rocketmq.proxy.v1.ProxyServiceGrpc;
 import apache.rocketmq.proxy.v1.QueueStats;
+import apache.rocketmq.proxy.v1.RelayReply;
+import apache.rocketmq.proxy.v1.RelayRequest;
 import apache.rocketmq.proxy.v1.ResetConsumeOffsetByTimestampRequest;
 import apache.rocketmq.proxy.v1.ResetConsumeOffsetReply;
 import apache.rocketmq.proxy.v1.ResetConsumeOffsetRequest;
 import apache.rocketmq.proxy.v1.Status;
 import apache.rocketmq.proxy.v1.TopicStatsReply;
 import apache.rocketmq.proxy.v1.TopicStatsRequest;
+import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.proxy.service.ExtendMessageService;
+import com.automq.rocketmq.store.api.MessageStore;
+import com.automq.rocketmq.store.model.StoreContext;
 import com.google.protobuf.TextFormat;
 import io.grpc.stub.StreamObserver;
 import io.netty.channel.Channel;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.rocketmq.broker.client.ClientChannelInfo;
@@ -51,13 +57,16 @@ import org.slf4j.Logger;
 public class ProxyServiceImpl extends ProxyServiceGrpc.ProxyServiceImplBase {
     private static final Logger LOGGER = org.slf4j.LoggerFactory.getLogger(ProxyServiceImpl.class);
 
+    private final MessageStore messageStore;
+
     private final ExtendMessageService messageService;
 
     private final ProducerManager producerManager;
     private final ConsumerManager consumerManager;
 
-    public ProxyServiceImpl(ExtendMessageService messageService, ProducerManager producerManager,
-        ConsumerManager consumerManager) {
+    public ProxyServiceImpl(MessageStore messageStore, ExtendMessageService messageService,
+        ProducerManager producerManager, ConsumerManager consumerManager) {
+        this.messageStore = messageStore;
         this.messageService = messageService;
         this.producerManager = producerManager;
         this.consumerManager = consumerManager;
@@ -197,5 +206,39 @@ public class ProxyServiceImpl extends ProxyServiceGrpc.ProxyServiceImplBase {
         }
         responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
+    }
+
+    @Override
+    public void relay(RelayRequest request, StreamObserver<RelayReply> responseObserver) {
+        switch (request.getCommandCase()) {
+            case PUT_MESSAGE_COMMAND -> {
+                ByteBuffer buffer = request.getPutMessageCommand().getFlatMessage().asReadOnlyByteBuffer();
+                FlatMessage flatMessage = FlatMessage.getRootAsFlatMessage(buffer);
+                messageStore.put(StoreContext.EMPTY, flatMessage)
+                    .whenComplete((v, e) -> {
+                        if (e != null) {
+                            responseObserver.onError(e);
+                            return;
+                        }
+                        responseObserver.onNext(RelayReply.newBuilder()
+                            .setStatus(Status
+                                .newBuilder()
+                                .setCode(Code.OK)
+                                .build())
+                            .build());
+                        responseObserver.onCompleted();
+                    });
+            }
+            default -> {
+                responseObserver.onNext(RelayReply.newBuilder()
+                    .setStatus(Status
+                        .newBuilder()
+                        .setCode(Code.BAD_REQUEST)
+                        .setMessage("Unsupported command: " + request.getCommandCase())
+                        .build())
+                    .build());
+                responseObserver.onCompleted();
+            }
+        }
     }
 }

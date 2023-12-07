@@ -17,7 +17,9 @@
 
 package com.automq.rocketmq.store.util;
 
+import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.store.exception.StoreException;
+import com.automq.rocketmq.store.mock.MockMessageUtil;
 import com.automq.rocketmq.store.model.generated.CheckPoint;
 import com.automq.rocketmq.store.model.generated.ReceiptHandle;
 import com.automq.rocketmq.store.model.operation.AckOperation;
@@ -37,6 +39,7 @@ import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 public class SerializeUtilTest {
     public static final long TOPIC_ID = 0L;
@@ -61,6 +64,19 @@ public class SerializeUtilTest {
     public static final long RETRY_OFFSET = 11L;
     public static final int CONSUMER_GROUP_VERSION = 13;
     public static final String RECEIPT_HANDLE = "EAAAAAwAGAAIAAAABAAQAAwAAAABAAAABAAAAAAAAAADAAAAAAAAAA==";
+
+    @Test
+    void flatBufferToByteArray() {
+        FlatMessage message = FlatMessage.getRootAsFlatMessage(MockMessageUtil.buildMessage());
+        byte[] bytes = SerializeUtil.flatBufferToByteArray(message);
+
+        FlatMessage message1 = FlatMessage.getRootAsFlatMessage(ByteBuffer.wrap(bytes));
+        assertEquals(message1.topicId(), message.topicId());
+        assertEquals(message1.keys(), message.keys());
+        assertNotNull(message1.systemProperties());
+        assertEquals(message1.systemProperties().deliveryAttempts(), message.systemProperties().deliveryAttempts());
+        assertEquals(message1.systemProperties().originalQueueOffset(), message.systemProperties().originalQueueOffset());
+    }
 
     @Test
     void buildCheckPointKey() {

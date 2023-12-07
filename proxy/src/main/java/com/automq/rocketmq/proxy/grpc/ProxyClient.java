@@ -24,7 +24,9 @@ import apache.rocketmq.proxy.v1.ProducerClientConnectionRequest;
 import apache.rocketmq.proxy.v1.QueueStats;
 import apache.rocketmq.proxy.v1.ResetConsumeOffsetByTimestampRequest;
 import apache.rocketmq.proxy.v1.ResetConsumeOffsetRequest;
+import apache.rocketmq.proxy.v1.Status;
 import apache.rocketmq.proxy.v1.TopicStatsRequest;
+import com.automq.rocketmq.common.model.generated.FlatMessage;
 import java.io.Closeable;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -41,4 +43,6 @@ public interface ProxyClient extends Closeable {
 
     CompletableFuture<List<ConsumerClientConnection>> consumerClientConnection(String target,
         ConsumerClientConnectionRequest request);
+
+    CompletableFuture<Status> relayMessage(String target, FlatMessage message);
 }
