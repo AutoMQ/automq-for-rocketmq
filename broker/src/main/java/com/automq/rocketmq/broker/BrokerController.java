@@ -34,6 +34,7 @@ import com.automq.rocketmq.metadata.service.S3MetadataService;
 import com.automq.rocketmq.proxy.config.ProxyConfiguration;
 import com.automq.rocketmq.proxy.grpc.GrpcProtocolServer;
 import com.automq.rocketmq.proxy.grpc.ProxyServiceImpl;
+import com.automq.rocketmq.proxy.grpc.client.GrpcProxyClient;
 import com.automq.rocketmq.proxy.processor.ExtendMessagingProcessor;
 import com.automq.rocketmq.proxy.remoting.RemotingProtocolServer;
 import com.automq.rocketmq.proxy.service.DeadLetterService;
@@ -108,7 +109,8 @@ public class BrokerController implements Lifecycle {
             metadataStore.sessionFactory(), metadataStore.asyncExecutor());
         storeMetadataService = new DefaultStoreMetadataService(metadataStore, s3MetadataService);
 
-        dlqService = new DeadLetterService(brokerConfig, proxyMetadataService);
+        GrpcProxyClient relayClient = new GrpcProxyClient(brokerConfig);
+        dlqService = new DeadLetterService(brokerConfig, proxyMetadataService, relayClient);
 
         MessageStoreImpl messageStore = MessageStoreBuilder.build(brokerConfig.store(), brokerConfig.s3Stream(), storeMetadataService, dlqService);
         SuspendRequestService suspendRequestService = SuspendRequestService.getInstance();
@@ -117,6 +119,7 @@ public class BrokerController implements Lifecycle {
 
         DataStore dataStore = new DataStoreFacade(messageStore.streamStore(), messageStore.s3ObjectOperator(), messageStore.topicQueueManager());
         metadataStore.setDataStore(dataStore);
+        dlqService.init(messageStore);
 
         LockService lockService = new LockService(brokerConfig.proxy());
 
