@@ -104,7 +104,7 @@ public class MessageStoreTest {
         logicQueueManager = new DefaultLogicQueueManager(config, streamStore, kvService, timerService, metadataService, operationLogService, inflightService, streamReclaimService);
         DeadLetterSender deadLetterSender = Mockito.mock(DeadLetterSender.class);
         Mockito.doReturn(CompletableFuture.completedFuture(null))
-            .when(deadLetterSender).send(Mockito.any(), Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
+            .when(deadLetterSender).send(Mockito.any(), Mockito.anyLong(), Mockito.any(FlatMessage.class));
         MessageArrivalNotificationService messageArrivalNotificationService = new MessageArrivalNotificationService();
         reviveService = new ReviveService(KV_NAMESPACE_CHECK_POINT, kvService, timerService, metadataService, messageArrivalNotificationService,
             logicQueueManager, deadLetterSender);

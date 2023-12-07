@@ -18,9 +18,10 @@
 package com.automq.rocketmq.proxy.service;
 
 import apache.rocketmq.v2.Code;
-import com.automq.rocketmq.common.config.ProxyConfig;
+import com.automq.rocketmq.common.config.BrokerConfig;
 import com.automq.rocketmq.metadata.api.ProxyMetadataService;
 import com.automq.rocketmq.proxy.exception.ProxyException;
+import com.automq.rocketmq.proxy.grpc.client.GrpcProxyClient;
 import com.automq.rocketmq.proxy.mock.MockMessageStore;
 import com.automq.rocketmq.proxy.mock.MockProxyMetadataService;
 import com.automq.rocketmq.proxy.model.ProxyContextExt;
@@ -100,10 +101,10 @@ class MessageServiceImplTest {
     public void setUp() throws StoreException {
         metadataService = new MockProxyMetadataService();
         messageStore = new MockMessageStore();
-        ProxyConfig config = new ProxyConfig();
+        BrokerConfig config = new BrokerConfig();
         deadLetterSender = Mockito.mock(DeadLetterSender.class);
         Mockito.doReturn(CompletableFuture.completedFuture(null)).when(deadLetterSender).send(Mockito.any(), Mockito.anyLong(), Mockito.any());
-        messageService = new MessageServiceImpl(config, messageStore, metadataService, new LockService(config), deadLetterSender, new ProducerManager());
+        messageService = new MessageServiceImpl(config, messageStore, metadataService, new LockService(config.proxy()), deadLetterSender, new ProducerManager(), new GrpcProxyClient(config));
     }
 
     @Test

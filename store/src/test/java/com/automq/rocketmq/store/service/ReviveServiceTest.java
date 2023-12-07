@@ -104,7 +104,7 @@ class ReviveServiceTest {
             FlatMessageExt flatMessageExt = ink.getArgument(2);
             assertNotNull(flatMessageExt);
             return CompletableFuture.completedFuture(null);
-        }).when(deadLetterSender).send(Mockito.any(), Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
+        }).when(deadLetterSender).send(Mockito.any(), Mockito.anyLong(), Mockito.any(FlatMessage.class));
         // mock max delivery attempts
         Mockito.doReturn(CompletableFuture.completedFuture(2))
             .when(metadataService).maxDeliveryAttemptsOf(Mockito.anyLong());
@@ -152,7 +152,7 @@ class ReviveServiceTest {
 
         // check if this message has been sent to DLQ
         Mockito.verify(deadLetterSender, Mockito.times(1))
-            .send(Mockito.any(), Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
+            .send(Mockito.any(), Mockito.anyLong(), Mockito.any(FlatMessage.class));
         PopResult popResult1 = logicQueue.popRetry(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 1, invisibleDuration).join();
         assertEquals(0, popResult1.messageList().size());
     }
@@ -165,7 +165,7 @@ class ReviveServiceTest {
             FlatMessageExt flatMessageExt = ink.getArgument(2);
             assertNotNull(flatMessageExt);
             return CompletableFuture.completedFuture(null);
-        }).when(deadLetterSender).send(Mockito.any(), Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
+        }).when(deadLetterSender).send(Mockito.any(), Mockito.anyLong(), Mockito.any(FlatMessage.class));
         // mock max delivery attempts
         Mockito.doReturn(CompletableFuture.completedFuture(2))
             .when(metadataService).maxDeliveryAttemptsOf(Mockito.anyLong());
@@ -212,7 +212,7 @@ class ReviveServiceTest {
 
         // check if this message has been sent to DLQ
         Mockito.verify(deadLetterSender, Mockito.times(1))
-            .send(Mockito.any(), Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
+            .send(Mockito.any(), Mockito.anyLong(), Mockito.any(FlatMessage.class));
 
         assertEquals(1, logicQueue.getAckOffset(CONSUMER_GROUP_ID));
 
@@ -232,7 +232,7 @@ class ReviveServiceTest {
             FlatMessageExt flatMessageExt = ink.getArgument(2);
             assertNotNull(flatMessageExt);
             return CompletableFuture.completedFuture(null);
-        }).when(deadLetterSender).send(Mockito.any(), Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
+        }).when(deadLetterSender).send(Mockito.any(), Mockito.anyLong(), Mockito.any(FlatMessage.class));
         // mock max delivery attempts
         Mockito.doReturn(CompletableFuture.completedFuture(2))
             .when(metadataService).maxDeliveryAttemptsOf(Mockito.anyLong());
@@ -279,7 +279,7 @@ class ReviveServiceTest {
         timerService.dequeue();
 
         // check if this message has been sent to DLQ
-        Mockito.verify(deadLetterSender, Mockito.times(1)).send(Mockito.any(), Mockito.anyLong(), Mockito.any(FlatMessageExt.class));
+        Mockito.verify(deadLetterSender, Mockito.times(1)).send(Mockito.any(), Mockito.anyLong(), Mockito.any(FlatMessage.class));
         // check ck not exist
         assertTrue(retryPopResult.messageList().get(0).receiptHandle().isPresent());
         handle = SerializeUtil.decodeReceiptHandle(retryPopResult.messageList().get(0).receiptHandle().get());

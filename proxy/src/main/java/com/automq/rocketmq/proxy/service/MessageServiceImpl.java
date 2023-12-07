@@ -19,11 +19,13 @@ package com.automq.rocketmq.proxy.service;
 
 import apache.rocketmq.common.v1.Code;
 import apache.rocketmq.controller.v1.ConsumerGroup;
+import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.SubscriptionMode;
 import apache.rocketmq.controller.v1.Topic;
 import apache.rocketmq.proxy.v1.QueueStats;
 import apache.rocketmq.proxy.v1.StreamStats;
+import com.automq.rocketmq.common.config.BrokerConfig;
 import com.automq.rocketmq.common.config.ProxyConfig;
 import com.automq.rocketmq.common.exception.ControllerException;
 import com.automq.rocketmq.common.model.FlatMessageExt;
@@ -31,6 +33,7 @@ import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.common.util.CommonUtil;
 import com.automq.rocketmq.metadata.api.ProxyMetadataService;
 import com.automq.rocketmq.proxy.exception.ProxyException;
+import com.automq.rocketmq.proxy.grpc.ProxyClient;
 import com.automq.rocketmq.proxy.metrics.ProxyMetricsManager;
 import com.automq.rocketmq.proxy.model.ProxyContextExt;
 import com.automq.rocketmq.proxy.model.VirtualQueue;
@@ -118,6 +121,7 @@ import org.slf4j.LoggerFactory;
 
 public class MessageServiceImpl implements MessageService, ExtendMessageService {
     private static final Logger LOGGER = LoggerFactory.getLogger(MessageServiceImpl.class);
+    private final BrokerConfig brokerConfig;
     private final ProxyConfig config;
     private final ProxyMetadataService metadataService;
     private final MessageStore store;
@@ -125,19 +129,22 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
     private final DeadLetterSender deadLetterService;
     private final SuspendRequestService suspendRequestService;
     private final ProducerManager producerManager;
+    private final ProxyClient relayClient;
     private final ExecutorService executorService = ThreadPoolMonitor.createAndMonitor(2, 5, 100, TimeUnit.SECONDS,
         "Transaction-msg-check-thread", 2000);
 
-    public MessageServiceImpl(ProxyConfig config, MessageStore store, ProxyMetadataService metadataService,
-        LockService lockService, DeadLetterSender deadLetterService,
-        ProducerManager producerManager) throws StoreException {
-        this.config = config;
+    public MessageServiceImpl(BrokerConfig config, MessageStore store, ProxyMetadataService metadataService,
+        LockService lockService, DeadLetterSender deadLetterService, ProducerManager producerManager,
+        ProxyClient relayClient) throws StoreException {
+        this.brokerConfig = config;
+        this.config = config.proxy();
         this.store = store;
         this.metadataService = metadataService;
         this.deadLetterService = deadLetterService;
         this.lockService = lockService;
         this.suspendRequestService = SuspendRequestService.getInstance();
         this.producerManager = producerManager;
+        this.relayClient = relayClient;
         store.registerTransactionCheckHandler(timerTag -> executorService.execute(() -> {
             try {
                 checkTransactionStatus(timerTag);
@@ -187,20 +194,24 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
             ProxyContextExt contextExt = (ProxyContextExt) ctx;
             FlatMessage flatMessage = FlatMessageUtil.convertTo(contextExt, topic.getTopicId(), virtualQueue.physicalQueueId(), config.hostName(), message);
 
+            Optional<MessageQueueAssignment> optional = topic.getAssignmentsList().stream().filter(assignment -> assignment.getQueue().getQueueId() == flatMessage.queueId()).findFirst();
+            if (optional.isEmpty()) {
+                LOGGER.error("Message: {} is dropped because the topic: {} doesn't have queue: {}",
+                    messageId, topic.getName(), flatMessage.queueId());
+                return CompletableFuture.failedFuture(new ProxyException(apache.rocketmq.v2.Code.BAD_REQUEST, "Queue " + flatMessage.queueId() + " is not assigned to any node."));
+            }
+            MessageQueueAssignment assignment = optional.get();
+
             if (requestHeader.getTopic().startsWith(MixAll.RETRY_GROUP_TOPIC_PREFIX)) {
                 flatMessage.systemProperties().mutateDeliveryAttempts(requestHeader.getReconsumeTimes() + 1);
                 if (requestHeader.getReconsumeTimes() > requestHeader.getMaxReconsumeTimes()) {
                     String groupName = requestHeader.getTopic().replace(MixAll.RETRY_GROUP_TOPIC_PREFIX, "");
-                    FlatMessageExt flatMessageExt = FlatMessageExt.Builder.builder()
-                        .message(flatMessage)
-                        .offset(0)
-                        .build();
                     contextExt.span().ifPresent(span -> {
                         span.setAttribute("deadLetter", true);
                         span.setAttribute("group", groupName);
                     });
                     return consumerGroupOf(groupName)
-                        .thenCompose(group -> deadLetterService.send(contextExt, group.getGroupId(), flatMessageExt))
+                        .thenCompose(group -> deadLetterService.send(contextExt, group.getGroupId(), flatMessage))
                         .thenApply(ignore -> new PutResult(PutResult.Status.PUT_OK, 0));
                 } else {
                     String groupName = requestHeader.getTopic().replace(MixAll.RETRY_GROUP_TOPIC_PREFIX, "");
@@ -210,10 +221,20 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
                         span.setAttribute("reconsumeTimes", requestHeader.getReconsumeTimes());
                         span.setAttribute("deliveryTimestamp", flatMessage.systemProperties().deliveryTimestamp());
                     });
+                    if (assignment.getNodeId() != brokerConfig.nodeId()) {
+                        return metadataService.addressOf(assignment.getNodeId())
+                            .thenCompose(address -> relayClient.relayMessage(address, flatMessage))
+                            .thenApply(status -> new PutResult(PutResult.Status.PUT_OK, 0));
+                    }
                     return store.put(ContextUtil.buildStoreContext(ctx, topic.getName(), groupName), flatMessage);
                 }
             }
 
+            if (assignment.getNodeId() != brokerConfig.nodeId()) {
+                return metadataService.addressOf(assignment.getNodeId())
+                    .thenCompose(address -> relayClient.relayMessage(address, flatMessage))
+                    .thenApply(status -> new PutResult(PutResult.Status.PUT_OK, 0));
+            }
             return store.put(ContextUtil.buildStoreContext(ctx, topic.getName(), ""), flatMessage);
         });
 
@@ -274,7 +295,7 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
                     throw new ProxyException(apache.rocketmq.v2.Code.MESSAGE_NOT_FOUND, "Message not found from server.");
                 }).thenCompose(messageExt -> {
                     if (messageExt.deliveryAttempts() > group.getMaxDeliveryAttempt()) {
-                        return deadLetterService.send((ProxyContextExt) ctx, group.getGroupId(), messageExt);
+                        return deadLetterService.send((ProxyContextExt) ctx, group.getGroupId(), messageExt.message());
                     }
 
                     // Message consume retry strategy
@@ -282,7 +303,8 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
                     // =0: broker control retry frequency
                     // >0: client control retry frequency
                     return switch (Integer.compare(delayLevel, 0)) {
-                        case -1 -> deadLetterService.send((ProxyContextExt) ctx, group.getGroupId(), messageExt);
+                        case -1 ->
+                            deadLetterService.send((ProxyContextExt) ctx, group.getGroupId(), messageExt.message());
                         case 0 -> topicOf(MixAll.RETRY_GROUP_TOPIC_PREFIX + requestHeader.getGroup())
                             .thenCompose(retryTopic -> {
                                 // Keep the same logic as apache RocketMQ.

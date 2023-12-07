@@ -17,7 +17,7 @@
 
 package com.automq.rocketmq.store.api;
 
-import com.automq.rocketmq.common.model.FlatMessageExt;
+import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.common.trace.TraceContext;
 import java.util.concurrent.CompletableFuture;
 
@@ -27,7 +27,7 @@ public interface DeadLetterSender {
      *
      * @param context trace context
      * @param consumerGroupId consumer group id
-     * @param originalFlatMessage original message
+     * @param message original message
      */
-    CompletableFuture<Void> send(TraceContext context, long consumerGroupId, FlatMessageExt originalFlatMessage);
+    CompletableFuture<Void> send(TraceContext context, long consumerGroupId, FlatMessage message);
 }
