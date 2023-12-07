@@ -140,10 +140,36 @@ message ConsumerClientConnectionReply {
   repeated ConsumerClientConnection connection = 2;
 }
 
+message TraceContext {
+  // Trace id
+  string trace_id = 1;
+  // Span id
+  string span_id = 2;
+}
+
+message PutMessageCommand {
+  bytes flat_message = 1;
+}
+
+message RelayRequest {
+  optional Status status = 1;
+  optional TraceContext trace_context = 2;
+
+  oneof command {
+    // Put message directly
+    PutMessageCommand put_message_command = 3;
+  }
+}
+
+message RelayReply {
+  Status status = 1;
+}
+
 service ProxyService {
   rpc resetConsumeOffset(ResetConsumeOffsetRequest) returns (ResetConsumeOffsetReply) {}
   rpc resetConsumeOffsetByTimestamp(ResetConsumeOffsetByTimestampRequest) returns (ResetConsumeOffsetReply) {}
   rpc topicStats(TopicStatsRequest) returns (TopicStatsReply) {}
   rpc producerClientConnection(ProducerClientConnectionRequest) returns (ProducerClientConnectionReply) {}
   rpc consumerClientConnection(ConsumerClientConnectionRequest) returns (ConsumerClientConnectionReply) {}
+  rpc relay(RelayRequest) returns (RelayReply) {}
 }

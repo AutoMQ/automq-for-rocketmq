@@ -31,6 +31,7 @@ import com.automq.rocketmq.store.model.operation.PopOperation;
 import com.automq.rocketmq.store.model.operation.ResetConsumeOffsetOperation;
 import com.automq.stream.s3.wal.util.WALUtil;
 import com.google.flatbuffers.FlatBufferBuilder;
+import com.google.flatbuffers.Table;
 import io.netty.buffer.Unpooled;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -43,6 +44,13 @@ import org.slf4j.LoggerFactory;
 public class SerializeUtil {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(SerializeUtil.class);
+
+    public static <T extends Table> byte[] flatBufferToByteArray(T table) {
+        ByteBuffer buffer = table.getByteBuffer();
+        byte[] bytes = new byte[buffer.remaining()];
+        buffer.get(buffer.position(), bytes);
+        return bytes;
+    }
 
     // <topicId><queueId>
     public static byte[] buildCheckPointQueuePrefix(long topicId, int queueId) {

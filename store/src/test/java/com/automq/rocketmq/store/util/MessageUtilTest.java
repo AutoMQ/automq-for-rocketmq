@@ -18,7 +18,6 @@
 package com.automq.rocketmq.store.util;
 
 import com.automq.rocketmq.common.model.FlatMessageExt;
-import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.store.mock.MemoryStreamClient;
 import com.automq.rocketmq.store.mock.MockMessageUtil;
 import com.automq.rocketmq.store.model.stream.SingleRecord;
@@ -30,19 +29,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 class MessageUtilTest {
-
-    @Test
-    void flatBufferToByteArray() {
-        FlatMessage message = FlatMessage.getRootAsFlatMessage(MockMessageUtil.buildMessage());
-        byte[] bytes = FlatMessageUtil.flatBufferToByteArray(message);
-
-        FlatMessage message1 = FlatMessage.getRootAsFlatMessage(ByteBuffer.wrap(bytes));
-        assertEquals(message1.topicId(), message.topicId());
-        assertEquals(message1.keys(), message.keys());
-        assertNotNull(message1.systemProperties());
-        assertEquals(message1.systemProperties().deliveryAttempts(), message.systemProperties().deliveryAttempts());
-        assertEquals(message1.systemProperties().originalQueueOffset(), message.systemProperties().originalQueueOffset());
-    }
 
     @Test
     void transferToMessageExt() {

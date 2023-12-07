@@ -22,7 +22,7 @@ import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.model.generated.TimerHandlerType;
 import com.automq.rocketmq.store.model.generated.TimerTag;
-import com.automq.rocketmq.store.util.FlatMessageUtil;
+import com.automq.rocketmq.store.util.SerializeUtil;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
@@ -78,7 +78,7 @@ public class TransactionService {
 
     protected String scheduleNextCheck(long deliveryTimestamp, FlatMessage message) throws StoreException {
         String transactionId = message.systemProperties().messageId();
-        timerService.enqueue(deliveryTimestamp, transactionId.getBytes(StandardCharsets.UTF_8), TimerHandlerType.TRANSACTION_MESSAGE, FlatMessageUtil.flatBufferToByteArray(message));
+        timerService.enqueue(deliveryTimestamp, transactionId.getBytes(StandardCharsets.UTF_8), TimerHandlerType.TRANSACTION_MESSAGE, SerializeUtil.flatBufferToByteArray(message));
         return transactionId;
     }
 

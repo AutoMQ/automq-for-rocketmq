@@ -25,18 +25,24 @@ import apache.rocketmq.proxy.v1.ProducerClientConnection;
 import apache.rocketmq.proxy.v1.ProducerClientConnectionReply;
 import apache.rocketmq.proxy.v1.ProducerClientConnectionRequest;
 import apache.rocketmq.proxy.v1.ProxyServiceGrpc;
+import apache.rocketmq.proxy.v1.PutMessageCommand;
 import apache.rocketmq.proxy.v1.QueueStats;
+import apache.rocketmq.proxy.v1.RelayReply;
+import apache.rocketmq.proxy.v1.RelayRequest;
 import apache.rocketmq.proxy.v1.ResetConsumeOffsetByTimestampRequest;
 import apache.rocketmq.proxy.v1.ResetConsumeOffsetReply;
 import apache.rocketmq.proxy.v1.ResetConsumeOffsetRequest;
+import apache.rocketmq.proxy.v1.Status;
 import apache.rocketmq.proxy.v1.TopicStatsReply;
 import apache.rocketmq.proxy.v1.TopicStatsRequest;
 import com.automq.rocketmq.common.config.GrpcClientConfig;
+import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.proxy.grpc.ProxyClient;
 import com.google.common.base.Strings;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.MoreExecutors;
+import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import io.grpc.Channel;
 import io.grpc.Grpc;
@@ -192,6 +198,30 @@ public class GrpcProxyClient implements ProxyClient {
                     } else {
                         future.completeExceptionally(new ProxyException(ProxyExceptionCode.INTERNAL_SERVER_ERROR, result.getStatus().getMessage()));
                     }
+                }
+
+                @Override
+                public void onFailure(Throwable t) {
+                    future.completeExceptionally(t);
+                }
+            }, MoreExecutors.directExecutor());
+        return future;
+    }
+
+    @Override
+    public CompletableFuture<Status> relayMessage(String target, FlatMessage message) {
+        ProxyServiceGrpc.ProxyServiceFutureStub stub = getOrCreateStubForTarget(target);
+
+        ByteString flatMessage = ByteString.copyFrom(message.getByteBuffer());
+        PutMessageCommand command = PutMessageCommand.newBuilder().setFlatMessage(flatMessage).build();
+        RelayRequest request = RelayRequest.newBuilder().setPutMessageCommand(command).build();
+
+        CompletableFuture<Status> future = new CompletableFuture<>();
+        Futures.addCallback(stub.relay(request),
+            new FutureCallback<>() {
+                @Override
+                public void onSuccess(RelayReply result) {
+                    future.complete(result.getStatus());
                 }
 
                 @Override

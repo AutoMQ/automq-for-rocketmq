@@ -47,13 +47,13 @@ import com.automq.rocketmq.store.service.SnapshotService;
 import com.automq.rocketmq.store.service.TimerService;
 import com.automq.rocketmq.store.service.TransactionService;
 import com.automq.rocketmq.store.service.api.KVService;
-import com.automq.rocketmq.store.util.FlatMessageUtil;
+import com.automq.rocketmq.store.util.SerializeUtil;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.instrumentation.annotations.SpanAttribute;
 import io.opentelemetry.instrumentation.annotations.WithSpan;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
-import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
@@ -193,7 +193,7 @@ public class MessageStoreImpl implements MessageStore {
         if (deliveryTimestamp > 0 && deliveryTimestamp - System.currentTimeMillis() > 1000) {
             try {
                 String messageId = message.systemProperties().messageId();
-                timerService.enqueue(deliveryTimestamp, messageId.getBytes(StandardCharsets.UTF_8), TimerHandlerType.TIMER_MESSAGE, FlatMessageUtil.flatBufferToByteArray(message));
+                timerService.enqueue(deliveryTimestamp, messageId.getBytes(StandardCharsets.UTF_8), TimerHandlerType.TIMER_MESSAGE, SerializeUtil.flatBufferToByteArray(message));
                 return CompletableFuture.completedFuture(new PutResult(PutResult.Status.PUT_DELAYED, -1));
             } catch (Exception e) {
                 return CompletableFuture.failedFuture(e);
