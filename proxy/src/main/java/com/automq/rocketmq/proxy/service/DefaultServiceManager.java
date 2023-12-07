@@ -46,14 +46,14 @@ public class DefaultServiceManager implements ServiceManager {
 
     public DefaultServiceManager(BrokerConfig config, ProxyMetadataService proxyMetadataService,
         DeadLetterService deadLetterService, MessageService messageService,
-        MessageStore messageStore, ProducerManager producerManager) {
+        MessageStore messageStore, ProducerManager producerManager, ConsumerManager consumerManager) {
         this.metadataService = proxyMetadataService;
         this.deadLetterService = deadLetterService;
         this.resourceMetadataService = new ResourceMetadataService(proxyMetadataService);
         this.messageService = messageService;
         this.topicRouteService = new TopicRouteServiceImpl(config, proxyMetadataService);
         this.producerManager = producerManager;
-        this.consumerManager = new ConsumerManager(new ConsumerIdsChangeListenerImpl(), config.proxy().channelExpiredTimeout());
+        this.consumerManager = consumerManager;
         this.proxyRelayService = new ProxyRelayServiceImpl();
         this.transactionService = new TransactionServiceImpl();
         this.adminService = new AdminServiceImpl();
@@ -109,7 +109,7 @@ public class DefaultServiceManager implements ServiceManager {
     public void start() throws Exception {
     }
 
-    protected static class ConsumerIdsChangeListenerImpl implements ConsumerIdsChangeListener {
+    public static class ConsumerIdsChangeListenerImpl implements ConsumerIdsChangeListener {
         @Override
         public void handle(ConsumerGroupEvent event, String group, Object... args) {
             // TODO: implement this to support consumer group change notification

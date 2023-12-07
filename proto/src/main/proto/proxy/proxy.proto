@@ -88,8 +88,8 @@ message TopicStatsReply {
 
 message ProducerClientConnectionRequest {
   ProxyRequestContext context = 1;
-  // Producer client id
-  string production_group = 2;
+  // Producer group name
+  string group = 2;
 }
 
 message ProducerClientConnection {
@@ -103,8 +103,6 @@ message ProducerClientConnection {
   string version = 4;
   // Client address
   string address = 5;
-  // Connected time
-  int64 connected_time = 6;
   // Last update time
   int64 last_update_time = 7;
 }
@@ -115,9 +113,37 @@ message ProducerClientConnectionReply {
   repeated ProducerClientConnection connection = 2;
 }
 
+message ConsumerClientConnectionRequest {
+  ProxyRequestContext context = 1;
+  // Consumer group name
+  string group = 2;
+}
+
+message ConsumerClientConnection {
+  // Producer client id
+  string client_id = 1;
+  // Protocol
+  string protocol = 2;
+  // Language
+  string language = 3;
+  // Version
+  string version = 4;
+  // Client address
+  string address = 5;
+  // Last update time
+  int64 last_update_time = 7;
+}
+
+message ConsumerClientConnectionReply {
+  Status status = 1;
+  // Producer client connection
+  repeated ConsumerClientConnection connection = 2;
+}
+
 service ProxyService {
   rpc resetConsumeOffset(ResetConsumeOffsetRequest) returns (ResetConsumeOffsetReply) {}
   rpc resetConsumeOffsetByTimestamp(ResetConsumeOffsetByTimestampRequest) returns (ResetConsumeOffsetReply) {}
   rpc topicStats(TopicStatsRequest) returns (TopicStatsReply) {}
   rpc producerClientConnection(ProducerClientConnectionRequest) returns (ProducerClientConnectionReply) {}
+  rpc consumerClientConnection(ConsumerClientConnectionRequest) returns (ConsumerClientConnectionReply) {}
 }

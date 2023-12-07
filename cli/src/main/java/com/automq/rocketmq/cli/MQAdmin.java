@@ -20,6 +20,7 @@ package com.automq.rocketmq.cli;
 import com.automq.rocketmq.cli.broker.DescribeCluster;
 import com.automq.rocketmq.cli.broker.TerminateNode;
 import com.automq.rocketmq.cli.consumer.ConsumeMessage;
+import com.automq.rocketmq.cli.consumer.ConsumerClientConnection;
 import com.automq.rocketmq.cli.consumer.CreateGroup;
 import com.automq.rocketmq.cli.consumer.DeleteGroup;
 import com.automq.rocketmq.cli.consumer.DescribeGroup;
@@ -60,7 +61,8 @@ import picocli.CommandLine;
         TerminateNode.class,
         ResetConsumeOffset.class,
         PrintTopicStats.class,
-        ProducerClientConnection.class
+        ProducerClientConnection.class,
+        ConsumerClientConnection.class
     }
 )
 public class MQAdmin implements Runnable {
