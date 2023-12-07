@@ -162,8 +162,8 @@ class ReviveServiceTest {
         Mockito.doAnswer(ink -> {
             long consumerGroupId = ink.getArgument(1);
             assertEquals(CONSUMER_GROUP_ID, consumerGroupId);
-            FlatMessageExt flatMessageExt = ink.getArgument(2);
-            assertNotNull(flatMessageExt);
+            FlatMessage flatMessage = ink.getArgument(2);
+            assertNotNull(flatMessage);
             return CompletableFuture.completedFuture(null);
         }).when(deadLetterSender).send(Mockito.any(), Mockito.anyLong(), Mockito.any(FlatMessage.class));
         // mock max delivery attempts
@@ -229,8 +229,8 @@ class ReviveServiceTest {
         Mockito.doAnswer(ink -> {
             long consumerGroupId = ink.getArgument(1);
             assertEquals(CONSUMER_GROUP_ID, consumerGroupId);
-            FlatMessageExt flatMessageExt = ink.getArgument(2);
-            assertNotNull(flatMessageExt);
+            FlatMessage flatMessage = ink.getArgument(2);
+            assertNotNull(flatMessage);
             return CompletableFuture.completedFuture(null);
         }).when(deadLetterSender).send(Mockito.any(), Mockito.anyLong(), Mockito.any(FlatMessage.class));
         // mock max delivery attempts
