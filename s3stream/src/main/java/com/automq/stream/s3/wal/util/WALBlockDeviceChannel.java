@@ -104,7 +104,7 @@ public class WALBlockDeviceChannel implements WALChannel {
             return "java.nio.DirectByteBuffer.<init>(long, int) not available." +
                     " Add --add-opens=java.base/java.nio=ALL-UNNAMED and -Dio.netty.tryReflectionSetAccessible=true to JVM options may fix this.";
         }
-        if (!tryOpenFileWithDirectIO(String.format(CHECK_DIRECT_IO_AVAILABLE_FORMAT, path))) {
+        if (!path.startsWith(DEVICE_PREFIX) && !tryOpenFileWithDirectIO(String.format(CHECK_DIRECT_IO_AVAILABLE_FORMAT, path))) {
             return "O_DIRECT not supported by the file system, path: " + path;
         }
         return null;
