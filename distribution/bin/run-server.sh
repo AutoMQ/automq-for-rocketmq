@@ -104,6 +104,11 @@ choose_gc_options()
 
 choose_gc_log_directory
 choose_gc_options
+
+if [ -z "$LOG4J_CONF" ] ; then
+    LOG4J_CONF="${BASE_DIR}/conf/log4j2.xml"
+fi
+
 JAVA_OPT="${JAVA_OPT} -XX:-OmitStackTraceInFastThrow"
 JAVA_OPT="${JAVA_OPT} -XX:-UseLargePages"
 JAVA_OPT="${JAVA_OPT} -Xdebug -Xrunjdwp:transport=dt_socket,address=*:9555,server=y,suspend=n"
@@ -111,6 +116,6 @@ JAVA_OPT="${JAVA_OPT} -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=${GC_LOG_
 JAVA_OPT="${JAVA_OPT} ${JAVA_OPT_EXT}"
 JAVA_OPT="${JAVA_OPT} -cp ${CLASSPATH}"
 # https://logging.apache.org/log4j/2.x/manual/configuration.html#automatic-configuration
-JAVA_OPT="${JAVA_OPT} -Dlog4j.configurationFile=file:${BASE_DIR}/conf/log4j2.xml"
+JAVA_OPT="${JAVA_OPT} -Dlog4j.configurationFile=file:${LOG4J_CONF}"
 
 "$JAVA" ${JAVA_OPT} $@
