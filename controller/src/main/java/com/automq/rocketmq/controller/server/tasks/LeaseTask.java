@@ -21,9 +21,9 @@ import apache.rocketmq.common.v1.Code;
 import com.automq.rocketmq.common.exception.ControllerException;
 import com.automq.rocketmq.controller.MetadataStore;
 import com.automq.rocketmq.controller.server.store.BrokerNode;
+import com.automq.rocketmq.metadata.dao.Lease;
 import com.automq.rocketmq.metadata.dao.Node;
 import com.automq.rocketmq.metadata.mapper.LeaseMapper;
-import com.automq.rocketmq.metadata.dao.Lease;
 import com.automq.rocketmq.metadata.mapper.NodeMapper;
 import java.util.Calendar;
 import org.apache.ibatis.session.SqlSession;
@@ -75,7 +75,7 @@ public class LeaseTask extends ControllerTask {
                     session.commit();
                     metadataStore.electionService().updateLease(update);
                 } else {
-                    LOGGER.info("Node[id={}, epoch={}] is controller leader currently, expiring at {}",
+                    LOGGER.debug("Node[id={}, epoch={}] is controller leader currently, expiring at {}",
                         lease.getNodeId(), lease.getEpoch(), lease.getExpirationTime());
                 }
             } else {

@@ -102,6 +102,22 @@
         </where>
     </update>
 
+    <update id="updateStreamAssignment">
+        UPDATE stream
+        SET src_node_id = #{srcNodeId},
+        dst_node_id = #{dstNodeId}
+        <where>
+            <if test="null != criteria.ids">
+                <foreach item="item" collection="criteria.ids" open="id IN (" separator="," close=")">
+                    #{item}
+                </foreach>
+            </if>
+            <if test="null != criteria.topicId">AND topic_id = #{criteria.topicId}</if>
+            <if test="null != criteria.queueId">AND queue_id = #{criteria.queueId}</if>
+            <if test="null != criteria.state">AND state = #{criteria.state}</if>
+        </where>
+    </update>
+
     <update id="planMove">
         UPDATE stream
         SET src_node_id = #{srcNodeId},

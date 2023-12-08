@@ -17,10 +17,10 @@
 
 package com.automq.rocketmq.controller.server.store;
 
+import apache.rocketmq.common.v1.Code;
 import apache.rocketmq.controller.v1.AssignmentStatus;
 import apache.rocketmq.controller.v1.Cluster;
 import apache.rocketmq.controller.v1.ClusterSummary;
-import apache.rocketmq.common.v1.Code;
 import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.CreateGroupRequest;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
@@ -36,15 +36,24 @@ import apache.rocketmq.controller.v1.UpdateTopicRequest;
 import com.automq.rocketmq.common.PrefixThreadFactory;
 import com.automq.rocketmq.common.api.DataStore;
 import com.automq.rocketmq.common.config.ControllerConfig;
-import com.automq.rocketmq.controller.ControllerClient;
 import com.automq.rocketmq.common.exception.ControllerException;
+import com.automq.rocketmq.controller.ControllerClient;
 import com.automq.rocketmq.controller.MetadataStore;
 import com.automq.rocketmq.controller.server.store.impl.ElectionServiceImpl;
 import com.automq.rocketmq.controller.server.store.impl.GroupManager;
 import com.automq.rocketmq.controller.server.store.impl.StreamManager;
 import com.automq.rocketmq.controller.server.store.impl.TopicManager;
+import com.automq.rocketmq.controller.server.tasks.DataRetentionTask;
+import com.automq.rocketmq.controller.server.tasks.HeartbeatTask;
+import com.automq.rocketmq.controller.server.tasks.ReclaimS3ObjectTask;
+import com.automq.rocketmq.controller.server.tasks.RecycleGroupTask;
+import com.automq.rocketmq.controller.server.tasks.RecycleTopicTask;
+import com.automq.rocketmq.controller.server.tasks.ScanAssignmentTask;
 import com.automq.rocketmq.controller.server.tasks.ScanGroupTask;
+import com.automq.rocketmq.controller.server.tasks.ScanNodeTask;
 import com.automq.rocketmq.controller.server.tasks.ScanStreamTask;
+import com.automq.rocketmq.controller.server.tasks.ScanTopicTask;
+import com.automq.rocketmq.controller.server.tasks.ScanYieldingQueueTask;
 import com.automq.rocketmq.metadata.dao.Group;
 import com.automq.rocketmq.metadata.dao.GroupProgress;
 import com.automq.rocketmq.metadata.dao.Lease;
@@ -58,16 +67,6 @@ import com.automq.rocketmq.metadata.mapper.LeaseMapper;
 import com.automq.rocketmq.metadata.mapper.NodeMapper;
 import com.automq.rocketmq.metadata.mapper.QueueAssignmentMapper;
 import com.automq.rocketmq.metadata.mapper.StreamMapper;
-import com.automq.rocketmq.controller.server.tasks.HeartbeatTask;
-import com.automq.rocketmq.controller.server.tasks.ReclaimS3ObjectTask;
-import com.automq.rocketmq.controller.server.tasks.RecycleGroupTask;
-import com.automq.rocketmq.controller.server.tasks.DataRetentionTask;
-import com.automq.rocketmq.controller.server.tasks.RecycleTopicTask;
-import com.automq.rocketmq.controller.server.tasks.ScanAssignmentTask;
-import com.automq.rocketmq.controller.server.tasks.ScanNodeTask;
-import com.automq.rocketmq.controller.server.tasks.ScanTopicTask;
-import com.automq.rocketmq.controller.server.tasks.ScanYieldingQueueTask;
-import com.automq.rocketmq.controller.server.tasks.SchedulerTask;
 import com.google.common.base.Strings;
 import com.google.protobuf.Timestamp;
 import java.io.IOException;
@@ -196,8 +195,9 @@ public class DefaultMetadataStore implements MetadataStore {
             config.scanIntervalInSecs(), TimeUnit.SECONDS);
         this.scheduledExecutorService.scheduleWithFixedDelay(new ScanYieldingQueueTask(this), 1,
             config.scanIntervalInSecs(), TimeUnit.SECONDS);
-        this.scheduledExecutorService.scheduleWithFixedDelay(new SchedulerTask(this), 1,
-            config.balanceWorkloadIntervalInSecs(), TimeUnit.SECONDS);
+        // Disable balance workload for now
+//        this.scheduledExecutorService.scheduleWithFixedDelay(new SchedulerTask(this), 1,
+//            config.balanceWorkloadIntervalInSecs(), TimeUnit.SECONDS);
         this.scheduledExecutorService.scheduleAtFixedRate(new HeartbeatTask(this), 3,
             Math.max(config().nodeAliveIntervalInSecs() / 2, 10), TimeUnit.SECONDS);
         this.scheduledExecutorService.scheduleWithFixedDelay(new RecycleTopicTask(this), 1,
@@ -554,22 +554,54 @@ public class DefaultMetadataStore implements MetadataStore {
         for (; ; ) {
             if (isLeader()) {
                 try (SqlSession session = openSession()) {
-                    QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
-                    List<QueueAssignment> assignments = assignmentMapper.list(topicId, null, null, AssignmentStatus.ASSIGNMENT_STATUS_YIELDING, null);
-                    for (QueueAssignment assignment : assignments) {
-                        if (assignment.getQueueId() != queueId) {
-                            continue;
-                        }
-                        assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNED);
-                        assignmentMapper.update(assignment);
-                        LOGGER.info("Mark queue[topic-id={}, queue-id={}] assignable", topicId, queueId);
-                        break;
+                    if (!maintainLeadershipWithSharedLock(session)) {
+                        continue;
                     }
+
+                    QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
+                    QueueAssignment assignment = assignmentMapper.get(topicId, queueId);
+                    assignment.setSrcNodeId(assignment.getDstNodeId());
+                    assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNED);
+                    assignmentMapper.update(assignment);
+
+                    StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+                    StreamCriteria criteria = StreamCriteria.newBuilder()
+                        .withTopicId(topicId)
+                        .withQueueId(queueId)
+                        .build();
+                    streamMapper.updateStreamAssignment(criteria, assignment.getDstNodeId(), assignment.getDstNodeId());
                     session.commit();
+                    LOGGER.info("Update status of queue assignment and stream since all its belonging streams are closed," +
+                        " having topic-id={}, queue-id={}", topicId, queueId);
+
+                    // Notify the destination node that this queue is assignable
+                    BrokerNode node = nodes.get(assignment.getDstNodeId());
+                    if (node != null) {
+                        controllerClient.notifyQueueClose(node.getNode().getAddress(), topicId, queueId)
+                            .whenComplete((res, e) -> {
+                                if (null != e) {
+                                    future.completeExceptionally(e);
+                                }
+                                future.complete(null);
+                            });
+                    } else {
+                        future.complete(null);
+                        LOGGER.warn("Node[{}] is not found, can not notify it that topic-id={}, queue-id={} is assigned", assignment.getDstNodeId(), topicId, queueId);
+                    }
                 }
-                future.complete(null);
-                break;
+                return future;
             } else {
+                // Check if this node is the leader of the queue
+                try (SqlSession session = openSession()) {
+                    QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
+                    QueueAssignment assignment = assignmentMapper.get(topicId, queueId);
+                    if (assignment.getSrcNodeId() == config.nodeId() && assignment.getStatus() == AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNED) {
+                        applyAssignmentChange(List.of(assignment));
+                        return dataStore.openQueue(topicId, queueId);
+                    }
+                }
+
+                // Forward to leader
                 Optional<String> leaderAddress = electionService.leaderAddress();
                 if (leaderAddress.isEmpty()) {
                     return CompletableFuture.failedFuture(new ControllerException(Code.NO_LEADER_VALUE, "No leader is elected yet"));
@@ -581,9 +613,9 @@ public class DefaultMetadataStore implements MetadataStore {
                         future.complete(null);
                     }
                 });
+                return future;
             }
         }
-        return future;
     }
 
     @Override
@@ -652,20 +684,35 @@ public class DefaultMetadataStore implements MetadataStore {
                     }
                     QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
                     QueueAssignment assignment = assignmentMapper.get(topicId, queueId);
+                    assignment.setSrcNodeId(assignment.getDstNodeId());
                     assignment.setStatus(AssignmentStatus.ASSIGNMENT_STATUS_ASSIGNED);
                     assignmentMapper.update(assignment);
 
                     StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+
                     StreamCriteria criteria = StreamCriteria.newBuilder()
                         .withTopicId(topicId)
                         .withQueueId(queueId)
-                        .withState(StreamState.CLOSING)
                         .build();
-                    streamMapper.updateStreamState(criteria, StreamState.CLOSED);
+                    streamMapper.updateStreamAssignment(criteria, assignment.getDstNodeId(), assignment.getDstNodeId());
                     session.commit();
                     LOGGER.info("Update status of queue assignment and stream since all its belonging streams are closed," +
                         " having topic-id={}, queue-id={}", topicId, queueId);
-                    future.complete(null);
+
+                    // Notify the destination node that this queue is assignable
+                    BrokerNode node = nodes.get(assignment.getDstNodeId());
+                    if (node != null) {
+                        controllerClient.notifyQueueClose(node.getNode().getAddress(), topicId, queueId)
+                            .whenComplete((res, e) -> {
+                                if (null != e) {
+                                    future.completeExceptionally(e);
+                                }
+                                future.complete(null);
+                            });
+                    } else {
+                        future.complete(null);
+                        LOGGER.warn("Node[{}] is not found, can not notify it that topic-id={}, queue-id={} is assigned", assignment.getDstNodeId(), topicId, queueId);
+                    }
                     return future;
                 }
             } else {
