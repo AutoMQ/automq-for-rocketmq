@@ -55,7 +55,7 @@ public class ExtendReceiveMessageResponseStreamWriter extends ReceiveMessageResp
 
     private void recordRpcLatency(ProxyContext ctx, Code code) {
         ProxyContextExt context = (ProxyContextExt) ctx;
-        ProxyMetricsManager.recordRpcLatency(ctx.getProtocolType(), ctx.getAction(), code.name().toLowerCase(), context.getElapsedTimeNanos(), context.suspended());
+        ProxyMetricsManager.recordRpcLatency(ctx.getProtocolType(), ctx.getAction(), code.name().toLowerCase(), context.getElapsedTimeNanos(), context.suspended(), context.relayed());
     }
 
     @Override

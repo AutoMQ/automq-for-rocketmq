@@ -121,7 +121,6 @@ public class MessageStoreImpl implements MessageStore {
         }
         clearStateMachineData();
         streamStore.start();
-        timerService.registerHandler(TimerHandlerType.TIMER_MESSAGE, timerTag -> put(StoreContext.EMPTY, FlatMessage.getRootAsFlatMessage(timerTag.payloadAsByteBuffer())));
         timerService.start();
         snapshotService.start();
         logicQueueManager.start();
@@ -316,18 +315,20 @@ public class MessageStoreImpl implements MessageStore {
     }
 
     @Override
-    public CompletableFuture<Void> endTransaction(String transactionId, TransactionResolution resolution) {
+    public CompletableFuture<Optional<FlatMessage>> endTransaction(String transactionId,
+        TransactionResolution resolution) {
         try {
             if (resolution == TransactionResolution.COMMIT) {
-                transactionService.commit(transactionId)
-                    .ifPresent(message -> {
-                        message.systemProperties().mutatePreparedTransactionMark(false);
-                        put(StoreContext.EMPTY, message);
-                    });
+                Optional<FlatMessage> optional = transactionService.commit(transactionId);
+                if (optional.isEmpty()) {
+                    return CompletableFuture.completedFuture(Optional.empty());
+                }
+                optional.get().systemProperties().mutatePreparedTransactionMark(false);
+                return CompletableFuture.completedFuture(optional);
             } else {
                 transactionService.rollback(transactionId);
             }
-            return CompletableFuture.completedFuture(null);
+            return CompletableFuture.completedFuture(Optional.empty());
         } catch (Exception e) {
             return CompletableFuture.failedFuture(e);
         }
@@ -341,6 +342,11 @@ public class MessageStoreImpl implements MessageStore {
     @Override
     public void registerMessageArriveListener(MessageArrivalListener listener) {
         messageArrivalNotificationService.registerMessageArriveListener(listener);
+    }
+
+    @Override
+    public void registerTimerMessageHandler(Consumer<TimerTag> handler) throws StoreException {
+        timerService.registerHandler(TimerHandlerType.TIMER_MESSAGE, handler);
     }
 
     @Override

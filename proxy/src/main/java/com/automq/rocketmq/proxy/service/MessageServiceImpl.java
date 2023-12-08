@@ -145,6 +145,17 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
         this.suspendRequestService = SuspendRequestService.getInstance();
         this.producerManager = producerManager;
         this.relayClient = relayClient;
+
+        store.registerTimerMessageHandler(timerTag -> executorService.execute(() -> {
+            try {
+                ByteBuffer payload = timerTag.payloadAsByteBuffer();
+                FlatMessage message = FlatMessage.getRootAsFlatMessage(payload);
+                putMessage(message).join();
+            } catch (Throwable t) {
+                LOGGER.error("Error while check transaction status", t);
+            }
+        }));
+
         store.registerTransactionCheckHandler(timerTag -> executorService.execute(() -> {
             try {
                 checkTransactionStatus(timerTag);
@@ -169,6 +180,40 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
             topicMessageType = TopicMessageType.DELAY;
         }
         return topicMessageType;
+    }
+
+    private CompletableFuture<PutResult> putMessage(FlatMessage message) {
+        return putMessage(null, message);
+    }
+
+    private CompletableFuture<PutResult> putMessage(ProxyContext ctx, FlatMessage message) {
+        return topicOf(message.topicId())
+            .thenCompose(topic -> {
+                Optional<MessageQueueAssignment> assignment = topic.getAssignmentsList().stream().filter(item -> item.getQueue().getQueueId() == message.queueId()).findFirst();
+                if (assignment.isEmpty()) {
+                    LOGGER.error("Message: {} is dropped because the topic: {} doesn't have queue: {}",
+                        message.systemProperties().messageId(), topic.getName(), message.queueId());
+                    return CompletableFuture.failedFuture(new ProxyException(apache.rocketmq.v2.Code.BAD_REQUEST, "Queue " + message.queueId() + " is not assigned to any node."));
+                }
+                return putMessage(ctx, topic, assignment.get(), message);
+            });
+    }
+
+    private CompletableFuture<PutResult> putMessage(ProxyContext ctx, Topic topic, MessageQueueAssignment assignment,
+        FlatMessage message) {
+        if (assignment.getNodeId() != brokerConfig.nodeId()) {
+            if (ctx instanceof ProxyContextExt contextExt) {
+                contextExt.setRelayed(true);
+            }
+            return metadataService.addressOf(assignment.getNodeId())
+                .thenCompose(address -> relayClient.relayMessage(address, message))
+                .thenApply(status -> new PutResult(PutResult.Status.PUT_OK, 0));
+        }
+        StoreContext storeContext = StoreContext.EMPTY;
+        if (ctx != null) {
+            storeContext = ContextUtil.buildStoreContext(ctx, topic.getName(), "");
+        }
+        return store.put(storeContext, message);
     }
 
     @Override
@@ -221,21 +266,10 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
                         span.setAttribute("reconsumeTimes", requestHeader.getReconsumeTimes());
                         span.setAttribute("deliveryTimestamp", flatMessage.systemProperties().deliveryTimestamp());
                     });
-                    if (assignment.getNodeId() != brokerConfig.nodeId()) {
-                        return metadataService.addressOf(assignment.getNodeId())
-                            .thenCompose(address -> relayClient.relayMessage(address, flatMessage))
-                            .thenApply(status -> new PutResult(PutResult.Status.PUT_OK, 0));
-                    }
-                    return store.put(ContextUtil.buildStoreContext(ctx, topic.getName(), groupName), flatMessage);
+                    return putMessage(ctx, topic, assignment, flatMessage);
                 }
             }
-
-            if (assignment.getNodeId() != brokerConfig.nodeId()) {
-                return metadataService.addressOf(assignment.getNodeId())
-                    .thenCompose(address -> relayClient.relayMessage(address, flatMessage))
-                    .thenApply(status -> new PutResult(PutResult.Status.PUT_OK, 0));
-            }
-            return store.put(ContextUtil.buildStoreContext(ctx, topic.getName(), ""), flatMessage);
+            return putMessage(ctx, topic, assignment, flatMessage);
         });
 
         return putFuture.thenApply(putResult -> {
@@ -363,7 +397,16 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
             }
         }
 
-        return store.endTransaction(requestHeader.getTransactionId(), resolution);
+        return store.endTransaction(requestHeader.getTransactionId(), resolution)
+            .thenCompose(optional -> {
+                if (optional.isEmpty()) {
+                    return CompletableFuture.completedFuture(null);
+                }
+
+                return putMessage(ctx, optional.get())
+                    .thenAccept(ignore -> {
+                    });
+            });
     }
 
     private void checkTransactionStatus(TimerTag timerTag) {
@@ -926,6 +969,21 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
 
     private CompletableFuture<Topic> topicOf(String topicName) {
         CompletableFuture<Topic> topicFuture = metadataService.topicOf(topicName);
+
+        return topicFuture.exceptionally(throwable -> {
+            Throwable t = ExceptionUtils.getRealException(throwable);
+            if (t instanceof ControllerException controllerException) {
+                if (controllerException.getErrorCode() == Code.NOT_FOUND.ordinal()) {
+                    throw new ProxyException(apache.rocketmq.v2.Code.TOPIC_NOT_FOUND, "Topic resource does not exist.");
+                }
+            }
+            // Rethrow other exceptions.
+            throw new CompletionException(t);
+        });
+    }
+
+    private CompletableFuture<Topic> topicOf(long topicId) {
+        CompletableFuture<Topic> topicFuture = metadataService.topicOf(topicId);
 
         return topicFuture.exceptionally(throwable -> {
             Throwable t = ExceptionUtils.getRealException(throwable);

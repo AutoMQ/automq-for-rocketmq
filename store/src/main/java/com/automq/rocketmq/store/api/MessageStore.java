@@ -30,8 +30,9 @@ import com.automq.rocketmq.store.model.message.PopResult;
 import com.automq.rocketmq.store.model.message.PullResult;
 import com.automq.rocketmq.store.model.message.PutResult;
 import com.automq.rocketmq.store.model.message.ResetConsumeOffsetResult;
-import java.util.List;
 import com.automq.rocketmq.store.model.transaction.TransactionResolution;
+import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
@@ -174,7 +175,7 @@ public interface MessageStore extends Lifecycle {
      * @param resolution    transaction resolution
      * @return end transaction result
      */
-    CompletableFuture<Void> endTransaction(String transactionId, TransactionResolution resolution);
+    CompletableFuture<Optional<FlatMessage>> endTransaction(String transactionId, TransactionResolution resolution);
 
     /**
      * Schedule a check for transaction status.
@@ -189,6 +190,13 @@ public interface MessageStore extends Lifecycle {
      * @param listener message arrive listener
      */
     void registerMessageArriveListener(MessageArrivalListener listener);
+
+    /**
+     * Register a hanler for denqueuing timer messages.
+     *
+     * @param handler timer message handler
+     */
+    void registerTimerMessageHandler(Consumer<TimerTag> handler) throws StoreException;
 
     /**
      * Register a hanler for checking transaction status.

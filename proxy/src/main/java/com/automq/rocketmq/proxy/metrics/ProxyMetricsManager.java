@@ -70,6 +70,7 @@ public class ProxyMetricsManager implements MetricsManager {
     public static final String LABEL_ACTION = "action";
     public static final String LABEL_RESULT = "result";
     public static final String LABEL_SUSPENDED = "suspended";
+    public static final String LABEL_RELAYED = "relayed";
     public static final String PROTOCOL_TYPE_GRPC = "grpc";
 
     private static LongHistogram rpcLatency = new NopLongHistogram();
@@ -271,17 +272,14 @@ public class ProxyMetricsManager implements MetricsManager {
         return metricsViewList;
     }
 
-    public static void recordRpcLatency(String protocolType, String action, String result, long costTimeNanos) {
-        recordRpcLatency(protocolType, action, result, costTimeNanos, false);
-    }
-
     public static void recordRpcLatency(String protocolType, String action, String result, long costTimeNanos,
-        boolean suspended) {
+        boolean suspended, boolean relayed) {
         AttributesBuilder attributesBuilder = newAttributesBuilder()
             .put(LABEL_PROTOCOL_TYPE, protocolType)
             .put(LABEL_ACTION, action)
             .put(LABEL_RESULT, result)
-            .put(LABEL_SUSPENDED, suspended);
+            .put(LABEL_SUSPENDED, suspended)
+            .put(LABEL_RELAYED, relayed);
         rpcLatency.record(costTimeNanos, attributesBuilder.build());
     }
 

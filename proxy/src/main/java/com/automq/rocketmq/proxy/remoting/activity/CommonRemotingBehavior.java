@@ -36,8 +36,9 @@ public interface CommonRemotingBehavior {
     String BROKER_NAME_FIELD_FOR_SEND_MESSAGE_V2 = "n";
 
     default void recordRpcLatency(ProxyContext context, RemotingCommand response) {
+        ProxyContextExt contextExt = (ProxyContextExt) context;
         ProxyMetricsManager.recordRpcLatency(context.getProtocolType(), context.getAction(),
-            RemotingHelper.getResponseCodeDesc(response.getCode()), ((ProxyContextExt) context).getElapsedTimeNanos());
+            RemotingHelper.getResponseCodeDesc(response.getCode()), contextExt.getElapsedTimeNanos(), contextExt.suspended(), contextExt.relayed());
     }
 
     default ProxyContext createExtendContext(ProxyContext context) {

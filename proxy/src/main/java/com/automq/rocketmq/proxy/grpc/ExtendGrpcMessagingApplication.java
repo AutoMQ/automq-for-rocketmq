@@ -80,11 +80,12 @@ public class ExtendGrpcMessagingApplication extends GrpcMessagingApplication {
     @Override
     protected <V, T> void writeResponse(ProxyContext context, V request, T response, StreamObserver<T> responseObserver,
         Throwable t, Function<Status, T> errorResponseCreator) {
+        ProxyContextExt contextExt = (ProxyContextExt) context;
         if (t != null) {
             Optional<Status> status = ExceptionHandler.convertToGrpcStatus(t);
             if (status.isPresent()) {
                 ProxyMetricsManager.recordRpcLatency(context.getProtocolType(), context.getAction(),
-                    status.get().getCode().name().toLowerCase(), ((ProxyContextExt) context).getElapsedTimeNanos());
+                    status.get().getCode().name().toLowerCase(), contextExt.getElapsedTimeNanos(), contextExt.suspended(), contextExt.relayed());
                 ResponseWriter.getInstance().write(
                     responseObserver,
                     errorResponseCreator.apply(status.get())
@@ -94,7 +95,7 @@ public class ExtendGrpcMessagingApplication extends GrpcMessagingApplication {
         }
 
         ProxyMetricsManager.recordRpcLatency(context.getProtocolType(), context.getAction(),
-            getResponseStatus(response), ((ProxyContextExt) context).getElapsedTimeNanos());
+            getResponseStatus(response), contextExt.getElapsedTimeNanos(), contextExt.suspended(), contextExt.relayed());
 
         super.writeResponse(context, request, response, responseObserver, t, errorResponseCreator);
     }
