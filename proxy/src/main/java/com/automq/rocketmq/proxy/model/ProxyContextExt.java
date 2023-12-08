@@ -32,6 +32,7 @@ public class ProxyContextExt extends ProxyContext implements TraceContext {
     private final Stopwatch stopwatch = Stopwatch.createStarted();
     public static final long DEFAULT_TIMEOUT_MILLIS = 3000;
     private boolean suspended;
+    private boolean relayed;
 
     private final Tracer tracer;
 
@@ -58,6 +59,14 @@ public class ProxyContextExt extends ProxyContext implements TraceContext {
 
     public void setSuspended(boolean suspended) {
         this.suspended = suspended;
+    }
+
+    public boolean relayed() {
+        return relayed;
+    }
+
+    public void setRelayed(boolean relayed) {
+        this.relayed = relayed;
     }
 
     public long getElapsedTimeNanos() {

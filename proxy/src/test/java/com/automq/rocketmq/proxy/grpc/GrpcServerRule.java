@@ -62,7 +62,7 @@ public final class GrpcServerRule implements BeforeEachCallback, AfterEachCallba
     }
 
     @Override
-    public void afterEach(ExtensionContext context) throws Exception {
+    public void afterEach(ExtensionContext context) {
         this.serverName = null;
         this.serviceRegistry = null;
         this.channel.shutdown();

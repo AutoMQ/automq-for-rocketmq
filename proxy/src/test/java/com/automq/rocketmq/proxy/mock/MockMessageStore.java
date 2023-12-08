@@ -41,6 +41,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
@@ -200,7 +201,8 @@ public class MockMessageStore implements MessageStore {
     }
 
     @Override
-    public CompletableFuture<Void> endTransaction(String transactionId, TransactionResolution resolution) {
+    public CompletableFuture<Optional<FlatMessage>> endTransaction(String transactionId,
+        TransactionResolution resolution) {
         return CompletableFuture.completedFuture(null);
     }
 
@@ -210,6 +212,10 @@ public class MockMessageStore implements MessageStore {
 
     @Override
     public void registerMessageArriveListener(MessageArrivalListener listener) {
+    }
+
+    @Override
+    public void registerTimerMessageHandler(Consumer<TimerTag> handler) throws StoreException {
     }
 
     @Override
