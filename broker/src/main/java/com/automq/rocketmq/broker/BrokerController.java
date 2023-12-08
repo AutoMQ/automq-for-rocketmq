@@ -124,7 +124,7 @@ public class BrokerController implements Lifecycle {
         LockService lockService = new LockService(brokerConfig.proxy());
 
         ProducerManager producerManager = new ProducerManager();
-        MessageServiceImpl messageServiceImpl = new MessageServiceImpl(brokerConfig.proxy(), messageStore, proxyMetadataService, lockService, dlqService, producerManager);
+        MessageServiceImpl messageServiceImpl = new MessageServiceImpl(brokerConfig, messageStore, proxyMetadataService, lockService, dlqService, producerManager, relayClient);
         this.messageService = messageServiceImpl;
         this.extendMessageService = messageServiceImpl;
         ConsumerManager consumerManager = new ConsumerManager(new DefaultServiceManager.ConsumerIdsChangeListenerImpl(), brokerConfig.proxy().channelExpiredTimeout());

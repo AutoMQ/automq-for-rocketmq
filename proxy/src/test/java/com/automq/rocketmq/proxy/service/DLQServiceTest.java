@@ -108,7 +108,7 @@ public class DLQServiceTest {
             return CompletableFuture.completedFuture(new PutResult(PutResult.Status.PUT_OK, 0));
         }).when(messageStore).put(Mockito.any(), Mockito.any(FlatMessage.class));
 
-        dlqService.send(StoreContext.EMPTY, CONSUMER_GROUP_ID, msg).join();
+        dlqService.send(StoreContext.EMPTY, CONSUMER_GROUP_ID, msg.message()).join();
         Mockito.verify(messageStore, Mockito.times(1)).put(Mockito.any(), Mockito.any(FlatMessage.class));
     }
 
@@ -132,7 +132,7 @@ public class DLQServiceTest {
 
         FlatMessageExt msg = MockMessageUtil.buildMessage(TOPIC_ID, QUEUE_ID, "TAG_DLQ");
 
-        dlqService.send(StoreContext.EMPTY, CONSUMER_GROUP_ID, msg).join();
+        dlqService.send(StoreContext.EMPTY, CONSUMER_GROUP_ID, msg.message()).join();
         Mockito.verify(messageStore, Mockito.times(0)).put(Mockito.any(), Mockito.any(FlatMessage.class));
 
         // 2. DLQ topic is configured but has no assignment
@@ -147,7 +147,7 @@ public class DLQServiceTest {
         Mockito.doReturn(CompletableFuture.completedFuture(consumerGroup))
             .when(metadataService).consumerGroupOf(CONSUMER_GROUP_ID);
 
-        dlqService.send(StoreContext.EMPTY, CONSUMER_GROUP_ID, msg).join();
+        dlqService.send(StoreContext.EMPTY, CONSUMER_GROUP_ID, msg.message()).join();
         Mockito.verify(messageStore, Mockito.times(0)).put(Mockito.any(), Mockito.any(FlatMessage.class));
 
         // 3. DLQ topic is the same as original topic
@@ -163,7 +163,7 @@ public class DLQServiceTest {
         Mockito.doReturn(CompletableFuture.completedFuture(consumerGroup))
             .when(metadataService).consumerGroupOf(CONSUMER_GROUP_ID);
 
-        dlqService.send(StoreContext.EMPTY, CONSUMER_GROUP_ID, msg).join();
+        dlqService.send(StoreContext.EMPTY, CONSUMER_GROUP_ID, msg.message()).join();
         Mockito.verify(messageStore, Mockito.times(0)).put(Mockito.any(), Mockito.any(FlatMessage.class));
 
         // 4. DLQ topic doesn't accept DLQ message
@@ -187,7 +187,7 @@ public class DLQServiceTest {
         Mockito.doReturn(CompletableFuture.completedFuture(consumerGroup))
             .when(metadataService).consumerGroupOf(CONSUMER_GROUP_ID);
 
-        dlqService.send(StoreContext.EMPTY, CONSUMER_GROUP_ID, msg).join();
+        dlqService.send(StoreContext.EMPTY, CONSUMER_GROUP_ID, msg.message()).join();
         Mockito.verify(messageStore, Mockito.times(0)).put(Mockito.any(), Mockito.any(FlatMessage.class));
 
         // 5. DLQ topic not exist
@@ -203,7 +203,7 @@ public class DLQServiceTest {
         Mockito.doReturn(CompletableFuture.completedFuture(consumerGroup))
             .when(metadataService).consumerGroupOf(CONSUMER_GROUP_ID);
 
-        dlqService.send(StoreContext.EMPTY, CONSUMER_GROUP_ID, msg).join();
+        dlqService.send(StoreContext.EMPTY, CONSUMER_GROUP_ID, msg.message()).join();
         Mockito.verify(messageStore, Mockito.times(0)).put(Mockito.any(), Mockito.any(FlatMessage.class));
     }
 }

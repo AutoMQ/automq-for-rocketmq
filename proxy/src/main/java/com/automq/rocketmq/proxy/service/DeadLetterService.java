@@ -22,7 +22,6 @@ import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.MessageType;
 import apache.rocketmq.controller.v1.Topic;
 import com.automq.rocketmq.common.config.BrokerConfig;
-import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.common.system.MessageConstants;
 import com.automq.rocketmq.common.trace.TraceContext;
@@ -66,7 +65,7 @@ public class DeadLetterService implements DeadLetterSender {
 
     @Override
     @WithSpan
-    public CompletableFuture<Void> send(TraceContext context, long consumerGroupId, FlatMessageExt flatMessageExt) {
+    public CompletableFuture<Void> send(TraceContext context, long consumerGroupId, FlatMessage message) {
         if (messageStore == null) {
             return CompletableFuture.failedFuture(new IllegalStateException("Message store is not initialized"));
         }
@@ -74,16 +73,16 @@ public class DeadLetterService implements DeadLetterSender {
         CompletableFuture<Topic> dlqQueryCf = metadataService.consumerGroupOf(consumerGroupId)
             .thenComposeAsync(consumerGroup -> {
                 long deadLetterTopicId = consumerGroup.getDeadLetterTopicId();
-                long topicId = flatMessageExt.message().topicId();
+                long topicId = message.topicId();
                 if (deadLetterTopicId == MessageConstants.UNINITIALIZED_TOPIC_ID) {
                     // not allow to send to DLQ
                     LOGGER.warn("Message: {} is dropped because the consumer group: {} doesn't have DLQ topic",
-                        flatMessageExt, consumerGroupId);
+                        message.systemProperties().messageId(), consumerGroupId);
                     return CompletableFuture.completedFuture(null);
                 }
                 if (deadLetterTopicId == topicId) {
                     LOGGER.error("Message: {} is dropped because the consumer group: {} has the same DLQ topic: {} with original topic",
-                        flatMessageExt, consumerGroupId, topicId);
+                        message.systemProperties().messageId(), consumerGroupId, topicId);
                     return CompletableFuture.completedFuture(null);
                 }
                 // get dlq topic info
@@ -98,17 +97,16 @@ public class DeadLetterService implements DeadLetterSender {
             if (!(dlqTopic.getAcceptTypes().getTypesList().contains(MessageType.NORMAL)
                 || dlqTopic.getAcceptTypes().getTypesList().contains(MessageType.FIFO))) {
                 LOGGER.error("Message: {} is dropped because the consumer group: {} has invalid DLQ topic: {}",
-                    flatMessageExt, consumerGroupId, dlqTopic);
+                    message.systemProperties().messageId(), consumerGroupId, dlqTopic);
                 return CompletableFuture.completedFuture(null);
             }
 
-            FlatMessage message = flatMessageExt.message();
             message.mutateTopicId(dlqTopic.getTopicId());
 
             List<MessageQueueAssignment> assignmentsList = new ArrayList<>(dlqTopic.getAssignmentsList());
             if (assignmentsList.isEmpty()) {
                 LOGGER.error("Message: {} is dropped because the consumer group: {} has empty DLQ topic: {}",
-                    flatMessageExt, consumerGroupId, dlqTopic);
+                    message.systemProperties().messageId(), consumerGroupId, dlqTopic);
                 return CompletableFuture.completedFuture(null);
             }
 

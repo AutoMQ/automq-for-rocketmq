@@ -193,7 +193,7 @@ public class ReviveService {
                     if (consumeTimes >= maxDeliveryAttempts) {
                         messageExt.setDeliveryAttempts(consumeTimes);
                         // Send to dead letter topic specified in consumer group config.
-                        return deadLetterSender.send(context, consumerGroupId, messageExt)
+                        return deadLetterSender.send(context, consumerGroupId, messageExt.message())
                             .thenApply(nil -> Pair.of(true, logicQueue));
                     }
                     return CompletableFuture.completedFuture(Pair.of(false, logicQueue));
@@ -203,7 +203,7 @@ public class ReviveService {
 
                 if (messageExt.deliveryAttempts() >= maxDeliveryAttempts) {
                     // Send to dead letter topic specified in consumer group config.
-                    return deadLetterSender.send(context, consumerGroupId, messageExt)
+                    return deadLetterSender.send(context, consumerGroupId, messageExt.message())
                         .thenApply(nil -> Pair.of(true, logicQueue));
                 }
                 messageExt.setOriginalQueueOffset(messageExt.originalOffset());
