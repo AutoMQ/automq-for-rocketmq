@@ -664,7 +664,6 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
 
         public synchronized void commitAck(long offset) {
             if (offset >= ackOffset) {
-                // TODO: how to handle overflow?
                 int offsetInBitmap = (int) (offset - baseOffset);
                 bitmap.add(offsetInBitmap);
                 boolean advance = false;

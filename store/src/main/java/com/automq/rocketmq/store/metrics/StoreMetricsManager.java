@@ -58,10 +58,8 @@ public class StoreMetricsManager extends ServiceThread implements MetricsManager
 
     public static ObservableLongGauge consumerLagMessages = new NopObservableLongGauge();
 
-    // TODO: implement consumerLagLatency
     public static ObservableLongGauge consumerLagLatency = new NopObservableLongGauge();
     public static ObservableLongGauge consumerInflightMessages = new NopObservableLongGauge();
-    // TODO: implement consumerQueueingLatency
     public static ObservableLongGauge consumerQueueingLatency = new NopObservableLongGauge();
     public static ObservableLongGauge consumerReadyMessages = new NopObservableLongGauge();
 

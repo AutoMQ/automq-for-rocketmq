@@ -48,7 +48,6 @@ import io.grpc.Channel;
 import io.grpc.Grpc;
 import io.grpc.InsecureChannelCredentials;
 import io.grpc.ManagedChannel;
-import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -61,11 +60,11 @@ public class GrpcProxyClient implements ProxyClient {
 
     private final GrpcClientConfig clientConfig;
 
-    private final ConcurrentHashMap<String, ProxyServiceGrpc.ProxyServiceFutureStub> stubs;
+    private final ConcurrentHashMap<String, ProxyServiceGrpc.ProxyServiceFutureStub> stubMap;
 
     public GrpcProxyClient(GrpcClientConfig clientConfig) {
         this.clientConfig = clientConfig;
-        stubs = new ConcurrentHashMap<>();
+        stubMap = new ConcurrentHashMap<>();
     }
 
     private ProxyServiceGrpc.ProxyServiceFutureStub getOrCreateStubForTarget(String target) {
@@ -73,16 +72,16 @@ public class GrpcProxyClient implements ProxyClient {
             throw new IllegalArgumentException("target is null or empty");
         }
 
-        if (!stubs.containsKey(target)) {
+        if (!stubMap.containsKey(target)) {
             ManagedChannel channel = Grpc.newChannelBuilder(target, InsecureChannelCredentials.create())
                 .build();
             ProxyServiceGrpc.ProxyServiceFutureStub stub = ProxyServiceGrpc.newFutureStub(channel);
-            stubs.putIfAbsent(target, stub);
+            stubMap.putIfAbsent(target, stub);
         }
         Duration timeout = clientConfig.rpcTimeout();
         long rpcTimeout = TimeUnit.SECONDS.toMillis(timeout.getSeconds())
             + TimeUnit.NANOSECONDS.toMillis(timeout.getNanos());
-        return stubs.get(target).withDeadlineAfter(rpcTimeout, TimeUnit.MILLISECONDS);
+        return stubMap.get(target).withDeadlineAfter(rpcTimeout, TimeUnit.MILLISECONDS);
     }
 
     @Override
@@ -233,15 +232,15 @@ public class GrpcProxyClient implements ProxyClient {
     }
 
     @Override
-    public void close() throws IOException {
-        for (Map.Entry<String, ProxyServiceGrpc.ProxyServiceFutureStub> entry : stubs.entrySet()) {
+    public void close() {
+        for (Map.Entry<String, ProxyServiceGrpc.ProxyServiceFutureStub> entry : stubMap.entrySet()) {
             Channel channel = entry.getValue().getChannel();
             if (channel instanceof ManagedChannel managedChannel) {
                 managedChannel.shutdownNow();
             }
         }
 
-        for (Map.Entry<String, ProxyServiceGrpc.ProxyServiceFutureStub> entry : stubs.entrySet()) {
+        for (Map.Entry<String, ProxyServiceGrpc.ProxyServiceFutureStub> entry : stubMap.entrySet()) {
             Channel channel = entry.getValue().getChannel();
             if (channel instanceof ManagedChannel managedChannel) {
                 try {

@@ -117,7 +117,6 @@ public class MockStreamStore implements StreamStore {
         if (openedStreams.containsKey(streamId)) {
             throw new IllegalStateException("Stream " + streamId + " already opened.");
         }
-        // TODO: Build a real OpenStreamOptions
         return openedStreams.computeIfAbsent(streamId, id -> streamClient.openStream(id, null).join());
     }
 
@@ -129,12 +128,12 @@ public class MockStreamStore implements StreamStore {
     }
 
     @Override
-    public void start() throws Exception {
+    public void start() {
 
     }
 
     @Override
-    public void shutdown() throws Exception {
+    public void shutdown() {
 
     }
 }
