@@ -18,9 +18,9 @@
 package com.automq.stream.s3.wal;
 
 import com.automq.stream.s3.DirectByteBufAlloc;
+import com.automq.stream.s3.metrics.S3StreamMetricsManager;
 import com.automq.stream.s3.metrics.TimerUtil;
 import com.automq.stream.s3.metrics.operations.S3Operation;
-import com.automq.stream.s3.metrics.stats.OperationMetricsStats;
 import com.automq.stream.s3.wal.util.WALChannel;
 import com.automq.stream.s3.wal.util.WALUtil;
 import com.automq.stream.utils.FutureUtil;
@@ -343,7 +343,7 @@ public class SlidingWindowService {
             walChannel.write(block.data(), position);
         }
         walChannel.flush();
-        OperationMetricsStats.getHistogram(S3Operation.APPEND_STORAGE_WAL_WRITE).update(timer.elapsedAs(TimeUnit.NANOSECONDS));
+        S3StreamMetricsManager.recordOperationLatency(timer.elapsedAs(TimeUnit.NANOSECONDS), S3Operation.APPEND_STORAGE_WAL_WRITE);
     }
 
     private void makeWriteOffsetMatchWindow(long newWindowEndOffset) throws IOException, OverCapacityException {
@@ -532,7 +532,7 @@ public class SlidingWindowService {
 
         @Override
         public void run() {
-            OperationMetricsStats.getHistogram(S3Operation.APPEND_STORAGE_WAL_AWAIT).update(timer.elapsedAs(TimeUnit.NANOSECONDS));
+            S3StreamMetricsManager.recordOperationLatency(timer.elapsedAs(TimeUnit.NANOSECONDS), S3Operation.APPEND_STORAGE_WAL_AWAIT);
             writeBlock(this.blocks);
         }
 
@@ -556,7 +556,7 @@ public class SlidingWindowService {
                         return "CallbackResult{" + "flushedOffset=" + flushedOffset() + '}';
                     }
                 });
-                OperationMetricsStats.getHistogram(S3Operation.APPEND_STORAGE_WAL_AFTER).update(timer.elapsedAs(TimeUnit.NANOSECONDS));
+                S3StreamMetricsManager.recordOperationLatency(timer.elapsedAs(TimeUnit.NANOSECONDS), S3Operation.APPEND_STORAGE_WAL_AFTER);
             } catch (Exception e) {
                 FutureUtil.completeExceptionally(blocks.futures(), e);
                 LOGGER.error(String.format("failed to write blocks, startOffset: %s", blocks.startOffset()), e);

@@ -17,9 +17,9 @@
 
 package com.automq.stream.s3.cache;
 
+import com.automq.stream.s3.metrics.S3StreamMetricsManager;
 import com.automq.stream.s3.metrics.TimerUtil;
 import com.automq.stream.s3.metrics.operations.S3Operation;
-import com.automq.stream.s3.metrics.stats.OperationMetricsStats;
 import com.automq.stream.s3.model.StreamRecordBatch;
 import com.automq.stream.utils.biniarysearch.StreamRecordBatchList;
 
@@ -85,7 +85,7 @@ public class LogCache {
         tryRealFree();
         size.addAndGet(recordBatch.size());
         boolean full = activeBlock.put(recordBatch);
-        OperationMetricsStats.getHistogram(S3Operation.APPEND_STORAGE_LOG_CACHE).update(timerUtil.elapsedAs(TimeUnit.NANOSECONDS));
+        S3StreamMetricsManager.recordOperationLatency(timerUtil.elapsedAs(TimeUnit.NANOSECONDS), S3Operation.APPEND_STORAGE_LOG_CACHE);
         return full;
     }
 
@@ -124,12 +124,12 @@ public class LogCache {
             readLock.unlock();
         }
 
+        long timeElapsed = timerUtil.elapsedAs(TimeUnit.NANOSECONDS);
         if (!records.isEmpty() && records.get(0).getBaseOffset() <= startOffset) {
-            OperationMetricsStats.getCounter(S3Operation.READ_STORAGE_LOG_CACHE).inc();
+            S3StreamMetricsManager.recordOperationLatency(timeElapsed, S3Operation.READ_STORAGE_LOG_CACHE_HIT);
         } else {
-            OperationMetricsStats.getCounter(S3Operation.READ_STORAGE_LOG_CACHE_MISS).inc();
+            S3StreamMetricsManager.recordOperationLatency(timeElapsed, S3Operation.READ_STORAGE_LOG_CACHE_MISS);
         }
-        OperationMetricsStats.getHistogram(S3Operation.READ_STORAGE_LOG_CACHE).update(timerUtil.elapsedAs(TimeUnit.NANOSECONDS));
         return records;
     }
 
