@@ -352,7 +352,11 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
             store.scheduleCheckTransaction(message);
 
             Topic topic = metadataService.topicOf(message.topicId()).join();
-            Channel channel = producerManager.getAvailableChannel(topic.getName());
+            String producerGroup = message.systemProperties().orphanedTransactionProducer();
+            if (StringUtils.isBlank(producerGroup)) {
+                producerGroup = topic.getName();
+            }
+            Channel channel = producerManager.getAvailableChannel(producerGroup);
             if (channel != null) {
                 CheckTransactionStateRequestHeader requestHeader = new CheckTransactionStateRequestHeader();
                 requestHeader.setCommitLogOffset(0L);

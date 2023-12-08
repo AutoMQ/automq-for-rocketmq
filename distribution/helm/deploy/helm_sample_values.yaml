@@ -30,6 +30,9 @@ broker:
       accessKey: "foot"
       secretKey: "bar"
 
+    transactionTimeoutMillis: 100
+    transactionCheckInterval: 1000
+
 mysql:
   enabled: false
 
