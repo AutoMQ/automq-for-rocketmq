@@ -574,6 +574,18 @@ public class DefaultMetadataStore implements MetadataStore {
                     LOGGER.info("Update status of queue assignment and stream since all its belonging streams are closed," +
                         " having topic-id={}, queue-id={}", topicId, queueId);
 
+                    if (assignment.getDstNodeId() == config.nodeId()) {
+                        applyAssignmentChange(List.of(assignment));
+                        dataStore.openQueue(topicId, queueId)
+                            .whenComplete((res, e) -> {
+                                if (null != e) {
+                                    future.completeExceptionally(e);
+                                }
+                                future.complete(null);
+                            });
+                        return future;
+                    }
+
                     // Notify the destination node that this queue is assignable
                     BrokerNode node = nodes.get(assignment.getDstNodeId());
                     if (node != null) {
