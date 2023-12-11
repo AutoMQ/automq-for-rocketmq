@@ -35,6 +35,7 @@ import com.automq.rocketmq.cli.topic.DeleteTopic;
 import com.automq.rocketmq.cli.topic.DescribeTopic;
 import com.automq.rocketmq.cli.topic.ListTopic;
 import com.automq.rocketmq.cli.topic.PrintTopicStats;
+import com.automq.rocketmq.cli.topic.ReassignTopic;
 import com.automq.rocketmq.cli.topic.UpdateTopic;
 import picocli.CommandLine;
 
@@ -50,6 +51,8 @@ import picocli.CommandLine;
         UpdateTopic.class,
         DeleteTopic.class,
         ListTopic.class,
+        PrintTopicStats.class,
+        ReassignTopic.class,
         DescribeStream.class,
         CreateGroup.class,
         DescribeGroup.class,
@@ -60,7 +63,6 @@ import picocli.CommandLine;
         ConsumeMessage.class,
         TerminateNode.class,
         ResetConsumeOffset.class,
-        PrintTopicStats.class,
         ProducerClientConnection.class,
         ConsumerClientConnection.class
     }

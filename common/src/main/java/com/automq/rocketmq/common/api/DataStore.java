@@ -22,6 +22,8 @@ import java.util.concurrent.CompletableFuture;
 
 public interface DataStore {
 
+    CompletableFuture<Void> openQueue(long topicId, int queueId);
+
     CompletableFuture<Void> closeQueue(long topicId, int queueId);
 
     /**
