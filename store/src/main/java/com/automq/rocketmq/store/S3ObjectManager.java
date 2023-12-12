@@ -26,9 +26,9 @@ import com.automq.stream.s3.metadata.S3ObjectMetadata;
 import com.automq.stream.s3.metadata.S3ObjectType;
 import com.automq.stream.s3.metadata.S3StreamConstant;
 import com.automq.stream.s3.metadata.StreamOffsetRange;
-import com.automq.stream.s3.objects.CompactStreamObjectRequest;
 import com.automq.stream.s3.objects.CommitStreamSetObjectRequest;
 import com.automq.stream.s3.objects.CommitStreamSetObjectResponse;
+import com.automq.stream.s3.objects.CompactStreamObjectRequest;
 import com.automq.stream.s3.objects.ObjectManager;
 import com.automq.stream.s3.objects.ObjectStreamRange;
 import java.util.ArrayList;
@@ -171,8 +171,13 @@ public class S3ObjectManager implements ObjectManager {
             List<S3ObjectMetadata> objectMetadataList = new ArrayList<>();
             long nextStartOffset = startOffset;
             int need = limit;
+
+            long realEndOffset = endOffset;
+            if (realEndOffset == -1) {
+                realEndOffset = Long.MAX_VALUE;
+            }
             while (need > 0
-                && nextStartOffset < endOffset
+                && nextStartOffset < realEndOffset
                 && (!streamObjects.isEmpty() || !streamSetObjects.isEmpty())) {
                 S3ObjectMetadataWrapper cur;
                 if (streamSetObjects.isEmpty() || !streamObjects.isEmpty() && streamObjects.peek().getStartOffset() <= streamSetObjects.peek().getStartOffset()) {
