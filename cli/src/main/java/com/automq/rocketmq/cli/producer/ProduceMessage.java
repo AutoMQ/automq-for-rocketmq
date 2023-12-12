@@ -120,6 +120,9 @@ public class ProduceMessage implements Callable<Void> {
                     long start = System.currentTimeMillis();
                     producers[i % producerNums].sendAsync(message).thenAccept(sendReceipt -> {
                         timer.update(System.currentTimeMillis() - start, TimeUnit.MILLISECONDS);
+                    }).exceptionally(throwable -> {
+                        counter.inc();
+                        return null;
                     });
                 } catch (Exception ignore) {
                     counter.inc();
