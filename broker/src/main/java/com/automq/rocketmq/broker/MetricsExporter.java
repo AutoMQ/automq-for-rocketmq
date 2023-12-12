@@ -322,8 +322,10 @@ public class MetricsExporter implements Lifecycle {
             periodicMetricReader.shutdown();
             loggingMetricExporter.shutdown();
         }
+        if (runtimeMetrics != null) {
+            runtimeMetrics.close();
+        }
         storeMetricsManager.shutdown();
-        runtimeMetrics.close();
         openTelemetrySdk.shutdown();
     }
 }
