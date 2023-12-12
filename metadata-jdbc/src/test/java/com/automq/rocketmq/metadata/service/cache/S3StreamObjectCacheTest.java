@@ -44,7 +44,7 @@ class S3StreamObjectCacheTest {
 
         cache.initStream(1, list);
 
-        list.clear();
+        list = new ArrayList<>();
 
         streamObject = new S3StreamObject();
         streamObject.setStartOffset(200L);
@@ -61,13 +61,17 @@ class S3StreamObjectCacheTest {
         List<S3StreamObject> result = cache.listStreamObjects(1, 0, 400, 100);
         assertEquals(4, result.size());
 
+        result = cache.listStreamObjects(1, 0, 100, 100);
+        assertEquals(1, result.size());
+        assertEquals(0L, result.get(0).getStartOffset());
+
         result = cache.listStreamObjects(1, 200, 400, 1);
         assertEquals(1, result.size());
         assertEquals(200L, result.get(0).getStartOffset());
 
-        result = cache.listStreamObjects(1, 200, -1, 2);
+        result = cache.listStreamObjects(1, 100, -1, 2);
         assertEquals(2, result.size());
-        assertEquals(200L, result.get(0).getStartOffset());
-        assertEquals(300L, result.get(1).getStartOffset());
+        assertEquals(100L, result.get(0).getStartOffset());
+        assertEquals(200L, result.get(1).getStartOffset());
     }
 }
