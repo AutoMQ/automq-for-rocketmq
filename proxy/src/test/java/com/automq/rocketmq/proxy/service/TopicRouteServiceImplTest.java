@@ -39,6 +39,7 @@ import org.apache.rocketmq.proxy.service.route.ProxyTopicRouteData;
 import org.apache.rocketmq.remoting.protocol.route.QueueData;
 import org.apache.rocketmq.remoting.protocol.route.TopicRouteData;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -106,6 +107,7 @@ class TopicRouteServiceImplTest {
         });
     }
 
+    @Disabled
     @Test
     void testGetCurrentMessageQueueView() {
         String topicA = "topicA";

@@ -17,8 +17,8 @@
 
 package com.automq.rocketmq.proxy.service;
 
-import apache.rocketmq.controller.v1.AcceptTypes;
 import apache.rocketmq.common.v1.Code;
+import apache.rocketmq.controller.v1.AcceptTypes;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.MessageQueueAssignment;
 import apache.rocketmq.controller.v1.MessageType;
@@ -80,8 +80,7 @@ public class TopicRouteServiceImpl extends TopicRouteService {
 
     @Override
     public MessageQueueView getCurrentMessageQueueView(ProxyContext ctx, String topicName) {
-        // Only return the MessageQueueAssignment that is assigned to the current broker.
-        return new MessageQueueView(topicName, routeDataFrom(assignmentsOf(ctx, topicName, nodeId -> nodeId == brokerConfig.nodeId())));
+        return getAllMessageQueueView(ctx, topicName);
     }
 
     @Override
