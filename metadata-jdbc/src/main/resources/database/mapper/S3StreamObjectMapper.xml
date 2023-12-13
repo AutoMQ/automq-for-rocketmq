@@ -111,8 +111,8 @@
         <where>
             <if test="null != objectId">object_id = #{objectId}</if>
             <if test="null != streamId">AND stream_id = #{streamId}</if>
-            <if test="null != startOffset">AND start_offset &lt;= #{endOffset}</if>
-            <if test="null != endOffset">AND end_offset &gt; #{startOffset}</if>
+            <if test="null != endOffset">AND start_offset &lt;= #{endOffset}</if>
+            <if test="null != startOffset">AND end_offset &gt; #{startOffset}</if>
         </where>
         ORDER BY start_offset ASC
         <if test="null != limit">

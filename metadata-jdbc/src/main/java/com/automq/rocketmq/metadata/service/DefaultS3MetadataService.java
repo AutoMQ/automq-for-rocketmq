@@ -508,8 +508,9 @@ public class DefaultS3MetadataService implements S3MetadataService {
                 s3StreamObjectCache.initStream(streamId, list);
                 return listStreamObjects0(streamId, startOffset, endOffset, limit);
             }
+            Long endOffsetObject = endOffset == -1 ? null : endOffset;
             List<com.automq.rocketmq.metadata.dao.S3StreamObject> streamObjects = s3StreamObjectMapper
-                .list(null, streamId, startOffset, endOffset, limit);
+                .list(null, streamId, startOffset, endOffsetObject, limit);
             future.complete(streamObjects);
         }
         return future;
@@ -624,7 +625,7 @@ public class DefaultS3MetadataService implements S3MetadataService {
                             Map<Long, SubStream> streamsRecords = new HashMap<>();
                             subStreams.entrySet().stream()
                                 .filter(entry -> !Objects.isNull(entry) && entry.getKey().equals(streamId))
-                                .filter(entry -> entry.getValue().getStartOffset() <= endOffset && entry.getValue().getEndOffset() > startOffset)
+                                .filter(entry -> entry.getValue().getEndOffset() > startOffset && (entry.getValue().getStartOffset() <= endOffset || endOffset == -1))
                                 .forEach(entry -> streamsRecords.put(entry.getKey(), entry.getValue()));
                             return streamsRecords.isEmpty() ? null : Helper.buildS3StreamSetObject(s3StreamSetObject,
                                 SubStreams.newBuilder().putAllSubStreams(streamsRecords).build());

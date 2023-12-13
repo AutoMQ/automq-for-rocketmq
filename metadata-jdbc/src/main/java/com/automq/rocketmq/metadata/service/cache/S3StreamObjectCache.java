@@ -127,11 +127,7 @@ public class S3StreamObjectCache {
         lock.readLock().lock();
         try {
             return list.stream()
-                .filter(s3StreamObject -> {
-                    long start = s3StreamObject.getStartOffset();
-                    long end = s3StreamObject.getEndOffset();
-                    return start >= startOffset && (end <= endOffset || endOffset == -1);
-                })
+                .filter(s3StreamObject -> s3StreamObject.getEndOffset() >= startOffset && (s3StreamObject.getStartOffset() <= endOffset || endOffset == -1))
                 .limit(limit)
                 .toList();
         } finally {
