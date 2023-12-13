@@ -28,7 +28,6 @@ import com.automq.rocketmq.proxy.processor.ExtendMessagingProcessor;
 import com.automq.rocketmq.store.MessageStoreImpl;
 import com.automq.rocketmq.store.metrics.StoreMetricsManager;
 import com.automq.rocketmq.store.metrics.StreamMetricsManager;
-import com.automq.stream.s3.metrics.S3StreamMetricsRegistry;
 import com.google.common.base.Splitter;
 import io.opentelemetry.api.baggage.propagation.W3CBaggagePropagator;
 import io.opentelemetry.api.common.Attributes;
@@ -104,7 +103,6 @@ public class MetricsExporter implements Lifecycle {
         this.streamMetricsManager = new StreamMetricsManager();
         this.topicMetricsManager = new TopicMetricsManager(metadataStore, s3MetadataService);
         init(resource, tracerProvider);
-        S3StreamMetricsRegistry.setMetricsGroup(this.streamMetricsManager);
     }
 
     public static AttributesBuilder newAttributesBuilder() {
