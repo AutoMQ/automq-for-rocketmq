@@ -33,6 +33,7 @@ import java.util.function.Supplier;
 import org.apache.commons.lang3.tuple.Pair;
 
 public class StreamMetricsManager implements MetricsManager {
+    private static final String STREAM_METRICS_PREFIX = "rocketmq_stream_";
     @Override
     public void initAttributesBuilder(Supplier<AttributesBuilder> attributesBuilderSupplier) {
         S3StreamMetricsManager.initAttributesBuilder(attributesBuilderSupplier);
@@ -40,7 +41,7 @@ public class StreamMetricsManager implements MetricsManager {
 
     @Override
     public void initStaticMetrics(Meter meter) {
-        S3StreamMetricsManager.initMetrics(meter);
+        S3StreamMetricsManager.initMetrics(meter, STREAM_METRICS_PREFIX);
     }
 
     @Override

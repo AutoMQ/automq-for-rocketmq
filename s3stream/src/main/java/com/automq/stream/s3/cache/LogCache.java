@@ -125,11 +125,8 @@ public class LogCache {
         }
 
         long timeElapsed = timerUtil.elapsedAs(TimeUnit.NANOSECONDS);
-        if (!records.isEmpty() && records.get(0).getBaseOffset() <= startOffset) {
-            S3StreamMetricsManager.recordOperationLatency(timeElapsed, S3Operation.READ_STORAGE_LOG_CACHE_HIT);
-        } else {
-            S3StreamMetricsManager.recordOperationLatency(timeElapsed, S3Operation.READ_STORAGE_LOG_CACHE_MISS);
-        }
+        boolean isCacheHit = !records.isEmpty() && records.get(0).getBaseOffset() <= startOffset;
+        S3StreamMetricsManager.recordReadCacheLatency(timeElapsed, S3Operation.READ_STORAGE_LOG_CACHE_HIT, isCacheHit);
         return records;
     }
 

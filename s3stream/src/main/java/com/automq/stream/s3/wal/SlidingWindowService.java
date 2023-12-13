@@ -343,7 +343,7 @@ public class SlidingWindowService {
             walChannel.write(block.data(), position);
         }
         walChannel.flush();
-        S3StreamMetricsManager.recordOperationLatency(timer.elapsedAs(TimeUnit.NANOSECONDS), S3Operation.APPEND_STORAGE_WAL_WRITE);
+        S3StreamMetricsManager.recordAppendWALLatency(timer.elapsedAs(TimeUnit.NANOSECONDS), "write");
     }
 
     private void makeWriteOffsetMatchWindow(long newWindowEndOffset) throws IOException, OverCapacityException {
@@ -532,7 +532,7 @@ public class SlidingWindowService {
 
         @Override
         public void run() {
-            S3StreamMetricsManager.recordOperationLatency(timer.elapsedAs(TimeUnit.NANOSECONDS), S3Operation.APPEND_STORAGE_WAL_AWAIT);
+            S3StreamMetricsManager.recordAppendWALLatency(timer.elapsedAs(TimeUnit.NANOSECONDS), "await");
             writeBlock(this.blocks);
         }
 
@@ -556,7 +556,7 @@ public class SlidingWindowService {
                         return "CallbackResult{" + "flushedOffset=" + flushedOffset() + '}';
                     }
                 });
-                S3StreamMetricsManager.recordOperationLatency(timer.elapsedAs(TimeUnit.NANOSECONDS), S3Operation.APPEND_STORAGE_WAL_AFTER);
+                S3StreamMetricsManager.recordAppendWALLatency(timer.elapsedAs(TimeUnit.NANOSECONDS), "after");
             } catch (Exception e) {
                 FutureUtil.completeExceptionally(blocks.futures(), e);
                 LOGGER.error(String.format("failed to write blocks, startOffset: %s", blocks.startOffset()), e);

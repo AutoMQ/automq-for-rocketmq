@@ -17,6 +17,7 @@
 
 package com.automq.stream.s3.metrics;
 
+import com.automq.stream.s3.metrics.operations.S3MetricsType;
 import com.automq.stream.s3.metrics.operations.S3ObjectStage;
 import com.automq.stream.s3.metrics.operations.S3Operation;
 import com.automq.stream.s3.network.AsyncNetworkBandwidthLimiter;
@@ -61,86 +62,90 @@ public class S3StreamMetricsManager {
     }
 
     public static void initMetrics(Meter meter) {
-        s3DownloadSizeInTotal = meter.counterBuilder(S3StreamMetricsConstant.DOWNLOAD_SIZE_METRIC_NAME)
+        initMetrics(meter, "");
+    }
+
+    public static void initMetrics(Meter meter, String prefix) {
+        s3DownloadSizeInTotal = meter.counterBuilder(prefix + S3StreamMetricsConstant.DOWNLOAD_SIZE_METRIC_NAME)
                 .setDescription("S3 download size")
                 .setUnit("bytes")
                 .build();
-        s3UploadSizeInTotal = meter.counterBuilder(S3StreamMetricsConstant.UPLOAD_SIZE_METRIC_NAME)
+        s3UploadSizeInTotal = meter.counterBuilder(prefix + S3StreamMetricsConstant.UPLOAD_SIZE_METRIC_NAME)
                 .setDescription("S3 upload size")
                 .setUnit("bytes")
                 .build();
-        operationNumInTotal = meter.counterBuilder(S3StreamMetricsConstant.OPERATION_COUNT_METRIC_NAME)
+        operationNumInTotal = meter.counterBuilder(prefix + S3StreamMetricsConstant.OPERATION_COUNT_METRIC_NAME)
                 .setDescription("Operations count")
                 .build();
-        operationLatency = meter.histogramBuilder(S3StreamMetricsConstant.OPERATION_LATENCY_METRIC_NAME)
+        operationLatency = meter.histogramBuilder(prefix + S3StreamMetricsConstant.OPERATION_LATENCY_METRIC_NAME)
                 .setDescription("Operations latency")
                 .setUnit("nanoseconds")
                 .ofLongs()
                 .build();
-        objectNumInTotal = meter.counterBuilder(S3StreamMetricsConstant.OBJECT_COUNT_METRIC_NAME)
+        objectNumInTotal = meter.counterBuilder(prefix + S3StreamMetricsConstant.OBJECT_COUNT_METRIC_NAME)
                 .setDescription("Objects count")
                 .build();
-        objectStageCost = meter.histogramBuilder(S3StreamMetricsConstant.OBJECT_STAGE_COST_METRIC_NAME)
+        objectStageCost = meter.histogramBuilder(prefix + S3StreamMetricsConstant.OBJECT_STAGE_COST_METRIC_NAME)
                 .setDescription("Objects stage cost")
                 .setUnit("nanoseconds")
                 .ofLongs()
                 .build();
-        objectUploadSize = meter.histogramBuilder(S3StreamMetricsConstant.OBJECT_UPLOAD_SIZE_METRIC_NAME)
+        objectUploadSize = meter.histogramBuilder(prefix + S3StreamMetricsConstant.OBJECT_UPLOAD_SIZE_METRIC_NAME)
                 .setDescription("Objects upload size")
                 .setUnit("bytes")
                 .ofLongs()
                 .build();
-        objectDownloadSize = meter.histogramBuilder(S3StreamMetricsConstant.OBJECT_DOWNLOAD_SIZE_METRIC_NAME)
+        objectDownloadSize = meter.histogramBuilder(prefix + S3StreamMetricsConstant.OBJECT_DOWNLOAD_SIZE_METRIC_NAME)
                 .setDescription("Objects download size")
                 .setUnit("bytes")
                 .ofLongs()
                 .build();
-        networkInboundUsageInTotal = meter.counterBuilder(S3StreamMetricsConstant.NETWORK_INBOUND_USAGE_METRIC_NAME)
+        networkInboundUsageInTotal = meter.counterBuilder(prefix + S3StreamMetricsConstant.NETWORK_INBOUND_USAGE_METRIC_NAME)
                 .setDescription("Network inbound usage")
                 .setUnit("bytes")
                 .build();
-        networkOutboundUsageInTotal = meter.counterBuilder(S3StreamMetricsConstant.NETWORK_OUTBOUND_USAGE_METRIC_NAME)
+        networkOutboundUsageInTotal = meter.counterBuilder(prefix + S3StreamMetricsConstant.NETWORK_OUTBOUND_USAGE_METRIC_NAME)
                 .setDescription("Network outbound usage")
                 .setUnit("bytes")
                 .build();
-        networkInboundAvailableBandwidth = meter.gaugeBuilder(S3StreamMetricsConstant.NETWORK_INBOUND_AVAILABLE_BANDWIDTH_METRIC_NAME)
+        networkInboundAvailableBandwidth = meter.gaugeBuilder(prefix + S3StreamMetricsConstant.NETWORK_INBOUND_AVAILABLE_BANDWIDTH_METRIC_NAME)
                 .setDescription("Network inbound available bandwidth")
                 .setUnit("bytes")
                 .ofLongs()
                 .buildWithCallback(result -> result.record(networkInboundAvailableBandwidthValue.value(), newAttributesBuilder().build()));
-        networkOutboundAvailableBandwidth = meter.gaugeBuilder(S3StreamMetricsConstant.NETWORK_OUTBOUND_AVAILABLE_BANDWIDTH_METRIC_NAME)
+        networkOutboundAvailableBandwidth = meter.gaugeBuilder(prefix + S3StreamMetricsConstant.NETWORK_OUTBOUND_AVAILABLE_BANDWIDTH_METRIC_NAME)
                 .setDescription("Network outbound available bandwidth")
                 .setUnit("bytes")
                 .ofLongs()
                 .buildWithCallback(result -> result.record(networkOutboundAvailableBandwidthValue.value(), newAttributesBuilder().build()));
-        networkInboundLimiterQueueSize = meter.gaugeBuilder(S3StreamMetricsConstant.NETWORK_INBOUND_LIMITER_QUEUE_SIZE_METRIC_NAME)
+        networkInboundLimiterQueueSize = meter.gaugeBuilder(prefix + S3StreamMetricsConstant.NETWORK_INBOUND_LIMITER_QUEUE_SIZE_METRIC_NAME)
                 .setDescription("Network inbound limiter queue size")
                 .ofLongs()
                 .buildWithCallback(result -> result.record(networkInboundLimiterQueueSizeValue.value(), newAttributesBuilder().build()));
-        networkOutboundLimiterQueueSize = meter.gaugeBuilder(S3StreamMetricsConstant.NETWORK_OUTBOUND_LIMITER_QUEUE_SIZE_METRIC_NAME)
+        networkOutboundLimiterQueueSize = meter.gaugeBuilder(prefix + S3StreamMetricsConstant.NETWORK_OUTBOUND_LIMITER_QUEUE_SIZE_METRIC_NAME)
                 .setDescription("Network outbound limiter queue size")
                 .ofLongs()
                 .buildWithCallback(result -> result.record(networkOutboundLimiterQueueSizeValue.value(), newAttributesBuilder().build()));
-        allocateByteBufSize = meter.histogramBuilder(S3StreamMetricsConstant.ALLOCATE_BYTE_BUF_SIZE_METRIC_NAME)
+        allocateByteBufSize = meter.histogramBuilder(prefix + S3StreamMetricsConstant.ALLOCATE_BYTE_BUF_SIZE_METRIC_NAME)
                 .setDescription("Allocate byte buf size")
                 .setUnit("bytes")
                 .ofLongs()
                 .build();
-        readAheadSize = meter.histogramBuilder(S3StreamMetricsConstant.READ_AHEAD_SIZE_METRIC_NAME)
+        readAheadSize = meter.histogramBuilder(prefix + S3StreamMetricsConstant.READ_AHEAD_SIZE_METRIC_NAME)
                 .setDescription("Read ahead size")
                 .setUnit("bytes")
                 .ofLongs()
                 .build();
-        availableInflightReadAheadSize = meter.gaugeBuilder(S3StreamMetricsConstant.AVAILABLE_INFLIGHT_READ_AHEAD_SIZE_METRIC_NAME)
+        availableInflightReadAheadSize = meter.gaugeBuilder(prefix + S3StreamMetricsConstant.AVAILABLE_INFLIGHT_READ_AHEAD_SIZE_METRIC_NAME)
                 .setDescription("Available inflight read ahead size")
                 .setUnit("bytes")
                 .ofLongs()
                 .buildWithCallback(result -> result.record(availableInflightReadAheadSizeValue.value(), newAttributesBuilder().build()));
-        compactionReadSizeInTotal = meter.counterBuilder(S3StreamMetricsConstant.COMPACTION_READ_SIZE_METRIC_NAME)
+        compactionReadSizeInTotal = meter.counterBuilder(prefix + S3StreamMetricsConstant.COMPACTION_READ_SIZE_METRIC_NAME)
                 .setDescription("Compaction read size")
                 .setUnit("bytes")
                 .build();
-        compactionWriteSizeInTotal = meter.counterBuilder(S3StreamMetricsConstant.COMPACTION_WRITE_SIZE_METRIC_NAME)
+        compactionWriteSizeInTotal = meter.counterBuilder(prefix + S3StreamMetricsConstant.COMPACTION_WRITE_SIZE_METRIC_NAME)
                 .setDescription("Compaction write size")
                 .setUnit("bytes")
                 .build();
@@ -190,6 +195,24 @@ public class S3StreamMetricsManager {
         Attributes attributes = newAttributesBuilder()
                 .put(S3StreamMetricsConstant.LABEL_OPERATION_TYPE, operation.getType().getName())
                 .put(S3StreamMetricsConstant.LABEL_OPERATION_NAME, operation.getName())
+                .build();
+        operationLatency.record(value, attributes);
+    }
+
+    public static void recordAppendWALLatency(long value, String stage) {
+        Attributes attributes = newAttributesBuilder()
+                .put(S3StreamMetricsConstant.LABEL_OPERATION_TYPE, S3MetricsType.S3Storage.getName())
+                .put(S3StreamMetricsConstant.LABEL_OPERATION_NAME, S3Operation.APPEND_STORAGE_WAL.getName())
+                .put(S3StreamMetricsConstant.LABEL_APPEND_WAL_STAGE, stage)
+                .build();
+        operationLatency.record(value, attributes);
+    }
+
+    public static void recordReadCacheLatency(long value, S3Operation operation, boolean isCacheHit) {
+        Attributes attributes = newAttributesBuilder()
+                .put(S3StreamMetricsConstant.LABEL_OPERATION_TYPE, operation.getType().getName())
+                .put(S3StreamMetricsConstant.LABEL_OPERATION_NAME, operation.getName())
+                .put(S3StreamMetricsConstant.LABEL_CACHE_STATUS, isCacheHit ? "hit" : "miss")
                 .build();
         operationLatency.record(value, attributes);
     }

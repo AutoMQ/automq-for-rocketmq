@@ -41,6 +41,8 @@ public class S3StreamMetricsConstant {
     public static final String COMPACTION_WRITE_SIZE_METRIC_NAME = "compaction_write_size_total";
     public static final AttributeKey<String> LABEL_OPERATION_TYPE = AttributeKey.stringKey("operation_type");
     public static final AttributeKey<String> LABEL_OPERATION_NAME = AttributeKey.stringKey("operation_name");
+    public static final AttributeKey<String> LABEL_APPEND_WAL_STAGE = AttributeKey.stringKey("stage");
+    public static final AttributeKey<String> LABEL_CACHE_STATUS = AttributeKey.stringKey("status");
     public static final AttributeKey<String> LABEL_OBJECT_STAGE = AttributeKey.stringKey("stage");
     public static final AttributeKey<String> LABEL_ALLOCATE_BYTE_BUF_SOURCE = AttributeKey.stringKey("source");
 }

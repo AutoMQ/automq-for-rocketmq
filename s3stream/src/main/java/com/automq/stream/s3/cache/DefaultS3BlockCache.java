@@ -96,11 +96,8 @@ public class DefaultS3BlockCache implements S3BlockCache {
                             ret.getRecords().get(ret.getRecords().size() - 1).getLastOffset(), totalReturnedSize);
 
                     long timeElapsed = timerUtil.elapsedAs(TimeUnit.NANOSECONDS);
-                    if (ret.getCacheAccessType() == CacheAccessType.BLOCK_CACHE_HIT) {
-                        S3StreamMetricsManager.recordOperationLatency(timeElapsed, S3Operation.READ_STORAGE_BLOCK_CACHE_HIT);
-                    } else {
-                        S3StreamMetricsManager.recordOperationLatency(timeElapsed, S3Operation.READ_STORAGE_BLOCK_CACHE_MISS);
-                    }
+                    boolean isCacheHit = ret.getCacheAccessType() == CacheAccessType.BLOCK_CACHE_HIT;
+                    S3StreamMetricsManager.recordReadCacheLatency(timeElapsed, S3Operation.READ_STORAGE_BLOCK_CACHE_HIT, isCacheHit);
                     if (LOGGER.isDebugEnabled()) {
                         LOGGER.debug("[S3BlockCache] read data complete, cache hit: {}, stream={}, {}-{}, total bytes: {} ",
                                 ret.getCacheAccessType() == CacheAccessType.BLOCK_CACHE_HIT, streamId, startOffset, endOffset, totalReturnedSize);

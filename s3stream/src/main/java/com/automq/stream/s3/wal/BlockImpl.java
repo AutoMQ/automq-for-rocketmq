@@ -126,6 +126,6 @@ public class BlockImpl implements Block {
 
     @Override
     public void polled() {
-        S3StreamMetricsManager.recordOperationLatency(timer.elapsedAs(TimeUnit.NANOSECONDS), S3Operation.APPEND_STORAGE_WAL_BLOCK_POLLED);
+        S3StreamMetricsManager.recordAppendWALLatency(timer.elapsedAs(TimeUnit.NANOSECONDS), "block_polled");
     }
 }

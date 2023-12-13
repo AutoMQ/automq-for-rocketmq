@@ -405,7 +405,7 @@ public class BlockWALService implements WriteAheadLog {
         final AppendResult appendResult = new AppendResultImpl(expectedWriteOffset, appendResultFuture);
         appendResult.future().whenComplete((nil, ex) -> S3StreamMetricsManager.recordOperationLatency(
                 timerUtil.elapsedAs(TimeUnit.NANOSECONDS), S3Operation.APPEND_STORAGE_WAL));
-        S3StreamMetricsManager.recordOperationLatency(timerUtil.elapsedAs(TimeUnit.NANOSECONDS), S3Operation.APPEND_STORAGE_WAL_BEFORE);
+        S3StreamMetricsManager.recordAppendWALLatency(timerUtil.elapsedAs(TimeUnit.NANOSECONDS), "before");
         return appendResult;
     }
 
