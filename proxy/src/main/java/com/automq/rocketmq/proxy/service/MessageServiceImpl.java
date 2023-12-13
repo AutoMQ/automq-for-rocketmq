@@ -71,6 +71,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -527,7 +528,18 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
                     lockService.release(topicId, queueId);
                 });
         }
-        return CompletableFuture.completedFuture(new InnerPopResult(0, Collections.emptyList()));
+        AtomicLong restOffset = new AtomicLong();
+        store.getOffsetRange(topicId, queueId, -1)
+            .stream()
+            .filter(range -> range.streamRole() == StreamRole.STREAM_ROLE_DATA)
+            .findFirst()
+            .ifPresent(range -> {
+                long diff = range.endOffset() - store.getConsumeOffset(consumerGroup.getGroupId(), topicId, queueId);
+                if (diff > 0) {
+                    restOffset.set(diff);
+                }
+            });
+        return CompletableFuture.completedFuture(new InnerPopResult(restOffset.get(), Collections.emptyList()));
     }
 
     @Override
