@@ -18,8 +18,10 @@
 package com.automq.stream.s3;
 
 import com.automq.stream.s3.metadata.S3ObjectMetadata;
+import com.automq.stream.s3.metadata.S3ObjectType;
 import com.automq.stream.s3.model.StreamRecordBatch;
 import com.automq.stream.s3.network.ThrottleStrategy;
+import com.automq.stream.s3.operator.FileS3Operator;
 import com.automq.stream.s3.operator.S3Operator;
 import com.automq.stream.utils.CloseableIterator;
 import com.automq.stream.utils.biniarysearch.IndexBlockOrderedBytes;
@@ -27,6 +29,8 @@ import io.netty.buffer.ByteBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -50,6 +54,43 @@ public class ObjectReader implements AutoCloseable {
         this.s3Operator = s3Operator;
         this.basicObjectInfoCf = new CompletableFuture<>();
         asyncGetBasicObjectInfo();
+    }
+
+    public static void main(String[] args) throws IOException {
+        if (args.length < 5) {
+            throw new IllegalArgumentException("Usage: ObjectReader <filePath> <fileSize> <streamId> <startOffset> <endOffset>");
+        }
+        String filePath = args[0];
+        S3Operator operator = new FileS3Operator(filePath);
+        int fileSize = Integer.parseInt(args[1]);
+        long streamId = Long.parseLong(args[2]);
+        long startOffset = Long.parseLong(args[3]);
+        long endOffset = Long.parseLong(args[4]);
+        S3ObjectMetadata metadata = new S3ObjectMetadata(0, fileSize, S3ObjectType.STREAM);
+        try (ObjectReader reader = new ObjectReader(metadata, operator)) {
+            reader.basicObjectInfoCf.thenCompose(basicObjectInfo -> {
+                System.out.println("basicObjectInfo = " + basicObjectInfo);
+                return reader.find(streamId, startOffset, endOffset).thenAccept(findIndexResult -> {
+                    for (StreamDataBlock streamDataBlock : findIndexResult.streamDataBlocks()) {
+                        System.out.printf("streamDataBlock = %s%n", streamDataBlock);
+                        reader.read(streamDataBlock.dataBlockIndex()).thenAccept(dataBlock -> {
+                            System.out.printf("dataBlock = %s%n", dataBlock);
+                            try (CloseableIterator<StreamRecordBatch> iterator = dataBlock.iterator()) {
+                                while (iterator.hasNext()) {
+                                    StreamRecordBatch next = iterator.next();
+                                    if (next.getBaseOffset() < startOffset || next.getBaseOffset() >= endOffset) {
+                                        continue;
+                                    }
+                                    System.out.printf("record = %s%n", next);
+                                }
+                            }
+                        }).join();
+                    }
+                });
+            }).join();
+        } finally {
+            operator.close();
+        }
     }
 
     public String objectKey() {

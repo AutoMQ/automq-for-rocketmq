@@ -383,7 +383,7 @@ public class S3Storage implements Storage {
         }).whenComplete((rst, ex) -> {
             timeout.cancel();
             if (ex != null) {
-                LOGGER.error("read from block cache failed, stream={}, {}-{}, maxBytes: {}",
+                LOGGER.error("read from block cache failed, stream={}, {}-{}, maxBytes: {}, ex: {}",
                         streamId, startOffset, finalEndOffset, maxBytes, ex);
                 logCacheRecords.forEach(StreamRecordBatch::release);
             }
