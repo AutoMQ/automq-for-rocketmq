@@ -132,6 +132,12 @@
                 <groupId>com.automq.elasticstream</groupId>
                 <artifactId>s3stream</artifactId>
                 <version>${s3stream.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>io.opentelemetry.instrumentation</groupId>
+                        <artifactId>*</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
 
             <!-- Below artifact are not directly used by the project, but are required by the dependencies of the project. -->
