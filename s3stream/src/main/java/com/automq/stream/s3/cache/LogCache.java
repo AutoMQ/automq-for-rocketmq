@@ -21,7 +21,6 @@ import com.automq.stream.s3.metrics.S3StreamMetricsManager;
 import com.automq.stream.s3.metrics.TimerUtil;
 import com.automq.stream.s3.metrics.operations.S3Operation;
 import com.automq.stream.s3.model.StreamRecordBatch;
-import com.automq.stream.utils.FutureUtil;
 import com.automq.stream.utils.biniarysearch.StreamRecordBatchList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
