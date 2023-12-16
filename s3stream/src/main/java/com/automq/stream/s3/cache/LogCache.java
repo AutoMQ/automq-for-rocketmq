@@ -21,6 +21,7 @@ import com.automq.stream.s3.metrics.S3StreamMetricsManager;
 import com.automq.stream.s3.metrics.TimerUtil;
 import com.automq.stream.s3.metrics.operations.S3Operation;
 import com.automq.stream.s3.model.StreamRecordBatch;
+import com.automq.stream.utils.FutureUtil;
 import com.automq.stream.utils.biniarysearch.StreamRecordBatchList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,6 +42,7 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static com.automq.stream.s3.cache.LogCache.StreamRange.NOOP_OFFSET;
+import static com.automq.stream.utils.FutureUtil.suppress;
 
 public class LogCache {
     private static final Logger LOGGER = LoggerFactory.getLogger(LogCache.class);
@@ -361,8 +363,10 @@ public class LogCache {
         }
 
         public void free() {
-            map.forEach((streamId, records) -> records.free());
-            map.clear();
+            suppress(() -> {
+                map.forEach((streamId, records) -> records.free());
+                map.clear();
+            }, LOGGER);
         }
 
         public long createdTimestamp() {
