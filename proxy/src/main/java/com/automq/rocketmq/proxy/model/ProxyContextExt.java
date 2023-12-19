@@ -35,6 +35,7 @@ public class ProxyContextExt extends ProxyContext implements TraceContext {
     private boolean relayed;
 
     private final Tracer tracer;
+    private Span rootSpan;
 
     private final BlockingDeque<Span> spanStack = new LinkedBlockingDeque<>();
 
@@ -78,6 +79,10 @@ public class ProxyContextExt extends ProxyContext implements TraceContext {
         return super.getRemainingMs() == null ? DEFAULT_TIMEOUT_MILLIS : super.getRemainingMs();
     }
 
+    public Span rootSpan() {
+        return rootSpan;
+    }
+
     public BlockingDeque<Span> spanStack() {
         return spanStack;
     }
@@ -94,6 +99,9 @@ public class ProxyContextExt extends ProxyContext implements TraceContext {
 
     @Override
     public void attachSpan(Span span) {
+        if (spanStack.isEmpty()) {
+            rootSpan = span;
+        }
         spanStack.push(span);
     }
 

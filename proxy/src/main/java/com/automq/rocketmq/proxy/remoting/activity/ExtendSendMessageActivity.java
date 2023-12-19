@@ -17,10 +17,15 @@
 
 package com.automq.rocketmq.proxy.remoting.activity;
 
+import com.automq.rocketmq.common.trace.TraceHelper;
 import com.automq.rocketmq.proxy.exception.ExceptionHandler;
+import com.automq.rocketmq.proxy.model.ProxyContextExt;
 import com.automq.rocketmq.proxy.processor.ExtendMessagingProcessor;
 import com.automq.rocketmq.proxy.remoting.RemotingUtil;
 import io.netty.channel.ChannelHandlerContext;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.api.trace.Tracer;
 import java.net.InetSocketAddress;
 import java.util.Collections;
 import java.util.Map;
@@ -32,12 +37,14 @@ import org.apache.rocketmq.common.message.MessageConst;
 import org.apache.rocketmq.common.message.MessageDecoder;
 import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.common.topic.TopicValidator;
+import org.apache.rocketmq.proxy.common.ContextVariable;
 import org.apache.rocketmq.proxy.common.ProxyContext;
 import org.apache.rocketmq.proxy.processor.QueueSelector;
 import org.apache.rocketmq.proxy.remoting.activity.SendMessageActivity;
 import org.apache.rocketmq.proxy.remoting.pipeline.RequestPipeline;
 import org.apache.rocketmq.proxy.service.route.AddressableMessageQueue;
 import org.apache.rocketmq.proxy.service.route.MessageQueueView;
+import org.apache.rocketmq.remoting.common.RemotingHelper;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 import org.apache.rocketmq.remoting.protocol.RequestCode;
 import org.apache.rocketmq.remoting.protocol.ResponseCode;
@@ -77,6 +84,17 @@ public class ExtendSendMessageActivity extends SendMessageActivity implements Co
     @Override
     protected RemotingCommand sendMessage(ChannelHandlerContext ctx, RemotingCommand request,
         ProxyContext context) throws Exception {
+        ProxyContextExt contextExt = (ProxyContextExt) context;
+        Tracer tracer = contextExt.tracer().get();
+        Span rootSpan = tracer.spanBuilder("SendMessage")
+            .setNoParent()
+            .setSpanKind(SpanKind.SERVER)
+            .setAttribute(ContextVariable.PROTOCOL_TYPE, contextExt.getProtocolType())
+            .setAttribute(ContextVariable.ACTION, contextExt.getAction())
+            .setAttribute(ContextVariable.CLIENT_ID, contextExt.getClientID())
+            .startSpan();
+        contextExt.attachSpan(rootSpan);
+
         // The parent class already checked the message type, added the transaction subscription.
         RemotingCommand superResponse = super.sendMessage(ctx, request, context);
         if (superResponse != null) {
@@ -136,7 +154,7 @@ public class ExtendSendMessageActivity extends SendMessageActivity implements Co
                 // TODO: Support batch message in the future.
                 SendResult sendResult = sendResults.get(0);
                 fillSendMessageResponse(response, sendResult);
-                writeResponse(ctx, context, request, response);
+                writeResponse(ctx, context, request, response, null);
             });
 
         // Return null to uplevel, the response will be sent back in the future.
@@ -146,6 +164,17 @@ public class ExtendSendMessageActivity extends SendMessageActivity implements Co
     @Override
     protected RemotingCommand consumerSendMessage(ChannelHandlerContext ctx, RemotingCommand request,
         ProxyContext context) throws Exception {
+        ProxyContextExt contextExt = (ProxyContextExt) context;
+        Tracer tracer = contextExt.tracer().get();
+        Span rootSpan = tracer.spanBuilder("ConsumerSendMessage")
+            .setNoParent()
+            .setSpanKind(SpanKind.SERVER)
+            .setAttribute(ContextVariable.PROTOCOL_TYPE, contextExt.getProtocolType())
+            .setAttribute(ContextVariable.ACTION, contextExt.getAction())
+            .setAttribute(ContextVariable.CLIENT_ID, contextExt.getClientID())
+            .startSpan();
+        contextExt.attachSpan(rootSpan);
+
         ConsumerSendMsgBackRequestHeader requestHeader = (ConsumerSendMsgBackRequestHeader) request.decodeCommandCustomHeader(ConsumerSendMsgBackRequestHeader.class);
         messagingProcessor.getServiceManager()
             .getMessageService()
@@ -155,7 +184,7 @@ public class ExtendSendMessageActivity extends SendMessageActivity implements Co
                     writeErrResponse(ctx, context, request, error);
                     return;
                 }
-                writeResponse(ctx, context, request, finalResponse);
+                writeResponse(ctx, context, request, finalResponse, null);
             });
 
         return null;
@@ -178,6 +207,10 @@ public class ExtendSendMessageActivity extends SendMessageActivity implements Co
     protected void writeResponse(ChannelHandlerContext ctx, ProxyContext context, RemotingCommand request,
         RemotingCommand response, Throwable t) {
         recordRpcLatency(context, response);
+        ProxyContextExt contextExt = (ProxyContextExt) context;
+        Span rootSpan = contextExt.rootSpan();
+        rootSpan.setAttribute("code", RemotingHelper.getResponseCodeDesc(response.getCode()));
+        TraceHelper.endSpan(contextExt, rootSpan, t);
         super.writeResponse(ctx, context, request, response, t);
     }
 
