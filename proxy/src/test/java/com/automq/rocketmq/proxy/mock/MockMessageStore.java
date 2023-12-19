@@ -97,7 +97,8 @@ public class MockMessageStore implements MessageStore {
     }
 
     @Override
-    public CompletableFuture<PullResult> pull(long consumerGroupId, long topicId, int queueId, Filter filter,
+    public CompletableFuture<PullResult> pull(StoreContext context, long consumerGroupId, long topicId, int queueId,
+        Filter filter,
         long offset, int batchSize, boolean retry) {
         if (retry) {
             return CompletableFuture.completedFuture(new PullResult(PullResult.Status.NO_NEW_MSG, 0L, 0L, 0L, new ArrayList<>()));

@@ -323,7 +323,7 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
             Topic topic = pair.getLeft();
             ConsumerGroup group = pair.getRight();
 
-            return store.pull(group.getGroupId(), topic.getTopicId(), virtualQueue.physicalQueueId(),
+            return store.pull(StoreContext.EMPTY, group.getGroupId(), topic.getTopicId(), virtualQueue.physicalQueueId(),
                     Filter.DEFAULT_FILTER, requestHeader.getOffset(), 1, false)
                 .thenApply(pullResult -> {
                     if (pullResult.status() == com.automq.rocketmq.store.model.message.PullResult.Status.FOUND) {
@@ -809,17 +809,21 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
                     metadataService.updateConsumerOffset(group.getGroupId(), topic.getTopicId(), virtualQueue.physicalQueueId(), requestHeader.getCommitOffset());
                 }
 
-                return store.pull(group.getGroupId(), topic.getTopicId(), virtualQueue.physicalQueueId(), filter, requestHeader.getQueueOffset(), requestHeader.getMaxMsgNums(), false);
+                StoreContext storeContext = ContextUtil.buildStoreContext(ctx, topic.getName(), group.getName());
+                return store.pull(storeContext, group.getGroupId(), topic.getTopicId(), virtualQueue.physicalQueueId(), filter, requestHeader.getQueueOffset(), requestHeader.getMaxMsgNums(), false);
             })
             .thenCompose(result -> {
+                Topic topic = topicReference.get();
+                ConsumerGroup group = consumerGroupReference.get();
                 if (result.messageList().isEmpty()) {
                     if (result.maxOffset() - result.nextBeginOffset() > 0) {
                         // This means there are messages in the queue but not match the filter. So we should prevent long polling.
                         return CompletableFuture.completedFuture(new PullResult(PullStatus.NO_MATCHED_MSG, result.nextBeginOffset(), result.minOffset(), result.maxOffset(), Collections.emptyList()));
                     } else {
+                        StoreContext storeContext = ContextUtil.buildStoreContext(ctx, topic.getName(), group.getName());
                         return suspendRequestService.suspendRequest((ProxyContextExt) ctx, requestHeader.getTopic(), virtualQueue.physicalQueueId(), filter, timeoutMillis,
                                 // Function to pull message later.
-                                timeout -> store.pull(consumerGroupReference.get().getGroupId(), topicReference.get().getTopicId(), virtualQueue.physicalQueueId(), filter,
+                                timeout -> store.pull(storeContext, group.getGroupId(), topic.getTopicId(), virtualQueue.physicalQueueId(), filter,
                                         requestHeader.getQueueOffset(), requestHeader.getMaxMsgNums(), false)
                                     .thenApply(PullResultWrapper::new))
                             .thenApply(resultWrapper -> {
@@ -827,16 +831,25 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
                                     return new PullResult(PullStatus.NO_MATCHED_MSG, result.nextBeginOffset(), result.minOffset(), result.maxOffset(), Collections.emptyList());
                                 }
                                 com.automq.rocketmq.store.model.message.PullResult suspendResult = resultWrapper.get().inner();
+                                recordMetricsForPulling(topic.getName(), group.getName(), suspendResult);
                                 return new PullResult(PullStatus.FOUND, suspendResult.nextBeginOffset(), suspendResult.minOffset(), suspendResult.maxOffset(),
                                     FlatMessageUtil.convertTo(null, suspendResult.messageList(), requestHeader.getTopic(), 0, config.hostName(), config.remotingListenPort()));
                             });
                     }
                 }
+
+                recordMetricsForPulling(topic.getName(), group.getName(), result);
                 return CompletableFuture.completedFuture(
                     new PullResult(PullStatus.FOUND, result.nextBeginOffset(), result.minOffset(), result.maxOffset(),
                         FlatMessageUtil.convertTo(null, result.messageList(), requestHeader.getTopic(), 0, config.hostName(), config.remotingListenPort()))
                 );
             });
+    }
+
+    private void recordMetricsForPulling(String topic, String group,
+        com.automq.rocketmq.store.model.message.PullResult result) {
+        Integer messageBytesTotal = result.messageList().stream().map(message -> message.message().payloadAsByteBuffer().remaining()).reduce(0, Integer::sum);
+        ProxyMetricsManager.recordOutgoingMessages(topic, group, result.messageList().size(), messageBytesTotal, topic.startsWith(MixAll.RETRY_GROUP_TOPIC_PREFIX));
     }
 
     @Override
