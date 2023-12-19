@@ -19,7 +19,59 @@ package com.automq.stream.s3.metrics;
 
 import io.opentelemetry.api.common.AttributeKey;
 
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
 public class S3StreamMetricsConstant {
+    public static final long[] OBJECT_SIZE_BUCKETS = {1024, // 1KB
+                                                      524288, // 512KB
+                                                      1048576, // 1MB
+                                                      4194304, // 4MB
+                                                      8388608, // 8MB
+                                                      16777216, // 16MB
+                                                      33554432, // 32MB
+                                                      67108864, // 64MB
+                                                      134217728}; // 128MB
+    public static final String[] OBJECT_SIZE_BUCKET_NAMES = {"1KB",
+                                                             "512KB",
+                                                             "1MB",
+                                                             "4MB",
+                                                             "8MB",
+                                                             "16MB",
+                                                             "32MB",
+                                                             "64MB",
+                                                             "128MB",
+                                                             "inf"};
+    public static final List<Long> OPERATION_LATENCY_BOUNDARIES = List.of(
+            TimeUnit.MICROSECONDS.toNanos(1),
+            TimeUnit.MICROSECONDS.toNanos(10),
+            TimeUnit.MICROSECONDS.toNanos(100),
+            TimeUnit.MILLISECONDS.toNanos(1),
+            TimeUnit.MILLISECONDS.toNanos(3),
+            TimeUnit.MILLISECONDS.toNanos(5),
+            TimeUnit.MILLISECONDS.toNanos(7),
+            TimeUnit.MILLISECONDS.toNanos(10),
+            TimeUnit.MILLISECONDS.toNanos(20),
+            TimeUnit.MILLISECONDS.toNanos(30),
+            TimeUnit.MILLISECONDS.toNanos(40),
+            TimeUnit.MILLISECONDS.toNanos(50),
+            TimeUnit.MILLISECONDS.toNanos(60),
+            TimeUnit.MILLISECONDS.toNanos(70),
+            TimeUnit.MILLISECONDS.toNanos(80),
+            TimeUnit.MILLISECONDS.toNanos(90),
+            TimeUnit.MILLISECONDS.toNanos(100),
+            TimeUnit.MILLISECONDS.toNanos(200),
+            TimeUnit.MILLISECONDS.toNanos(500),
+            TimeUnit.SECONDS.toNanos(1),
+            TimeUnit.SECONDS.toNanos(3),
+            TimeUnit.SECONDS.toNanos(5),
+            TimeUnit.SECONDS.toNanos(10),
+            TimeUnit.SECONDS.toNanos(30),
+            TimeUnit.MINUTES.toNanos(1),
+            TimeUnit.MINUTES.toNanos(3),
+            TimeUnit.MINUTES.toNanos(5)
+    );
+
     public static final String UPLOAD_SIZE_METRIC_NAME = "upload_size_total";
     public static final String DOWNLOAD_SIZE_METRIC_NAME = "download_size_total";
     public static final String OPERATION_COUNT_METRIC_NAME = "operation_count_total";
@@ -36,11 +88,18 @@ public class S3StreamMetricsConstant {
     public static final String NETWORK_OUTBOUND_LIMITER_QUEUE_SIZE_METRIC_NAME = "network_outbound_limiter_queue_size";
     public static final String ALLOCATE_BYTE_BUF_SIZE_METRIC_NAME = "allocate_byte_buf_size";
     public static final String READ_AHEAD_SIZE_METRIC_NAME = "read_ahead_size";
+    public static final String WAL_START_OFFSET = "wal_start_offset";
+    public static final String WAL_TRIMMED_OFFSET = "wal_trimmed_offset";
+    public static final String DELTA_WAL_CACHE_SIZE = "delta_wal_cache_size";
+    public static final String BLOCK_CACHE_SIZE = "block_cache_size";
     public static final String AVAILABLE_INFLIGHT_READ_AHEAD_SIZE_METRIC_NAME = "available_inflight_read_ahead_size";
+    public static final String AVAILABLE_S3_INFLIGHT_READ_QUOTA_METRIC_NAME = "available_s3_inflight_read_quota";
+    public static final String AVAILABLE_S3_INFLIGHT_WRITE_QUOTA_METRIC_NAME = "available_s3_inflight_write_quota";
     public static final String COMPACTION_READ_SIZE_METRIC_NAME = "compaction_read_size_total";
     public static final String COMPACTION_WRITE_SIZE_METRIC_NAME = "compaction_write_size_total";
     public static final AttributeKey<String> LABEL_OPERATION_TYPE = AttributeKey.stringKey("operation_type");
     public static final AttributeKey<String> LABEL_OPERATION_NAME = AttributeKey.stringKey("operation_name");
+    public static final AttributeKey<String> LABEL_OBJECT_SIZE_NAME = AttributeKey.stringKey("size");
     public static final AttributeKey<String> LABEL_APPEND_WAL_STAGE = AttributeKey.stringKey("stage");
     public static final AttributeKey<String> LABEL_CACHE_STATUS = AttributeKey.stringKey("status");
     public static final AttributeKey<String> LABEL_OBJECT_STAGE = AttributeKey.stringKey("stage");
