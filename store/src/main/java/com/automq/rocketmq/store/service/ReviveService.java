@@ -152,9 +152,9 @@ public class ReviveService {
 
                         CompletableFuture<PullResult> pullFuture;
                         if (operationType == PopOperation.PopOperationType.POP_RETRY) {
-                            pullFuture = queue.pullRetry(consumerGroupId, Filter.DEFAULT_FILTER, checkPoint.messageOffset(), 1);
+                            pullFuture = queue.pullRetry(context, consumerGroupId, Filter.DEFAULT_FILTER, checkPoint.messageOffset(), 1);
                         } else {
-                            pullFuture = queue.pullNormal(consumerGroupId, Filter.DEFAULT_FILTER, checkPoint.messageOffset(), 1);
+                            pullFuture = queue.pullNormal(context, consumerGroupId, Filter.DEFAULT_FILTER, checkPoint.messageOffset(), 1);
                         }
                         return pullFuture.thenApply(result -> {
                             if (result.messageList().isEmpty()) {

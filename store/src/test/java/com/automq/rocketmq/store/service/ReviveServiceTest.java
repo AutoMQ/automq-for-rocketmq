@@ -136,7 +136,7 @@ class ReviveServiceTest {
         assertNull(ckValue);
 
         // check if this message has been appended to retry stream
-        PullResult retryPullResult = logicQueue.pullRetry(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 0, invisibleDuration).join();
+        PullResult retryPullResult = logicQueue.pullRetry(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 0, invisibleDuration).join();
         assertEquals(1, retryPullResult.messageList().size());
 
         // pop retry
@@ -264,7 +264,7 @@ class ReviveServiceTest {
         assertNull(ckValue);
 
         // check if this message has been appended to retry stream
-        PullResult retryPullResult = logicQueue.pullRetry(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 0, 32).join();
+        PullResult retryPullResult = logicQueue.pullRetry(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 0, 32).join();
         assertEquals(1, retryPullResult.messageList().size());
 
         // pop retry

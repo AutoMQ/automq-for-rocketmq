@@ -66,7 +66,8 @@ public interface MessageStore extends Lifecycle {
      * @param retry           whether to pull retry messages
      * @return pull result, see {@link PullResult}
      */
-    CompletableFuture<PullResult> pull(long consumerGroupId, long topicId, int queueId, Filter filter, long offset,
+    CompletableFuture<PullResult> pull(StoreContext context, long consumerGroupId, long topicId, int queueId,
+        Filter filter, long offset,
         int batchSize, boolean retry);
 
     /**
