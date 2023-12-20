@@ -287,14 +287,10 @@ public class S3StreamMetricsManager {
         operationLatency.record(value, attributes);
     }
 
-    private static String getObjectBucketLabel(long objectSize) {
-        int i = 0;
-        for (; i < S3StreamMetricsConstant.OBJECT_SIZE_BUCKETS.length; i++) {
-            if (objectSize <= S3StreamMetricsConstant.OBJECT_SIZE_BUCKETS[i]) {
-                break;
-            }
-        }
-        return S3StreamMetricsConstant.OBJECT_SIZE_BUCKET_NAMES[i];
+    public static String getObjectBucketLabel(long objectSize) {
+        int index = (int) Math.ceil(Math.log((double) objectSize / (16 * 1024)) / Math.log(2));
+        index = Math.min(S3StreamMetricsConstant.OBJECT_SIZE_BUCKET_NAMES.length - 1, Math.max(0, index));
+        return S3StreamMetricsConstant.OBJECT_SIZE_BUCKET_NAMES[index];
     }
 
     public static void recordObjectNum(long value) {

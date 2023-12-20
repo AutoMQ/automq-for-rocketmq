@@ -23,18 +23,15 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 public class S3StreamMetricsConstant {
-    public static final long[] OBJECT_SIZE_BUCKETS = {1024, // 1KB
-                                                      524288, // 512KB
-                                                      1048576, // 1MB
-                                                      4194304, // 4MB
-                                                      8388608, // 8MB
-                                                      16777216, // 16MB
-                                                      33554432, // 32MB
-                                                      67108864, // 64MB
-                                                      134217728}; // 128MB
-    public static final String[] OBJECT_SIZE_BUCKET_NAMES = {"1KB",
+    // value = 16KB * 2^i
+    public static final String[] OBJECT_SIZE_BUCKET_NAMES = {"16KB",
+                                                             "32KB",
+                                                             "64KB",
+                                                             "128KB",
+                                                             "256KB",
                                                              "512KB",
                                                              "1MB",
+                                                             "2MB",
                                                              "4MB",
                                                              "8MB",
                                                              "16MB",
