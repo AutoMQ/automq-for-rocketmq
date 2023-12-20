@@ -225,7 +225,8 @@ jobs:
   clean:
     if: always()
     name: Clean
-    needs: [deploy, list-version, test-e2e-grpc-java, test-e2e-remoting-java]
+    # needs: [deploy, list-version, test-e2e-grpc-java, test-e2e-remoting-java]
+    needs: [deploy, list-version, test-e2e-grpc-java]
     runs-on: private-k3s
     timeout-minutes: 60
     strategy:
