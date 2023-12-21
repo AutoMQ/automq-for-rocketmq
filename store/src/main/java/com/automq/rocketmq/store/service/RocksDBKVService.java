@@ -139,6 +139,30 @@ public class RocksDBKVService implements KVService {
         }
     }
 
+    @Override
+    public byte[] getByPrefix(String namespace, final byte[] prefix) throws StoreException {
+        if (stopped) {
+            throw new StoreException(StoreErrorCode.KV_SERVICE_IS_NOT_RUNNING, "KV service is stopped.");
+        }
+
+        if (!columnFamilyNameHandleMap.containsKey(namespace)) {
+            return null;
+        }
+
+        ColumnFamilyHandle handle = columnFamilyNameHandleMap.get(namespace);
+        try (RocksIterator iterator = rocksDB.newIterator(handle)) {
+            iterator.seek(prefix);
+            if (!iterator.isValid()) {
+                return null;
+            }
+            byte[] key = iterator.key();
+            if (!checkPrefix(key, prefix)) {
+                return null;
+            }
+            return iterator.value();
+        }
+    }
+
     private void transformKVReadOptions(ReadOptions readOptions, KVReadOptions kvReadOptions) {
         if (kvReadOptions.isSnapshotRead()) {
             readOptions.setSnapshot(snapshotMap.get(kvReadOptions.getSnapshotVersion()));

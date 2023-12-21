@@ -515,7 +515,7 @@ public class LogicQueueTest {
         // 3. ack second message in result
         AckResult ackResult = logicQueue.ack(popMessageList.get(1).receiptHandle().get()).join();
         assertEquals(AckResult.Status.SUCCESS, ackResult.status());
-        assertEquals(0, stateMachine.ackOffset(CONSUMER_GROUP_ID));
+        assertEquals(2, stateMachine.ackOffset(CONSUMER_GROUP_ID));
 
         // 4. pop fifo again
         popResult = logicQueue.popFifo(StoreContext.EMPTY, CONSUMER_GROUP_ID, new TagFilter("TagB"), 1, 100).join();

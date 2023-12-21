@@ -42,14 +42,10 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
-import org.roaringbitmap.RoaringBitmap;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,8 +63,6 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
     private final long topicId;
     private final int queueId;
     private ConcurrentMap<Long/*consumerGroup*/, ConsumerGroupMetadata> consumerGroupMetadataMap;
-    private final ConcurrentMap<Long/*consumerGroup*/, AckCommitter> ackCommitterMap = new ConcurrentHashMap<>();
-    private final ConcurrentMap<Long/*consumerGroup*/, AckCommitter> retryAckCommitterMap = new ConcurrentHashMap<>();
     private long currentOperationOffset = -1;
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
     private final Lock reentrantLock = lock.readLock();
@@ -76,7 +70,6 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
     private final KVService kvService;
     private final TimerService timerService;
     private final String identity;
-    private final List<OffsetListener> ackOffsetListeners = new ArrayList<>();
     private final List<OffsetListener> retryAckOffsetListeners = new ArrayList<>();
 
     public DefaultLogicQueueStateMachine(long topicId, int queueId, KVService kvService, TimerService timerService) {
@@ -96,16 +89,6 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
     @Override
     public int queueId() {
         return queueId;
-    }
-
-    @Override
-    public void registerAckOffsetListener(OffsetListener listener) {
-        this.ackOffsetListeners.add(listener);
-    }
-
-    @Override
-    public void registerRetryAckOffsetListener(OffsetListener listener) {
-        this.retryAckOffsetListeners.add(listener);
     }
 
     @Override
@@ -140,15 +123,10 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
         // update consume offset, data or retry stream
         ConsumerGroupMetadata metadata = this.consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId));
         if (metadata.getConsumeOffset() < offset + 1) {
+            // if this is a pop-last operation, it only needs to update consume offset
             metadata.setConsumeOffset(offset + 1);
         }
         if (operation.isEndMark()) {
-            // if this is a pop-last operation, it only needs to update consume offset and advance ack offset
-            long baseOffset = offset - count + 1;
-            for (int i = 0; i < count; i++) {
-                long currOffset = baseOffset + i;
-                this.getAckCommitter(consumerGroupId).commitAck(currOffset);
-            }
             return ReplayPopResult.empty();
         }
 
@@ -166,12 +144,9 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
             TimerHandlerType.POP_REVIVE, buildReceiptHandle(consumerGroupId, topicId, queueId, operationId));
         requestList.add(timerEnqueueRequest);
 
-        Integer currentConsumeTimes = metadata.getConsumeTimes().getOrDefault(offset, 0);
-        int newConsumeTimes = currentConsumeTimes + 1;
-        metadata.getConsumeTimes().put(offset, newConsumeTimes);
-
         kvService.batch(requestList.toArray(new BatchRequest[0]));
-        return ReplayPopResult.of(newConsumeTimes);
+        // normal pop operation does not need to update consume times
+        return ReplayPopResult.of(1);
     }
 
     private ReplayPopResult replayPopRetryOperation(long operationOffset,
@@ -190,18 +165,7 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
 
         // update consume offset, data or retry stream
         ConsumerGroupMetadata metadata = this.consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId));
-        if (metadata.getRetryConsumeOffset() < offset + 1) {
-            metadata.setRetryConsumeOffset(offset + 1);
-        }
-        if (operation.isEndMark()) {
-            // if this is a pop-last operation, it only needs to update consume offset and advance ack offset
-            long baseOffset = offset - count + 1;
-            for (int i = 0; i < count; i++) {
-                long currOffset = baseOffset + i;
-                this.getAckCommitter(consumerGroupId).commitAck(currOffset);
-            }
-            return ReplayPopResult.empty();
-        }
+        metadata.advanceRetryConsumeOffset(offset + 1);
 
         List<BatchRequest> requestList = new ArrayList<>();
         // write a ck for this offset
@@ -242,12 +206,7 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
             metadata.setConsumeOffset(offset + 1);
         }
         if (operation.isEndMark()) {
-            // if this is a pop-last operation, it only needs to update consume offset and advance ack offset
-            long baseOffset = offset - count + 1;
-            for (int i = 0; i < count; i++) {
-                long currOffset = baseOffset + i;
-                this.getAckCommitter(consumerGroupId).commitAck(currOffset);
-            }
+            // if this is a pop-last operation, it only needs to update consume offset
             return ReplayPopResult.empty();
         }
 
@@ -269,46 +228,23 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
         long baseOffset = offset - count + 1;
         for (int i = 0; i < count; i++) {
             long currOffset = baseOffset + i;
-            BatchWriteRequest writeOrderIndexRequest = new BatchWriteRequest(KV_NAMESPACE_FIFO_INDEX,
-                buildOrderIndexKey(consumerGroupId, topicId, queueId, currOffset), buildOrderIndexValue(operationId));
+            byte[] orderIndexKey = buildOrderIndexKey(consumerGroupId, topicId, queueId, currOffset);
+            int consumeTimes = 0;
+            try {
+                byte[] orderIndexValue = kvService.get(KV_NAMESPACE_FIFO_INDEX, orderIndexKey);
+                if (orderIndexValue != null) {
+                    ByteBuffer wrappedBuffer = ByteBuffer.wrap(orderIndexValue);
+                    consumeTimes = wrappedBuffer.getInt(8);
+                }
+            } catch (StoreException e) {
+                LOGGER.error("{}: get consume times from order index failed", identity, e);
+            }
+            BatchWriteRequest writeOrderIndexRequest = new BatchWriteRequest(KV_NAMESPACE_FIFO_INDEX, orderIndexKey, buildOrderIndexValue(operationId, consumeTimes + 1));
             requestList.add(writeOrderIndexRequest);
         }
 
-        Integer currentConsumeTimes = metadata.getConsumeTimes().getOrDefault(offset, 0);
-        int newConsumeTimes = currentConsumeTimes + 1;
-        metadata.getConsumeTimes().put(offset, newConsumeTimes);
-
         kvService.batch(requestList.toArray(new BatchRequest[0]));
-        return ReplayPopResult.of(newConsumeTimes);
-    }
-
-    private AckCommitter getAckCommitter(long consumerGroupId) {
-        return getAckCommitter(consumerGroupId, null);
-    }
-
-    private AckCommitter getAckCommitter(long consumerGroupId, ByteBuffer serializedBitmapBuffer) {
-        ConsumerGroupMetadata metadata = this.consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId));
-        return this.ackCommitterMap.computeIfAbsent(consumerGroupId, k ->
-            new AckCommitter(
-                metadata.getAckOffset(),
-                offset -> {
-                    metadata.setAckOffset(offset);
-                    this.ackOffsetListeners.forEach(listener -> listener.onOffset(consumerGroupId, offset));
-                },
-                serializedBitmapBuffer
-            ));
-    }
-
-    private AckCommitter getRetryAckCommitter(long consumerGroupId) {
-        return getRetryAckCommitter(consumerGroupId, null);
-    }
-
-    private AckCommitter getRetryAckCommitter(long consumerGroupId, ByteBuffer serializedBitmapBuffer) {
-        ConsumerGroupMetadata metadata = this.consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId));
-        return this.retryAckCommitterMap.computeIfAbsent(consumerGroupId, k -> new AckCommitter(metadata.getRetryAckOffset(), offset -> {
-            metadata.setRetryAckOffset(offset);
-            this.retryAckOffsetListeners.forEach(listener -> listener.onOffset(consumerGroupId, offset));
-        }, serializedBitmapBuffer));
+        return ReplayPopResult.of(consumeTimes(consumerGroupId, offset));
     }
 
     @Override
@@ -339,19 +275,32 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
                 throw new StoreException(StoreErrorCode.ILLEGAL_ARGUMENT, "Ack operation failed, check point not found");
             }
             CheckPoint ck = CheckPoint.getRootAsCheckPoint(ByteBuffer.wrap(ckValue));
-            int count = ck.count();
-            long baseOffset = ck.messageOffset() - count + 1;
-            for (int i = 0; i < count; i++) {
-                long currOffset = baseOffset + i;
-                if (ck.popOperationType() == PopOperation.PopOperationType.POP_NORMAL.ordinal() ||
-                    (ck.popOperationType() == PopOperation.PopOperationType.POP_ORDER.ordinal() && type == AckOperation.AckOperationType.ACK_NORMAL)) {
-                    this.getAckCommitter(consumerGroupId).commitAck(currOffset);
-                }
-                if (ck.popOperationType() == PopOperation.PopOperationType.POP_RETRY.ordinal()) {
-                    this.getRetryAckCommitter(consumerGroupId).commitAck(currOffset);
+            deleteCheckPointAndRewriteOrderIndex(ck);
+
+            // Update ack offset
+            long ackOffset;
+            if (ck.popOperationType() == PopOperation.PopOperationType.POP_RETRY.ordinal()) {
+                ackOffset = metadata.getRetryConsumeOffset();
+            } else {
+                ackOffset = metadata.getConsumeOffset();
+            }
+
+            byte[] prefix = kvService.getByPrefix(KV_NAMESPACE_CHECK_POINT, SerializeUtil.buildCheckPointGroupPrefix(topicId, queueId, consumerGroupId));
+            if (prefix != null) {
+                CheckPoint earliestCK = SerializeUtil.decodeCheckPoint(ByteBuffer.wrap(prefix));
+                ackOffset = earliestCK.messageOffset();
+            }
+
+            if (ck.popOperationType() == PopOperation.PopOperationType.POP_NORMAL.ordinal() ||
+                (ck.popOperationType() == PopOperation.PopOperationType.POP_ORDER.ordinal() && type == AckOperation.AckOperationType.ACK_NORMAL)) {
+                metadata.advanceAckOffset(ackOffset);
+            }
+            if (ck.popOperationType() == PopOperation.PopOperationType.POP_RETRY.ordinal()) {
+                metadata.advanceRetryAckOffset(ackOffset);
+                for (OffsetListener listener : retryAckOffsetListeners) {
+                    listener.onOffset(consumerGroupId, ackOffset);
                 }
             }
-            deleteCheckPointAndRelatedStates(ck);
         } finally {
             reentrantLock.unlock();
         }
@@ -427,12 +376,8 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
             // Create a new consumer group with a new version.
             ConsumerGroupMetadata metadata = this.consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId));
             ConsumerGroupMetadata newMetadata = new ConsumerGroupMetadata(
-                metadata.getConsumerGroupId(), newConsumeOffset, newConsumeOffset, metadata.getRetryConsumeOffset(), metadata.getRetryAckOffset(),
-                new ConcurrentSkipListMap<>(), operationOffset);
+                metadata.getConsumerGroupId(), newConsumeOffset, newConsumeOffset, metadata.getRetryConsumeOffset(), metadata.getRetryAckOffset(), operationOffset);
             this.consumerGroupMetadataMap.put(consumerGroupId, newMetadata);
-
-            // Remove old ack committer to avoid advance the ack offset to old group-metadata.
-            this.ackCommitterMap.remove(consumerGroupId);
 
             // Delete all check points and related states about this consumer group
             List<CheckPoint> checkPoints = new ArrayList<>();
@@ -458,11 +403,38 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
         }
     }
 
-    private void deleteCheckPointAndRelatedStates(CheckPoint checkPoint) throws StoreException {
-        List<BatchRequest> batchRequests = deleteCheckPointAndRelatedStatesReqs(checkPoint);
-        if (!batchRequests.isEmpty()) {
-            kvService.batch(batchRequests.toArray(new BatchRequest[0]));
+    private void deleteCheckPointAndRewriteOrderIndex(CheckPoint checkPoint) throws StoreException {
+        List<BatchRequest> requestList = new ArrayList<>();
+
+        BatchDeleteRequest deleteCheckPointRequest = new BatchDeleteRequest(KV_NAMESPACE_CHECK_POINT,
+            buildCheckPointKey(checkPoint.topicId(), checkPoint.queueId(), checkPoint.consumerGroupId(), checkPoint.operationId()));
+        requestList.add(deleteCheckPointRequest);
+
+        List<BatchDeleteRequest> timerCancelRequest = timerService.cancelRequest(checkPoint.nextVisibleTimestamp(),
+            buildReceiptHandleKey(checkPoint.topicId(), checkPoint.queueId(), checkPoint.operationId()));
+        requestList.addAll(timerCancelRequest);
+
+        if (checkPoint.popOperationType() == PopOperation.PopOperationType.POP_ORDER.value()) {
+            long baseOffset = checkPoint.messageOffset() - checkPoint.count() + 1;
+            for (int i = 0; i < checkPoint.count(); i++) {
+                long currOffset = baseOffset + i;
+                byte[] orderIndexKey = buildOrderIndexKey(checkPoint.consumerGroupId(), checkPoint.topicId(), checkPoint.queueId(), currOffset);
+                int consumeTimes = 0;
+                try {
+                    byte[] orderIndexValue = kvService.get(KV_NAMESPACE_FIFO_INDEX, orderIndexKey);
+                    if (orderIndexValue != null) {
+                        ByteBuffer wrappedBuffer = ByteBuffer.wrap(orderIndexValue);
+                        consumeTimes = wrappedBuffer.getInt(8);
+                    }
+                } catch (StoreException e) {
+                    LOGGER.error("{}: get consume times from order index failed", identity, e);
+                }
+                BatchWriteRequest rewriteOrderIndex = new BatchWriteRequest(KV_NAMESPACE_FIFO_INDEX, orderIndexKey, buildOrderIndexValue(-1, consumeTimes));
+                requestList.add(rewriteOrderIndex);
+            }
         }
+
+        kvService.batch(requestList.toArray(new BatchRequest[0]));
     }
 
     private List<BatchRequest> deleteCheckPointAndRelatedStatesReqs(CheckPoint checkPoint) {
@@ -525,8 +497,18 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
             long baseOffset = checkPoint.messageOffset() - checkPoint.count() + 1;
             for (int i = 0; i < checkPoint.count(); i++) {
                 long currOffset = baseOffset + i;
-                BatchWriteRequest writeOrderIndexRequest = new BatchWriteRequest(KV_NAMESPACE_FIFO_INDEX,
-                    buildOrderIndexKey(checkPoint.consumerGroupId(), checkPoint.topicId(), checkPoint.queueId(), currOffset), buildOrderIndexValue(checkPoint.operationId()));
+                byte[] orderIndexKey = buildOrderIndexKey(checkPoint.consumerGroupId(), checkPoint.topicId(), checkPoint.queueId(), currOffset);
+                int consumeTimes = 0;
+                try {
+                    byte[] orderIndexValue = kvService.get(KV_NAMESPACE_FIFO_INDEX, orderIndexKey);
+                    if (orderIndexValue != null) {
+                        ByteBuffer wrappedBuffer = ByteBuffer.wrap(orderIndexValue);
+                        consumeTimes = wrappedBuffer.getInt(8);
+                    }
+                } catch (StoreException e) {
+                    LOGGER.error("{}: get consume times from order index failed", identity, e);
+                }
+                BatchWriteRequest writeOrderIndexRequest = new BatchWriteRequest(KV_NAMESPACE_FIFO_INDEX, orderIndexKey, buildOrderIndexValue(checkPoint.operationId(), consumeTimes + 1));
                 requestList.add(writeOrderIndexRequest);
             }
         }
@@ -537,16 +519,13 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
     public OperationSnapshot takeSnapshot() throws StoreException {
         exclusiveLock.lock();
         try {
-            List<OperationSnapshot.ConsumerGroupMetadataSnapshot> metadataSnapshots = consumerGroupMetadataMap.values().stream().map(metadata -> {
-                return new OperationSnapshot.ConsumerGroupMetadataSnapshot(metadata.getConsumerGroupId(), metadata.getConsumeOffset(), metadata.getAckOffset(),
-                    metadata.getRetryConsumeOffset(), metadata.getRetryAckOffset(),
-                    getAckCommitter(metadata.getConsumerGroupId()).getSerializedBuffer().array(),
-                    getRetryAckCommitter(metadata.getConsumerGroupId()).getSerializedBuffer().array(),
-                    metadata.getConsumeTimes(), metadata.getVersion());
-            }).collect(Collectors.toList());
+            List<ConsumerGroupMetadata> metadataSnapshots = consumerGroupMetadataMap.values()
+                .stream()
+                .map(metadata -> new ConsumerGroupMetadata(metadata.getConsumerGroupId(), metadata.getConsumeOffset(), metadata.getAckOffset(),
+                    metadata.getRetryConsumeOffset(), metadata.getRetryAckOffset(), metadata.getVersion()))
+                .collect(Collectors.toList());
             long snapshotVersion = kvService.takeSnapshot();
-            OperationSnapshot snapshot = new OperationSnapshot(currentOperationOffset, snapshotVersion, metadataSnapshots);
-            return snapshot;
+            return new OperationSnapshot(currentOperationOffset, snapshotVersion, metadataSnapshots);
         } finally {
             exclusiveLock.unlock();
         }
@@ -559,12 +538,7 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
             this.consumerGroupMetadataMap = snapshot.getConsumerGroupMetadataList().stream().collect(Collectors.toConcurrentMap(
                 ConsumerGroupMetadata::getConsumerGroupId, metadataSnapshot ->
                     new ConsumerGroupMetadata(metadataSnapshot.getConsumerGroupId(), metadataSnapshot.getConsumeOffset(), metadataSnapshot.getAckOffset(),
-                        metadataSnapshot.getRetryConsumeOffset(), metadataSnapshot.getRetryAckOffset(), metadataSnapshot.getConsumeTimes(),
-                        metadataSnapshot.getVersion())));
-            snapshot.getConsumerGroupMetadataList().forEach(metadataSnapshot -> {
-                getAckCommitter(metadataSnapshot.getConsumerGroupId(), ByteBuffer.wrap(metadataSnapshot.getAckOffsetBitmapBuffer()));
-                getRetryAckCommitter(metadataSnapshot.getConsumerGroupId(), ByteBuffer.wrap(metadataSnapshot.getRetryAckOffsetBitmapBuffer()));
-            });
+                        metadataSnapshot.getRetryConsumeOffset(), metadataSnapshot.getRetryAckOffset(), metadataSnapshot.getVersion())));
             this.currentOperationOffset = snapshot.getSnapshotEndOffset();
         } catch (Exception e) {
             Throwable cause = FutureUtil.cause(e);
@@ -582,8 +556,6 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
         exclusiveLock.lock();
         try {
             this.consumerGroupMetadataMap.clear();
-            this.ackCommitterMap.clear();
-            this.retryAckCommitterMap.clear();
             this.currentOperationOffset = -1;
             List<CheckPoint> checkPointList = new ArrayList<>();
             byte[] tqPrefix = SerializeUtil.buildCheckPointQueuePrefix(topicId, queueId);
@@ -626,7 +598,15 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
         exclusiveLock.lock();
         try {
             byte[] lockKey = buildOrderIndexKey(consumerGroupId, topicId, queueId, offset);
-            return kvService.get(KV_NAMESPACE_FIFO_INDEX, lockKey) != null;
+            byte[] value = kvService.get(KV_NAMESPACE_FIFO_INDEX, lockKey);
+            // If the message is acked or send to dead letter topic, the order index will be cleared.
+            if (value != null) {
+                long operationId = ByteBuffer.wrap(value).getLong();
+                // If the operation id is positive, it means that the message is locked.
+                // If the message could be visible again, the ReviveService will set operation id to -1.
+                return operationId >= 0;
+            }
+            return false;
         } finally {
             exclusiveLock.unlock();
         }
@@ -634,58 +614,22 @@ public class DefaultLogicQueueStateMachine implements MessageStateMachine {
 
     @Override
     public int consumeTimes(long consumerGroupId, long offset) {
-        return consumerGroupMetadataMap.computeIfAbsent(consumerGroupId, k -> new ConsumerGroupMetadata(consumerGroupId))
-            .getConsumeTimes()
-            .getOrDefault(offset, 0);
+        byte[] orderIndexKey = buildOrderIndexKey(consumerGroupId, topicId, queueId, offset);
+        try {
+            byte[] orderIndexValue = kvService.get(KV_NAMESPACE_FIFO_INDEX, orderIndexKey);
+            if (orderIndexValue == null) {
+                return 1;
+            }
+            ByteBuffer wrappedBuffer = ByteBuffer.wrap(orderIndexValue);
+            return wrappedBuffer.getInt(8);
+        } catch (StoreException e) {
+            LOGGER.error("{}: get consume times from order index failed", identity, e);
+        }
+        return 1;
     }
 
-    static class AckCommitter {
-        private final long baseOffset;
-        private volatile long ackOffset;
-        private final RoaringBitmap bitmap;
-        private final Consumer<Long> ackAdvanceFn;
-
-        public AckCommitter(long ackOffset, Consumer<Long> ackAdvanceFn) {
-            this(ackOffset, ackAdvanceFn, null);
-        }
-
-        public AckCommitter(long ackOffset, Consumer<Long> ackAdvanceFn, ByteBuffer serializedBitmap) {
-            this.ackOffset = ackOffset;
-            this.ackAdvanceFn = ackAdvanceFn;
-            // deserialize bitmap
-            if (serializedBitmap == null || !serializedBitmap.hasRemaining()) {
-                this.baseOffset = ackOffset;
-                this.bitmap = new RoaringBitmap();
-            } else {
-                this.baseOffset = serializedBitmap.getLong();
-                this.bitmap = new RoaringBitmap(new ImmutableRoaringBitmap(serializedBitmap));
-            }
-        }
-
-        public synchronized void commitAck(long offset) {
-            if (offset >= ackOffset) {
-                int offsetInBitmap = (int) (offset - baseOffset);
-                bitmap.add(offsetInBitmap);
-                boolean advance = false;
-                while (bitmap.contains((int) (ackOffset - baseOffset))) {
-                    ackOffset++;
-                    advance = true;
-                }
-                if (advance) {
-                    ackAdvanceFn.accept(ackOffset);
-                }
-            }
-        }
-
-        // <baseOffset>/<bitmap>
-        public synchronized ByteBuffer getSerializedBuffer() {
-            int length = bitmap.serializedSizeInBytes() + Long.BYTES;
-            ByteBuffer buffer = ByteBuffer.allocate(length);
-            buffer.putLong(baseOffset);
-            bitmap.serialize(buffer);
-            // Flip buffer to prepare read
-            buffer.flip();
-            return buffer;
-        }
+    @Override
+    public void registerRetryAckOffsetListener(OffsetListener listener) {
+        retryAckOffsetListeners.add(listener);
     }
 }

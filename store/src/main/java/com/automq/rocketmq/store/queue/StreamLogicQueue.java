@@ -90,6 +90,7 @@ public class StreamLogicQueue extends LogicQueue {
         this.config = config;
         this.metadataService = metadataService;
         this.stateMachine = stateMachine;
+        stateMachine.registerRetryAckOffsetListener(this::onRetryAckOffsetAdvance);
         this.streamStore = streamStore;
         this.retryStreamIdMap = new ConcurrentHashMap<>();
         this.operationLogService = operationLogService;
@@ -138,18 +139,12 @@ public class StreamLogicQueue extends LogicQueue {
                 })
                 // recover from operation log
                 .thenCompose(nil -> operationLogService.recover(stateMachine, operationStreamId, snapshotStreamId))
-                .thenAccept(nil -> {
-                    // register retry ack advance listener
-                    this.stateMachine.registerRetryAckOffsetListener(this::onRetryAckOffsetAdvance);
-                    state.set(State.OPENED);
-                })
                 .thenAccept(nil -> state.set(State.OPENED));
         }
         return CompletableFuture.completedFuture(null);
     }
 
     private void onRetryAckOffsetAdvance(long consumerGroupId, long ackOffset) {
-        // TODO: add reclaim policy
         CompletableFuture<Long> retryStreamIdCf = retryStreamIdMap.get(consumerGroupId);
         if (retryStreamIdCf == null) {
             LOGGER.warn("Retry stream id not found for consumer group: {}", consumerGroupId);
@@ -414,7 +409,6 @@ public class StreamLogicQueue extends LogicQueue {
             .thenApply(fetchResult -> {
                 AtomicLong fetchBytes = new AtomicLong();
 
-                // TODO: Assume message count is always 1 in each batch for now.
                 List<FlatMessageExt> resultList = fetchResult.recordBatchList()
                     .stream()
                     .map(batch -> {
