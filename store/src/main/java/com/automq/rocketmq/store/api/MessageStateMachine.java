@@ -59,8 +59,6 @@ public interface MessageStateMachine {
 
     int consumeTimes(long consumerGroupId, long offset);
 
-    void registerAckOffsetListener(OffsetListener listener);
-
     void registerRetryAckOffsetListener(OffsetListener listener);
 
     class ReplayPopResult {

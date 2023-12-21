@@ -21,22 +21,23 @@ import com.automq.rocketmq.store.model.generated.CheckPoint;
 import com.automq.rocketmq.store.model.metadata.ConsumerGroupMetadata;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentSkipListMap;
 
 public class OperationSnapshot {
 
     private final long snapshotEndOffset;
     private List<CheckPoint> checkPoints;
     private long kvServiceSnapshotVersion;
-    private final List<ConsumerGroupMetadataSnapshot> consumerGroupMetadataList;
+    private final List<ConsumerGroupMetadata> consumerGroupMetadataList;
 
-    public OperationSnapshot(long snapshotEndOffset, long kvServiceSnapshotVersion, List<ConsumerGroupMetadataSnapshot> consumerGroupMetadataList) {
+    public OperationSnapshot(long snapshotEndOffset, long kvServiceSnapshotVersion,
+        List<ConsumerGroupMetadata> consumerGroupMetadataList) {
         this.snapshotEndOffset = snapshotEndOffset;
         this.kvServiceSnapshotVersion = kvServiceSnapshotVersion;
         this.consumerGroupMetadataList = consumerGroupMetadataList;
     }
 
-    public OperationSnapshot(long snapshotEndOffset, List<ConsumerGroupMetadataSnapshot> consumerGroupMetadataList, List<CheckPoint> checkPoints) {
+    public OperationSnapshot(long snapshotEndOffset, List<ConsumerGroupMetadata> consumerGroupMetadataList,
+        List<CheckPoint> checkPoints) {
         this.snapshotEndOffset = snapshotEndOffset;
         this.consumerGroupMetadataList = consumerGroupMetadataList;
         this.checkPoints = checkPoints;
@@ -58,7 +59,7 @@ public class OperationSnapshot {
         return kvServiceSnapshotVersion;
     }
 
-    public List<ConsumerGroupMetadataSnapshot> getConsumerGroupMetadataList() {
+    public List<ConsumerGroupMetadata> getConsumerGroupMetadataList() {
         return consumerGroupMetadataList;
     }
 
@@ -82,30 +83,6 @@ public class OperationSnapshot {
         return "OperationSnapshot{" +
             "snapshotEndOffset=" + snapshotEndOffset +
             '}';
-    }
-
-    public static class ConsumerGroupMetadataSnapshot extends ConsumerGroupMetadata {
-        private final byte[] ackOffsetBitmapBuffer;
-        private final byte[] retryAckOffsetBitmapBuffer;
-
-        public ConsumerGroupMetadataSnapshot(long consumerGroupId, long consumeOffset, long ackOffset,
-            long retryConsumeOffset, long retryAckOffset,
-            byte[] ackOffsetBitmapBuffer, byte[] retryAckOffsetBitmapBuffer,
-            ConcurrentSkipListMap<Long, Integer> consumeTimes,
-            long version) {
-            super(consumerGroupId, consumeOffset, ackOffset, retryConsumeOffset, retryAckOffset, consumeTimes, version);
-            this.ackOffsetBitmapBuffer = ackOffsetBitmapBuffer;
-            this.retryAckOffsetBitmapBuffer = retryAckOffsetBitmapBuffer;
-        }
-
-        public byte[] getAckOffsetBitmapBuffer() {
-            return ackOffsetBitmapBuffer;
-        }
-
-        public byte[] getRetryAckOffsetBitmapBuffer() {
-            return retryAckOffsetBitmapBuffer;
-        }
-
     }
 
 }

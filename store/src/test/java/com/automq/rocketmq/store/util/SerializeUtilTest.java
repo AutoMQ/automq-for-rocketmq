@@ -22,6 +22,7 @@ import com.automq.rocketmq.store.exception.StoreException;
 import com.automq.rocketmq.store.mock.MockMessageUtil;
 import com.automq.rocketmq.store.model.generated.CheckPoint;
 import com.automq.rocketmq.store.model.generated.ReceiptHandle;
+import com.automq.rocketmq.store.model.metadata.ConsumerGroupMetadata;
 import com.automq.rocketmq.store.model.operation.AckOperation;
 import com.automq.rocketmq.store.model.operation.AckOperation.AckOperationType;
 import com.automq.rocketmq.store.model.operation.ChangeInvisibleDurationOperation;
@@ -32,11 +33,8 @@ import com.automq.rocketmq.store.model.operation.PopOperation.PopOperationType;
 import com.automq.rocketmq.store.model.operation.ResetConsumeOffsetOperation;
 import java.nio.ByteBuffer;
 import java.util.List;
-import java.util.concurrent.ConcurrentSkipListMap;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.roaringbitmap.RoaringBitmap;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -113,8 +111,9 @@ public class SerializeUtilTest {
 
     @Test
     void buildOrderIndexValue() {
-        byte[] value = SerializeUtil.buildOrderIndexValue(OPERATION_ID);
-        assertEquals(8, value.length);
+        byte[] value = SerializeUtil.buildOrderIndexValue(OPERATION_ID, QUEUE_ID);
+        assertEquals(12, value.length);
+        assertEquals(QUEUE_ID, ByteBuffer.wrap(value).getInt(8));
     }
 
     @Test
@@ -176,28 +175,8 @@ public class SerializeUtilTest {
 
     @Test
     void encodeOperationSnapshot() {
-        ConcurrentSkipListMap<Long, Integer> consumeTimes = new ConcurrentSkipListMap<>();
-        consumeTimes.put(1L, 2);
-        consumeTimes.put(3L, 4);
-        consumeTimes.put(5L, 6);
-        RoaringBitmap ackBitmap = new RoaringBitmap();
-        ackBitmap.add(1, 3, 5);
-        int ackBitmapLength = ackBitmap.serializedSizeInBytes();
-        ByteBuffer ackBitmapBuffer = ByteBuffer.allocate(ackBitmapLength);
-        ackBitmap.serialize(ackBitmapBuffer);
-        ackBitmapBuffer.flip();
-
-        RoaringBitmap retryAckBitmap = new RoaringBitmap();
-        retryAckBitmap.add(2, 4, 6);
-        int retryAckBitmapLength = retryAckBitmap.serializedSizeInBytes();
-        ByteBuffer retryAckBitmapBuffer = ByteBuffer.allocate(retryAckBitmapLength);
-        retryAckBitmap.serialize(retryAckBitmapBuffer);
-        retryAckBitmapBuffer.flip();
-
-        OperationSnapshot.ConsumerGroupMetadataSnapshot consumerGroupMetadataSnapshot = new OperationSnapshot.ConsumerGroupMetadataSnapshot(
-            CONSUMER_GROUP_ID, 1, 2, 3, 4, ackBitmapBuffer.array(), retryAckBitmapBuffer.array(),
-            consumeTimes, CONSUMER_GROUP_VERSION
-        );
+        ConsumerGroupMetadata consumerGroupMetadataSnapshot = new ConsumerGroupMetadata(
+            CONSUMER_GROUP_ID, 1, 2, 3, 4, CONSUMER_GROUP_VERSION);
         byte[] checkPointValue = SerializeUtil.buildCheckPointValue(TOPIC_ID, QUEUE_ID, OFFSET, COUNT, CONSUMER_GROUP_ID, OPERATION_ID, POP_OPERATION_TYPE, DELIVERY_TIMESTAMP, NEXT_VISIBLE_TIMESTAMP);
         CheckPoint checkPoint = CheckPoint.getRootAsCheckPoint(ByteBuffer.wrap(checkPointValue));
         OperationSnapshot operationSnapshot = new OperationSnapshot(
@@ -223,13 +202,6 @@ public class SerializeUtilTest {
         assertEquals(operationSnapshot.getCheckPoints().get(0).nextVisibleTimestamp(), decodedOperationSnapshot.getCheckPoints().get(0).nextVisibleTimestamp());
 
         assertEquals(operationSnapshot.getConsumerGroupMetadataList(), decodedOperationSnapshot.getConsumerGroupMetadataList());
-        byte[] decodedAckBitmapBuffer = decodedOperationSnapshot.getConsumerGroupMetadataList().get(0).getAckOffsetBitmapBuffer();
-        RoaringBitmap decodedAckBitmap = new RoaringBitmap(new ImmutableRoaringBitmap(ByteBuffer.wrap(decodedAckBitmapBuffer)));
-        assertEquals(ackBitmap, decodedAckBitmap);
-        byte[] decodedRetryAckBitmapBuffer = decodedOperationSnapshot.getConsumerGroupMetadataList().get(0).getRetryAckOffsetBitmapBuffer();
-        RoaringBitmap decodedRetryAckBitmap = new RoaringBitmap(new ImmutableRoaringBitmap(ByteBuffer.wrap(decodedRetryAckBitmapBuffer)));
-        assertEquals(retryAckBitmap, decodedRetryAckBitmap);
-        assertEquals(operationSnapshot.getConsumerGroupMetadataList().get(0).getConsumeTimes(), decodedOperationSnapshot.getConsumerGroupMetadataList().get(0).getConsumeTimes());
     }
 
     @Test

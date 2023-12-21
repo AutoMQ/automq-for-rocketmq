@@ -78,11 +78,8 @@ table ConsumerGroupMetadata {
   consumer_group_id:long;
   consume_offset:long;
   ack_offset:long;
-  ack_bit_map:[byte];
   retry_consume_offset:long;
   retry_ack_offset:long;
-  retry_ack_bit_map:[byte];
-  consume_times:[ConsumeTimes];
   // for identify the consumer group metadata version, usually it is the first operation id when the consumer group metadata is created or reset
   version: long;
 }

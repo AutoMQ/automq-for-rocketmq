@@ -30,29 +30,14 @@ public class ConsumerGroupMetadataTest {
     public void ack() {
         ConsumerGroupMetadata metadata = new ConsumerGroupMetadata(CONSUMER_GROUP_ID);
         assertEquals(0L, metadata.getAckOffset());
-        metadata.setAckOffset(1L);
+        metadata.advanceAckOffset(1L);
         assertEquals(1L, metadata.getAckOffset());
 
-        // add consume times
-        metadata.getConsumeTimes().put(0L, 1);
-        metadata.getConsumeTimes().put(1L, 2);
-        metadata.getConsumeTimes().put(2L, 3);
-        metadata.getConsumeTimes().put(4L, 5);
-        metadata.getConsumeTimes().put(5L, 6);
-        metadata.getConsumeTimes().put(6L, 7);
-
-        metadata.setAckOffset(3L);
+        metadata.advanceAckOffset(3L);
         assertEquals(3L, metadata.getAckOffset());
-        assertEquals(3, metadata.getConsumeTimes().size());
-        assertEquals(5, metadata.getConsumeTimes().get(4L));
-        assertEquals(6, metadata.getConsumeTimes().get(5L));
-        assertEquals(7, metadata.getConsumeTimes().get(6L));
 
-        metadata.setAckOffset(6L);
+        metadata.advanceAckOffset(6L);
         assertEquals(6L, metadata.getAckOffset());
-        assertEquals(1, metadata.getConsumeTimes().size());
-        assertEquals(7, metadata.getConsumeTimes().get(6L));
-
     }
 
 
