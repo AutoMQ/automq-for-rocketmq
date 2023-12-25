@@ -20,6 +20,7 @@ package com.automq.stream.s3.metrics;
 import com.automq.stream.s3.metrics.operations.S3MetricsType;
 import com.automq.stream.s3.metrics.operations.S3ObjectStage;
 import com.automq.stream.s3.metrics.operations.S3Operation;
+import com.automq.stream.s3.metrics.operations.S3Stage;
 import com.automq.stream.s3.network.AsyncNetworkBandwidthLimiter;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.common.AttributesBuilder;
@@ -293,11 +294,11 @@ public class S3StreamMetricsManager {
         operationLatency.record(value, attributesBuilder.build());
     }
 
-    public static void recordAppendWALLatency(long value, String stage) {
+    public static void recordStageLatency(long value, S3Stage stage) {
         Attributes attributes = newAttributesBuilder()
-                .put(S3StreamMetricsConstant.LABEL_OPERATION_TYPE, S3MetricsType.S3Storage.getName())
-                .put(S3StreamMetricsConstant.LABEL_OPERATION_NAME, S3Operation.APPEND_STORAGE_WAL.getName())
-                .put(S3StreamMetricsConstant.LABEL_APPEND_WAL_STAGE, stage)
+                .put(S3StreamMetricsConstant.LABEL_OPERATION_TYPE, stage.getOperation().getType().getName())
+                .put(S3StreamMetricsConstant.LABEL_OPERATION_NAME, stage.getOperation().getName())
+                .put(S3StreamMetricsConstant.LABEL_STAGE, stage.getName())
                 .build();
         operationLatency.record(value, attributes);
     }
