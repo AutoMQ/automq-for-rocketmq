@@ -43,7 +43,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 
 public class MemoryMetadataManager implements StreamManager, ObjectManager {
-    private final static AtomicLong nodeIdAlloc = new AtomicLong();
+    private final static AtomicLong NODE_ID_ALLOC = new AtomicLong();
 
     // Data structure of stream metadata
     private final AtomicLong streamIdAlloc = new AtomicLong();
@@ -55,7 +55,7 @@ public class MemoryMetadataManager implements StreamManager, ObjectManager {
     private final ConcurrentMap<Long, Pair<Long, S3ObjectMetadata>> streamSetObjects = new ConcurrentHashMap<>();
 
     public static void advanceNodeId() {
-        nodeIdAlloc.getAndIncrement();
+        NODE_ID_ALLOC.getAndIncrement();
     }
 
     @Override
@@ -88,7 +88,7 @@ public class MemoryMetadataManager implements StreamManager, ObjectManager {
             S3ObjectMetadata object = new S3ObjectMetadata(
                 request.getObjectId(), S3ObjectType.STREAM_SET, request.getStreamRanges().stream().map(MemoryMetadataManager::to).collect(Collectors.toList()),
                 dataTimeInMs, now, request.getObjectSize(), request.getOrderId());
-            streamSetObjects.put(request.getObjectId(), Pair.of(nodeIdAlloc.get(), object));
+            streamSetObjects.put(request.getObjectId(), Pair.of(NODE_ID_ALLOC.get(), object));
         }
 
         for (StreamObject streamObject : request.getStreamObjects()) {
@@ -159,7 +159,7 @@ public class MemoryMetadataManager implements StreamManager, ObjectManager {
     public synchronized CompletableFuture<List<S3ObjectMetadata>> getServerObjects() {
         List<S3ObjectMetadata> result = streamSetObjects.values()
             .stream()
-            .filter(pair -> pair.getLeft() == nodeIdAlloc.get())
+            .filter(pair -> pair.getLeft() == NODE_ID_ALLOC.get())
             .map(Pair::getRight).toList();
         return CompletableFuture.completedFuture(result);
     }
