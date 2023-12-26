@@ -102,6 +102,5 @@ public class S3StreamMetricsConstant {
     public static final AttributeKey<String> LABEL_SIZE_NAME = AttributeKey.stringKey("size");
     public static final AttributeKey<String> LABEL_STAGE = AttributeKey.stringKey("stage");
     public static final AttributeKey<String> LABEL_STATUS = AttributeKey.stringKey("status");
-    public static final AttributeKey<String> LABEL_OBJECT_STAGE = AttributeKey.stringKey("stage");
     public static final AttributeKey<String> LABEL_ALLOCATE_BYTE_BUF_SOURCE = AttributeKey.stringKey("source");
 }

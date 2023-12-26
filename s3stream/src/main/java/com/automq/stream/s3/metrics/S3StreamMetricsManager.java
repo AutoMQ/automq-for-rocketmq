@@ -342,7 +342,7 @@ public class S3StreamMetricsManager {
 
     public static void recordObjectStageCost(long value, S3ObjectStage stage) {
         Attributes attributes = newAttributesBuilder()
-                .put(S3StreamMetricsConstant.LABEL_OBJECT_STAGE, stage.getName())
+                .put(S3StreamMetricsConstant.LABEL_STAGE, stage.getName())
                 .build();
         objectStageCost.record(value, attributes);
     }
