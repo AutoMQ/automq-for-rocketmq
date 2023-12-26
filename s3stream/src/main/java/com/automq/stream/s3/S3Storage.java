@@ -90,7 +90,7 @@ public class S3Storage implements Storage {
     private final WALConfirmOffsetCalculator confirmOffsetCalculator = new WALConfirmOffsetCalculator();
     private final Queue<DeltaWALUploadTaskContext> walPrepareQueue = new LinkedList<>();
     private final Queue<DeltaWALUploadTaskContext> walCommitQueue = new LinkedList<>();
-    private final List<CompletableFuture<Void>> inflightWALUploadTasks = new CopyOnWriteArrayList<>();
+    private final List<DeltaWALUploadTaskContext> inflightWALUploadTasks = new CopyOnWriteArrayList<>();
 
     private final ScheduledExecutorService backgroundExecutor = Threads.newSingleThreadScheduledExecutor(
             ThreadUtils.createThreadFactory("s3-storage-background", true), LOGGER);
@@ -424,12 +424,17 @@ public class S3Storage implements Storage {
     public CompletableFuture<Void> forceUpload(long streamId) {
         TimerUtil timer = new TimerUtil();
         CompletableFuture<Void> cf = new CompletableFuture<>();
-        List<CompletableFuture<Void>> inflightWALUploadTasks = new ArrayList<>(this.inflightWALUploadTasks);
+        List<CompletableFuture<Void>> inflightWALUploadTasks = this.inflightWALUploadTasks.stream().map(it -> it.cf).toList();
         // await inflight stream set object upload tasks to group force upload tasks.
         CompletableFuture.allOf(inflightWALUploadTasks.toArray(new CompletableFuture[0])).whenComplete((nil, ex) -> {
             S3StreamMetricsManager.recordStageLatency(timer.elapsedAs(TimeUnit.NANOSECONDS), S3Stage.FORCE_UPLOAD_WAL_AWAIT_INFLIGHT);
             uploadDeltaWAL(streamId, true);
-            FutureUtil.propagate(CompletableFuture.allOf(this.inflightWALUploadTasks.toArray(new CompletableFuture[0])), cf);
+            // Wait for all tasks contains streamId complete.
+            List<CompletableFuture<Void>> tasksContainsStream = this.inflightWALUploadTasks.stream()
+                    .filter(it -> it.cache.containsStream(streamId))
+                    .map(it -> it.cf)
+                    .toList();
+            FutureUtil.propagate(CompletableFuture.allOf(tasksContainsStream.toArray(new CompletableFuture[0])), cf);
             if (LogCache.MATCH_ALL_STREAMS != streamId) {
                 callbackSequencer.tryFree(streamId);
             }
@@ -508,11 +513,11 @@ public class S3Storage implements Storage {
         context.timer = new TimerUtil();
         CompletableFuture<Void> cf = new CompletableFuture<>();
         context.cf = cf;
-        inflightWALUploadTasks.add(cf);
+        inflightWALUploadTasks.add(context);
         backgroundExecutor.execute(() -> FutureUtil.exec(() -> uploadDeltaWAL0(context), cf, LOGGER, "uploadDeltaWAL"));
         cf.whenComplete((nil, ex) -> {
             S3StreamMetricsManager.recordStageLatency(context.timer.elapsedAs(TimeUnit.NANOSECONDS), S3Stage.UPLOAD_WAL_COMPLETE);
-            inflightWALUploadTasks.remove(cf);
+            inflightWALUploadTasks.remove(context);
             if (ex != null) {
                 LOGGER.error("upload delta WAL fail", ex);
             }
