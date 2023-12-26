@@ -17,7 +17,6 @@
 
 package com.automq.stream.s3.metrics;
 
-import com.automq.stream.s3.metrics.operations.S3MetricsType;
 import com.automq.stream.s3.metrics.operations.S3ObjectStage;
 import com.automq.stream.s3.metrics.operations.S3Operation;
 import com.automq.stream.s3.metrics.operations.S3Stage;
