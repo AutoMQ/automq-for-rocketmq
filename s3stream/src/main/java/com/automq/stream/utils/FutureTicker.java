@@ -42,7 +42,7 @@ public class FutureTicker {
     private synchronized CompletableFuture<Void> maybeNextTick() {
         if (currentTick.isDone()) {
             // a future which will complete after delay
-            currentTick = CompletableFuture.runAsync(() -> {}, delayedExecutor);
+            currentTick = CompletableFuture.runAsync(() -> { }, delayedExecutor);
         }
         return currentTick;
     }
