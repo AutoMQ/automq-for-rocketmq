@@ -13,9 +13,15 @@ public enum S3Stage {
 
     /* Force upload WAL start */
     FORCE_UPLOAD_WAL_AWAIT_INFLIGHT(S3Operation.FORCE_UPLOAD_STORAGE_WAL, "await_inflight"),
-    FORCE_UPLOAD_WAL_COMPLETE(S3Operation.FORCE_UPLOAD_STORAGE_WAL, "complete");
+    FORCE_UPLOAD_WAL_COMPLETE(S3Operation.FORCE_UPLOAD_STORAGE_WAL, "complete"),
     /* Force upload WAL end */
 
+    /* Upload WAL start */
+    UPLOAD_WAL_PREPARE(S3Operation.UPLOAD_STORAGE_WAL, "prepare"),
+    UPLOAD_WAL_UPLOAD(S3Operation.UPLOAD_STORAGE_WAL, "upload"),
+    UPLOAD_WAL_COMMIT(S3Operation.UPLOAD_STORAGE_WAL, "commit"),
+    UPLOAD_WAL_COMPLETE(S3Operation.UPLOAD_STORAGE_WAL, "complete");
+    /* Upload WAL end */
 
     private final S3Operation operation;
     private final String name;
