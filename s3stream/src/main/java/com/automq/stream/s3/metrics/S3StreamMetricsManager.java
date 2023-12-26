@@ -57,6 +57,7 @@ public class S3StreamMetricsManager {
     private static ObservableLongGauge availableInflightReadAheadSize = new NoopObservableLongGauge();
     private static ObservableLongGauge availableInflightS3ReadQuota = new NoopObservableLongGauge();
     private static ObservableLongGauge availableInflightS3WriteQuota = new NoopObservableLongGauge();
+    private static ObservableLongGauge inflightWALUploadTasksCount = new NoopObservableLongGauge();
     private static LongCounter compactionReadSizeInTotal = new NoopLongCounter();
     private static LongCounter compactionWriteSizeInTotal = new NoopLongCounter();
     private static Supplier<Long> networkInboundAvailableBandwidthSupplier = () -> 0L;
@@ -70,6 +71,7 @@ public class S3StreamMetricsManager {
     private static Supplier<Long> blockCacheSizeSupplier = () -> 0L;
     private static Supplier<Integer> availableInflightS3ReadQuotaSupplier = () -> 0;
     private static Supplier<Integer> availableInflightS3WriteQuotaSupplier = () -> 0;
+    private static Supplier<Integer> inflightWALUploadTasksCountSupplier = () -> 0;
     private static Supplier<AttributesBuilder> attributesBuilderSupplier = null;
 
     public static void initAttributesBuilder(Supplier<AttributesBuilder> attributesBuilderSupplier) {
@@ -196,6 +198,10 @@ public class S3StreamMetricsManager {
                 .setDescription("Available inflight S3 write quota")
                 .ofLongs()
                 .buildWithCallback(result -> result.record((long) availableInflightS3WriteQuotaSupplier.get(), newAttributesBuilder().build()));
+        inflightWALUploadTasksCount = meter.gaugeBuilder(prefix + S3StreamMetricsConstant.INFLIGHT_WAL_UPLOAD_TASKS_COUNT_METRIC_NAME)
+                .setDescription("Inflight upload WAL tasks count")
+                .ofLongs()
+                .buildWithCallback(result -> result.record((long) inflightWALUploadTasksCountSupplier.get(), newAttributesBuilder().build()));
         compactionReadSizeInTotal = meter.counterBuilder(prefix + S3StreamMetricsConstant.COMPACTION_READ_SIZE_METRIC_NAME)
                 .setDescription("Compaction read size")
                 .setUnit("bytes")
@@ -253,6 +259,10 @@ public class S3StreamMetricsManager {
 
     public static void registerInflightReadSizeLimiterSupplier(Supplier<Integer> availableInflightReadAheadSizeSupplier) {
         S3StreamMetricsManager.availableInflightReadAheadSizeSupplier = availableInflightReadAheadSizeSupplier;
+    }
+
+    public static void registerInflightWALUploadTasksCountSupplier(Supplier<Integer> inflightWALUploadTasksCountSupplier) {
+        S3StreamMetricsManager.inflightWALUploadTasksCountSupplier = inflightWALUploadTasksCountSupplier;
     }
 
     public static void recordS3UploadSize(long value) {

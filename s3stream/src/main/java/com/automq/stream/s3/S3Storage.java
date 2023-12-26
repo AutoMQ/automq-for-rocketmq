@@ -128,8 +128,8 @@ public class S3Storage implements Storage {
         this.streamManager = streamManager;
         this.objectManager = objectManager;
         this.s3Operator = s3Operator;
-
         this.drainBackoffTask = this.backgroundExecutor.scheduleWithFixedDelay(this::tryDrainBackoffRecords, 100, 100, TimeUnit.MILLISECONDS);
+        S3StreamMetricsManager.registerInflightWALUploadTasksCountSupplier(this.inflightWALUploadTasks::size);
     }
 
     @Override
