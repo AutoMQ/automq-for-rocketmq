@@ -33,6 +33,7 @@ import com.automq.stream.s3.objects.ObjectManager;
 import com.automq.stream.s3.operator.S3Operator;
 import com.automq.stream.s3.streams.StreamManager;
 import com.automq.stream.s3.wal.WriteAheadLog;
+import com.automq.stream.utils.FutureTicker;
 import com.automq.stream.utils.FutureUtil;
 import com.automq.stream.utils.ThreadUtils;
 import com.automq.stream.utils.Threads;
@@ -96,6 +97,12 @@ public class S3Storage implements Storage {
             ThreadUtils.createThreadFactory("s3-storage-background", true), LOGGER);
     private final ExecutorService uploadWALExecutor = Threads.newFixedThreadPoolWithMonitor(
             4, "s3-storage-upload-wal", true, LOGGER);
+
+    /**
+     * A ticker used for batching force upload WAL.
+     * @see #forceUpload
+     */
+    private final FutureTicker forceUploadTicker = new FutureTicker(500, TimeUnit.MILLISECONDS, backgroundExecutor);
 
     private final Queue<WalWriteRequest> backoffRecords = new LinkedBlockingQueue<>();
     private final ScheduledFuture<?> drainBackoffTask;
@@ -424,10 +431,9 @@ public class S3Storage implements Storage {
     public CompletableFuture<Void> forceUpload(long streamId) {
         TimerUtil timer = new TimerUtil();
         CompletableFuture<Void> cf = new CompletableFuture<>();
-        List<CompletableFuture<Void>> inflightWALUploadTasks = this.inflightWALUploadTasks.stream().map(it -> it.cf).toList();
-        // await inflight stream set object upload tasks to group force upload tasks.
-        CompletableFuture.allOf(inflightWALUploadTasks.toArray(new CompletableFuture[0])).whenComplete((nil, ex) -> {
-            S3StreamMetricsManager.recordStageLatency(timer.elapsedAs(TimeUnit.NANOSECONDS), S3Stage.FORCE_UPLOAD_WAL_AWAIT_INFLIGHT);
+        // Wait for a while to group force upload tasks.
+        forceUploadTicker.tick().whenComplete((nil, ex) -> {
+            S3StreamMetricsManager.recordStageLatency(timer.elapsedAs(TimeUnit.NANOSECONDS), S3Stage.FORCE_UPLOAD_WAL_AWAIT);
             uploadDeltaWAL(streamId, true);
             // Wait for all tasks contains streamId complete.
             List<CompletableFuture<Void>> tasksContainsStream = this.inflightWALUploadTasks.stream()
