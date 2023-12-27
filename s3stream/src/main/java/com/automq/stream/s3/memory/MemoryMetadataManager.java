@@ -82,10 +82,21 @@ public class MemoryMetadataManager implements StreamManager, ObjectManager {
             for (ObjectStreamRange range : request.getStreamRanges()) {
                 StreamMetadata stream = streams.get(range.getStreamId());
                 assert stream != null;
-                if (stream.getEndOffset() != range.getStartOffset()) {
-                    throw new IllegalArgumentException("stream " + range.getStreamId() + " end offset " + stream.getEndOffset() + " is not equal to start offset " + range.getStartOffset());
+                if (request.getCompactedObjectIds().isEmpty()) {
+                    // Commit new object.
+                    if (stream.getEndOffset() != range.getStartOffset()) {
+                        throw new IllegalArgumentException("stream " + range.getStreamId() + " end offset " + stream.getEndOffset() + " is not equal to start offset of request " + range.getStartOffset());
+                    }
+                    stream.setEndOffset(range.getEndOffset());
+                } else {
+                    // Compact old object.
+                    if (stream.getEndOffset() < range.getEndOffset()) {
+                        throw new IllegalArgumentException("stream " + range.getStreamId() + " end offset " + stream.getEndOffset() + " is lesser than request " + range.getEndOffset());
+                    }
+                    if (stream.getStartOffset() > range.getStartOffset()) {
+                        throw new IllegalArgumentException("stream " + range.getStreamId() + " start offset " + stream.getStartOffset() + " is greater than request " + range.getStartOffset());
+                    }
                 }
-                stream.setEndOffset(range.getEndOffset());
             }
 
             S3ObjectMetadata object = new S3ObjectMetadata(
@@ -98,11 +109,20 @@ public class MemoryMetadataManager implements StreamManager, ObjectManager {
             long streamId = streamObject.getStreamId();
             StreamMetadata stream = streams.get(streamId);
             assert stream != null;
-            if (stream.getEndOffset() < streamObject.getEndOffset()) {
+            if (request.getCompactedObjectIds().isEmpty()) {
+                // Commit new object.
                 if (stream.getEndOffset() != streamObject.getStartOffset()) {
-                    throw new IllegalArgumentException("stream " + streamObject.getStreamId() + " end offset " + stream.getEndOffset() + " is not equal to start offset " + streamObject.getStartOffset());
+                    throw new IllegalArgumentException("stream " + streamObject.getStreamId() + " end offset " + stream.getEndOffset() + " is not equal to start offset of request " + streamObject.getStartOffset());
                 }
                 stream.setEndOffset(streamObject.getEndOffset());
+            } else {
+                // Compact old object.
+                if (stream.getEndOffset() < streamObject.getEndOffset()) {
+                    throw new IllegalArgumentException("stream " + streamObject.getStreamId() + " end offset " + stream.getEndOffset() + " is lesser than request " + streamObject.getEndOffset());
+                }
+                if (stream.getStartOffset() > streamObject.getStartOffset()) {
+                    throw new IllegalArgumentException("stream " + streamObject.getStreamId() + " start offset " + stream.getStartOffset() + " is greater than request " + streamObject.getStartOffset());
+                }
             }
 
             List<S3ObjectMetadata> metadataList = streamObjects.computeIfAbsent(streamId, id -> new LinkedList<>());
@@ -146,11 +166,11 @@ public class MemoryMetadataManager implements StreamManager, ObjectManager {
         List<S3ObjectMetadata> streamSetObjectList = streamSetObjects.values()
             .stream()
             .map(Pair::getRight)
-            .filter(o -> o.getOffsetRanges().stream().anyMatch(r -> r.getStreamId() == streamId && r.getEndOffset() > startOffset && (r.getStartOffset() <= endOffset || endOffset == -1)))
+            .filter(o -> o.getOffsetRanges().stream().anyMatch(r -> r.getStreamId() == streamId && r.getEndOffset() > startOffset && (r.getStartOffset() < endOffset || endOffset == -1)))
             .toList();
         List<S3ObjectMetadata> streamObjectList = streamObjects.computeIfAbsent(streamId, id -> new LinkedList<>())
             .stream()
-            .filter(o -> o.getOffsetRanges().stream().anyMatch(r -> r.getStreamId() == streamId && r.getEndOffset() > startOffset && (r.getStartOffset() <= endOffset || endOffset == -1)))
+            .filter(o -> o.getOffsetRanges().stream().anyMatch(r -> r.getStreamId() == streamId && r.getEndOffset() > startOffset && (r.getStartOffset() < endOffset || endOffset == -1)))
             .toList();
 
         List<S3ObjectMetadata> result = new ArrayList<>();
@@ -179,7 +199,7 @@ public class MemoryMetadataManager implements StreamManager, ObjectManager {
         long endOffset, int limit) {
         List<S3ObjectMetadata> streamObjectList = streamObjects.computeIfAbsent(streamId, id -> new LinkedList<>())
             .stream()
-            .filter(o -> o.getOffsetRanges().stream().anyMatch(r -> r.getStreamId() == streamId && r.getEndOffset() > startOffset && (r.getStartOffset() <= endOffset || endOffset == -1)))
+            .filter(o -> o.getOffsetRanges().stream().anyMatch(r -> r.getStreamId() == streamId && r.getEndOffset() > startOffset && (r.getStartOffset() < endOffset || endOffset == -1)))
             .limit(limit)
             .toList();
         return CompletableFuture.completedFuture(streamObjectList);
