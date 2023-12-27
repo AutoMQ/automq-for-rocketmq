@@ -82,6 +82,9 @@ public class MemoryMetadataManager implements StreamManager, ObjectManager {
             for (ObjectStreamRange range : request.getStreamRanges()) {
                 StreamMetadata stream = streams.get(range.getStreamId());
                 assert stream != null;
+                if (stream.getEndOffset() != range.getStartOffset()) {
+                    throw new IllegalArgumentException("stream " + range.getStreamId() + " end offset " + stream.getEndOffset() + " is not equal to start offset " + range.getStartOffset());
+                }
                 stream.setEndOffset(range.getEndOffset());
             }
 
@@ -95,7 +98,12 @@ public class MemoryMetadataManager implements StreamManager, ObjectManager {
             long streamId = streamObject.getStreamId();
             StreamMetadata stream = streams.get(streamId);
             assert stream != null;
-            stream.setEndOffset(streamObject.getEndOffset());
+            if (stream.getEndOffset() < streamObject.getEndOffset()) {
+                if (stream.getEndOffset() != streamObject.getStartOffset()) {
+                    throw new IllegalArgumentException("stream " + streamObject.getStreamId() + " end offset " + stream.getEndOffset() + " is not equal to start offset " + streamObject.getStartOffset());
+                }
+                stream.setEndOffset(streamObject.getEndOffset());
+            }
 
             List<S3ObjectMetadata> metadataList = streamObjects.computeIfAbsent(streamId, id -> new LinkedList<>());
             metadataList.add(
@@ -112,12 +120,14 @@ public class MemoryMetadataManager implements StreamManager, ObjectManager {
     @Override
     public synchronized CompletableFuture<Void> compactStreamObject(CompactStreamObjectRequest request) {
         long streamId = request.getStreamId();
-        StreamObject streamObject = new StreamObject();
-        streamObject.setStreamId(streamId);
-        streamObject.setStartOffset(request.getStartOffset());
-        streamObject.setEndOffset(request.getEndOffset());
-        streamObject.setObjectId(request.getObjectId());
-        streamObject.setObjectSize(request.getObjectSize());
+        StreamMetadata stream = streams.get(streamId);
+        assert stream != null;
+        if (stream.getEndOffset() < request.getEndOffset()) {
+            throw new IllegalArgumentException("stream " + streamId + " end offset " + stream.getEndOffset() + " is lesser than request " + request.getEndOffset());
+        }
+        if (stream.getStartOffset() > request.getStartOffset()) {
+            throw new IllegalArgumentException("stream " + streamId + " start offset " + stream.getStartOffset() + " is greater than request " + request.getStartOffset());
+        }
 
         streamObjects.computeIfAbsent(streamId, id -> new LinkedList<>())
             .add(new S3ObjectMetadata(
@@ -177,7 +187,7 @@ public class MemoryMetadataManager implements StreamManager, ObjectManager {
 
     @Override
     public synchronized CompletableFuture<List<StreamMetadata>> getOpeningStreams() {
-        return CompletableFuture.completedFuture(streams.values().stream().toList());
+        return CompletableFuture.completedFuture(streams.values().stream().filter(stream -> stream.getState() == StreamState.OPENED).toList());
     }
 
     @Override
