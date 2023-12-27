@@ -622,7 +622,7 @@ public class DefaultS3Operator implements S3Operator {
                 exceptionMsg += "\nUnable to execute HTTP request. Please check your network connection and make sure you can access S3.";
             }
 
-            if (cause instanceof TimeoutException) {
+            if (e instanceof TimeoutException || cause instanceof TimeoutException) {
                 exceptionMsg += "\nConnection timeout. Please check your network connection and make sure you can access S3.";
             }
 
