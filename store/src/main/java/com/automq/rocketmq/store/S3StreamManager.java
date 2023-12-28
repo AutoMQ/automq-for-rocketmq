@@ -72,15 +72,15 @@ public class S3StreamManager implements StreamManager {
 
     private StreamMetadata convertFrom(apache.rocketmq.controller.v1.StreamMetadata stream) {
         StreamMetadata metadata = new StreamMetadata();
-        metadata.setStreamId(stream.getStreamId());
-        metadata.setEpoch(stream.getEpoch());
-        metadata.setStartOffset(stream.getStartOffset());
-        metadata.setEndOffset(stream.getEndOffset());
+        metadata.streamId(stream.getStreamId());
+        metadata.epoch(stream.getEpoch());
+        metadata.streamId(stream.getStartOffset());
+        metadata.endOffset(stream.getEndOffset());
         if (stream.getState() == apache.rocketmq.controller.v1.StreamState.OPEN) {
-            metadata.setState(StreamState.OPENED);
+            metadata.state(StreamState.OPENED);
         } else {
             // Treat all other states as closed.
-            metadata.setState(StreamState.CLOSED);
+            metadata.state(StreamState.CLOSED);
         }
         return metadata;
     }
