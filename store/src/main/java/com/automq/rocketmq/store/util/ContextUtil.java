@@ -15,22 +15,15 @@
  * limitations under the License.
  */
 
-package com.automq.stream.s3.cache;
+package com.automq.rocketmq.store.util;
 
 import com.automq.stream.s3.trace.context.TraceContext;
+import io.opentelemetry.context.Context;
 
-import java.util.concurrent.CompletableFuture;
-
-/**
- * Like linux page cache, S3BlockCache is responsible for:
- * 1. read from S3 when the data block is not in cache.
- * 2. caching the data blocks of S3 objects.
- */
-public interface S3BlockCache {
-
-    CompletableFuture<ReadDataBlock> read(TraceContext context, long streamId, long startOffset, long endOffset, int maxBytes);
-
-    default CompletableFuture<ReadDataBlock> read(long streamId, long startOffset, long endOffset, int maxBytes) {
-        return read(TraceContext.DEFAULT, streamId, startOffset, endOffset, maxBytes);
+public class ContextUtil {
+    public static TraceContext buildStreamTraceContext(com.automq.rocketmq.common.trace.TraceContext context) {
+        boolean isTraceEnabled = context.tracer().isPresent();
+        Context currContext = context.span().map(span -> Context.current().with(span)).orElse(Context.current());
+        return new TraceContext(isTraceEnabled, context.tracer().get(), currContext);
     }
 }
