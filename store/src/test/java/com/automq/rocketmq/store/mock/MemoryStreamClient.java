@@ -26,6 +26,9 @@ import com.automq.stream.api.RecordBatch;
 import com.automq.stream.api.RecordBatchWithContext;
 import com.automq.stream.api.Stream;
 import com.automq.stream.api.StreamClient;
+import com.automq.stream.s3.context.AppendContext;
+import com.automq.stream.s3.context.FetchContext;
+
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -99,14 +102,14 @@ public class MemoryStreamClient implements StreamClient {
         }
 
         @Override
-        public CompletableFuture<AppendResult> append(RecordBatch recordBatch) {
+        public CompletableFuture<AppendResult> append(AppendContext context, RecordBatch recordBatch) {
             long baseOffset = nextOffsetAlloc.getAndAdd(recordBatch.count());
             recordMap.put(baseOffset, new RecordBatchWithContextWrapper(recordBatch, baseOffset));
             return CompletableFuture.completedFuture(() -> baseOffset);
         }
 
         @Override
-        public CompletableFuture<FetchResult> fetch(long startOffset, long endOffset, int maxBytesHint, ReadOptions readOptions) {
+        public CompletableFuture<FetchResult> fetch(FetchContext context, long startOffset, long endOffset, int maxBytesHint) {
             List<RecordBatchWithContext> records = new ArrayList<>(recordMap.subMap(startOffset, endOffset).values());
             return CompletableFuture.completedFuture(() -> records);
         }
