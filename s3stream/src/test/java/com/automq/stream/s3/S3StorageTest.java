@@ -17,7 +17,6 @@
 
 package com.automq.stream.s3;
 
-import com.automq.stream.api.ReadOptions;
 import com.automq.stream.s3.cache.DefaultS3BlockCache;
 import com.automq.stream.s3.cache.LogCache;
 import com.automq.stream.s3.cache.ReadDataBlock;

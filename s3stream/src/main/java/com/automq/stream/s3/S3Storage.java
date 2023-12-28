@@ -17,7 +17,6 @@
 
 package com.automq.stream.s3;
 
-import com.automq.stream.api.ReadOptions;
 import com.automq.stream.api.exceptions.FastReadFailFastException;
 import com.automq.stream.s3.cache.CacheAccessType;
 import com.automq.stream.s3.cache.LogCache;
@@ -34,7 +33,6 @@ import com.automq.stream.s3.model.StreamRecordBatch;
 import com.automq.stream.s3.objects.ObjectManager;
 import com.automq.stream.s3.operator.S3Operator;
 import com.automq.stream.s3.streams.StreamManager;
-import com.automq.stream.s3.trace.context.TraceContext;
 import com.automq.stream.s3.trace.context.TraceContext;
 import com.automq.stream.s3.wal.WriteAheadLog;
 import com.automq.stream.utils.FutureTicker;
