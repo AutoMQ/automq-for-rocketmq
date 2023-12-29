@@ -234,7 +234,7 @@ public class S3StreamStore implements StreamStore {
         }
 
         // Open the specified stream if not opened yet.
-        OpenStreamOptions options = OpenStreamOptions.newBuilder().epoch(epoch).build();
+        OpenStreamOptions options = OpenStreamOptions.builder().epoch(epoch).build();
         return streamClient.openStream(streamId, options)
             .thenAccept(stream -> LOGGER.info("Stream {} opened", streamId))
             .exceptionally(throwable -> {
