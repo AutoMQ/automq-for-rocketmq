@@ -348,25 +348,15 @@ public class SlidingWindowService {
         S3StreamMetricsManager.recordStageLatency(MetricsLevel.DEBUG, timer.elapsedAs(TimeUnit.NANOSECONDS), S3Stage.APPEND_WAL_WRITE);
     }
 
-    private void makeWriteOffsetMatchWindow(long newWindowEndOffset) throws IOException, OverCapacityException {
+    private void makeWriteOffsetMatchWindow(long newWindowEndOffset) throws IOException {
         // align to block size
         newWindowEndOffset = WALUtil.alignLargeByBlockSize(newWindowEndOffset);
         long windowStartOffset = windowCoreData.getStartOffset();
         long windowMaxLength = windowCoreData.getMaxLength();
         if (newWindowEndOffset > windowStartOffset + windowMaxLength) {
-            long newWindowMaxLength = newWindowEndOffset - windowStartOffset + scaleUnit;
-            if (newWindowMaxLength > upperLimit) {
-                // exceed upper limit
-                if (newWindowEndOffset - windowStartOffset <= upperLimit) {
-                    // however, the new window length is still larger than upper limit, so we just set it to upper limit
-                    newWindowMaxLength = upperLimit;
-                } else {
-                    // the new window length is bigger than upper limit, reject this write request
-                    LOGGER.error("new windows size {} exceeds upper limit {}, reject this write request, window start offset: {}, new window end offset: {}",
-                        newWindowMaxLength, upperLimit, windowStartOffset, newWindowEndOffset);
-                    throw new OverCapacityException(String.format("new windows size exceeds upper limit %d", upperLimit));
-                }
-            }
+            // endOffset - startOffset <= block.maxSize <= upperLimit in {@link #sealAndNewBlockLocked}
+            assert newWindowEndOffset - windowStartOffset <= upperLimit;
+            long newWindowMaxLength = Math.min(newWindowEndOffset - windowStartOffset + scaleUnit, upperLimit);
             windowCoreData.scaleOutWindow(walHeaderFlusher, newWindowMaxLength);
         }
     }
