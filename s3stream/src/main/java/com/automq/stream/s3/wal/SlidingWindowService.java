@@ -357,7 +357,7 @@ public class SlidingWindowService {
             long newWindowMaxLength = newWindowEndOffset - windowStartOffset + scaleUnit;
             if (newWindowMaxLength > upperLimit) {
                 // exceed upper limit
-                if (newWindowEndOffset - windowStartOffset >= upperLimit) {
+                if (newWindowEndOffset - windowStartOffset <= upperLimit) {
                     // however, the new window length is still larger than upper limit, so we just set it to upper limit
                     newWindowMaxLength = upperLimit;
                 } else {
