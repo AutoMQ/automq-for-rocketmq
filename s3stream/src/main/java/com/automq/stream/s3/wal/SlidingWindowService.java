@@ -94,7 +94,14 @@ public class SlidingWindowService {
      */
     private Block currentBlock;
 
+    /**
+     * The thread pool for write operations.
+     */
     private ExecutorService ioExecutor;
+    /**
+     * The scheduler for polling blocks and sending them to @{@link #ioExecutor}.
+     */
+    private ScheduledExecutorService pollBlockScheduler;
 
     /**
      * The last time when a batch of blocks is written to the disk.
@@ -121,7 +128,7 @@ public class SlidingWindowService {
         this.windowCoreData = new WindowCoreData(windowMaxLength, windowStartOffset, windowStartOffset);
         this.ioExecutor = Threads.newFixedThreadPoolWithMonitor(ioThreadNums,
             "block-wal-io-thread", false, LOGGER);
-        ScheduledExecutorService pollBlockScheduler = Threads.newSingleThreadScheduledExecutor(
+        this.pollBlockScheduler = Threads.newSingleThreadScheduledExecutor(
             ThreadUtils.createThreadFactory("wal-poll-block-thread-%d", false), LOGGER);
         pollBlockScheduler.scheduleAtFixedRate(this::tryWriteBlock, 0, minWriteIntervalNanos, TimeUnit.NANOSECONDS);
         initialized.set(true);
@@ -138,6 +145,7 @@ public class SlidingWindowService {
 
         boolean gracefulShutdown;
         this.ioExecutor.shutdown();
+        this.pollBlockScheduler.shutdownNow();
         try {
             gracefulShutdown = this.ioExecutor.awaitTermination(timeout, unit);
         } catch (InterruptedException e) {
