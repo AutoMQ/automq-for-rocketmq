@@ -18,6 +18,7 @@
 package com.automq.rocketmq.proxy.service;
 
 import java.util.concurrent.CompletableFuture;
+
 import org.apache.rocketmq.common.message.MessageExt;
 import org.apache.rocketmq.proxy.common.ProxyContext;
 import org.apache.rocketmq.proxy.service.relay.ProxyRelayResult;
@@ -35,6 +36,7 @@ public class ProxyRelayServiceImpl implements ProxyRelayService {
     @Override
     public CompletableFuture<ProxyRelayResult<ConsumerRunningInfo>> processGetConsumerRunningInfo(ProxyContext context,
         RemotingCommand command, GetConsumerRunningInfoRequestHeader header) {
+        //
         throw new UnsupportedOperationException();
     }
 
