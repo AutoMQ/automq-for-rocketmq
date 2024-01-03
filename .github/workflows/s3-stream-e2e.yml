@@ -11,14 +11,14 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
           cache: "maven"
-      - uses: actions/checkout@v3
-        with:
-          submodules: true
       - name: Build s3stream
         working-directory: ./s3stream
         run: mvn clean install -U -DskipTests
