@@ -263,6 +263,7 @@ public class S3Storage implements Storage {
                 LOGGER.warn("await backgroundExecutor timeout 10s");
             }
         } catch (InterruptedException e) {
+            backgroundExecutor.shutdownNow();
             LOGGER.warn("await backgroundExecutor close fail", e);
         }
     }
