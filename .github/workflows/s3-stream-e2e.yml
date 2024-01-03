@@ -27,6 +27,7 @@ jobs:
           repository: AutoMQ/s3stream-e2e
           ref: main
           path: s3stream-e2e
+          token: ${{ secrets.PAT_E2E }}
       - name: Change s3stream version
         run: |
           export S3STREAM_VERSION=$(cat s3stream/target/maven-archiver/pom.properties| grep version | awk -F '=' '{print $2}')
