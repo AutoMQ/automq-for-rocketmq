@@ -36,6 +36,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <opentelemetry.version>1.32.0</opentelemetry.version>
         <aspectj.version>1.9.20.1</aspectj.version>
+        <fortest.version>1.9.20.1</fortest.version>
     </properties>
     <dependencies>
         <dependency>
