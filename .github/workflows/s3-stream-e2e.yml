@@ -33,6 +33,10 @@ jobs:
           export S3STREAM_VERSION=$(cat s3stream/target/maven-archiver/pom.properties | grep version | awk -F '=' '{print $2}')
           echo "change s3stream version of e2e test to $S3STREAM_VERSION"
           sed -i "s/<s3stream.version>.*<\/s3stream.version>/<s3stream.version>$S3STREAM_VERSION<\/s3stream.version>/g" s3stream-e2e/pom.xml
+          export LINE_START=$(grep -n '<repositories>' pom.xml | awk -F ':' '{print $1}')
+          export LINE_END=$(grep -n '</repositories>' pom.xml | awk -F ':' '{print $1}')
+          sed -i "${LINE_START},${LINE_END}d" s3stream-e2e/pom.xml
+          cat s3stream-e2e/pom.xml
       - name: Run tests
         working-directory: ./s3stream-e2e
         run: mvn test -pl integration
