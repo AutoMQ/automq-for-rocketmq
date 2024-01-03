@@ -21,6 +21,10 @@ import apache.rocketmq.common.v1.Code;
 import apache.rocketmq.proxy.v1.ConsumerClientConnection;
 import apache.rocketmq.proxy.v1.ConsumerClientConnectionReply;
 import apache.rocketmq.proxy.v1.ConsumerClientConnectionRequest;
+import apache.rocketmq.proxy.v1.ConsumerConnectionReply;
+import apache.rocketmq.proxy.v1.ConsumerConnectionRequest;
+import apache.rocketmq.proxy.v1.ConsumerGroupCliInfo;
+import apache.rocketmq.proxy.v1.ConsumerSubInfo;
 import apache.rocketmq.proxy.v1.ProducerClientConnection;
 import apache.rocketmq.proxy.v1.ProducerClientConnectionReply;
 import apache.rocketmq.proxy.v1.ProducerClientConnectionRequest;
@@ -52,6 +56,7 @@ import org.apache.rocketmq.common.MQVersion;
 import org.apache.rocketmq.common.utils.NetworkUtil;
 import org.apache.rocketmq.proxy.grpc.v2.channel.GrpcClientChannel;
 import org.apache.rocketmq.proxy.processor.channel.ChannelProtocolType;
+import org.apache.rocketmq.remoting.protocol.heartbeat.SubscriptionData;
 import org.slf4j.Logger;
 
 public class ProxyServiceImpl extends ProxyServiceGrpc.ProxyServiceImplBase {
@@ -241,4 +246,56 @@ public class ProxyServiceImpl extends ProxyServiceGrpc.ProxyServiceImplBase {
             }
         }
     }
+
+    @Override
+    public void consumerConnection(ConsumerConnectionRequest request,
+                                   StreamObserver<ConsumerConnectionReply> responseObserver) {
+        ConsumerGroupInfo groupInfo = consumerManager.getConsumerGroupInfo(request.getGroup(), true);
+        if (groupInfo == null) {
+            responseObserver.onNext(ConsumerConnectionReply.newBuilder()
+                    .setStatus(Status
+                            .newBuilder()
+                            .setCode(Code.BAD_REQUEST)
+                            .setMessage("Consumer group not found: " + request.getGroup())
+                            .build())
+                    .build());
+            responseObserver.onCompleted();
+            return;
+        }
+
+        ConsumerGroupCliInfo.Builder consumerBuilder = ConsumerGroupCliInfo.newBuilder();
+
+        consumerBuilder
+                .setConsumeType(groupInfo.getConsumeType().getTypeCN())
+                .setMessageModel(groupInfo.getMessageModel().getModeCN())
+                .setConsumeFromWhere(groupInfo.getConsumeFromWhere().name());
+
+        for (ClientChannelInfo info : groupInfo.getChannelInfoTable().values()) {
+            String protocolType = ChannelProtocolType.REMOTING.name();
+            if (info.getChannel() instanceof GrpcClientChannel) {
+                protocolType = ChannelProtocolType.GRPC_V2.name();
+            }
+            consumerBuilder.addConnection(ConsumerClientConnection.newBuilder()
+                    .setClientId(info.getClientId())
+                    .setProtocol(protocolType)
+                    .setAddress(NetworkUtil.socketAddress2String(info.getChannel().remoteAddress()))
+                    .setLanguage(info.getLanguage().name())
+                    .setVersion(MQVersion.getVersionDesc(info.getVersion()))
+                    .setLastUpdateTime(info.getLastUpdateTimestamp())
+                    .build());
+        }
+
+        for (SubscriptionData data : groupInfo.getSubscriptionTable().values()) {
+            consumerBuilder.addConsumerSubInfo(ConsumerSubInfo.newBuilder()
+                    .setTopic(data.getTopic())
+                    .setSubExpression(data.getSubString())
+                    .build());
+        }
+        ConsumerConnectionReply.Builder builder = ConsumerConnectionReply.newBuilder()
+                .setConsumerGroupCliInfo(consumerBuilder.build());
+
+        responseObserver.onNext(builder.build());
+        responseObserver.onCompleted();
+    }
+
 }
