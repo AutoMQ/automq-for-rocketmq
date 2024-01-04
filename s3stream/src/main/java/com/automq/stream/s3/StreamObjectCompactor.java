@@ -27,15 +27,14 @@ import com.automq.stream.s3.operator.Writer;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Stream objects compaction task.
@@ -55,7 +54,7 @@ public class StreamObjectCompactor {
     private final S3Operator s3Operator;
 
     private StreamObjectCompactor(ObjectManager objectManager, S3Operator s3Operator, S3Stream stream,
-                                  long maxStreamObjectSize) {
+        long maxStreamObjectSize) {
         this.objectManager = objectManager;
         this.s3Operator = s3Operator;
         this.stream = stream;
@@ -100,7 +99,8 @@ public class StreamObjectCompactor {
         private final ObjectManager objectManager;
         private final S3Operator s3Operator;
 
-        public StreamObjectGroupCompactor(long streamId, long startOffset, List<S3ObjectMetadata> objectGroup, ObjectManager objectManager, S3Operator s3Operator) {
+        public StreamObjectGroupCompactor(long streamId, long startOffset, List<S3ObjectMetadata> objectGroup,
+            ObjectManager objectManager, S3Operator s3Operator) {
             this.streamId = streamId;
             this.startOffset = startOffset;
             this.objectGroup = objectGroup;
@@ -181,10 +181,10 @@ public class StreamObjectCompactor {
             }
             // group the objects when the object's range is continuous
             if (groupNextOffset != object.startOffset()
-                    // the group object size is less than maxStreamObjectSize
-                    || (groupSize + object.objectSize() > maxStreamObjectSize && !group.isEmpty())
-                    // object count in group is larger than MAX_OBJECT_GROUP_COUNT
-                    || group.size() >= MAX_OBJECT_GROUP_COUNT
+                // the group object size is less than maxStreamObjectSize
+                || (groupSize + object.objectSize() > maxStreamObjectSize && !group.isEmpty())
+                // object count in group is larger than MAX_OBJECT_GROUP_COUNT
+                || group.size() >= MAX_OBJECT_GROUP_COUNT
             ) {
                 objectGroups.add(group);
                 group = new LinkedList<>();
@@ -199,7 +199,6 @@ public class StreamObjectCompactor {
         }
         return objectGroups;
     }
-
 
     // no operation for now.
     public void close() {
@@ -219,7 +218,6 @@ public class StreamObjectCompactor {
             this.objectManager = objectManager;
             return this;
         }
-
 
         public Builder s3Operator(S3Operator s3Operator) {
             this.s3Operator = s3Operator;

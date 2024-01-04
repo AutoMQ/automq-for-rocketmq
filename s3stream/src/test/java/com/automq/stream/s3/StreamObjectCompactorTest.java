@@ -25,11 +25,6 @@ import com.automq.stream.s3.objects.CompactStreamObjectRequest;
 import com.automq.stream.s3.objects.ObjectManager;
 import com.automq.stream.s3.operator.MemoryS3Operator;
 import com.automq.stream.s3.operator.S3Operator;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
-
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -37,6 +32,10 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -71,57 +70,57 @@ class StreamObjectCompactorTest {
             // object-1: offset 10~15
             ObjectWriter writer = ObjectWriter.writer(1, s3Operator, Integer.MAX_VALUE, Integer.MAX_VALUE);
             writer.write(233L, List.of(
-                    newRecord(10L, 1, 1024),
-                    newRecord(11L, 1, 1024),
-                    newRecord(12L, 1, 1024)
+                newRecord(10L, 1, 1024),
+                newRecord(11L, 1, 1024),
+                newRecord(12L, 1, 1024)
             ));
             writer.write(233L, List.of(
-                    newRecord(13L, 1, 1024),
-                    newRecord(14L, 1, 1024),
-                    newRecord(15L, 1, 1024)
+                newRecord(13L, 1, 1024),
+                newRecord(14L, 1, 1024),
+                newRecord(15L, 1, 1024)
             ));
             writer.close().get();
             objects.add(new S3ObjectMetadata(1, S3ObjectType.STREAM, List.of(new StreamOffsetRange(streamId, 10, 16)),
-                    System.currentTimeMillis(), System.currentTimeMillis(), writer.size(), 1));
+                System.currentTimeMillis(), System.currentTimeMillis(), writer.size(), 1));
         }
         {
             // object-2: offset 16~17
             ObjectWriter writer = ObjectWriter.writer(2, s3Operator, Integer.MAX_VALUE, Integer.MAX_VALUE);
             writer.write(233L, List.of(
-                    newRecord(16L, 1, 1024)
+                newRecord(16L, 1, 1024)
             ));
             writer.write(233L, List.of(
-                    newRecord(17L, 1, 1024)
+                newRecord(17L, 1, 1024)
             ));
             writer.close().get();
             objects.add(new S3ObjectMetadata(2, S3ObjectType.STREAM, List.of(new StreamOffsetRange(streamId, 16, 18)),
-                    System.currentTimeMillis(), System.currentTimeMillis(), writer.size(), 2));
+                System.currentTimeMillis(), System.currentTimeMillis(), writer.size(), 2));
         }
         {
             // object-3: offset 30
             ObjectWriter writer = ObjectWriter.writer(3, s3Operator, Integer.MAX_VALUE, Integer.MAX_VALUE);
             writer.write(233L, List.of(
-                    newRecord(30L, 1, 1024)
+                newRecord(30L, 1, 1024)
             ));
             writer.close().get();
             objects.add(new S3ObjectMetadata(3, S3ObjectType.STREAM, List.of(new StreamOffsetRange(streamId, 30, 31)),
-                    System.currentTimeMillis(), System.currentTimeMillis(), writer.size(), 3));
+                System.currentTimeMillis(), System.currentTimeMillis(), writer.size(), 3));
         }
         {
             // object-4: offset 31-32
             ObjectWriter writer = ObjectWriter.writer(4, s3Operator, Integer.MAX_VALUE, Integer.MAX_VALUE);
             writer.write(233L, List.of(
-                    newRecord(31L, 1, 1024)
+                newRecord(31L, 1, 1024)
             ));
             writer.write(233L, List.of(
-                    newRecord(32L, 1, 1024)
+                newRecord(32L, 1, 1024)
             ));
             writer.close().get();
             objects.add(new S3ObjectMetadata(4, S3ObjectType.STREAM, List.of(new StreamOffsetRange(streamId, 31, 33)),
-                    System.currentTimeMillis(), System.currentTimeMillis(), writer.size(), 4));
+                System.currentTimeMillis(), System.currentTimeMillis(), writer.size(), 4));
         }
         when(objectManager.getStreamObjects(eq(streamId), eq(14L), eq(32L), eq(Integer.MAX_VALUE)))
-                .thenReturn(CompletableFuture.completedFuture(objects));
+            .thenReturn(CompletableFuture.completedFuture(objects));
         AtomicLong nextObjectId = new AtomicLong(5);
         doAnswer(invocationOnMock -> CompletableFuture.completedFuture(nextObjectId.getAndIncrement())).when(objectManager).prepareObject(anyInt(), anyLong());
         when(objectManager.compactStreamObject(any())).thenReturn(CompletableFuture.completedFuture(null));
@@ -130,7 +129,7 @@ class StreamObjectCompactorTest {
         when(stream.confirmOffset()).thenReturn(32L);
 
         StreamObjectCompactor task = StreamObjectCompactor.builder().objectManager(objectManager).s3Operator(s3Operator)
-                .maxStreamObjectSize(1024 * 1024 * 1024).stream(stream).build();
+            .maxStreamObjectSize(1024 * 1024 * 1024).stream(stream).build();
         task.compact();
 
         ArgumentCaptor<CompactStreamObjectRequest> ac = ArgumentCaptor.forClass(CompactStreamObjectRequest.class);
@@ -212,18 +211,18 @@ class StreamObjectCompactorTest {
     @Test
     public void testGroup() {
         List<S3ObjectMetadata> objects = List.of(
-                new S3ObjectMetadata(2, S3ObjectType.STREAM, List.of(new StreamOffsetRange(streamId, 16, 18)),
-                        System.currentTimeMillis(), System.currentTimeMillis(), 1024, 2),
+            new S3ObjectMetadata(2, S3ObjectType.STREAM, List.of(new StreamOffsetRange(streamId, 16, 18)),
+                System.currentTimeMillis(), System.currentTimeMillis(), 1024, 2),
 
-                new S3ObjectMetadata(3, S3ObjectType.STREAM, List.of(new StreamOffsetRange(streamId, 18, 19)),
-                        System.currentTimeMillis(), System.currentTimeMillis(), 1, 3),
-                new S3ObjectMetadata(4, S3ObjectType.STREAM, List.of(new StreamOffsetRange(streamId, 19, 20)),
-                        System.currentTimeMillis(), System.currentTimeMillis(), 1, 4),
+            new S3ObjectMetadata(3, S3ObjectType.STREAM, List.of(new StreamOffsetRange(streamId, 18, 19)),
+                System.currentTimeMillis(), System.currentTimeMillis(), 1, 3),
+            new S3ObjectMetadata(4, S3ObjectType.STREAM, List.of(new StreamOffsetRange(streamId, 19, 20)),
+                System.currentTimeMillis(), System.currentTimeMillis(), 1, 4),
 
-                new S3ObjectMetadata(5, S3ObjectType.STREAM, List.of(new StreamOffsetRange(streamId, 30, 31)),
-                        System.currentTimeMillis(), System.currentTimeMillis(), 1, 5),
-                new S3ObjectMetadata(6, S3ObjectType.STREAM, List.of(new StreamOffsetRange(streamId, 31, 32)),
-                        System.currentTimeMillis(), System.currentTimeMillis(), 1, 6)
+            new S3ObjectMetadata(5, S3ObjectType.STREAM, List.of(new StreamOffsetRange(streamId, 30, 31)),
+                System.currentTimeMillis(), System.currentTimeMillis(), 1, 5),
+            new S3ObjectMetadata(6, S3ObjectType.STREAM, List.of(new StreamOffsetRange(streamId, 31, 32)),
+                System.currentTimeMillis(), System.currentTimeMillis(), 1, 6)
         );
         List<List<S3ObjectMetadata>> groups = StreamObjectCompactor.group0(objects, 512);
         assertEquals(3, groups.size());
@@ -231,7 +230,6 @@ class StreamObjectCompactorTest {
         assertEquals(List.of(3L, 4L), groups.get(1).stream().map(S3ObjectMetadata::objectId).collect(Collectors.toList()));
         assertEquals(List.of(5L, 6L), groups.get(2).stream().map(S3ObjectMetadata::objectId).collect(Collectors.toList()));
     }
-
 
     StreamRecordBatch newRecord(long offset, int count, int payloadSize) {
         return new StreamRecordBatch(streamId, 0, offset, count, TestUtils.random(payloadSize));
