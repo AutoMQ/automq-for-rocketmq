@@ -269,7 +269,6 @@ public class S3StreamStore implements StreamStore {
         // Compaction config
         config.streamObjectCompactionIntervalMinutes(streamConfig.streamObjectCompactionIntervalMinutes());
         config.streamObjectCompactionMaxSizeBytes(streamConfig.streamObjectCompactionMaxSizeBytes());
-        config.streamObjectCompactionLivingTimeMinutes(streamConfig.streamObjectCompactionLivingTimeMinutes());
 
         config.streamSetObjectCompactionInterval(streamConfig.streamSetObjectCompactionInterval());
         config.streamSetObjectCompactionCacheSize(streamConfig.streamSetObjectCompactionCacheSize());
