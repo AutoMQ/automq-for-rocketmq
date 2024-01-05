@@ -63,29 +63,21 @@ public class S3Utils {
      */
     public static void checkS3Access(S3Context context) {
         System.out.println("You are using s3 context: " + context);
-        System.out.println("====== 1/3: basic available task starting ======");
-        try (HelloS3Task task = new HelloS3Task(context)) {
-            task.run();
-        } catch (Throwable e) {
-            System.exit(1);
-        }
-        System.out.println("====== 1/3: basic available task passed ======");
-
-        System.out.println("====== 2/3: object operation task starting ======");
+        System.out.println("====== 1/2: object operation task starting ======");
         try (ObjectOperationTask task = new ObjectOperationTask(context)) {
             task.run();
         } catch (Throwable e) {
             System.exit(1);
         }
-        System.out.println("====== 2/3: object operation task passed ======");
+        System.out.println("====== 1/2: object operation task passed ======");
 
-        System.out.println("====== 3/3: multipart object operation task starting ======");
+        System.out.println("====== 2/2: multipart object operation task starting ======");
         try (MultipartObjectOperationTask task = new MultipartObjectOperationTask(context)) {
             task.run();
         } catch (Throwable e) {
             System.exit(1);
         }
-        System.out.println("====== 3/3: multipart object operation task passed ======");
+        System.out.println("====== 2/2: multipart object operation task passed ======");
 
         System.out.println("====== Congratulations! You have passed all checks!!! ======");
 
@@ -373,33 +365,6 @@ public class S3Utils {
             } finally {
                 super.close();
             }
-        }
-    }
-
-    private static class HelloS3Task extends S3CheckTask {
-        public HelloS3Task(S3Context context) {
-            super(context, HelloS3Task.class.getSimpleName());
-        }
-
-        private static void listBuckets(S3AsyncClient s3) {
-            try {
-                s3.listBuckets(ListBucketsRequest.builder().build())
-                    .thenAccept(response -> {
-                        List<Bucket> bucketList = response.buckets();
-                        bucketList.forEach(bucket -> {
-                            System.out.println("Bucket Name: " + bucket.name());
-                        });
-                    }).get();
-            } catch (ExecutionException | InterruptedException e) {
-                showErrorInfo(e);
-                throw new RuntimeException(e);
-            }
-        }
-
-        @Override
-        public void run() {
-            System.out.println("Trying to list all buckets in your account ...");
-            listBuckets(client);
         }
     }
 
