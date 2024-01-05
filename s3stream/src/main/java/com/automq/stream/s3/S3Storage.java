@@ -471,7 +471,13 @@ public class S3Storage implements Storage {
     }
 
     private void handleAppendRequest(WalWriteRequest request) {
-        callbackSequencer.before(request);
+        Lock lock = getStreamCallbackLock(request.record.getStreamId());
+        lock.lock();
+        try {
+            callbackSequencer.before(request);
+        } finally {
+            lock.unlock();
+        }
     }
 
     private void handleAppendCallback(WalWriteRequest request) {

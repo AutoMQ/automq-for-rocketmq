@@ -134,7 +134,7 @@ public class S3Stream implements Stream {
     @WithSpan
     public CompletableFuture<AppendResult> append(AppendContext context, RecordBatch recordBatch) {
         TimerUtil timerUtil = new TimerUtil();
-        writeLock.lock();
+        readLock.lock();
         S3StreamMetricsManager.recordOperationLatency(MetricsLevel.DEBUG, timerUtil.elapsedAs(TimeUnit.NANOSECONDS), S3Operation.APPEND_STREAM_WRITE_LOCK);
         try {
             CompletableFuture<AppendResult> cf = exec(() -> {
@@ -150,7 +150,7 @@ public class S3Stream implements Stream {
             });
             return cf;
         } finally {
-            writeLock.unlock();
+            readLock.unlock();
         }
     }
 
