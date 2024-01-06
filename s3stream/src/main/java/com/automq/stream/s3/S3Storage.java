@@ -89,7 +89,7 @@ public class S3Storage implements Storage {
      */
     private final LogCache deltaWALCache;
     /**
-     * WAL out of order callback sequencer. {@link #callbackSequencerLocks} will ensure the memory safety.
+     * WAL out of order callback sequencer. {@link #streamCallbackLocks} will ensure the memory safety.
      */
     private final WALCallbackSequencer callbackSequencer = new WALCallbackSequencer();
     private final WALConfirmOffsetCalculator confirmOffsetCalculator = new WALConfirmOffsetCalculator();
@@ -113,12 +113,11 @@ public class S3Storage implements Storage {
     private final S3Operator s3Operator;
     private final S3BlockCache blockCache;
     /**
-     * Stream callback locks. Used to ensure the stream requests and callbacks will not be called concurrently.
+     * Stream callback locks. Used to ensure the stream callbacks will not be called concurrently.
      *
-     * @see #handleAppendRequest
      * @see #handleAppendCallback
      */
-    private final Lock[] callbackSequencerLocks = IntStream.range(0, NUM_STREAM_CALLBACK_LOCKS).mapToObj(i -> new ReentrantLock()).toArray(Lock[]::new);
+    private final Lock[] streamCallbackLocks = IntStream.range(0, NUM_STREAM_CALLBACK_LOCKS).mapToObj(i -> new ReentrantLock()).toArray(Lock[]::new);
     private final HashedWheelTimer timeoutDetect = new HashedWheelTimer(
         ThreadUtils.createThreadFactory("storage-timeout-detect", true), 1, TimeUnit.SECONDS, 100);
     private long lastLogTimestamp = 0L;
@@ -274,21 +273,11 @@ public class S3Storage implements Storage {
     public CompletableFuture<Void> append(AppendContext context, StreamRecordBatch streamRecord) {
         TimerUtil timerUtil = new TimerUtil();
         CompletableFuture<Void> cf = new CompletableFuture<>();
-
         // encoded before append to free heap ByteBuf.
         streamRecord.encoded();
-
         WalWriteRequest writeRequest = new WalWriteRequest(streamRecord, -1L, cf, context);
-        // lock it to make sure requests are added into {@link #callbackSequencer} in the same order as they sent to deltaWAL.
-        Lock lock = callbackSequencerLock(writeRequest.record.getStreamId());
-        lock.lock();
-        try {
-            handleAppendRequest(writeRequest);
-            append0(context, writeRequest, false);
-        } finally {
-            lock.unlock();
-        }
-
+        handleAppendRequest(writeRequest);
+        append0(context, writeRequest, false);
         cf.whenComplete((nil, ex) -> {
             streamRecord.release();
             S3StreamMetricsManager.recordOperationLatency(MetricsLevel.INFO, timerUtil.elapsedAs(TimeUnit.NANOSECONDS), S3Operation.APPEND_STORAGE);
@@ -492,7 +481,7 @@ public class S3Storage implements Storage {
     private void handleAppendCallback0(WalWriteRequest request) {
         TimerUtil timer = new TimerUtil();
         List<WalWriteRequest> waitingAckRequests;
-        Lock lock = callbackSequencerLock(request.record.getStreamId());
+        Lock lock = getStreamCallbackLock(request.record.getStreamId());
         lock.lock();
         try {
             waitingAckRequests = callbackSequencer.after(request);
@@ -512,8 +501,8 @@ public class S3Storage implements Storage {
         S3StreamMetricsManager.recordOperationLatency(MetricsLevel.DEBUG, timer.elapsedAs(TimeUnit.NANOSECONDS), S3Operation.APPEND_STORAGE_APPEND_CALLBACK);
     }
 
-    private Lock callbackSequencerLock(long streamId) {
-        return callbackSequencerLocks[(int) ((streamId & Long.MAX_VALUE) % NUM_STREAM_CALLBACK_LOCKS)];
+    private Lock getStreamCallbackLock(long streamId) {
+        return streamCallbackLocks[(int) ((streamId & Long.MAX_VALUE) % NUM_STREAM_CALLBACK_LOCKS)];
     }
 
     @SuppressWarnings("UnusedReturnValue")
