@@ -136,7 +136,7 @@ message ConsumerClientConnection {
 
 message ConsumerClientConnectionReply {
   Status status = 1;
-  // Producer client connection
+  // consumer client connection
   repeated ConsumerClientConnection connection = 2;
 }
 
@@ -165,6 +165,38 @@ message RelayReply {
   Status status = 1;
 }
 
+
+
+message ConsumerConnectionRequest {
+  ProxyRequestContext context = 1;
+  // Consumer group name
+  string group = 2;
+}
+
+
+message ConsumerSubInfo {
+  // topic
+  string topic = 1;
+  // subExpression
+  string sub_expression = 2;
+}
+
+message ConsumerGroupCliInfo {
+  string consume_type = 1;
+  string message_model = 2;
+  string consume_from_where = 3;
+  // consumer client connection
+  repeated ConsumerClientConnection connection = 4;
+  // consumer subscription info
+  repeated ConsumerSubInfo consumer_sub_info = 5;
+}
+message ConsumerConnectionReply {
+  Status status = 1;
+  // consumer group cli info
+  ConsumerGroupCliInfo consumer_group_cli_info = 2;
+}
+
+
 service ProxyService {
   rpc resetConsumeOffset(ResetConsumeOffsetRequest) returns (ResetConsumeOffsetReply) {}
   rpc resetConsumeOffsetByTimestamp(ResetConsumeOffsetByTimestampRequest) returns (ResetConsumeOffsetReply) {}
@@ -172,4 +204,5 @@ service ProxyService {
   rpc producerClientConnection(ProducerClientConnectionRequest) returns (ProducerClientConnectionReply) {}
   rpc consumerClientConnection(ConsumerClientConnectionRequest) returns (ConsumerClientConnectionReply) {}
   rpc relay(RelayRequest) returns (RelayReply) {}
+  rpc consumerConnection(ConsumerConnectionRequest) returns (ConsumerConnectionReply) {}
 }
