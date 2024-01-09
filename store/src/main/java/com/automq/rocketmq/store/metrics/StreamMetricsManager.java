@@ -18,6 +18,8 @@
 package com.automq.rocketmq.store.metrics;
 
 import com.automq.rocketmq.common.MetricsManager;
+import com.automq.stream.s3.metrics.MetricsConfig;
+import com.automq.stream.s3.metrics.MetricsLevel;
 import com.automq.stream.s3.metrics.S3StreamMetricsManager;
 import io.opentelemetry.api.common.AttributesBuilder;
 import io.opentelemetry.api.metrics.Meter;
@@ -36,7 +38,7 @@ public class StreamMetricsManager implements MetricsManager {
     private static final String STREAM_METRICS_PREFIX = "rocketmq_stream_";
     @Override
     public void initAttributesBuilder(Supplier<AttributesBuilder> attributesBuilderSupplier) {
-        S3StreamMetricsManager.initAttributesBuilder(attributesBuilderSupplier);
+        S3StreamMetricsManager.configure(new MetricsConfig(MetricsLevel.INFO, attributesBuilderSupplier.get().build()));
     }
 
     @Override
