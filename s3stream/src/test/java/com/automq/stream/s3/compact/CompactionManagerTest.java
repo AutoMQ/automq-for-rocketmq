@@ -36,7 +36,6 @@ import com.automq.stream.s3.objects.ObjectStreamRange;
 import com.automq.stream.s3.objects.StreamObject;
 import com.automq.stream.s3.operator.DefaultS3Operator;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
