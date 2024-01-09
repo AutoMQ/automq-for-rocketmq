@@ -23,6 +23,7 @@ import com.automq.stream.s3.ObjectWriter;
 import com.automq.stream.s3.StreamDataBlock;
 import com.automq.stream.s3.TestUtils;
 import com.automq.stream.s3.compact.operator.DataBlockReader;
+import com.automq.stream.s3.compact.utils.CompactionUtils;
 import com.automq.stream.s3.metadata.S3ObjectMetadata;
 import com.automq.stream.s3.metadata.S3ObjectType;
 import com.automq.stream.s3.metadata.S3StreamConstant;
@@ -473,13 +474,37 @@ public class CompactionManagerTest extends CompactionTestBase {
                 compactedObjectMap.get(objectId).objectSize(), S3ObjectType.STREAM_SET), s3Operator);
             reader.readBlocks(entry.getValue());
         }
-        List<StreamDataBlock> expectedStreamDataBlocks = streamDataBlocks.values().stream().flatMap(Collection::stream).toList();
-        List<StreamDataBlock> compactedStreamDataBlocks = compactedStreamDataBlocksMap.values().stream().flatMap(Collection::stream).toList();
-        if (expectedStreamDataBlocks.size() != compactedStreamDataBlocks.size()) {
-            return false;
-        }
+        List<StreamDataBlock> expectedStreamDataBlocks = CompactionUtils.sortStreamRangePositions(streamDataBlocks);
+        List<StreamDataBlock> compactedStreamDataBlocks = CompactionUtils.sortStreamRangePositions(compactedStreamDataBlocksMap);
+
+        int i = 0;
         for (StreamDataBlock compactedStreamDataBlock : compactedStreamDataBlocks) {
-            if (expectedStreamDataBlocks.stream().noneMatch(s -> compare(compactedStreamDataBlock, s))) {
+            long currStreamId = compactedStreamDataBlock.getStreamId();
+            long startOffset = compactedStreamDataBlock.getStartOffset();
+            if (i == expectedStreamDataBlocks.size()) {
+                return false;
+            }
+            List<StreamDataBlock> groupedStreamDataBlocks = new ArrayList<>();
+            for (; i < expectedStreamDataBlocks.size(); i++) {
+                StreamDataBlock expectedBlock = expectedStreamDataBlocks.get(i);
+
+                if (startOffset == compactedStreamDataBlock.getEndOffset()) {
+                    break;
+                }
+                if (currStreamId != expectedBlock.getStreamId()) {
+                    return false;
+                }
+                if (startOffset != expectedBlock.getStartOffset()) {
+                    return false;
+                }
+                if (expectedBlock.getEndOffset() > compactedStreamDataBlock.getEndOffset()) {
+                    return false;
+                }
+                startOffset = expectedBlock.getEndOffset();
+                groupedStreamDataBlocks.add(expectedBlock);
+            }
+            List<StreamDataBlock> compactedGroupedStreamDataBlocks = mergeStreamDataBlocksForGroup(List.of(groupedStreamDataBlocks));
+            if (!compare(compactedStreamDataBlock, compactedGroupedStreamDataBlocks.get(0))) {
                 return false;
             }
         }
