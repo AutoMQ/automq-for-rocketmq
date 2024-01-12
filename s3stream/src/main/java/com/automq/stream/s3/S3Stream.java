@@ -203,7 +203,10 @@ public class S3Stream implements Stream {
                         LOGGER.error("{} stream fetch [{}, {}) {} fail", logIdent, startOffset, endOffset, maxBytes, ex);
                     }
                 } else if (networkOutboundLimiter != null) {
-                    long totalSize = rs.recordBatchList().stream().mapToLong(record -> record.rawPayload().remaining()).sum();
+                    long totalSize = 0L;
+                    for (RecordBatch recordBatch : rs.recordBatchList()) {
+                        totalSize += recordBatch.rawPayload().remaining();
+                    }
                     networkOutboundLimiter.forceConsume(totalSize);
                     if (LOGGER.isDebugEnabled()) {
                         LOGGER.debug("[S3BlockCache] fetch data, stream={}, {}-{}, total bytes: {}, cost={}ms", streamId,
