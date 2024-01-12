@@ -218,7 +218,7 @@ public class S3Utils {
             writeS3Client.completeMultipartUpload(request).thenAccept(completeMultipartUploadResponse -> {
                 cf.complete(null);
             }).exceptionally(ex -> {
-                System.out.println("[ FAILED ] Upload s3 multipart object, upload id is "+uploadId);
+                System.out.println("[ FAILED ] Upload s3 multipart object, upload id is " + uploadId);
                 cf.completeExceptionally(ex);
                 return null;
             });
