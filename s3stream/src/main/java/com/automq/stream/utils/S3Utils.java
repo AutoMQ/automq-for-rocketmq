@@ -119,11 +119,12 @@ public class S3Utils {
 
         protected static void showErrorInfo(Exception e) {
             if (e.getCause() instanceof S3Exception se) {
-                System.err.println("get S3 exception: ");
-                se.printStackTrace();
+                // Do not use system.err because automq admin tool suppress system.err
+                System.out.println("get S3 exception: ");
+                se.printStackTrace(System.out);
             } else {
-                System.err.println("get other exception: ");
-                e.printStackTrace();
+                System.out.println("get other exception: ");
+                e.printStackTrace(System.out);
             }
         }
 
@@ -201,7 +202,7 @@ public class S3Utils {
             writeS3Client.createMultipartUpload(request).thenAccept(createMultipartUploadResponse -> {
                 cf.complete(createMultipartUploadResponse.uploadId());
             }).exceptionally(ex -> {
-                System.err.println("[ FAILED ] Upload s3 multipart object");
+                System.out.println("[ FAILED ] Upload s3 multipart object");
                 cf.completeExceptionally(ex);
                 return null;
             });
@@ -217,7 +218,7 @@ public class S3Utils {
             writeS3Client.completeMultipartUpload(request).thenAccept(completeMultipartUploadResponse -> {
                 cf.complete(null);
             }).exceptionally(ex -> {
-                System.err.println("[ FAILED ] Upload s3 multipart object, upload id is "+uploadId);
+                System.out.println("[ FAILED ] Upload s3 multipart object, upload id is "+uploadId);
                 cf.completeExceptionally(ex);
                 return null;
             });
@@ -275,16 +276,16 @@ public class S3Utils {
                 readRange(client, path, readCf, bucketName, 0, -1);
                 byteBuf = readCf.get();
                 if (byteBuf == null) {
-                    System.err.println("[ Failed ] Read s3 object");
+                    System.out.println("[ Failed ] Read s3 object");
                     throw new RuntimeException("read object " + path + " fail. got null");
                 } else if (byteBuf.readableBytes() != content.length) {
-                    System.err.println("[ Failed ] Read s3 object");
+                    System.out.println("[ Failed ] Read s3 object");
                     throw new RuntimeException("read object " + path + " fail. expected size " + content.length + ", actual size " + byteBuf.readableBytes());
                 }
                 byte[] readContent = new byte[byteBuf.readableBytes()];
                 byteBuf.readBytes(readContent);
                 if (!StringUtils.equals(new String(readContent, StandardCharsets.UTF_8), new String(content, StandardCharsets.UTF_8))) {
-                    System.err.println("[ Failed ] Read s3 object");
+                    System.out.println("[ Failed ] Read s3 object");
                     throw new RuntimeException("read object " + path + " fail. expected content " + new String(content, StandardCharsets.UTF_8) + ", actual content " + new String(readContent, StandardCharsets.UTF_8));
                 }
                 System.out.println("[ OK ] Read s3 object");
@@ -305,7 +306,7 @@ public class S3Utils {
             writeS3Client.putObject(request, body).thenAccept(putObjectResponse -> {
                 cf.complete(null);
             }).exceptionally(ex -> {
-                System.err.printf("[ Failed ] Write s3 object. PutObject for object %s fail with msg %s %n", path, ex.getMessage());
+                System.out.printf("[ Failed ] Write s3 object. PutObject for object %s fail with msg %s %n", path, ex.getMessage());
                 cf.completeExceptionally(ex);
                 return null;
             });
@@ -335,7 +336,7 @@ public class S3Utils {
             deleteS3Client.deleteObject(request).thenAccept(deleteObjectResponse -> {
                 cf.complete(null);
             }).exceptionally(ex -> {
-                System.err.printf("[ FAILED ] Delete s3 object. Delete object %s fail with msg %s %n", path, ex.getMessage());
+                System.out.printf("[ FAILED ] Delete s3 object. Delete object %s fail with msg %s %n", path, ex.getMessage());
                 cf.completeExceptionally(ex);
                 return null;
             });
@@ -349,7 +350,7 @@ public class S3Utils {
                 deleteCf.get();
             } catch (InterruptedException | ExecutionException e) {
 
-                System.err.println("[ FAILED ] Delete s3 object. NOTICE: please delete object " + path + " manually!!!");
+                System.out.println("[ FAILED ] Delete s3 object. NOTICE: please delete object " + path + " manually!!!");
                 showErrorInfo(e);
                 throw new RuntimeException(e);
             } finally {
