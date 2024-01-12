@@ -379,7 +379,11 @@ public class S3Stream implements Stream {
             boolean pooledBuf) {
             this.pooledRecords = streamRecords;
             this.pooledBuf = pooledBuf;
-            this.records = streamRecords.stream().map(r -> new RecordBatchWithContextWrapper(covert(r, pooledBuf), r.getBaseOffset())).collect(Collectors.toList());
+            this.records = new ArrayList<>(streamRecords.size());
+            for (StreamRecordBatch streamRecordBatch : streamRecords) {
+                RecordBatch recordBatch = covert(streamRecordBatch, pooledBuf);
+                records.add(new RecordBatchWithContextWrapper(recordBatch, streamRecordBatch.getBaseOffset()));
+            }
             this.cacheAccessType = cacheAccessType;
             if (!pooledBuf) {
                 streamRecords.forEach(StreamRecordBatch::release);
