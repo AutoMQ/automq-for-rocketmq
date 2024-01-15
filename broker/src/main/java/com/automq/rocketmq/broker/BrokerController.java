@@ -199,9 +199,12 @@ public class BrokerController implements Lifecycle {
 
         // TODO: Split controller to a separate port
         ControllerServiceImpl controllerService = MetadataStoreBuilder.build(metadataStore);
-        ProxyServiceImpl proxyService = new ProxyServiceImpl(messageStore, extendMessageService, producerManager, consumerManager);
+        ProxyServiceImpl proxyService = new ProxyServiceImpl(messageStore, extendMessageService
+                , producerManager, consumerManager,serviceManager);
         grpcServer = new GrpcProtocolServer(brokerConfig.proxy(), messagingProcessor, controllerService, proxyService);
         remotingServer = new RemotingProtocolServer(messagingProcessor);
+
+        ((DefaultServiceManager)serviceManager).setRemotingProtocolServer(this.remotingServer);
     }
 
     @Override

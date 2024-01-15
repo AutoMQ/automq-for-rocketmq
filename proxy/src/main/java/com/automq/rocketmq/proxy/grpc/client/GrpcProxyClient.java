@@ -21,6 +21,8 @@ import apache.rocketmq.common.v1.Code;
 import apache.rocketmq.proxy.v1.ConsumerClientConnection;
 import apache.rocketmq.proxy.v1.ConsumerClientConnectionReply;
 import apache.rocketmq.proxy.v1.ConsumerClientConnectionRequest;
+import apache.rocketmq.proxy.v1.ConsumerStatusReply;
+import apache.rocketmq.proxy.v1.ConsumerStatusRequest;
 import apache.rocketmq.proxy.v1.ProducerClientConnection;
 import apache.rocketmq.proxy.v1.ProducerClientConnectionReply;
 import apache.rocketmq.proxy.v1.ProducerClientConnectionRequest;
@@ -204,6 +206,30 @@ public class GrpcProxyClient implements ProxyClient {
                     future.completeExceptionally(t);
                 }
             }, MoreExecutors.directExecutor());
+        return future;
+    }
+
+    @Override
+    public CompletableFuture<ConsumerStatusReply> consumerStatus(String target, ConsumerStatusRequest request) {
+        ProxyServiceGrpc.ProxyServiceFutureStub stub = getOrCreateStubForTarget(target);
+
+        CompletableFuture<ConsumerStatusReply> future = new CompletableFuture<>();
+        Futures.addCallback(stub.consumerStatus(request),
+                new FutureCallback<>() {
+                    @Override
+                    public void onSuccess(ConsumerStatusReply result) {
+                        if (result.getStatus().getCode() == Code.OK) {
+                            future.complete(result);
+                        } else {
+                            future.completeExceptionally(new ProxyException(ProxyExceptionCode.INTERNAL_SERVER_ERROR, result.getStatus().getMessage()));
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(Throwable t) {
+                        future.completeExceptionally(t);
+                    }
+                }, MoreExecutors.directExecutor());
         return future;
     }
 

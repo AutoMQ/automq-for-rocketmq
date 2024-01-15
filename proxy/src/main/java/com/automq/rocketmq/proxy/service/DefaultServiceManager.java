@@ -19,6 +19,7 @@ package com.automq.rocketmq.proxy.service;
 
 import com.automq.rocketmq.common.config.BrokerConfig;
 import com.automq.rocketmq.metadata.api.ProxyMetadataService;
+import com.automq.rocketmq.proxy.remoting.RemotingProtocolServer;
 import com.automq.rocketmq.store.api.MessageStore;
 import org.apache.rocketmq.broker.client.ConsumerGroupEvent;
 import org.apache.rocketmq.broker.client.ConsumerIdsChangeListener;
@@ -43,6 +44,7 @@ public class DefaultServiceManager implements ServiceManager {
     private final TransactionService transactionService;
     private final AdminService adminService;
     private final DeadLetterService deadLetterService;
+    private RemotingProtocolServer remotingProtocolServer;
 
     public DefaultServiceManager(BrokerConfig config, ProxyMetadataService proxyMetadataService,
         DeadLetterService deadLetterService, MessageService messageService,
@@ -54,7 +56,7 @@ public class DefaultServiceManager implements ServiceManager {
         this.topicRouteService = new TopicRouteServiceImpl(config, proxyMetadataService);
         this.producerManager = producerManager;
         this.consumerManager = consumerManager;
-        this.proxyRelayService = new ProxyRelayServiceImpl();
+        this.proxyRelayService = new ProxyRelayServiceImpl(this.consumerManager,this.remotingProtocolServer);
         this.transactionService = new TransactionServiceImpl();
         this.adminService = new AdminServiceImpl();
     }
@@ -98,6 +100,14 @@ public class DefaultServiceManager implements ServiceManager {
     public AdminService getAdminService() {
         // We don't need this for the current design
         return adminService;
+    }
+
+    public RemotingProtocolServer getRemotingProtocolServer() {
+        return remotingProtocolServer;
+    }
+
+    public void setRemotingProtocolServer(RemotingProtocolServer remotingProtocolServer) {
+        this.remotingProtocolServer = remotingProtocolServer;
     }
 
     @Override

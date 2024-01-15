@@ -19,6 +19,8 @@ package com.automq.rocketmq.proxy.grpc;
 
 import apache.rocketmq.proxy.v1.ConsumerClientConnection;
 import apache.rocketmq.proxy.v1.ConsumerClientConnectionRequest;
+import apache.rocketmq.proxy.v1.ConsumerStatusReply;
+import apache.rocketmq.proxy.v1.ConsumerStatusRequest;
 import apache.rocketmq.proxy.v1.ProducerClientConnection;
 import apache.rocketmq.proxy.v1.ProducerClientConnectionRequest;
 import apache.rocketmq.proxy.v1.QueueStats;
@@ -43,6 +45,9 @@ public interface ProxyClient extends Closeable {
 
     CompletableFuture<List<ConsumerClientConnection>> consumerClientConnection(String target,
         ConsumerClientConnectionRequest request);
+
+    CompletableFuture<ConsumerStatusReply> consumerStatus(String target, ConsumerStatusRequest request);
+
 
     CompletableFuture<Status> relayMessage(String target, FlatMessage message);
 }
