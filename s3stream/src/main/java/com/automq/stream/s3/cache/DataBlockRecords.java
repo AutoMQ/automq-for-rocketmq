@@ -20,15 +20,14 @@ package com.automq.stream.s3.cache;
 import com.automq.stream.s3.ObjectReader;
 import com.automq.stream.s3.model.StreamRecordBatch;
 import com.automq.stream.utils.CloseableIterator;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class DataBlockRecords {
     private static final Logger LOGGER = LoggerFactory.getLogger(DataBlockRecords.class);
@@ -41,10 +40,10 @@ public class DataBlockRecords {
         listeners.add(listener);
     }
 
-    public void complete(ObjectReader.DataBlock dataBlock, Throwable ex) {
+    public void complete(ObjectReader.DataBlockGroup dataBlockGroup, Throwable ex) {
         if (ex == null) {
-            records = new ArrayList<>(dataBlock.recordCount());
-            try (CloseableIterator<StreamRecordBatch> it = dataBlock.iterator()) {
+            records = new ArrayList<>(dataBlockGroup.recordCount());
+            try (CloseableIterator<StreamRecordBatch> it = dataBlockGroup.iterator()) {
                 while (it.hasNext()) {
                     records.add(it.next());
                 }

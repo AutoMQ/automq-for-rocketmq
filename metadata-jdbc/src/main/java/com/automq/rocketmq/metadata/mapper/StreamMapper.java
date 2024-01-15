@@ -21,9 +21,8 @@ package com.automq.rocketmq.metadata.mapper;
 import apache.rocketmq.controller.v1.StreamState;
 import com.automq.rocketmq.metadata.dao.Stream;
 import com.automq.rocketmq.metadata.dao.StreamCriteria;
-import org.apache.ibatis.annotations.Param;
-
 import java.util.List;
+import org.apache.ibatis.annotations.Param;
 
 public interface StreamMapper {
 
@@ -42,6 +41,10 @@ public interface StreamMapper {
 
     int updateStreamState(@Param("criteria") StreamCriteria criteria, @Param("state") StreamState state);
 
+    int updateStreamAssignment(@Param("criteria") StreamCriteria criteria,
+        @Param("srcNodeId") int src,
+        @Param("dstNodeId") int dst);
+
     int delete(@Param("id") Long id);
 
     List<Stream> byCriteria(@Param("criteria") StreamCriteria criteria);
@@ -50,7 +53,6 @@ public interface StreamMapper {
 
     long queueEpoch(@Param("topicId") long topicId,
         @Param("queueId") long queueId);
-
 
     int planMove(@Param("criteria") StreamCriteria criteria,
         @Param("srcNodeId") int src,

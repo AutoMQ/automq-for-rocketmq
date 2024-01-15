@@ -19,15 +19,15 @@ package com.automq.stream.utils.biniarysearch;
 
 public abstract class AbstractOrderedCollection<T> {
 
-    abstract int size();
+    protected abstract int size();
 
-    abstract ComparableItem<T> get(int index);
+    protected abstract ComparableItem<T> get(int index);
 
     public int search(T target) {
         int low = 0;
         int high = size() - 1;
         while (low <= high) {
-            int mid = (low + high) >>> 1;
+            int mid = low + ((high - low) >>> 1);
             ComparableItem<T> midVal = get(mid);
             if (midVal.isLessThan(target)) {
                 low = mid + 1;

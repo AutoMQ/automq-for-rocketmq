@@ -18,15 +18,13 @@
 package com.automq.stream.s3.operator;
 
 import com.automq.stream.s3.DirectByteBufAlloc;
+import com.automq.stream.s3.metrics.MetricsLevel;
 import com.automq.stream.s3.metrics.TimerUtil;
-import com.automq.stream.s3.metrics.operations.S3ObjectStage;
-import com.automq.stream.s3.metrics.stats.S3ObjectMetricsStats;
+import com.automq.stream.s3.metrics.stats.S3ObjectStats;
 import com.automq.stream.s3.network.ThrottleStrategy;
 import com.automq.stream.utils.FutureUtil;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
-import software.amazon.awssdk.services.s3.model.CompletedPart;
-
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -34,24 +32,25 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
+import software.amazon.awssdk.services.s3.model.CompletedPart;
 
 public class MultiPartWriter implements Writer {
     private static final long MAX_MERGE_WRITE_SIZE = 16L * 1024 * 1024;
+    final CompletableFuture<String> uploadIdCf = new CompletableFuture<>();
     private final S3Operator operator;
     private final String path;
-    final CompletableFuture<String> uploadIdCf = new CompletableFuture<>();
-    private String uploadId;
     private final List<CompletableFuture<CompletedPart>> parts = new LinkedList<>();
     private final AtomicInteger nextPartNumber = new AtomicInteger(1);
-    private CompletableFuture<Void> closeCf;
     /**
      * The minPartSize represents the minimum size of a part for a multipart object.
      */
     private final long minPartSize;
-    private ObjectPart objectPart = null;
     private final TimerUtil timerUtil = new TimerUtil();
     private final ThrottleStrategy throttleStrategy;
     private final AtomicLong totalWriteSize = new AtomicLong(0L);
+    private String uploadId;
+    private CompletableFuture<Void> closeCf;
+    private ObjectPart objectPart = null;
 
     public MultiPartWriter(S3Operator operator, String path, long minPartSize, ThrottleStrategy throttleStrategy) {
         this.operator = operator;
@@ -63,11 +62,11 @@ public class MultiPartWriter implements Writer {
 
     private void init() {
         FutureUtil.propagate(
-                operator.createMultipartUpload(path).thenApply(uploadId -> {
-                    this.uploadId = uploadId;
-                    return uploadId;
-                }),
-                uploadIdCf
+            operator.createMultipartUpload(path).thenApply(uploadId -> {
+                this.uploadId = uploadId;
+                return uploadId;
+            }),
+            uploadIdCf
         );
     }
 
@@ -103,6 +102,18 @@ public class MultiPartWriter implements Writer {
 
     @Override
     public void copyWrite(String sourcePath, long start, long end) {
+        long nextStart = start;
+        for (; ; ) {
+            long currentEnd = Math.min(nextStart + Writer.MAX_PART_SIZE, end);
+            copyWrite0(sourcePath, nextStart, currentEnd);
+            nextStart = currentEnd;
+            if (currentEnd == end) {
+                break;
+            }
+        }
+    }
+
+    public void copyWrite0(String sourcePath, long start, long end) {
         long targetSize = end - start;
         if (objectPart == null) {
             if (targetSize < minPartSize) {
@@ -140,14 +151,14 @@ public class MultiPartWriter implements Writer {
             objectPart = null;
         }
 
-        S3ObjectMetricsStats.getHistogram(S3ObjectStage.READY_CLOSE).update(timerUtil.elapsedAs(TimeUnit.NANOSECONDS));
+        S3ObjectStats.getInstance().objectStageReadyCloseStats.record(MetricsLevel.DEBUG, timerUtil.elapsedAs(TimeUnit.NANOSECONDS));
         closeCf = new CompletableFuture<>();
         CompletableFuture<Void> uploadDoneCf = uploadIdCf.thenCompose(uploadId -> CompletableFuture.allOf(parts.toArray(new CompletableFuture[0])));
         FutureUtil.propagate(uploadDoneCf.thenCompose(nil -> operator.completeMultipartUpload(path, uploadId, genCompleteParts())), closeCf);
         closeCf.whenComplete((nil, ex) -> {
-            S3ObjectMetricsStats.getHistogram(S3ObjectStage.TOTAL).update(timerUtil.elapsedAs(TimeUnit.NANOSECONDS));
-            S3ObjectMetricsStats.getOrCreateS3ObjectCounter().inc();
-            S3ObjectMetricsStats.getOrCreates3ObjectUploadSizeHist().update(totalWriteSize.get());
+            S3ObjectStats.getInstance().objectStageTotalStats.record(MetricsLevel.DEBUG, timerUtil.elapsedAs(TimeUnit.NANOSECONDS));
+            S3ObjectStats.getInstance().objectNumInTotalStats.add(MetricsLevel.DEBUG, 1);
+            S3ObjectStats.getInstance().objectUploadSizeStats.record(MetricsLevel.DEBUG, totalWriteSize.get());
         });
         return closeCf;
     }
@@ -175,11 +186,11 @@ public class MultiPartWriter implements Writer {
 
     class ObjectPart {
         private final int partNumber = nextPartNumber.getAndIncrement();
+        private final CompletableFuture<CompletedPart> partCf = new CompletableFuture<>();
+        private final ThrottleStrategy throttleStrategy;
         private CompositeByteBuf partBuf = DirectByteBufAlloc.compositeByteBuffer();
         private CompletableFuture<Void> lastRangeReadCf = CompletableFuture.completedFuture(null);
-        private final CompletableFuture<CompletedPart> partCf = new CompletableFuture<>();
         private long size;
-        private final ThrottleStrategy throttleStrategy;
 
         public ObjectPart(ThrottleStrategy throttleStrategy) {
             this.throttleStrategy = throttleStrategy;
@@ -207,8 +218,8 @@ public class MultiPartWriter implements Writer {
             size += end - start;
             // TODO: parallel read and sequence add.
             this.lastRangeReadCf = lastRangeReadCf
-                    .thenCompose(nil -> operator.rangeRead(sourcePath, start, end, throttleStrategy))
-                    .thenAccept(buf -> partBuf.addComponent(true, buf));
+                .thenCompose(nil -> operator.rangeRead(sourcePath, start, end, throttleStrategy))
+                .thenAccept(buf -> partBuf.addComponent(true, buf));
         }
 
         public void upload() {
@@ -224,7 +235,9 @@ public class MultiPartWriter implements Writer {
         private void upload0() {
             TimerUtil timerUtil = new TimerUtil();
             FutureUtil.propagate(uploadIdCf.thenCompose(uploadId -> operator.uploadPart(path, uploadId, partNumber, partBuf, throttleStrategy)), partCf);
-            partCf.whenComplete((nil, ex) -> S3ObjectMetricsStats.getHistogram(S3ObjectStage.UPLOAD_PART).update(timerUtil.elapsedAs(TimeUnit.NANOSECONDS)));
+            partCf.whenComplete((nil, ex) -> {
+                S3ObjectStats.getInstance().objectStageUploadPartStats.record(MetricsLevel.DEBUG, timerUtil.elapsedAs(TimeUnit.NANOSECONDS));
+            });
         }
 
         public long size() {

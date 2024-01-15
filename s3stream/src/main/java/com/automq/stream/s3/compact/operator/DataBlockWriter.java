@@ -17,15 +17,19 @@
 
 package com.automq.stream.s3.compact.operator;
 
+import com.automq.stream.s3.DataBlockIndex;
 import com.automq.stream.s3.DirectByteBufAlloc;
 import com.automq.stream.s3.StreamDataBlock;
+import com.automq.stream.s3.compact.utils.CompactionUtils;
+import com.automq.stream.s3.compact.utils.GroupByLimitPredicate;
+import com.automq.stream.s3.metadata.ObjectUtils;
+import com.automq.stream.s3.metrics.MetricsLevel;
+import com.automq.stream.s3.metrics.stats.CompactionStats;
 import com.automq.stream.s3.network.ThrottleStrategy;
 import com.automq.stream.s3.operator.S3Operator;
 import com.automq.stream.s3.operator.Writer;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
-import com.automq.stream.s3.metadata.ObjectUtils;
-
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -40,9 +44,9 @@ public class DataBlockWriter {
     private final List<StreamDataBlock> waitingUploadBlocks;
     private final Map<StreamDataBlock, CompletableFuture<Void>> waitingUploadBlockCfs;
     private final List<StreamDataBlock> completedBlocks;
-    private IndexBlock indexBlock;
     private final Writer writer;
     private final long objectId;
+    private IndexBlock indexBlock;
     private long nextDataBlockPosition;
     private long size;
 
@@ -61,7 +65,9 @@ public class DataBlockWriter {
     }
 
     public void write(StreamDataBlock dataBlock) {
-        waitingUploadBlockCfs.put(dataBlock, new CompletableFuture<>());
+        CompletableFuture<Void> cf = new CompletableFuture<>();
+        cf.whenComplete((nil, ex) -> CompactionStats.getInstance().compactionWriteSizeStats.add(MetricsLevel.INFO, dataBlock.getBlockSize()));
+        waitingUploadBlockCfs.put(dataBlock, cf);
         waitingUploadBlocks.add(dataBlock);
         long waitingUploadSize = waitingUploadBlocks.stream().mapToLong(StreamDataBlock::getBlockSize).sum();
         if (waitingUploadSize >= partSizeThreshold) {
@@ -143,34 +149,19 @@ public class DataBlockWriter {
     }
 
     class IndexBlock {
+        private static final int DEFAULT_DATA_BLOCK_GROUP_SIZE_THRESHOLD = 1024 * 1024; // 1MiB
         private final ByteBuf buf;
         private final long position;
 
         public IndexBlock() {
             position = nextDataBlockPosition;
-            buf = DirectByteBufAlloc.byteBuffer(calculateIndexBlockSize(), "write_index_block");
-            buf.writeInt(completedBlocks.size()); // block count
-            long nextPosition = 0;
-            // block index
-            for (StreamDataBlock block : completedBlocks) {
-                buf.writeLong(nextPosition);
-                buf.writeInt(block.getBlockSize());
-                buf.writeInt(block.getRecordCount());
-                nextPosition += block.getBlockSize();
-            }
 
-            // object stream range
-            for (int blockIndex = 0; blockIndex < completedBlocks.size(); blockIndex++) {
-                StreamDataBlock block = completedBlocks.get(blockIndex);
-                buf.writeLong(block.getStreamId());
-                buf.writeLong(block.getStartOffset());
-                buf.writeInt((int) (block.getEndOffset() - block.getStartOffset()));
-                buf.writeInt(blockIndex);
+            List<DataBlockIndex> dataBlockIndices = CompactionUtils.buildDataBlockIndicesFromGroup(
+                CompactionUtils.groupStreamDataBlocks(completedBlocks, new GroupByLimitPredicate(DEFAULT_DATA_BLOCK_GROUP_SIZE_THRESHOLD)));
+            buf = DirectByteBufAlloc.byteBuffer(dataBlockIndices.size() * DataBlockIndex.BLOCK_INDEX_SIZE, "write_index_block");
+            for (DataBlockIndex dataBlockIndex : dataBlockIndices) {
+                dataBlockIndex.encode(buf);
             }
-        }
-
-        private int calculateIndexBlockSize() {
-            return 4 + completedBlocks.size() * 40;
         }
 
         public ByteBuf buffer() {

@@ -22,6 +22,7 @@ import com.automq.rocketmq.common.config.StoreConfig;
 import com.automq.rocketmq.metadata.api.StoreMetadataService;
 import com.automq.rocketmq.store.api.StreamStore;
 import com.automq.rocketmq.store.model.StoreContext;
+import com.automq.rocketmq.store.util.ContextUtil;
 import com.automq.stream.api.AppendResult;
 import com.automq.stream.api.FetchResult;
 import com.automq.stream.api.OpenStreamOptions;
@@ -35,6 +36,8 @@ import com.automq.stream.s3.Storage;
 import com.automq.stream.s3.cache.DefaultS3BlockCache;
 import com.automq.stream.s3.cache.S3BlockCache;
 import com.automq.stream.s3.compact.CompactionManager;
+import com.automq.stream.s3.context.AppendContext;
+import com.automq.stream.s3.context.FetchContext;
 import com.automq.stream.s3.network.AsyncNetworkBandwidthLimiter;
 import com.automq.stream.s3.objects.ObjectManager;
 import com.automq.stream.s3.operator.DefaultS3Operator;
@@ -127,7 +130,8 @@ public class S3StreamStore implements StreamStore {
         if (stream.isEmpty()) {
             throw new IllegalStateException("Stream " + streamId + " is not opened.");
         }
-        return stream.get().fetch(startOffset, startOffset + maxCount, Integer.MAX_VALUE)
+        FetchContext fetchContext = new FetchContext(ContextUtil.buildStreamTraceContext(context));
+        return stream.get().fetch(fetchContext, startOffset, startOffset + maxCount, Integer.MAX_VALUE)
             .thenApplyAsync(result -> {
                 context.span().ifPresent(span -> {
                     span.setAttribute("messageCount", result.recordBatchList().size());
@@ -151,7 +155,8 @@ public class S3StreamStore implements StreamStore {
             span.setAttribute("recordBytes", recordBatch.rawPayload().remaining());
         });
 
-        return stream.get().append(recordBatch)
+        AppendContext appendContext = new AppendContext(ContextUtil.buildStreamTraceContext(context));
+        return stream.get().append(appendContext, recordBatch)
             .thenApplyAsync(result -> {
                 context.span().ifPresent(span -> span.setAttribute("offset", result.baseOffset()));
                 return result;
@@ -229,7 +234,7 @@ public class S3StreamStore implements StreamStore {
         }
 
         // Open the specified stream if not opened yet.
-        OpenStreamOptions options = OpenStreamOptions.newBuilder().epoch(epoch).build();
+        OpenStreamOptions options = OpenStreamOptions.builder().epoch(epoch).build();
         return streamClient.openStream(streamId, options)
             .thenAccept(stream -> LOGGER.info("Stream {} opened", streamId))
             .exceptionally(throwable -> {
@@ -264,7 +269,6 @@ public class S3StreamStore implements StreamStore {
         // Compaction config
         config.streamObjectCompactionIntervalMinutes(streamConfig.streamObjectCompactionIntervalMinutes());
         config.streamObjectCompactionMaxSizeBytes(streamConfig.streamObjectCompactionMaxSizeBytes());
-        config.streamObjectCompactionLivingTimeMinutes(streamConfig.streamObjectCompactionLivingTimeMinutes());
 
         config.streamSetObjectCompactionInterval(streamConfig.streamSetObjectCompactionInterval());
         config.streamSetObjectCompactionCacheSize(streamConfig.streamSetObjectCompactionCacheSize());

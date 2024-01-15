@@ -17,10 +17,15 @@
 
 package com.automq.rocketmq.proxy.remoting.activity;
 
+import com.automq.rocketmq.common.trace.TraceHelper;
 import com.automq.rocketmq.proxy.exception.ExceptionHandler;
+import com.automq.rocketmq.proxy.model.ProxyContextExt;
 import com.automq.rocketmq.proxy.remoting.RemotingUtil;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.FileRegion;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.api.trace.Tracer;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Objects;
@@ -35,10 +40,12 @@ import org.apache.rocketmq.common.message.MessageDecoder;
 import org.apache.rocketmq.common.message.MessageExt;
 import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.common.sysflag.PullSysFlag;
+import org.apache.rocketmq.proxy.common.ContextVariable;
 import org.apache.rocketmq.proxy.common.ProxyContext;
 import org.apache.rocketmq.proxy.processor.MessagingProcessor;
 import org.apache.rocketmq.proxy.remoting.activity.PullMessageActivity;
 import org.apache.rocketmq.proxy.remoting.pipeline.RequestPipeline;
+import org.apache.rocketmq.remoting.common.RemotingHelper;
 import org.apache.rocketmq.remoting.exception.RemotingCommandException;
 import org.apache.rocketmq.remoting.protocol.ForbiddenType;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
@@ -95,11 +102,26 @@ public class ExtendPullMessageActivity extends PullMessageActivity implements Co
     protected void writeResponse(ChannelHandlerContext ctx, ProxyContext context, RemotingCommand request,
         RemotingCommand response, Throwable t) {
         recordRpcLatency(context, response);
+        ProxyContextExt contextExt = (ProxyContextExt) context;
+        Span rootSpan = contextExt.rootSpan();
+        rootSpan.setAttribute("code", RemotingHelper.getResponseCodeDesc(response.getCode()));
+        TraceHelper.endSpan(contextExt, rootSpan, t);
         super.writeResponse(ctx, context, request, response, t);
     }
 
     private RemotingCommand pullMessage(ChannelHandlerContext ctx, RemotingCommand request,
         ProxyContext context) throws RemotingCommandException {
+        ProxyContextExt contextExt = (ProxyContextExt) context;
+        Tracer tracer = contextExt.tracer().get();
+        Span rootSpan = tracer.spanBuilder("PullMessage")
+            .setNoParent()
+            .setSpanKind(SpanKind.SERVER)
+            .setAttribute(ContextVariable.PROTOCOL_TYPE, contextExt.getProtocolType())
+            .setAttribute(ContextVariable.ACTION, contextExt.getAction())
+            .setAttribute(ContextVariable.CLIENT_ID, contextExt.getClientID())
+            .startSpan();
+        contextExt.attachSpan(rootSpan);
+
         // Retrieve the request header.
         final PullMessageRequestHeader requestHeader = (PullMessageRequestHeader)
             request.decodeCommandCustomHeader(PullMessageRequestHeader.class);
@@ -234,13 +256,15 @@ public class ExtendPullMessageActivity extends PullMessageActivity implements Co
                     ctx.writeAndFlush(fileRegion)
                         .addListener(future -> {
                             recordRpcLatency(context, response);
+                            rootSpan.setAttribute("code", RemotingHelper.getResponseCodeDesc(response.getCode()));
+                            TraceHelper.endSpan(contextExt, rootSpan, future.cause());
                             if (!future.isSuccess()) {
                                 LOGGER.error("Write pull message response failed", future.cause());
                             }
                         });
                     return;
                 }
-                writeResponse(ctx, context, request, response);
+                writeResponse(ctx, context, request, response, null);
             });
 
         return null;

@@ -17,16 +17,16 @@
 
 package com.automq.stream.s3;
 
-import com.automq.stream.s3.metrics.stats.ByteBufMetricsStats;
+import com.automq.stream.s3.metrics.MetricsLevel;
+import com.automq.stream.s3.metrics.stats.ByteBufStats;
 import com.automq.stream.utils.Threads;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.PooledByteBufAllocator;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.ArrayList;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class DirectByteBufAlloc {
     private static final Logger LOGGER = LoggerFactory.getLogger(DirectByteBufAlloc.class);
@@ -45,11 +45,11 @@ public class DirectByteBufAlloc {
     public static ByteBuf byteBuffer(int initCapacity, String name) {
         try {
             if (name != null) {
-                ByteBufMetricsStats.getHistogram(name).update(initCapacity);
+                ByteBufStats.getInstance().allocateByteBufSizeStats(name).record(MetricsLevel.DEBUG, initCapacity);
             }
             return ALLOC.directBuffer(initCapacity);
         } catch (OutOfMemoryError e) {
-            for (;;) {
+            for (; ; ) {
                 int freedBytes = 0;
                 for (OOMHandler handler : OOM_HANDLERS) {
                     freedBytes += handler.handle(initCapacity);
@@ -77,6 +77,7 @@ public class DirectByteBufAlloc {
     public interface OOMHandler {
         /**
          * Try handle OOM exception.
+         *
          * @param memoryRequired the memory required
          * @return freed memory.
          */

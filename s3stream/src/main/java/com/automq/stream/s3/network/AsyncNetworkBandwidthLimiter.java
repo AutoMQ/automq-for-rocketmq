@@ -17,9 +17,10 @@
 
 package com.automq.stream.s3.network;
 
-import com.automq.stream.s3.metrics.stats.NetworkMetricsStats;
+import com.automq.stream.s3.metrics.MetricsLevel;
+import com.automq.stream.s3.metrics.S3StreamMetricsManager;
+import com.automq.stream.s3.metrics.stats.NetworkStats;
 import io.netty.util.concurrent.DefaultThreadFactory;
-
 import java.util.Objects;
 import java.util.PriorityQueue;
 import java.util.Queue;
@@ -36,11 +37,11 @@ public class AsyncNetworkBandwidthLimiter {
     private final Lock lock = new ReentrantLock();
     private final Condition condition = lock.newCondition();
     private final long maxTokens;
-    private long availableTokens;
     private final ScheduledExecutorService refillThreadPool;
     private final ExecutorService callbackThreadPool;
     private final Queue<BucketItem> queuedCallbacks;
     private final Type type;
+    private long availableTokens;
 
     public AsyncNetworkBandwidthLimiter(Type type, long tokenSize, int refillIntervalMs, long maxTokenSize) {
         this.type = type;
@@ -78,22 +79,7 @@ public class AsyncNetworkBandwidthLimiter {
                 lock.unlock();
             }
         }, refillIntervalMs, refillIntervalMs, TimeUnit.MILLISECONDS);
-        NetworkMetricsStats.registerNetworkInboundAvailableBandwidth(type, () -> {
-            lock.lock();
-            try {
-                return availableTokens;
-            } finally {
-                lock.unlock();
-            }
-        });
-        NetworkMetricsStats.registerNetworkLimiterQueueSize(type, () -> {
-            lock.lock();
-            try {
-                return queuedCallbacks.size();
-            } finally {
-                lock.unlock();
-            }
-        });
+        S3StreamMetricsManager.registerNetworkLimiterSupplier(type, this::getAvailableTokens, this::getQueueSize);
     }
 
     public void shutdown() {
@@ -109,6 +95,15 @@ public class AsyncNetworkBandwidthLimiter {
         lock.lock();
         try {
             return availableTokens;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public int getQueueSize() {
+        lock.lock();
+        try {
+            return queuedCallbacks.size();
         } finally {
             lock.unlock();
         }
@@ -154,18 +149,7 @@ public class AsyncNetworkBandwidthLimiter {
     }
 
     private void logMetrics(long size) {
-        if (type == Type.INBOUND) {
-            NetworkMetricsStats.getOrCreateNetworkInboundUsageCounter().inc(size);
-        } else {
-            NetworkMetricsStats.getOrCreateNetworkOutboundUsageCounter().inc(size);
-        }
-    }
-
-    record BucketItem(int priority, long size, CompletableFuture<Void> cf) implements Comparable<BucketItem> {
-        @Override
-        public int compareTo(BucketItem o) {
-            return Long.compare(priority, o.priority);
-        }
+        NetworkStats.getInstance().networkUsageStats(type).add(MetricsLevel.INFO, size);
     }
 
     public enum Type {
@@ -180,6 +164,13 @@ public class AsyncNetworkBandwidthLimiter {
 
         public String getName() {
             return name;
+        }
+    }
+
+    record BucketItem(int priority, long size, CompletableFuture<Void> cf) implements Comparable<BucketItem> {
+        @Override
+        public int compareTo(BucketItem o) {
+            return Long.compare(priority, o.priority);
         }
     }
 }

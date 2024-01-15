@@ -1259,9 +1259,15 @@ class DefaultMetadataStoreTest extends DatabaseTestBase {
 
             metadataStore.onQueueClosed(2, 1).join();
 
-            StreamMapper mapper = session.getMapper(StreamMapper.class);
-            Stream stream = mapper.getByStreamId(streamId);
-            assertEquals(stream.getState(), StreamState.CLOSED);
+            QueueAssignmentMapper assignmentMapper = session.getMapper(QueueAssignmentMapper.class);
+            QueueAssignment assignment = assignmentMapper.get(2, 1);
+            assertEquals(4, assignment.getDstNodeId());
+            assertEquals(4, assignment.getDstNodeId());
+
+            StreamMapper streamMapper = session.getMapper(StreamMapper.class);
+            Stream stream = streamMapper.getByStreamId(streamId);
+            assertEquals(4, stream.getDstNodeId());
+            assertEquals(4, stream.getDstNodeId());
         }
     }
 

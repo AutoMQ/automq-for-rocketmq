@@ -90,6 +90,7 @@ public class StreamLogicQueue extends LogicQueue {
         this.config = config;
         this.metadataService = metadataService;
         this.stateMachine = stateMachine;
+        stateMachine.registerRetryAckOffsetListener(this::onRetryAckOffsetAdvance);
         this.streamStore = streamStore;
         this.retryStreamIdMap = new ConcurrentHashMap<>();
         this.operationLogService = operationLogService;
@@ -138,18 +139,12 @@ public class StreamLogicQueue extends LogicQueue {
                 })
                 // recover from operation log
                 .thenCompose(nil -> operationLogService.recover(stateMachine, operationStreamId, snapshotStreamId))
-                .thenAccept(nil -> {
-                    // register retry ack advance listener
-                    this.stateMachine.registerRetryAckOffsetListener(this::onRetryAckOffsetAdvance);
-                    state.set(State.OPENED);
-                })
                 .thenAccept(nil -> state.set(State.OPENED));
         }
         return CompletableFuture.completedFuture(null);
     }
 
     private void onRetryAckOffsetAdvance(long consumerGroupId, long ackOffset) {
-        // TODO: add reclaim policy
         CompletableFuture<Long> retryStreamIdCf = retryStreamIdMap.get(consumerGroupId);
         if (retryStreamIdCf == null) {
             LOGGER.warn("Retry stream id not found for consumer group: {}", consumerGroupId);
@@ -414,7 +409,6 @@ public class StreamLogicQueue extends LogicQueue {
             .thenApply(fetchResult -> {
                 AtomicLong fetchBytes = new AtomicLong();
 
-                // TODO: Assume message count is always 1 in each batch for now.
                 List<FlatMessageExt> resultList = fetchResult.recordBatchList()
                     .stream()
                     .map(batch -> {
@@ -612,15 +606,18 @@ public class StreamLogicQueue extends LogicQueue {
     }
 
     @Override
-    public CompletableFuture<PullResult> pullNormal(long consumerGroupId, Filter filter, long startOffset,
+    @WithSpan(kind = SpanKind.SERVER)
+    public CompletableFuture<PullResult> pullNormal(StoreContext context, long consumerGroupId, Filter filter,
+        long startOffset,
         int batchSize) {
         if (state.get() != State.OPENED) {
             return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.QUEUE_NOT_OPENED, "Topic queue not opened"));
         }
-        return pull(dataStreamId, consumerGroupId, filter, startOffset, batchSize);
+        return pull(context, dataStreamId, consumerGroupId, filter, startOffset, batchSize);
     }
 
-    private CompletableFuture<PullResult> pull(long streamId, long consumerGroupId, Filter filter, long startOffset,
+    private CompletableFuture<PullResult> pull(StoreContext context, long streamId, long consumerGroupId, Filter filter,
+        long startOffset,
         int batchSize) {
         int fetchBatchSize;
         if (filter.needApply()) {
@@ -632,7 +629,7 @@ public class StreamLogicQueue extends LogicQueue {
         }
         FilterFetchResult fetchResult = new FilterFetchResult(startOffset);
         long operationTimestamp = System.currentTimeMillis();
-        CompletableFuture<FilterFetchResult> fetchCf = fetchAndFilterMessages(StoreContext.EMPTY, streamId, startOffset, batchSize,
+        CompletableFuture<FilterFetchResult> fetchCf = fetchAndFilterMessages(context, streamId, startOffset, batchSize,
             fetchBatchSize, filter, fetchResult, 0, 0, operationTimestamp);
         return fetchCf.thenApply(filterFetchResult -> {
             List<FlatMessageExt> messageExtList = filterFetchResult.messageList;
@@ -648,13 +645,15 @@ public class StreamLogicQueue extends LogicQueue {
     }
 
     @Override
-    public CompletableFuture<PullResult> pullRetry(long consumerGroupId, Filter filter, long startOffset,
+    @WithSpan(kind = SpanKind.SERVER)
+    public CompletableFuture<PullResult> pullRetry(StoreContext context, long consumerGroupId, Filter filter,
+        long startOffset,
         int batchSize) {
         if (state.get() != State.OPENED) {
             return CompletableFuture.failedFuture(new StoreException(StoreErrorCode.QUEUE_NOT_OPENED, "Topic queue not opened"));
         }
         CompletableFuture<Long> retryStreamIdCf = retryStreamId(consumerGroupId);
-        return retryStreamIdCf.thenCompose(streamId -> pull(streamId, consumerGroupId, filter, startOffset, batchSize));
+        return retryStreamIdCf.thenCompose(streamId -> pull(context, streamId, consumerGroupId, filter, startOffset, batchSize));
     }
 
     @Override

@@ -17,8 +17,8 @@
 
 package com.automq.rocketmq.cli.producer;
 
-import apache.rocketmq.controller.v1.AcceptTypes;
 import apache.rocketmq.common.v1.Code;
+import apache.rocketmq.controller.v1.AcceptTypes;
 import apache.rocketmq.controller.v1.CreateTopicRequest;
 import apache.rocketmq.controller.v1.MessageType;
 import com.automq.rocketmq.cli.CliClientConfig;
@@ -28,6 +28,7 @@ import com.automq.rocketmq.common.PrefixThreadFactory;
 import com.automq.rocketmq.common.exception.ControllerException;
 import com.automq.rocketmq.controller.client.GrpcControllerClient;
 import com.codahale.metrics.ConsoleReporter;
+import com.codahale.metrics.Counter;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Timer;
 import com.google.common.util.concurrent.RateLimiter;
@@ -96,6 +97,7 @@ public class ProduceMessage implements Callable<Void> {
         ConsoleReporter reporter = ConsoleReporter.forRegistry(metrics)
             .build();
         reporter.start(reportIntervalInSeconds, TimeUnit.SECONDS);
+        Counter counter = metrics.counter("Counter for sending messages failed");
         Timer timer = metrics.timer("Timer for sending messages");
         long startTimestamp = System.currentTimeMillis();
 
@@ -118,9 +120,12 @@ public class ProduceMessage implements Callable<Void> {
                     long start = System.currentTimeMillis();
                     producers[i % producerNums].sendAsync(message).thenAccept(sendReceipt -> {
                         timer.update(System.currentTimeMillis() - start, TimeUnit.MILLISECONDS);
+                    }).exceptionally(throwable -> {
+                        counter.inc();
+                        return null;
                     });
-                } catch (Exception e) {
-                    System.out.println("Failed to send message: " + e.getMessage());
+                } catch (Exception ignore) {
+                    counter.inc();
                 }
             }
         });

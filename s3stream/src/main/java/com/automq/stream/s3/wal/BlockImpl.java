@@ -18,14 +18,13 @@
 package com.automq.stream.s3.wal;
 
 import com.automq.stream.s3.DirectByteBufAlloc;
+import com.automq.stream.s3.metrics.MetricsLevel;
 import com.automq.stream.s3.metrics.TimerUtil;
-import com.automq.stream.s3.metrics.operations.S3Operation;
-import com.automq.stream.s3.metrics.stats.ByteBufMetricsStats;
-import com.automq.stream.s3.metrics.stats.OperationMetricsStats;
+import com.automq.stream.s3.metrics.stats.ByteBufStats;
+import com.automq.stream.s3.metrics.stats.StorageOperationStats;
 import com.automq.stream.s3.wal.util.WALUtil;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
-
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -77,7 +76,8 @@ public class BlockImpl implements Block {
      * Note: this method is NOT thread safe.
      */
     @Override
-    public long addRecord(long recordSize, Function<Long, ByteBuf> recordSupplier, CompletableFuture<WriteAheadLog.AppendResult.CallbackResult> future) {
+    public long addRecord(long recordSize, Function<Long, ByteBuf> recordSupplier,
+        CompletableFuture<WriteAheadLog.AppendResult.CallbackResult> future) {
         assert data == null;
         long requiredCapacity = nextOffset + recordSize;
         if (requiredCapacity > maxSize) {
@@ -113,10 +113,10 @@ public class BlockImpl implements Block {
         data = DirectByteBufAlloc.compositeByteBuffer();
         for (Supplier<ByteBuf> supplier : records) {
             ByteBuf record = supplier.get();
-            ByteBufMetricsStats.getHistogram("wal_record").update(record.readableBytes());
+            ByteBufStats.getInstance().allocateByteBufSizeStats("wal_record").record(MetricsLevel.DEBUG, record.readableBytes());
             data.addComponent(true, record);
         }
-        ByteBufMetricsStats.getHistogram("wal_block").update(data.readableBytes());
+        ByteBufStats.getInstance().allocateByteBufSizeStats("wal_block").record(MetricsLevel.DEBUG, data.readableBytes());
         return data;
     }
 
@@ -127,6 +127,6 @@ public class BlockImpl implements Block {
 
     @Override
     public void polled() {
-        OperationMetricsStats.getHistogram(S3Operation.APPEND_STORAGE_WAL_BLOCK_POLLED).update(timer.elapsedAs(TimeUnit.NANOSECONDS));
+        StorageOperationStats.getInstance().appendWALBlockPolledStats.record(MetricsLevel.DEBUG, timer.elapsedAs(TimeUnit.NANOSECONDS));
     }
 }

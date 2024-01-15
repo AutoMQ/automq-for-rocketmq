@@ -17,23 +17,23 @@
 
 package com.automq.stream.s3.cache;
 
+import com.automq.stream.s3.metrics.MetricsLevel;
 import com.automq.stream.s3.metrics.TimerUtil;
-import com.automq.stream.s3.metrics.stats.BlockCacheMetricsStats;
+import com.automq.stream.s3.metrics.stats.StorageOperationStats;
 import com.automq.stream.utils.LogContext;
 import com.google.common.base.Objects;
-import org.apache.commons.lang3.tuple.Pair;
-import org.slf4j.Logger;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import org.apache.commons.lang3.tuple.Pair;
+import org.slf4j.Logger;
 
 public class ReadAheadAgent {
-    private final Logger logger;
     private static final Integer MAX_READ_AHEAD_SIZE = 40 * 1024 * 1024; // 40MB
     private static final Integer S3_OPERATION_DELAY_MS = 400; // 400ms
+    private final Logger logger;
     private final Lock lock = new ReentrantLock();
     private final TimerUtil timer;
     private final long streamId;
@@ -99,7 +99,7 @@ public class ReadAheadAgent {
             lock.lock();
             this.readAheadEndOffset = readAheadEndOffset;
             this.lastReadAheadSize = readAheadSize;
-            BlockCacheMetricsStats.getOrCreateReadAheadSizeHist().update(readAheadSize);
+            StorageOperationStats.getInstance().readAheadSizeStats.record(MetricsLevel.INFO, readAheadSize);
             if (logger.isDebugEnabled()) {
                 logger.debug("update read ahead offset {}, size: {}, lastReadOffset: {}", readAheadEndOffset, readAheadSize, lastReadOffset);
             }
@@ -190,9 +190,9 @@ public class ReadAheadAgent {
         try {
             lock.lock();
             if (startOffset >= endOffset
-                    || lastReadOffset >= readAheadEndOffset
-                    || endOffset <= lastReadOffset
-                    || startOffset >= readAheadEndOffset) {
+                || lastReadOffset >= readAheadEndOffset
+                || endOffset <= lastReadOffset
+                || startOffset >= readAheadEndOffset) {
                 return;
             }
 
@@ -208,8 +208,10 @@ public class ReadAheadAgent {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o)
+            return true;
+        if (o == null || getClass() != o.getClass())
+            return false;
         ReadAheadAgent agent = (ReadAheadAgent) o;
         return streamId == agent.streamId && lastReadOffset == agent.lastReadOffset;
     }
@@ -222,12 +224,12 @@ public class ReadAheadAgent {
     @Override
     public String toString() {
         return "ReadAheadAgent{" +
-                "stream=" + streamId +
-                ", bytesPerSecond=" + bytePerSecond +
-                ", lastReadOffset=" + lastReadOffset +
-                ", lastReadSize=" + lastReadSize +
-                ", readAheadEndOffset=" + readAheadEndOffset +
-                ", evictedOffsetRanges=" + evictedOffsetRanges +
-                '}';
+            "stream=" + streamId +
+            ", bytesPerSecond=" + bytePerSecond +
+            ", lastReadOffset=" + lastReadOffset +
+            ", lastReadSize=" + lastReadSize +
+            ", readAheadEndOffset=" + readAheadEndOffset +
+            ", evictedOffsetRanges=" + evictedOffsetRanges +
+            '}';
     }
 }

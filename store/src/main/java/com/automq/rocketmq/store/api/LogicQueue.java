@@ -78,10 +78,12 @@ public abstract class LogicQueue {
 
     public abstract int getInflightStats(long consumerGroupId);
 
-    public abstract CompletableFuture<PullResult> pullNormal(long consumerGroupId, Filter filter, long startOffset,
+    public abstract CompletableFuture<PullResult> pullNormal(StoreContext context, long consumerGroupId, Filter filter,
+        long startOffset,
         int batchSize);
 
-    public abstract CompletableFuture<PullResult> pullRetry(long consumerGroupId, Filter filter, long startOffset,
+    public abstract CompletableFuture<PullResult> pullRetry(StoreContext context, long consumerGroupId, Filter filter,
+        long startOffset,
         int batchSize);
 
     public abstract long getConsumeOffset(long consumerGroupId);

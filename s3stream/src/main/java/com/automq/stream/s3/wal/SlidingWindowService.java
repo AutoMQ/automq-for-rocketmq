@@ -18,18 +18,15 @@
 package com.automq.stream.s3.wal;
 
 import com.automq.stream.s3.DirectByteBufAlloc;
+import com.automq.stream.s3.metrics.MetricsLevel;
 import com.automq.stream.s3.metrics.TimerUtil;
-import com.automq.stream.s3.metrics.operations.S3Operation;
-import com.automq.stream.s3.metrics.stats.OperationMetricsStats;
+import com.automq.stream.s3.metrics.stats.StorageOperationStats;
 import com.automq.stream.s3.wal.util.WALChannel;
 import com.automq.stream.s3.wal.util.WALUtil;
 import com.automq.stream.utils.FutureUtil;
 import com.automq.stream.utils.ThreadUtils;
 import com.automq.stream.utils.Threads;
 import io.netty.buffer.ByteBuf;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.util.Collection;
 import java.util.LinkedList;
@@ -42,6 +39,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static com.automq.stream.s3.wal.BlockWALService.RECORD_HEADER_MAGIC_CODE;
 import static com.automq.stream.s3.wal.BlockWALService.RECORD_HEADER_SIZE;
@@ -94,14 +93,22 @@ public class SlidingWindowService {
      */
     private Block currentBlock;
 
+    /**
+     * The thread pool for write operations.
+     */
     private ExecutorService ioExecutor;
+    /**
+     * The scheduler for polling blocks and sending them to @{@link #ioExecutor}.
+     */
+    private ScheduledExecutorService pollBlockScheduler;
 
     /**
      * The last time when a batch of blocks is written to the disk.
      */
     private long lastWriteTimeNanos = 0;
 
-    public SlidingWindowService(WALChannel walChannel, int ioThreadNums, long upperLimit, long scaleUnit, long blockSoftLimit, int writeRateLimit, WALHeaderFlusher flusher) {
+    public SlidingWindowService(WALChannel walChannel, int ioThreadNums, long upperLimit, long scaleUnit,
+        long blockSoftLimit, int writeRateLimit, WALHeaderFlusher flusher) {
         this.walChannel = walChannel;
         this.ioThreadNums = ioThreadNums;
         this.upperLimit = upperLimit;
@@ -119,9 +126,9 @@ public class SlidingWindowService {
     public void start(AtomicLong windowMaxLength, long windowStartOffset) {
         this.windowCoreData = new WindowCoreData(windowMaxLength, windowStartOffset, windowStartOffset);
         this.ioExecutor = Threads.newFixedThreadPoolWithMonitor(ioThreadNums,
-                "block-wal-io-thread", false, LOGGER);
-        ScheduledExecutorService pollBlockScheduler = Threads.newSingleThreadScheduledExecutor(
-                ThreadUtils.createThreadFactory("wal-poll-block-thread-%d", false), LOGGER);
+            "block-wal-io-thread", false, LOGGER);
+        this.pollBlockScheduler = Threads.newSingleThreadScheduledExecutor(
+            ThreadUtils.createThreadFactory("wal-poll-block-thread-%d", false), LOGGER);
         pollBlockScheduler.scheduleAtFixedRate(this::tryWriteBlock, 0, minWriteIntervalNanos, TimeUnit.NANOSECONDS);
         initialized.set(true);
     }
@@ -137,6 +144,7 @@ public class SlidingWindowService {
 
         boolean gracefulShutdown;
         this.ioExecutor.shutdown();
+        this.pollBlockScheduler.shutdownNow();
         try {
             gracefulShutdown = this.ioExecutor.awaitTermination(timeout, unit);
         } catch (InterruptedException e) {
@@ -184,7 +192,8 @@ public class SlidingWindowService {
      * - creates a new block, sets it as the current block and returns it
      * Note: this method is NOT thread safe, and it should be called with {@link #blockLock} locked.
      */
-    public Block sealAndNewBlockLocked(Block previousBlock, long minSize, long trimOffset, long recordSectionCapacity) throws OverCapacityException {
+    public Block sealAndNewBlockLocked(Block previousBlock, long minSize, long trimOffset,
+        long recordSectionCapacity) throws OverCapacityException {
         assert initialized();
         long startOffset = nextBlockStartOffset(previousBlock);
 
@@ -195,10 +204,10 @@ public class SlidingWindowService {
 
         // Not enough space for this block
         if (startOffset + minSize - trimOffset > recordSectionCapacity) {
-            LOGGER.error("failed to allocate write offset as the ring buffer is full: startOffset: {}, minSize: {}, trimOffset: {}, recordSectionCapacity: {}",
-                    startOffset, minSize, trimOffset, recordSectionCapacity);
+            LOGGER.warn("failed to allocate write offset as the ring buffer is full: startOffset: {}, minSize: {}, trimOffset: {}, recordSectionCapacity: {}",
+                startOffset, minSize, trimOffset, recordSectionCapacity);
             throw new OverCapacityException(String.format("failed to allocate write offset: ring buffer is full: startOffset: %d, minSize: %d, trimOffset: %d, recordSectionCapacity: %d",
-                    startOffset, minSize, trimOffset, recordSectionCapacity));
+                startOffset, minSize, trimOffset, recordSectionCapacity));
         }
 
         long maxSize = upperLimit;
@@ -343,28 +352,18 @@ public class SlidingWindowService {
             walChannel.write(block.data(), position);
         }
         walChannel.flush();
-        OperationMetricsStats.getHistogram(S3Operation.APPEND_STORAGE_WAL_WRITE).update(timer.elapsedAs(TimeUnit.NANOSECONDS));
+        StorageOperationStats.getInstance().appendWALWriteStats.record(MetricsLevel.DEBUG, timer.elapsedAs(TimeUnit.NANOSECONDS));
     }
 
-    private void makeWriteOffsetMatchWindow(long newWindowEndOffset) throws IOException, OverCapacityException {
+    private void makeWriteOffsetMatchWindow(long newWindowEndOffset) throws IOException {
         // align to block size
         newWindowEndOffset = WALUtil.alignLargeByBlockSize(newWindowEndOffset);
         long windowStartOffset = windowCoreData.getStartOffset();
         long windowMaxLength = windowCoreData.getMaxLength();
         if (newWindowEndOffset > windowStartOffset + windowMaxLength) {
-            long newWindowMaxLength = newWindowEndOffset - windowStartOffset + scaleUnit;
-            if (newWindowMaxLength > upperLimit) {
-                // exceed upper limit
-                if (newWindowEndOffset - windowStartOffset >= upperLimit) {
-                    // however, the new window length is still larger than upper limit, so we just set it to upper limit
-                    newWindowMaxLength = upperLimit;
-                } else {
-                    // the new window length is bigger than upper limit, reject this write request
-                    LOGGER.error("new windows size {} exceeds upper limit {}, reject this write request, window start offset: {}, new window end offset: {}",
-                            newWindowMaxLength, upperLimit, windowStartOffset, newWindowEndOffset);
-                    throw new OverCapacityException(String.format("new windows size exceeds upper limit %d", upperLimit));
-                }
-            }
+            // endOffset - startOffset <= block.maxSize <= upperLimit in {@link #sealAndNewBlockLocked}
+            assert newWindowEndOffset - windowStartOffset <= upperLimit;
+            long newWindowMaxLength = Math.min(newWindowEndOffset - windowStartOffset + scaleUnit, upperLimit);
             windowCoreData.scaleOutWindow(walHeaderFlusher, newWindowMaxLength);
         }
     }
@@ -435,12 +434,12 @@ public class SlidingWindowService {
         @Override
         public String toString() {
             return "RecordHeaderCoreData{" +
-                    "magicCode=" + magicCode0 +
-                    ", recordBodyLength=" + recordBodyLength1 +
-                    ", recordBodyOffset=" + recordBodyOffset2 +
-                    ", recordBodyCRC=" + recordBodyCRC3 +
-                    ", recordHeaderCRC=" + recordHeaderCRC4 +
-                    '}';
+                "magicCode=" + magicCode0 +
+                ", recordBodyLength=" + recordBodyLength1 +
+                ", recordBodyOffset=" + recordBodyOffset2 +
+                ", recordBodyCRC=" + recordBodyCRC3 +
+                ", recordHeaderCRC=" + recordHeaderCRC4 +
+                '}';
         }
 
         private ByteBuf marshalHeaderExceptCRC() {
@@ -532,7 +531,7 @@ public class SlidingWindowService {
 
         @Override
         public void run() {
-            OperationMetricsStats.getHistogram(S3Operation.APPEND_STORAGE_WAL_AWAIT).update(timer.elapsedAs(TimeUnit.NANOSECONDS));
+            StorageOperationStats.getInstance().appendWALAwaitStats.record(MetricsLevel.DEBUG, timer.elapsedAs(TimeUnit.NANOSECONDS));
             writeBlock(this.blocks);
         }
 
@@ -556,7 +555,7 @@ public class SlidingWindowService {
                         return "CallbackResult{" + "flushedOffset=" + flushedOffset() + '}';
                     }
                 });
-                OperationMetricsStats.getHistogram(S3Operation.APPEND_STORAGE_WAL_AFTER).update(timer.elapsedAs(TimeUnit.NANOSECONDS));
+                StorageOperationStats.getInstance().appendWALAfterStats.record(MetricsLevel.DEBUG, timer.elapsedAs(TimeUnit.NANOSECONDS));
             } catch (Exception e) {
                 FutureUtil.completeExceptionally(blocks.futures(), e);
                 LOGGER.error(String.format("failed to write blocks, startOffset: %s", blocks.startOffset()), e);

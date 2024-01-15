@@ -38,6 +38,8 @@ public interface KVService {
         return get(namespace, key, new KVReadOptions());
     }
 
+    byte[] getByPrefix(final String namespace, final byte[] prefix) throws StoreException;
+
     /**
      * Iterate all the k-v pairs.
      *

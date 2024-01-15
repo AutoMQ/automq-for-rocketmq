@@ -20,6 +20,7 @@ package com.automq.rocketmq.proxy.service;
 import apache.rocketmq.common.v1.Code;
 import apache.rocketmq.controller.v1.ConsumerGroup;
 import apache.rocketmq.controller.v1.MessageQueueAssignment;
+import apache.rocketmq.controller.v1.OngoingMessageQueueReassignment;
 import apache.rocketmq.controller.v1.StreamRole;
 import apache.rocketmq.controller.v1.SubscriptionMode;
 import apache.rocketmq.controller.v1.Topic;
@@ -70,6 +71,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -188,32 +190,41 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
 
     private CompletableFuture<PutResult> putMessage(ProxyContext ctx, FlatMessage message) {
         return topicOf(message.topicId())
-            .thenCompose(topic -> {
-                Optional<MessageQueueAssignment> assignment = topic.getAssignmentsList().stream().filter(item -> item.getQueue().getQueueId() == message.queueId()).findFirst();
-                if (assignment.isEmpty()) {
-                    LOGGER.error("Message: {} is dropped because the topic: {} doesn't have queue: {}",
-                        message.systemProperties().messageId(), topic.getName(), message.queueId());
-                    return CompletableFuture.failedFuture(new ProxyException(apache.rocketmq.v2.Code.BAD_REQUEST, "Queue " + message.queueId() + " is not assigned to any node."));
-                }
-                return putMessage(ctx, topic, assignment.get(), message);
-            });
+            .thenCompose(topic -> putMessage(ctx, topic, message));
     }
 
-    private CompletableFuture<PutResult> putMessage(ProxyContext ctx, Topic topic, MessageQueueAssignment assignment,
-        FlatMessage message) {
-        if (assignment.getNodeId() != brokerConfig.nodeId()) {
-            if (ctx instanceof ProxyContextExt contextExt) {
-                contextExt.setRelayed(true);
+    private CompletableFuture<PutResult> putMessage(ProxyContext ctx, Topic topic, FlatMessage message) {
+        Optional<MessageQueueAssignment> optional = topic.getAssignmentsList().stream().filter(item -> item.getQueue().getQueueId() == message.queueId()).findFirst();
+        if (optional.isEmpty()) {
+            Optional<OngoingMessageQueueReassignment> reassignment = topic.getReassignmentsList().stream().filter(item -> item.getQueue().getQueueId() == message.queueId()).findFirst();
+            if (reassignment.isPresent()) {
+                return forwardMessage(ctx, reassignment.get().getDstNodeId(), message);
             }
-            return metadataService.addressOf(assignment.getNodeId())
-                .thenCompose(address -> relayClient.relayMessage(address, message))
-                .thenApply(status -> new PutResult(PutResult.Status.PUT_OK, 0));
+
+            // If the queue is not assigned to any node or under ongoing reassignment, the message will be dropped.
+            LOGGER.error("Message: {} is dropped because the topic: {} queue id: {} is not assigned to any node.",
+                message.systemProperties().messageId(), topic.getName(), message.queueId());
+            return CompletableFuture.failedFuture(new ProxyException(apache.rocketmq.v2.Code.BAD_REQUEST, "Topic " + topic.getName() + "queue id " + message.queueId() + " is not assigned to any node."));
+        }
+
+        MessageQueueAssignment assignment = optional.get();
+        if (assignment.getNodeId() != brokerConfig.nodeId()) {
+            return forwardMessage(ctx, assignment.getNodeId(), message);
         }
         StoreContext storeContext = StoreContext.EMPTY;
         if (ctx != null) {
             storeContext = ContextUtil.buildStoreContext(ctx, topic.getName(), "");
         }
         return store.put(storeContext, message);
+    }
+
+    private CompletableFuture<PutResult> forwardMessage(ProxyContext ctx, int nodeId, FlatMessage message) {
+        if (ctx instanceof ProxyContextExt contextExt) {
+            contextExt.setRelayed(true);
+        }
+        return metadataService.addressOf(nodeId)
+            .thenCompose(address -> relayClient.relayMessage(address, message))
+            .thenApply(status -> new PutResult(PutResult.Status.PUT_OK, 0));
     }
 
     @Override
@@ -239,14 +250,6 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
             ProxyContextExt contextExt = (ProxyContextExt) ctx;
             FlatMessage flatMessage = FlatMessageUtil.convertTo(contextExt, topic.getTopicId(), virtualQueue.physicalQueueId(), config.hostName(), message);
 
-            Optional<MessageQueueAssignment> optional = topic.getAssignmentsList().stream().filter(assignment -> assignment.getQueue().getQueueId() == flatMessage.queueId()).findFirst();
-            if (optional.isEmpty()) {
-                LOGGER.error("Message: {} is dropped because the topic: {} doesn't have queue: {}",
-                    messageId, topic.getName(), flatMessage.queueId());
-                return CompletableFuture.failedFuture(new ProxyException(apache.rocketmq.v2.Code.BAD_REQUEST, "Queue " + flatMessage.queueId() + " is not assigned to any node."));
-            }
-            MessageQueueAssignment assignment = optional.get();
-
             if (requestHeader.getTopic().startsWith(MixAll.RETRY_GROUP_TOPIC_PREFIX)) {
                 flatMessage.systemProperties().mutateDeliveryAttempts(requestHeader.getReconsumeTimes() + 1);
                 if (requestHeader.getReconsumeTimes() > requestHeader.getMaxReconsumeTimes()) {
@@ -266,10 +269,10 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
                         span.setAttribute("reconsumeTimes", requestHeader.getReconsumeTimes());
                         span.setAttribute("deliveryTimestamp", flatMessage.systemProperties().deliveryTimestamp());
                     });
-                    return putMessage(ctx, topic, assignment, flatMessage);
+                    return putMessage(ctx, topic, flatMessage);
                 }
             }
-            return putMessage(ctx, topic, assignment, flatMessage);
+            return putMessage(ctx, topic, flatMessage);
         });
 
         return putFuture.thenApply(putResult -> {
@@ -320,7 +323,7 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
             Topic topic = pair.getLeft();
             ConsumerGroup group = pair.getRight();
 
-            return store.pull(group.getGroupId(), topic.getTopicId(), virtualQueue.physicalQueueId(),
+            return store.pull(StoreContext.EMPTY, group.getGroupId(), topic.getTopicId(), virtualQueue.physicalQueueId(),
                     Filter.DEFAULT_FILTER, requestHeader.getOffset(), 1, false)
                 .thenApply(pullResult -> {
                     if (pullResult.status() == com.automq.rocketmq.store.model.message.PullResult.Status.FOUND) {
@@ -525,7 +528,18 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
                     lockService.release(topicId, queueId);
                 });
         }
-        return CompletableFuture.completedFuture(new InnerPopResult(0, Collections.emptyList()));
+        AtomicLong restOffset = new AtomicLong();
+        store.getOffsetRange(topicId, queueId, -1)
+            .stream()
+            .filter(range -> range.streamRole() == StreamRole.STREAM_ROLE_DATA)
+            .findFirst()
+            .ifPresent(range -> {
+                long diff = range.endOffset() - store.getConsumeOffset(consumerGroup.getGroupId(), topicId, queueId);
+                if (diff > 0) {
+                    restOffset.set(diff);
+                }
+            });
+        return CompletableFuture.completedFuture(new InnerPopResult(restOffset.get(), Collections.emptyList()));
     }
 
     @Override
@@ -795,17 +809,21 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
                     metadataService.updateConsumerOffset(group.getGroupId(), topic.getTopicId(), virtualQueue.physicalQueueId(), requestHeader.getCommitOffset());
                 }
 
-                return store.pull(group.getGroupId(), topic.getTopicId(), virtualQueue.physicalQueueId(), filter, requestHeader.getQueueOffset(), requestHeader.getMaxMsgNums(), false);
+                StoreContext storeContext = ContextUtil.buildStoreContext(ctx, topic.getName(), group.getName());
+                return store.pull(storeContext, group.getGroupId(), topic.getTopicId(), virtualQueue.physicalQueueId(), filter, requestHeader.getQueueOffset(), requestHeader.getMaxMsgNums(), false);
             })
             .thenCompose(result -> {
+                Topic topic = topicReference.get();
+                ConsumerGroup group = consumerGroupReference.get();
                 if (result.messageList().isEmpty()) {
                     if (result.maxOffset() - result.nextBeginOffset() > 0) {
                         // This means there are messages in the queue but not match the filter. So we should prevent long polling.
                         return CompletableFuture.completedFuture(new PullResult(PullStatus.NO_MATCHED_MSG, result.nextBeginOffset(), result.minOffset(), result.maxOffset(), Collections.emptyList()));
                     } else {
+                        StoreContext storeContext = ContextUtil.buildStoreContext(ctx, topic.getName(), group.getName());
                         return suspendRequestService.suspendRequest((ProxyContextExt) ctx, requestHeader.getTopic(), virtualQueue.physicalQueueId(), filter, timeoutMillis,
                                 // Function to pull message later.
-                                timeout -> store.pull(consumerGroupReference.get().getGroupId(), topicReference.get().getTopicId(), virtualQueue.physicalQueueId(), filter,
+                                timeout -> store.pull(storeContext, group.getGroupId(), topic.getTopicId(), virtualQueue.physicalQueueId(), filter,
                                         requestHeader.getQueueOffset(), requestHeader.getMaxMsgNums(), false)
                                     .thenApply(PullResultWrapper::new))
                             .thenApply(resultWrapper -> {
@@ -813,16 +831,25 @@ public class MessageServiceImpl implements MessageService, ExtendMessageService 
                                     return new PullResult(PullStatus.NO_MATCHED_MSG, result.nextBeginOffset(), result.minOffset(), result.maxOffset(), Collections.emptyList());
                                 }
                                 com.automq.rocketmq.store.model.message.PullResult suspendResult = resultWrapper.get().inner();
+                                recordMetricsForPulling(topic.getName(), group.getName(), suspendResult);
                                 return new PullResult(PullStatus.FOUND, suspendResult.nextBeginOffset(), suspendResult.minOffset(), suspendResult.maxOffset(),
                                     FlatMessageUtil.convertTo(null, suspendResult.messageList(), requestHeader.getTopic(), 0, config.hostName(), config.remotingListenPort()));
                             });
                     }
                 }
+
+                recordMetricsForPulling(topic.getName(), group.getName(), result);
                 return CompletableFuture.completedFuture(
                     new PullResult(PullStatus.FOUND, result.nextBeginOffset(), result.minOffset(), result.maxOffset(),
                         FlatMessageUtil.convertTo(null, result.messageList(), requestHeader.getTopic(), 0, config.hostName(), config.remotingListenPort()))
                 );
             });
+    }
+
+    private void recordMetricsForPulling(String topic, String group,
+        com.automq.rocketmq.store.model.message.PullResult result) {
+        Integer messageBytesTotal = result.messageList().stream().map(message -> message.message().payloadAsByteBuffer().remaining()).reduce(0, Integer::sum);
+        ProxyMetricsManager.recordOutgoingMessages(topic, group, result.messageList().size(), messageBytesTotal, topic.startsWith(MixAll.RETRY_GROUP_TOPIC_PREFIX));
     }
 
     @Override

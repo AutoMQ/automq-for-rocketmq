@@ -17,21 +17,21 @@
 
 package com.automq.stream.s3.cache;
 
+import com.automq.stream.s3.DataBlockIndex;
 import com.automq.stream.s3.ObjectReader;
 import com.automq.stream.s3.StreamDataBlock;
 import com.automq.stream.s3.TestUtils;
 import com.automq.stream.s3.model.StreamRecordBatch;
 import com.automq.stream.utils.CloseableIterator;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
-
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
@@ -43,14 +43,18 @@ import static org.mockito.Mockito.when;
 
 public class DataBlockReadAccumulatorTest {
 
+    private static StreamRecordBatch newRecord(long streamId, long offset, int count, int size) {
+        return new StreamRecordBatch(streamId, 0, offset, count, TestUtils.random(size));
+    }
+
     @Test
     public void test() throws ExecutionException, InterruptedException, TimeoutException {
         DataBlockReadAccumulator accumulator = new DataBlockReadAccumulator();
 
         ObjectReader reader = mock(ObjectReader.class);
-        ObjectReader.DataBlockIndex dataBlockIndex = new ObjectReader.DataBlockIndex(10, 10, 100, 2);
-        StreamDataBlock streamDataBlock = new StreamDataBlock(233L, 0, 12, 1, dataBlockIndex);
-        CompletableFuture<ObjectReader.DataBlock> readerCf = new CompletableFuture<>();
+        DataBlockIndex dataBlockIndex = new DataBlockIndex(10, 0, 12, 2, 10, 100);
+        StreamDataBlock streamDataBlock = new StreamDataBlock(1, dataBlockIndex);
+        CompletableFuture<ObjectReader.DataBlockGroup> readerCf = new CompletableFuture<>();
         when(reader.read(eq(dataBlockIndex))).thenReturn(readerCf);
 
         List<DataBlockReadAccumulator.ReserveResult> reserveResults = accumulator.reserveDataBlock(List.of(new ImmutablePair<>(reader, streamDataBlock)));
@@ -63,13 +67,13 @@ public class DataBlockReadAccumulatorTest {
 
         accumulator.readDataBlock(reader, dataBlockIndex);
 
-        ObjectReader.DataBlock dataBlock = mock(ObjectReader.DataBlock.class);
+        ObjectReader.DataBlockGroup dataBlockGroup = mock(ObjectReader.DataBlockGroup.class);
         List<StreamRecordBatch> records = List.of(
-                newRecord(10, 10, 2, 1),
-                newRecord(10, 12, 2, 1)
+            newRecord(10, 10, 2, 1),
+            newRecord(10, 12, 2, 1)
         );
-        when(dataBlock.recordCount()).thenReturn(2);
-        when(dataBlock.iterator()).thenAnswer(args -> {
+        when(dataBlockGroup.recordCount()).thenReturn(2);
+        when(dataBlockGroup.iterator()).thenAnswer(args -> {
             Iterator<StreamRecordBatch> it = records.iterator();
             return new CloseableIterator<StreamRecordBatch>() {
 
@@ -89,8 +93,8 @@ public class DataBlockReadAccumulatorTest {
                 }
             };
         });
-        when(dataBlock.recordCount()).thenReturn(2);
-        readerCf.complete(dataBlock);
+        when(dataBlockGroup.recordCount()).thenReturn(2);
+        readerCf.complete(dataBlockGroup);
 
         verify(reader, times(1)).read(any());
 
@@ -109,10 +113,6 @@ public class DataBlockReadAccumulatorTest {
         accumulator.readDataBlock(reader, dataBlockIndex);
         verify(reader, times(2)).read(any());
         reserveResults3.get(0).cf().get().release();
-    }
-
-    private static StreamRecordBatch newRecord(long streamId, long offset, int count, int size) {
-        return new StreamRecordBatch(streamId, 0, offset, count, TestUtils.random(size));
     }
 
 }

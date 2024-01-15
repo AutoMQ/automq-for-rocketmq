@@ -101,8 +101,8 @@ class ReviveServiceTest {
         Mockito.doAnswer(ink -> {
             long consumerGroupId = ink.getArgument(1);
             assertEquals(CONSUMER_GROUP_ID, consumerGroupId);
-            FlatMessageExt flatMessageExt = ink.getArgument(2);
-            assertNotNull(flatMessageExt);
+            FlatMessage flatMessage = ink.getArgument(2);
+            assertNotNull(flatMessage);
             return CompletableFuture.completedFuture(null);
         }).when(deadLetterSender).send(Mockito.any(), Mockito.anyLong(), Mockito.any(FlatMessage.class));
         // mock max delivery attempts
@@ -136,7 +136,7 @@ class ReviveServiceTest {
         assertNull(ckValue);
 
         // check if this message has been appended to retry stream
-        PullResult retryPullResult = logicQueue.pullRetry(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 0, invisibleDuration).join();
+        PullResult retryPullResult = logicQueue.pullRetry(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 0, invisibleDuration).join();
         assertEquals(1, retryPullResult.messageList().size());
 
         // pop retry
@@ -169,6 +169,7 @@ class ReviveServiceTest {
         // mock max delivery attempts
         Mockito.doReturn(CompletableFuture.completedFuture(2))
             .when(metadataService).maxDeliveryAttemptsOf(Mockito.anyLong());
+
         // Append mock message.
         for (int i = 0; i < 2; i++) {
             FlatMessage message = FlatMessage.getRootAsFlatMessage(buildMessage(TOPIC_ID, QUEUE_ID, "TagA"));
@@ -264,7 +265,7 @@ class ReviveServiceTest {
         assertNull(ckValue);
 
         // check if this message has been appended to retry stream
-        PullResult retryPullResult = logicQueue.pullRetry(CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 0, 32).join();
+        PullResult retryPullResult = logicQueue.pullRetry(StoreContext.EMPTY, CONSUMER_GROUP_ID, Filter.DEFAULT_FILTER, 0, 32).join();
         assertEquals(1, retryPullResult.messageList().size());
 
         // pop retry

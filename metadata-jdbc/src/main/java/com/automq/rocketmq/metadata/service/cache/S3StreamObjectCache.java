@@ -18,7 +18,6 @@
 package com.automq.rocketmq.metadata.service.cache;
 
 import com.automq.rocketmq.metadata.dao.S3StreamObject;
-import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -127,10 +126,8 @@ public class S3StreamObjectCache {
 
         lock.readLock().lock();
         try {
-            List<S3StreamObject> reversed = Lists.reverse(list);
-            return reversed.stream()
-                .filter(s3StreamObject -> s3StreamObject.getEndOffset() >= startOffset
-                    && s3StreamObject.getStartOffset() <= endOffset)
+            return list.stream()
+                .filter(s3StreamObject -> s3StreamObject.getEndOffset() >= startOffset && (s3StreamObject.getStartOffset() <= endOffset || endOffset == -1))
                 .limit(limit)
                 .toList();
         } finally {

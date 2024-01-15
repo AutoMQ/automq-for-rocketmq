@@ -174,14 +174,16 @@ public class MessageStoreImpl implements MessageStore {
     }
 
     @Override
-    public CompletableFuture<PullResult> pull(long consumerGroupId, long topicId, int queueId, Filter filter,
+    @WithSpan(kind = SpanKind.SERVER)
+    public CompletableFuture<PullResult> pull(StoreContext context, long consumerGroupId, long topicId, int queueId,
+        Filter filter,
         long offset, int batchSize, boolean retry) {
-        return logicQueueManager.getOrCreate(StoreContext.EMPTY, topicId, queueId)
+        return logicQueueManager.getOrCreate(context, topicId, queueId)
             .thenCompose(topicQueue -> {
                 if (retry) {
-                    return topicQueue.pullRetry(consumerGroupId, filter, offset, batchSize);
+                    return topicQueue.pullRetry(context, consumerGroupId, filter, offset, batchSize);
                 }
-                return topicQueue.pullNormal(consumerGroupId, filter, offset, batchSize);
+                return topicQueue.pullNormal(context, consumerGroupId, filter, offset, batchSize);
             });
     }
 

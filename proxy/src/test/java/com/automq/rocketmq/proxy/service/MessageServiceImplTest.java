@@ -407,7 +407,7 @@ class MessageServiceImplTest {
         // Pop with client id "client2".
         context.setClientID("client2");
         result = messageService.popMessage(context, messageQueue, header, 0L).join();
-        assertEquals(PopStatus.POLLING_NOT_FOUND, result.getPopStatus());
+        assertEquals(PopStatus.NO_NEW_MSG, result.getPopStatus());
         assertEquals(0, result.getMsgFoundList().size());
 
         AckMessageRequestHeader ackHeader = new AckMessageRequestHeader();

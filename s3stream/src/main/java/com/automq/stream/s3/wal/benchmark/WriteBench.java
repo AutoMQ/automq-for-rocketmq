@@ -25,12 +25,6 @@ import com.automq.stream.utils.ThreadUtils;
 import com.automq.stream.utils.Threads;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import net.sourceforge.argparse4j.ArgumentParsers;
-import net.sourceforge.argparse4j.helper.HelpScreenException;
-import net.sourceforge.argparse4j.inf.ArgumentParser;
-import net.sourceforge.argparse4j.inf.ArgumentParserException;
-import net.sourceforge.argparse4j.inf.Namespace;
-
 import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
@@ -44,6 +38,11 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
+import net.sourceforge.argparse4j.ArgumentParsers;
+import net.sourceforge.argparse4j.helper.HelpScreenException;
+import net.sourceforge.argparse4j.inf.ArgumentParser;
+import net.sourceforge.argparse4j.inf.ArgumentParserException;
+import net.sourceforge.argparse4j.inf.Namespace;
 
 /**
  * WriteBench is a tool for benchmarking write performance of {@link BlockWALService}
@@ -108,29 +107,30 @@ public class WriteBench implements AutoCloseable {
         }
     }
 
-    private static void logIt(Config config, Stat stat) {
+    private static Runnable logIt(Config config, Stat stat) {
         ScheduledExecutorService statExecutor = Threads.newSingleThreadScheduledExecutor(
-                ThreadUtils.createThreadFactory("stat-thread-%d", true), null);
+            ThreadUtils.createThreadFactory("stat-thread-%d", true), null);
         statExecutor.scheduleAtFixedRate(() -> {
             Stat.Result result = stat.reset();
             if (0 != result.count()) {
                 System.out.printf("Append task | Append Rate %d msg/s %d KB/s | Avg Latency %.3f ms | Max Latency %.3f ms\n",
-                        TimeUnit.SECONDS.toNanos(1) * result.count() / result.elapsedTimeNanos(),
-                        TimeUnit.SECONDS.toNanos(1) * (result.count() * config.recordSizeBytes) / result.elapsedTimeNanos() / 1024,
-                        (double) result.costNanos() / TimeUnit.MILLISECONDS.toNanos(1) / result.count(),
-                        (double) result.maxCostNanos() / TimeUnit.MILLISECONDS.toNanos(1));
+                    TimeUnit.SECONDS.toNanos(1) * result.count() / result.elapsedTimeNanos(),
+                    TimeUnit.SECONDS.toNanos(1) * (result.count() * config.recordSizeBytes) / result.elapsedTimeNanos() / 1024,
+                    (double) result.costNanos() / TimeUnit.MILLISECONDS.toNanos(1) / result.count(),
+                    (double) result.maxCostNanos() / TimeUnit.MILLISECONDS.toNanos(1));
             }
         }, LOG_INTERVAL_SECONDS, LOG_INTERVAL_SECONDS, TimeUnit.SECONDS);
+        return statExecutor::shutdownNow;
     }
 
     private void run(Config config) {
         System.out.println("Starting benchmark");
 
         ExecutorService executor = Threads.newFixedThreadPool(
-                config.threads, ThreadUtils.createThreadFactory("append-thread-%d", false), null);
+            config.threads, ThreadUtils.createThreadFactory("append-thread-%d", false), null);
         AppendTaskConfig appendTaskConfig = new AppendTaskConfig(config);
         Stat stat = new Stat();
-        runTrimTask();
+        Runnable stopTrim = runTrimTask();
         for (int i = 0; i < config.threads; i++) {
             int index = i;
             executor.submit(() -> {
@@ -142,7 +142,7 @@ public class WriteBench implements AutoCloseable {
                 }
             });
         }
-        logIt(config, stat);
+        Runnable stopLog = logIt(config, stat);
 
         executor.shutdown();
         try {
@@ -152,13 +152,15 @@ public class WriteBench implements AutoCloseable {
         } catch (InterruptedException e) {
             executor.shutdownNow();
         }
+        stopLog.run();
+        stopTrim.run();
 
         System.out.println("Benchmark finished");
     }
 
-    private void runTrimTask() {
+    private Runnable runTrimTask() {
         ScheduledExecutorService trimExecutor = Threads.newSingleThreadScheduledExecutor(
-                ThreadUtils.createThreadFactory("trim-thread-%d", true), null);
+            ThreadUtils.createThreadFactory("trim-thread-%d", true), null);
         trimExecutor.scheduleAtFixedRate(() -> {
             try {
                 log.trim(trimOffset.get());
@@ -167,6 +169,7 @@ public class WriteBench implements AutoCloseable {
                 e.printStackTrace();
             }
         }, TRIM_INTERVAL_MILLIS, TRIM_INTERVAL_MILLIS, TimeUnit.MILLISECONDS);
+        return trimExecutor::shutdownNow;
     }
 
     private void runAppendTask(int index, AppendTaskConfig config, Stat stat) throws Exception {
@@ -248,37 +251,37 @@ public class WriteBench implements AutoCloseable {
 
         static ArgumentParser parser() {
             ArgumentParser parser = ArgumentParsers
-                    .newFor("WriteBench")
-                    .build()
-                    .defaultHelp(true)
-                    .description("Benchmark write performance of BlockWALService");
+                .newFor("WriteBench")
+                .build()
+                .defaultHelp(true)
+                .description("Benchmark write performance of BlockWALService");
             parser.addArgument("-p", "--path")
-                    .required(true)
-                    .help("Path of the WAL file");
+                .required(true)
+                .help("Path of the WAL file");
             parser.addArgument("-c", "--capacity")
-                    .type(Long.class)
-                    .setDefault((long) 1 << 30)
-                    .help("Capacity of the WAL in bytes");
+                .type(Long.class)
+                .setDefault((long) 1 << 30)
+                .help("Capacity of the WAL in bytes");
             parser.addArgument("-d", "--depth")
-                    .type(Integer.class)
-                    .help("IO depth of the WAL");
+                .type(Integer.class)
+                .help("IO depth of the WAL");
             parser.addArgument("--threads")
-                    .type(Integer.class)
-                    .setDefault(1)
-                    .help("Number of threads to use to write");
+                .type(Integer.class)
+                .setDefault(1)
+                .help("Number of threads to use to write");
             parser.addArgument("--throughput")
-                    .type(Integer.class)
-                    .setDefault(1 << 20)
-                    .help("Expected throughput in total in bytes per second");
+                .type(Integer.class)
+                .setDefault(1 << 20)
+                .help("Expected throughput in total in bytes per second");
             parser.addArgument("--record-size")
-                    .dest("recordSize")
-                    .type(Integer.class)
-                    .setDefault(1 << 10)
-                    .help("Size of each record in bytes");
+                .dest("recordSize")
+                .type(Integer.class)
+                .setDefault(1 << 10)
+                .help("Size of each record in bytes");
             parser.addArgument("--duration")
-                    .type(Long.class)
-                    .setDefault(60L)
-                    .help("Duration of the benchmark in seconds");
+                .type(Long.class)
+                .setDefault(60L)
+                .help("Duration of the benchmark in seconds");
             return parser;
         }
     }

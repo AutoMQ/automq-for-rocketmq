@@ -17,24 +17,28 @@
 
 package com.automq.stream.s3.compact.operator;
 
+import com.automq.stream.s3.DataBlockIndex;
 import com.automq.stream.s3.DirectByteBufAlloc;
+import com.automq.stream.s3.ObjectReader;
 import com.automq.stream.s3.StreamDataBlock;
+import com.automq.stream.s3.metadata.S3ObjectMetadata;
+import com.automq.stream.s3.metrics.MetricsLevel;
+import com.automq.stream.s3.metrics.stats.CompactionStats;
 import com.automq.stream.s3.network.ThrottleStrategy;
 import com.automq.stream.s3.operator.S3Operator;
 import io.github.bucket4j.Bucket;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
-import com.automq.stream.s3.metadata.S3ObjectMetadata;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 //TODO: refactor to reduce duplicate code with ObjectWriter
 public class DataBlockReader {
@@ -50,7 +54,8 @@ public class DataBlockReader {
         this(metadata, s3Operator, null, null);
     }
 
-    public DataBlockReader(S3ObjectMetadata metadata, S3Operator s3Operator, Bucket throttleBucket, ScheduledExecutorService bucketCallbackExecutor) {
+    public DataBlockReader(S3ObjectMetadata metadata, S3Operator s3Operator, Bucket throttleBucket,
+        ScheduledExecutorService bucketCallbackExecutor) {
         this.metadata = metadata;
         this.objectKey = metadata.key();
         this.s3Operator = s3Operator;
@@ -67,24 +72,21 @@ public class DataBlockReader {
     }
 
     public void parseDataBlockIndex() {
-        parseDataBlockIndex(Math.max(0, metadata.objectSize() - 1024 * 1024));
-    }
-
-    public void parseDataBlockIndex(long startPosition) {
-        s3Operator.rangeRead(objectKey, startPosition, metadata.objectSize(), ThrottleStrategy.THROTTLE_2)
-                .thenAccept(buf -> {
-                    try {
-                        indexBlockCf.complete(IndexBlock.parse(buf, metadata.objectSize(), metadata.objectId()));
-                    } catch (IndexBlockParseException ex) {
-                        parseDataBlockIndex(ex.indexBlockPosition);
-                    }
-                }).exceptionally(ex -> {
-                    // unrecoverable error, possibly read on a deleted object
-                    LOGGER.warn("s3 range read from {} [{}, {}) failed", objectKey, startPosition, metadata.objectSize(), ex);
-                    indexBlockCf.completeExceptionally(ex);
-                    return null;
-                });
-
+        // TODO: throttle level
+        @SuppressWarnings("resource") ObjectReader objectReader = new ObjectReader(metadata, s3Operator);
+        objectReader.basicObjectInfo().thenAccept(info -> {
+            List<StreamDataBlock> blocks = new ArrayList<>(info.indexBlock().count());
+            Iterator<DataBlockIndex> it = info.indexBlock().iterator();
+            while (it.hasNext()) {
+                blocks.add(new StreamDataBlock(metadata.objectId(), it.next()));
+            }
+            indexBlockCf.complete(blocks);
+        }).exceptionally(ex -> {
+            // unrecoverable error, possibly read on a deleted object
+            LOGGER.warn("object {} index parse fail", objectKey, ex);
+            indexBlockCf.completeExceptionally(ex);
+            return null;
+        }).whenComplete((nil, ex) -> objectReader.release());
     }
 
     public void readBlocks(List<StreamDataBlock> streamDataBlocks) {
@@ -146,18 +148,18 @@ public class DataBlockReader {
                     final int iterations = cnt;
                     final int finalEnd = end + 1; // include current block
                     CompletableFuture.allOf(cfList.toArray(new CompletableFuture[0]))
-                            .thenAccept(v -> {
-                                CompositeByteBuf compositeByteBuf = DirectByteBufAlloc.compositeByteBuffer();
-                                for (int j = 0; j < iterations; j++) {
-                                    compositeByteBuf.addComponent(true, bufferMap.get(j));
-                                }
-                                parseDataBlocks(compositeByteBuf, streamDataBlocks.subList(finalStart, finalEnd));
-                            })
-                            .exceptionally(ex -> {
-                                LOGGER.error("read data from object {} failed", objectId, ex);
-                                failDataBlocks(streamDataBlocks, ex);
-                                return null;
-                            });
+                        .thenAccept(v -> {
+                            CompositeByteBuf compositeByteBuf = DirectByteBufAlloc.compositeByteBuffer();
+                            for (int j = 0; j < iterations; j++) {
+                                compositeByteBuf.addComponent(true, bufferMap.get(j));
+                            }
+                            parseDataBlocks(compositeByteBuf, streamDataBlocks.subList(finalStart, finalEnd));
+                        })
+                        .exceptionally(ex -> {
+                            LOGGER.error("read data from object {} failed", objectId, ex);
+                            failDataBlocks(streamDataBlocks, ex);
+                            return null;
+                        });
                     end++;
                 } else {
                     // read before current block
@@ -176,16 +178,21 @@ public class DataBlockReader {
 
     private void readContinuousBlocks0(List<StreamDataBlock> streamDataBlocks) {
         rangeRead(streamDataBlocks.get(0).getBlockStartPosition(),
-                streamDataBlocks.get(streamDataBlocks.size() - 1).getBlockEndPosition())
-                .thenAccept(buf -> parseDataBlocks(buf, streamDataBlocks))
-                .exceptionally(ex -> {
-                    LOGGER.error("read data from object {} failed", metadata.objectId(), ex);
-                    failDataBlocks(streamDataBlocks, ex);
-                    return null;
-                });
+            streamDataBlocks.get(streamDataBlocks.size() - 1).getBlockEndPosition())
+            .thenAccept(buf -> parseDataBlocks(buf, streamDataBlocks))
+            .exceptionally(ex -> {
+                LOGGER.error("read data from object {} failed", metadata.objectId(), ex);
+                failDataBlocks(streamDataBlocks, ex);
+                return null;
+            });
     }
 
     private CompletableFuture<ByteBuf> rangeRead(long start, long end) {
+        return rangeRead0(start, end).whenComplete((ret, ex) ->
+                CompactionStats.getInstance().compactionReadSizeStats.add(MetricsLevel.INFO, ret.readableBytes()));
+    }
+
+    private CompletableFuture<ByteBuf> rangeRead0(long start, long end) {
         if (throttleBucket == null) {
             return s3Operator.rangeRead(objectKey, start, end, ThrottleStrategy.THROTTLE_2).thenApply(buf -> {
                 // convert heap buffer to direct buffer
@@ -196,14 +203,14 @@ public class DataBlockReader {
             });
         } else {
             return throttleBucket.asScheduler().consume(end - start + 1, bucketCallbackExecutor)
-                    .thenCompose(v ->
-                            s3Operator.rangeRead(objectKey, start, end, ThrottleStrategy.THROTTLE_2).thenApply(buf -> {
-                                // convert heap buffer to direct buffer
-                                ByteBuf directBuf = DirectByteBufAlloc.byteBuffer(buf.readableBytes());
-                                directBuf.writeBytes(buf);
-                                buf.release();
-                                return directBuf;
-                            }));
+                .thenCompose(v ->
+                    s3Operator.rangeRead(objectKey, start, end, ThrottleStrategy.THROTTLE_2).thenApply(buf -> {
+                        // convert heap buffer to direct buffer
+                        ByteBuf directBuf = DirectByteBufAlloc.byteBuffer(buf.readableBytes());
+                        directBuf.writeBytes(buf);
+                        buf.release();
+                        return directBuf;
+                    }));
         }
     }
 
@@ -221,48 +228,5 @@ public class DataBlockReader {
         for (StreamDataBlock streamDataBlock : streamDataBlocks) {
             streamDataBlock.getDataCf().completeExceptionally(ex);
         }
-    }
-
-    static class IndexBlock {
-        static List<StreamDataBlock> parse(ByteBuf objectTailBuf, long objectSize, long objectId) throws IndexBlockParseException {
-            try {
-                long indexBlockPosition = objectTailBuf.getLong(objectTailBuf.readableBytes() - 48);
-                int indexBlockSize = objectTailBuf.getInt(objectTailBuf.readableBytes() - 40);
-                if (indexBlockPosition + objectTailBuf.readableBytes() < objectSize) {
-                    throw new IndexBlockParseException(indexBlockPosition);
-                } else {
-                    int indexRelativePosition = objectTailBuf.readableBytes() - (int) (objectSize - indexBlockPosition);
-                    ByteBuf indexBlockBuf = objectTailBuf.slice(objectTailBuf.readerIndex() + indexRelativePosition, indexBlockSize);
-                    int blockCount = indexBlockBuf.readInt();
-                    ByteBuf blocks = indexBlockBuf.slice(indexBlockBuf.readerIndex(), blockCount * 16);
-                    indexBlockBuf.skipBytes(blockCount * 16);
-                    ByteBuf streamRanges = indexBlockBuf.slice(indexBlockBuf.readerIndex(), indexBlockBuf.readableBytes());
-                    List<StreamDataBlock> streamDataBlocks = new ArrayList<>();
-                    for (int i = 0; i < blockCount; i++) {
-                        long blockPosition = blocks.readLong();
-                        int blockSize = blocks.readInt();
-                        int recordCount = blocks.readInt();
-                        long streamId = streamRanges.readLong();
-                        long startOffset = streamRanges.readLong();
-                        int rangeSize = streamRanges.readInt();
-                        int blockIndex = streamRanges.readInt();
-                        streamDataBlocks.add(new StreamDataBlock(streamId, startOffset, startOffset + rangeSize,
-                                blockIndex, objectId, blockPosition, blockSize, recordCount));
-                    }
-                    return streamDataBlocks;
-                }
-            } finally {
-                objectTailBuf.release();
-            }
-        }
-    }
-
-    static class IndexBlockParseException extends Exception {
-        long indexBlockPosition;
-
-        public IndexBlockParseException(long indexBlockPosition) {
-            this.indexBlockPosition = indexBlockPosition;
-        }
-
     }
 }

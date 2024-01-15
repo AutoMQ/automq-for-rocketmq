@@ -48,6 +48,7 @@ services:
       - ROCKETMQ_NODE_NAME=broker-1
       - ROCKETMQ_NODE_BIND_ADDRESS=0.0.0.0:8081
       - ROCKETMQ_NODE_ADVERTISE_ADDRESS=${EXTERNAL_IP}:8081
+      - LOG4J_CONF=/root/automq-for-rocketmq/conf/log4j2_console.xml
     ports:
       - "8081:8081"
       - "8082:8082"
@@ -71,6 +72,7 @@ services:
       - ROCKETMQ_NODE_NAME=broker-2
       - ROCKETMQ_NODE_BIND_ADDRESS=0.0.0.0:8181
       - ROCKETMQ_NODE_ADVERTISE_ADDRESS=${EXTERNAL_IP}:8181
+      - LOG4J_CONF=/root/automq-for-rocketmq/conf/log4j2_console.xml
     ports:
       - "8181:8181"
       - "8182:8182"

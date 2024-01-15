@@ -18,7 +18,6 @@
 package com.automq.rocketmq.store.model.metadata;
 
 import java.util.Objects;
-import java.util.concurrent.ConcurrentSkipListMap;
 
 public class ConsumerGroupMetadata {
     private final long consumerGroupId;
@@ -26,24 +25,20 @@ public class ConsumerGroupMetadata {
     private long ackOffset;
     private long retryConsumeOffset;
     private long retryAckOffset;
-    private final ConcurrentSkipListMap<Long/*offset*/, Integer/*times*/> consumeTimes;
     private final long version;
 
     public ConsumerGroupMetadata(long consumerGroupId) {
         this.consumerGroupId = consumerGroupId;
-        this.consumeTimes = new ConcurrentSkipListMap<>();
         this.version = 0;
     }
 
     public ConsumerGroupMetadata(long consumerGroupId, long consumeOffset, long ackOffset, long retryConsumeOffset,
-        long retryAckOffset, ConcurrentSkipListMap<Long, Integer> consumeTimes,
-        long version) {
+        long retryAckOffset, long version) {
         this.consumerGroupId = consumerGroupId;
         this.consumeOffset = consumeOffset;
         this.ackOffset = ackOffset;
         this.retryConsumeOffset = retryConsumeOffset;
         this.retryAckOffset = retryAckOffset;
-        this.consumeTimes = consumeTimes;
         this.version = version;
     }
 
@@ -71,22 +66,22 @@ public class ConsumerGroupMetadata {
         this.consumeOffset = consumeOffset;
     }
 
-    public void setAckOffset(long ackOffset) {
-        this.ackOffset = ackOffset;
-        // when ack offset is updated, we should clear the consume times
-        this.consumeTimes.subMap(0L, ackOffset).clear();
+    public void advanceAckOffset(long ackOffset) {
+        if (ackOffset > this.ackOffset) {
+            this.ackOffset = ackOffset;
+        }
     }
 
-    public void setRetryConsumeOffset(long retryConsumeOffset) {
-        this.retryConsumeOffset = retryConsumeOffset;
+    public void advanceRetryConsumeOffset(long retryConsumeOffset) {
+        if (retryConsumeOffset > this.retryConsumeOffset) {
+            this.retryConsumeOffset = retryConsumeOffset;
+        }
     }
 
-    public void setRetryAckOffset(long retryAckOffset) {
-        this.retryAckOffset = retryAckOffset;
-    }
-
-    public ConcurrentSkipListMap<Long, Integer> getConsumeTimes() {
-        return consumeTimes;
+    public void advanceRetryAckOffset(long retryAckOffset) {
+        if (retryAckOffset > this.retryAckOffset) {
+            this.retryAckOffset = retryAckOffset;
+        }
     }
 
     public long getVersion() {
@@ -100,11 +95,11 @@ public class ConsumerGroupMetadata {
         if (o == null || getClass() != o.getClass())
             return false;
         ConsumerGroupMetadata metadata = (ConsumerGroupMetadata) o;
-        return consumerGroupId == metadata.consumerGroupId && consumeOffset == metadata.consumeOffset && ackOffset == metadata.ackOffset && retryConsumeOffset == metadata.retryConsumeOffset && retryAckOffset == metadata.retryAckOffset && version == metadata.version && Objects.equals(consumeTimes, metadata.consumeTimes);
+        return consumerGroupId == metadata.consumerGroupId && consumeOffset == metadata.consumeOffset && ackOffset == metadata.ackOffset && retryConsumeOffset == metadata.retryConsumeOffset && retryAckOffset == metadata.retryAckOffset && version == metadata.version;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(consumerGroupId, consumeOffset, ackOffset, retryConsumeOffset, retryAckOffset, consumeTimes, version);
+        return Objects.hash(consumerGroupId, consumeOffset, ackOffset, retryConsumeOffset, retryAckOffset, version);
     }
 }

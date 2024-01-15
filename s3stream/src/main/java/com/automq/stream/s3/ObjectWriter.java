@@ -17,30 +17,35 @@
 
 package com.automq.stream.s3;
 
+import com.automq.stream.s3.metadata.ObjectUtils;
 import com.automq.stream.s3.model.StreamRecordBatch;
 import com.automq.stream.s3.objects.ObjectStreamRange;
 import com.automq.stream.s3.operator.S3Operator;
 import com.automq.stream.s3.operator.Writer;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
-import com.automq.stream.s3.metadata.ObjectUtils;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-// TODO: memory optimization
-
 /**
  * Write stream records to a single object.
  */
 public interface ObjectWriter {
 
-    byte DATA_BLOCK_MAGIC = 0x01;
+    byte DATA_BLOCK_MAGIC = 0x5A;
     // TODO: first n bit is the compressed flag
     byte DATA_BLOCK_DEFAULT_FLAG = 0x02;
+
+    static ObjectWriter writer(long objectId, S3Operator s3Operator, int blockSizeThreshold, int partSizeThreshold) {
+        return new DefaultObjectWriter(objectId, s3Operator, blockSizeThreshold, partSizeThreshold);
+    }
+
+    static ObjectWriter noop(long objectId) {
+        return new NoopObjectWriter(objectId);
+    }
 
     void write(long streamId, List<StreamRecordBatch> records);
 
@@ -52,24 +57,16 @@ public interface ObjectWriter {
 
     long size();
 
-    static ObjectWriter writer(long objectId, S3Operator s3Operator, int blockSizeThreshold, int partSizeThreshold) {
-        return new DefaultObjectWriter(objectId, s3Operator, blockSizeThreshold, partSizeThreshold);
-    }
-
-    static ObjectWriter noop(long objectId) {
-        return new NoopObjectWriter(objectId);
-    }
-
     class DefaultObjectWriter implements ObjectWriter {
 
         private final int blockSizeThreshold;
         private final int partSizeThreshold;
         private final List<DataBlock> waitingUploadBlocks;
         private final List<DataBlock> completedBlocks;
-        private IndexBlock indexBlock;
         private final Writer writer;
         private final long objectId;
-
+        private int waitingUploadBlocksSize;
+        private IndexBlock indexBlock;
         private long size;
 
         /**
@@ -80,7 +77,8 @@ public interface ObjectWriter {
          * @param blockSizeThreshold the max size of a block
          * @param partSizeThreshold  the max size of a part. If it is smaller than {@link Writer#MIN_PART_SIZE}, it will be set to {@link Writer#MIN_PART_SIZE}.
          */
-        public DefaultObjectWriter(long objectId, S3Operator s3Operator, int blockSizeThreshold, int partSizeThreshold) {
+        public DefaultObjectWriter(long objectId, S3Operator s3Operator, int blockSizeThreshold,
+            int partSizeThreshold) {
             this.objectId = objectId;
             String objectKey = ObjectUtils.genKey(0, objectId);
             this.blockSizeThreshold = blockSizeThreshold;
@@ -92,14 +90,14 @@ public interface ObjectWriter {
 
         public void write(long streamId, List<StreamRecordBatch> records) {
             List<List<StreamRecordBatch>> blocks = groupByBlock(records);
-            List<CompletableFuture<Void>> closeCf = new ArrayList<>(blocks.size());
             blocks.forEach(blockRecords -> {
                 DataBlock block = new DataBlock(streamId, blockRecords);
                 waitingUploadBlocks.add(block);
-                closeCf.add(block.close());
+                waitingUploadBlocksSize += block.size();
             });
-            CompletableFuture.allOf(closeCf.toArray(new CompletableFuture[0])).whenComplete((nil, ex) -> tryUploadPart());
-
+            if (waitingUploadBlocksSize >= partSizeThreshold) {
+                tryUploadPart();
+            }
         }
 
         private List<List<StreamRecordBatch>> groupByBlock(List<StreamRecordBatch> records) {
@@ -122,13 +120,10 @@ public interface ObjectWriter {
 
         private synchronized void tryUploadPart() {
             for (; ; ) {
-                List<DataBlock> uploadBlocks = new ArrayList<>(32);
+                List<DataBlock> uploadBlocks = new ArrayList<>(waitingUploadBlocks.size());
                 boolean partFull = false;
                 int size = 0;
                 for (DataBlock block : waitingUploadBlocks) {
-                    if (!block.close().isDone()) {
-                        break;
-                    }
                     uploadBlocks.add(block);
                     size += block.size();
                     if (size >= partSizeThreshold) {
@@ -139,6 +134,7 @@ public interface ObjectWriter {
                 if (partFull) {
                     CompositeByteBuf partBuf = DirectByteBufAlloc.compositeByteBuffer();
                     for (DataBlock block : uploadBlocks) {
+                        waitingUploadBlocksSize -= block.size();
                         partBuf.addComponent(true, block.buffer());
                     }
                     writer.write(partBuf);
@@ -151,22 +147,19 @@ public interface ObjectWriter {
         }
 
         public CompletableFuture<Void> close() {
-            CompletableFuture<Void> waitBlocksCloseCf = CompletableFuture.allOf(waitingUploadBlocks.stream().map(DataBlock::close).toArray(CompletableFuture[]::new));
-            return waitBlocksCloseCf.thenCompose(nil -> {
-                CompositeByteBuf buf = DirectByteBufAlloc.compositeByteBuffer();
-                for (DataBlock block : waitingUploadBlocks) {
-                    buf.addComponent(true, block.buffer());
-                    completedBlocks.add(block);
-                }
-                waitingUploadBlocks.clear();
-                indexBlock = new IndexBlock();
-                buf.addComponent(true, indexBlock.buffer());
-                Footer footer = new Footer(indexBlock.position(), indexBlock.size());
-                buf.addComponent(true, footer.buffer());
-                writer.write(buf.duplicate());
-                size = indexBlock.position() + indexBlock.size() + footer.size();
-                return writer.close();
-            });
+            CompositeByteBuf buf = DirectByteBufAlloc.compositeByteBuffer();
+            for (DataBlock block : waitingUploadBlocks) {
+                buf.addComponent(true, block.buffer());
+                completedBlocks.add(block);
+            }
+            waitingUploadBlocks.clear();
+            indexBlock = new IndexBlock();
+            buf.addComponent(true, indexBlock.buffer());
+            Footer footer = new Footer(indexBlock.position(), indexBlock.size());
+            buf.addComponent(true, footer.buffer());
+            writer.write(buf.duplicate());
+            size = indexBlock.position() + indexBlock.size() + footer.size();
+            return writer.close();
         }
 
         public List<ObjectStreamRange> getStreamRanges() {
@@ -199,40 +192,21 @@ public interface ObjectWriter {
             return size;
         }
 
-
         class IndexBlock {
             private final ByteBuf buf;
             private final long position;
 
             public IndexBlock() {
                 long nextPosition = 0;
-                int indexBlockSize = 4 + (8 + 4 + 4 + 8 + 8 + 4 + 4) * completedBlocks.size();
+                int indexBlockSize = DataBlockIndex.BLOCK_INDEX_SIZE * completedBlocks.size();
                 buf = DirectByteBufAlloc.byteBuffer(indexBlockSize, "write_index_block");
-                buf.writeInt(completedBlocks.size()); // block count
-                // block index
                 for (DataBlock block : completedBlocks) {
-                    // start position in the object
-                    buf.writeLong(nextPosition);
-                    // byte size of the block
-                    buf.writeInt(block.size());
-                    // how many ranges in the block
-                    buf.writeInt(block.recordCount());
+                    ObjectStreamRange streamRange = block.getStreamRange();
+                    new DataBlockIndex(streamRange.getStreamId(), streamRange.getStartOffset(), (int) (streamRange.getEndOffset() - streamRange.getStartOffset()),
+                        block.recordCount(), nextPosition, block.size()).encode(buf);
                     nextPosition += block.size();
                 }
                 position = nextPosition;
-                // object stream range
-                for (int blockIndex = 0; blockIndex < completedBlocks.size(); blockIndex++) {
-                    DataBlock block = completedBlocks.get(blockIndex);
-                    ObjectStreamRange range = block.getStreamRange();
-                    // stream id of this range
-                    buf.writeLong(range.getStreamId());
-                    // start offset of the related stream
-                    buf.writeLong(range.getStartOffset());
-                    // record count of the related stream in this range
-                    buf.writeInt((int) (range.getEndOffset() - range.getStartOffset()));
-                    // the index of block where this range is in
-                    buf.writeInt(blockIndex);
-                }
             }
 
             public ByteBuf buffer() {
@@ -250,6 +224,7 @@ public interface ObjectWriter {
     }
 
     class DataBlock {
+        public static final int BLOCK_HEADER_SIZE = 1 /* magic */ + 1/* flag */ + 4 /* record count*/ + 4 /* data length */;
         private final CompositeByteBuf encodedBuf;
         private final ObjectStreamRange streamRange;
         private final int recordCount;
@@ -258,17 +233,16 @@ public interface ObjectWriter {
         public DataBlock(long streamId, List<StreamRecordBatch> records) {
             this.recordCount = records.size();
             this.encodedBuf = DirectByteBufAlloc.compositeByteBuffer();
-            ByteBuf header = DirectByteBufAlloc.byteBuffer(2);
+            ByteBuf header = DirectByteBufAlloc.byteBuffer(BLOCK_HEADER_SIZE);
             header.writeByte(DATA_BLOCK_MAGIC);
             header.writeByte(DATA_BLOCK_DEFAULT_FLAG);
+            header.writeInt(recordCount);
+            header.writeInt(0); // data length
             encodedBuf.addComponent(true, header);
             records.forEach(r -> encodedBuf.addComponent(true, r.encoded().retain()));
             this.size = encodedBuf.readableBytes();
+            encodedBuf.setInt(BLOCK_HEADER_SIZE - 4, size - BLOCK_HEADER_SIZE);
             this.streamRange = new ObjectStreamRange(streamId, records.get(0).getEpoch(), records.get(0).getBaseOffset(), records.get(records.size() - 1).getLastOffset(), size);
-        }
-
-        public CompletableFuture<Void> close() {
-            return CompletableFuture.completedFuture(null);
         }
 
         public int size() {
