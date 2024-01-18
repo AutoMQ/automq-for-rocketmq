@@ -58,6 +58,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.rocketmq.common.thread.ThreadPoolMonitor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 
 public class S3StreamStore implements StreamStore {
     private static final Logger LOGGER = LoggerFactory.getLogger(S3StreamStore.class);
@@ -92,7 +93,8 @@ public class S3StreamStore implements StreamStore {
         }
 
         S3Operator defaultOperator = new DefaultS3Operator(streamConfig.s3Endpoint(), streamConfig.s3Region(), streamConfig.s3Bucket(),
-            streamConfig.s3ForcePathStyle(), streamConfig.s3AccessKey(), streamConfig.s3SecretKey(), networkInboundLimiter, networkOutboundLimiter, true);
+            streamConfig.s3ForcePathStyle(), List.of(() -> AwsBasicCredentials.create(streamConfig.s3AccessKey(), streamConfig.s3SecretKey())),
+            networkInboundLimiter, networkOutboundLimiter, true);
 
         WriteAheadLog writeAheadLog = BlockWALService.builder(s3Config.walPath(), s3Config.walCapacity()).config(s3Config).build();
         S3BlockCache blockCache = new DefaultS3BlockCache(s3Config, objectManager, defaultOperator);
@@ -102,7 +104,8 @@ public class S3StreamStore implements StreamStore {
 
         // Build the compaction manager
         S3Operator compactionOperator = new DefaultS3Operator(streamConfig.s3Endpoint(), streamConfig.s3Region(), streamConfig.s3Bucket(),
-            streamConfig.s3ForcePathStyle(), streamConfig.s3AccessKey(), streamConfig.s3SecretKey(), networkInboundLimiter, networkOutboundLimiter, true);
+            streamConfig.s3ForcePathStyle(), List.of(() -> AwsBasicCredentials.create(streamConfig.s3AccessKey(), streamConfig.s3SecretKey())),
+            networkInboundLimiter, networkOutboundLimiter, true);
         this.compactionManager = new CompactionManager(s3Config, objectManager, streamManager, compactionOperator);
 
         this.streamClient = new S3StreamClient(streamManager, storage, objectManager, defaultOperator, s3Config, networkInboundLimiter, networkOutboundLimiter);
@@ -255,8 +258,6 @@ public class S3StreamStore implements StreamStore {
         config.bucket(streamConfig.s3Bucket());
         config.forcePathStyle(streamConfig.s3ForcePathStyle());
         config.walPath(streamConfig.s3WALPath());
-        config.accessKey(streamConfig.s3AccessKey());
-        config.secretKey(streamConfig.s3SecretKey());
         config.networkBaselineBandwidth(streamConfig.networkBaselineBandwidth());
         config.refillPeriodMs(streamConfig.refillPeriodMs());
 

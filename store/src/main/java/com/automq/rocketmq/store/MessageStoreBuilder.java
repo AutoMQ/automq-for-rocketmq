@@ -40,6 +40,8 @@ import com.automq.rocketmq.store.service.api.OperationLogService;
 import com.automq.stream.s3.metadata.ObjectUtils;
 import com.automq.stream.s3.operator.DefaultS3Operator;
 import com.automq.stream.s3.operator.S3Operator;
+import java.util.List;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 
 import static com.automq.rocketmq.store.MessageStoreImpl.KV_NAMESPACE_CHECK_POINT;
 
@@ -64,7 +66,7 @@ public class MessageStoreBuilder {
 
         // S3 object manager, such as trim expired messages, etc.
         S3Operator operator = new DefaultS3Operator(s3StreamConfig.s3Endpoint(), s3StreamConfig.s3Region(), s3StreamConfig.s3Bucket(),
-            s3StreamConfig.s3ForcePathStyle(), s3StreamConfig.s3AccessKey(), s3StreamConfig.s3SecretKey());
+            s3StreamConfig.s3ForcePathStyle(), List.of(() -> AwsBasicCredentials.create(s3StreamConfig.s3AccessKey(), s3StreamConfig.s3SecretKey())));
         S3ObjectOperator objectOperator = new S3ObjectOperatorImpl(operator);
 
         TransactionService transactionService = new TransactionService(storeConfig, timerService);
