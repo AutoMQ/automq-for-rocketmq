@@ -40,5 +40,10 @@ target/
 !**/src/test/**/target/
 *.xml.versionsBackup
 
+# Gradle
+.gradle/
+build/
+gradle/
+
 # Docker
 distribution/docker/ddl.sql
