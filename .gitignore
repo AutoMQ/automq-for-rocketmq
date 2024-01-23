@@ -43,7 +43,7 @@ target/
 # Gradle
 .gradle/
 build/
-gradle/
+gradle/wrapper/*.jar
 
 # Docker
 distribution/docker/ddl.sql
