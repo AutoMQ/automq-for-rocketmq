@@ -18,9 +18,10 @@
 package com.automq.stream.s3.model;
 
 import com.automq.stream.s3.StreamRecordBatchCodec;
+import com.automq.stream.utils.biniarysearch.primitive.LongComparableItem;
 import io.netty.buffer.ByteBuf;
 
-public class StreamRecordBatch implements Comparable<StreamRecordBatch> {
+public class StreamRecordBatch implements Comparable<StreamRecordBatch>, LongComparableItem {
     private final long streamId;
     private final long epoch;
     private final long baseOffset;
@@ -112,5 +113,15 @@ public class StreamRecordBatch implements Comparable<StreamRecordBatch> {
             ", baseOffset=" + baseOffset +
             ", count=" + count +
             ", size=" + size() + '}';
+    }
+
+    @Override
+    public boolean isLessThan(long value) {
+        return getLastOffset() <= value;
+    }
+
+    @Override
+    public boolean isGreaterThan(long value) {
+        return getBaseOffset() > value;
     }
 }

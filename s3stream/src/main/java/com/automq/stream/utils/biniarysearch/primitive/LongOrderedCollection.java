@@ -14,33 +14,32 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.automq.stream.utils.biniarysearch.primitive;
 
-package com.automq.stream.utils.biniarysearch;
+public abstract class LongOrderedCollection {
 
-import com.automq.stream.s3.model.StreamRecordBatch;
-import com.automq.stream.utils.biniarysearch.primitive.LongComparableItem;
-import com.automq.stream.utils.biniarysearch.primitive.LongOrderedCollection;
+    protected abstract int size();
 
-import java.util.List;
+    protected abstract LongComparableItem get(int index);
 
-public class StreamRecordBatchList extends LongOrderedCollection {
-
-    private final List<StreamRecordBatch> records;
-    private final int size;
-
-    public StreamRecordBatchList(List<StreamRecordBatch> records) {
-        this.records = records;
-        this.size = records.size();
+    public int search(long target) {
+        int low = 0;
+        int high = size() - 1;
+        while (low <= high) {
+            int mid = low + ((high - low) >>> 1);
+            LongComparableItem midVal = get(mid);
+            if (midVal.isLessThan(target)) {
+                low = mid + 1;
+            } else if (midVal.isGreaterThan(target)) {
+                high = mid - 1;
+            } else {
+                low = mid;
+                break;
+            }
+        }
+        if (low > high) {
+            return -1;
+        }
+        return low;
     }
-
-    @Override
-    public int size() {
-        return size;
-    }
-
-    @Override
-    protected LongComparableItem get(int index) {
-        return records.get(index);
-    }
-
 }
