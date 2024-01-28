@@ -19,6 +19,7 @@ package com.automq.stream.utils;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.util.stream.Collectors;
 
 public class CommandUtils {
     public static CommandResult run(String... cmd) {
