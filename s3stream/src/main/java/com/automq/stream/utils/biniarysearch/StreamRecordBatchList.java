@@ -18,12 +18,10 @@
 package com.automq.stream.utils.biniarysearch;
 
 import com.automq.stream.s3.model.StreamRecordBatch;
-import com.automq.stream.utils.biniarysearch.primitive.LongComparableItem;
-import com.automq.stream.utils.biniarysearch.primitive.LongOrderedCollection;
 
 import java.util.List;
 
-public class StreamRecordBatchList extends LongOrderedCollection {
+public class StreamRecordBatchList extends AbstractOrderedCollection<Long> {
 
     private final List<StreamRecordBatch> records;
     private final int size;
@@ -39,7 +37,7 @@ public class StreamRecordBatchList extends LongOrderedCollection {
     }
 
     @Override
-    protected LongComparableItem get(int index) {
+    protected ComparableItem<Long> get(int index) {
         return records.get(index);
     }
 
