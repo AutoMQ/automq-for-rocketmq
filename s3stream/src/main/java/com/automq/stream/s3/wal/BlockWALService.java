@@ -167,6 +167,8 @@ public class BlockWALService implements WriteAheadLog {
      */
     private ByteBuf readRecord(long recoverStartOffset,
         Function<Long, Long> logicalToPhysical) throws ReadRecordException {
+        // TODO: a cache wrapper of WALChannel
+        // release related resources in the finally block
         final ByteBuf recordHeader = DirectByteBufAlloc.byteBuffer(RECORD_HEADER_SIZE);
         SlidingWindowService.RecordHeaderCoreData readRecordHeader;
         try {
@@ -740,10 +742,12 @@ public class BlockWALService implements WriteAheadLog {
 
         @Override
         public boolean equals(Object obj) {
-            if (obj == this)
+            if (obj == this) {
                 return true;
-            if (obj == null || obj.getClass() != this.getClass())
+            }
+            if (obj == null || obj.getClass() != this.getClass()) {
                 return false;
+            }
             var that = (AppendResultImpl) obj;
             return this.recordOffset == that.recordOffset &&
                 Objects.equals(this.future, that.future);
@@ -785,10 +789,12 @@ public class BlockWALService implements WriteAheadLog {
 
         @Override
         public boolean equals(Object obj) {
-            if (obj == this)
+            if (obj == this) {
                 return true;
-            if (obj == null || obj.getClass() != this.getClass())
+            }
+            if (obj == null || obj.getClass() != this.getClass()) {
                 return false;
+            }
             var that = (RecoverResultImpl) obj;
             return Objects.equals(this.record, that.record) &&
                 this.recordOffset == that.recordOffset;
