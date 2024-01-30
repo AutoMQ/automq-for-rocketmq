@@ -24,6 +24,8 @@ import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.automq.stream.s3.Constants.CAPACITY_NOT_SET;
+
 /**
  * There are two implementations of WALChannel:
  * 1. WALFileChannel based on file system, which calls fsync after each write to ensure data is flushed to disk.
@@ -119,6 +121,7 @@ public interface WALChannel {
         }
 
         public WALChannelBuilder capacity(long capacity) {
+            assert capacity == CAPACITY_NOT_SET || WALUtil.isAligned(capacity);
             this.capacity = capacity;
             return this;
         }

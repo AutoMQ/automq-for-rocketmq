@@ -301,6 +301,7 @@ public class WALBlockDeviceChannel implements WALChannel {
         long alignedStart = WALUtil.alignSmallByBlockSize(start);
         long alignedEnd = WALUtil.alignLargeByBlockSize(end);
         int alignedSize = (int) (alignedEnd - alignedStart);
+        // capacity may be CAPACITY_NOT_SET only when we call {@link CapacityReader#capacity} in recovery mode
         assert CAPACITY_NOT_SET == capacity() || alignedEnd <= capacity();
 
         ByteBuffer tmpBuf = getBuffer(alignedSize);

@@ -118,7 +118,7 @@ public class BlockWALService implements WriteAheadLog {
     private final AtomicLong writeHeaderRoundTimes = new AtomicLong(0);
     private final ExecutorService walHeaderFlusher = Threads.newFixedThreadPool(1, ThreadUtils.createThreadFactory("flush-wal-header-thread-%d", true), LOGGER);
     private long initialWindowSize;
-    private WALChannel walChannel;
+    private WALCachedChannel walChannel;
     private SlidingWindowService slidingWindowService;
     private WALHeader walHeader;
     private boolean recoveryMode;
@@ -844,6 +844,7 @@ public class BlockWALService implements WriteAheadLog {
             if (!hasNext) {
                 // recovery complete
                 recoveryCompleteOffset = WALUtil.alignLargeByBlockSize(nextRecoverOffset);
+                walChannel.releaseCache();
             }
             return hasNext;
         }
