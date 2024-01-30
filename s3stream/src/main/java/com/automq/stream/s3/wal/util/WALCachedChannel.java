@@ -21,6 +21,8 @@ import com.automq.stream.s3.DirectByteBufAlloc;
 import io.netty.buffer.ByteBuf;
 import java.io.IOException;
 
+import static com.automq.stream.s3.Constants.CAPACITY_NOT_SET;
+
 /**
  * A wrapper of {@link WALChannel} that caches for read to reduce I/O.
  */
@@ -52,6 +54,10 @@ public class WALCachedChannel implements WALChannel {
      */
     @Override
     public synchronized int read(ByteBuf dst, long position, int length) throws IOException {
+        if (CAPACITY_NOT_SET == channel.capacity()) {
+            // If we don't know the capacity now, we can't cache.
+            return channel.read(dst, position, length);
+        }
         long start = position;
         length = Math.min(length, dst.writableBytes());
         long end = position + length;
