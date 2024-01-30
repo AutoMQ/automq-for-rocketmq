@@ -25,6 +25,7 @@ import com.automq.stream.s3.metrics.TimerUtil;
 import com.automq.stream.s3.metrics.stats.StorageOperationStats;
 import com.automq.stream.s3.trace.TraceUtils;
 import com.automq.stream.s3.trace.context.TraceContext;
+import com.automq.stream.s3.wal.util.WALCachedChannel;
 import com.automq.stream.s3.wal.util.WALChannel;
 import com.automq.stream.s3.wal.util.WALUtil;
 import com.automq.stream.utils.ThreadUtils;
@@ -136,6 +137,9 @@ public class BlockWALService implements WriteAheadLog {
 
     public static BlockWALServiceBuilder recoveryBuilder(String path) {
         return new BlockWALServiceBuilder(path);
+    }
+
+    private BlockWALService() {
     }
 
     private void flushWALHeader(ShutdownType shutdownType) throws IOException {
@@ -661,9 +665,10 @@ public class BlockWALService implements WriteAheadLog {
             if (direct != null) {
                 walChannelBuilder.direct(direct);
             }
-            blockWALService.walChannel = walChannelBuilder.build();
+            WALChannel channel = walChannelBuilder.build();
+            blockWALService.walChannel = WALCachedChannel.of(channel);
             if (!blockWALService.walChannel.useDirectIO()) {
-                LOGGER.info("block wal not using direct IO");
+                LOGGER.warn("block wal not using direct IO");
             }
 
             if (!recoveryMode) {
@@ -673,7 +678,7 @@ public class BlockWALService implements WriteAheadLog {
                 slidingWindowUpperLimit = Math.min(slidingWindowUpperLimit, blockDeviceCapacityWant - WAL_HEADER_TOTAL_CAPACITY);
                 blockWALService.initialWindowSize = slidingWindowInitialSize;
                 blockWALService.slidingWindowService = new SlidingWindowService(
-                    blockWALService.walChannel,
+                    channel,
                     ioThreadNums,
                     slidingWindowUpperLimit,
                     slidingWindowScaleUnit,
