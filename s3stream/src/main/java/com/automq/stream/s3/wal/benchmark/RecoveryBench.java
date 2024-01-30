@@ -47,7 +47,7 @@ public class RecoveryBench implements AutoCloseable {
     }
 
     public static void main(String[] args) throws Exception {
-        Namespace ns = parseArgs(args);
+        Namespace ns = parseArgs(Config.parser(), args);
         Config config = new Config(ns);
 
         resetWALHeader(config.path);

@@ -32,9 +32,8 @@ import net.sourceforge.argparse4j.inf.Namespace;
 
 public class BenchTool {
 
-    public static Namespace parseArgs(String[] args) {
+    public static Namespace parseArgs(ArgumentParser parser, String[] args) {
         Namespace ns = null;
-        ArgumentParser parser = WriteBench.Config.parser();
         try {
             ns = parser.parseArgs(args);
         } catch (HelpScreenException e) {
