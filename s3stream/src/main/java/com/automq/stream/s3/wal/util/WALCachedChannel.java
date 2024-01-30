@@ -29,14 +29,14 @@ public class WALCachedChannel implements WALChannel {
     private static final int DEFAULT_CACHE_SIZE = 1 << 20;
 
     private final WALChannel channel;
-    private final int cacheSizeWant;
+    private final int cacheSize;
 
     private ByteBuf cache;
     private long cachePosition = -1;
 
-    private WALCachedChannel(WALChannel channel, int cacheSizeWant) {
+    private WALCachedChannel(WALChannel channel, int cacheSize) {
         this.channel = channel;
-        this.cacheSizeWant = cacheSizeWant;
+        this.cacheSize = cacheSize;
     }
 
     public static WALCachedChannel of(WALChannel channel) {
@@ -51,21 +51,18 @@ public class WALCachedChannel implements WALChannel {
      * As we use a common cache for all threads, we need to synchronize the read.
      */
     @Override
-    public synchronized int read(ByteBuf dst, long position) throws IOException {
+    public synchronized int read(ByteBuf dst, long position, int length) throws IOException {
         long start = position;
-        int length = dst.writableBytes();
+        length = Math.min(length, dst.writableBytes());
         long end = position + length;
         ByteBuf cache = getCache();
         boolean fallWithinCache = cachePosition >= 0 && cachePosition <= start && end <= cachePosition + cache.readableBytes();
         if (!fallWithinCache) {
             cache.clear();
             cachePosition = start;
-            if (cachePosition + cache.writableBytes() > channel.capacity()) {
-                // The cache is larger than the channel capacity.
-                cachePosition = channel.capacity() - cache.writableBytes();
-                assert cachePosition >= 0;
-            }
-            channel.read(cache, cachePosition);
+            // Make sure the cache is not larger than the channel capacity.
+            int cacheLength = (int) Math.min(cache.writableBytes(), channel.capacity() - cachePosition);
+            channel.read(cache, cachePosition, cacheLength);
         }
         // Now the cache is ready.
         int relativePosition = (int) (start - cachePosition);
@@ -97,8 +94,6 @@ public class WALCachedChannel implements WALChannel {
      */
     private ByteBuf getCache() {
         if (this.cache == null) {
-            // Make sure the cache size is not larger than the channel capacity.
-            int cacheSize = (int) Math.min(this.cacheSizeWant, this.channel.capacity());
             this.cache = DirectByteBufAlloc.byteBuffer(cacheSize);
         }
         return this.cache;

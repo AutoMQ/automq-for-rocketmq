@@ -88,7 +88,19 @@ public interface WALChannel {
      * This method will change the writer index of the given buffer to the end of the read bytes.
      * This method will not change the reader index of the given buffer.
      */
-    int read(ByteBuf dst, long position) throws IOException;
+    default int read(ByteBuf dst, long position) throws IOException {
+        return read(dst, position, dst.writableBytes());
+    }
+
+    /**
+     * Read bytes from the given position of the channel to the given buffer from the current writer index
+     * until reaching the given length or the end of the channel.
+     * This method will change the writer index of the given buffer to the end of the read bytes.
+     * This method will not change the reader index of the given buffer.
+     * If the given length is larger than the writable bytes of the given buffer, only the first
+     * {@code dst.writableBytes()} bytes will be read.
+     */
+    int read(ByteBuf dst, long position, int length) throws IOException;
 
     default boolean useDirectIO() {
         return this instanceof WALBlockDeviceChannel;
