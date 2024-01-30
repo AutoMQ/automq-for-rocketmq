@@ -171,8 +171,6 @@ public class BlockWALService implements WriteAheadLog {
      */
     private ByteBuf readRecord(long recoverStartOffset,
         Function<Long, Long> logicalToPhysical) throws ReadRecordException {
-        // TODO: a cache wrapper of WALChannel
-        // release related resources in the finally block
         final ByteBuf recordHeader = DirectByteBufAlloc.byteBuffer(RECORD_HEADER_SIZE);
         SlidingWindowService.RecordHeaderCoreData readRecordHeader;
         try {
