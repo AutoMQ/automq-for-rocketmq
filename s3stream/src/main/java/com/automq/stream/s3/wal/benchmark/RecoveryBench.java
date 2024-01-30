@@ -69,7 +69,7 @@ public class RecoveryBench implements AutoCloseable {
 
         AtomicInteger appended = new AtomicInteger();
         for (int i = 0; i < numRecords; i++) {
-            WriteAheadLog.AppendResult result = log.append(payload);
+            WriteAheadLog.AppendResult result = log.append(payload.retainedDuplicate());
             result.future().whenComplete((r, e) -> {
                 if (e != null) {
                     System.err.println("Failed to append record: " + e.getMessage());
