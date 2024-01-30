@@ -124,11 +124,11 @@ public class RecoveryBench implements AutoCloseable {
                 .type(Long.class)
                 .setDefault((long) 3 << 30)
                 .help("Capacity of the WAL in bytes");
-            parser.addArgument("--numRecords")
+            parser.addArgument("--records")
                 .type(Integer.class)
                 .setDefault(1 << 20)
                 .help("number of records to write");
-            parser.addArgument("--recordSizeBytes")
+            parser.addArgument("--record-size")
                 .type(Integer.class)
                 .setDefault(1 << 10)
                 .help("size of each record in bytes");
