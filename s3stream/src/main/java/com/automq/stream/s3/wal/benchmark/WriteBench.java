@@ -357,34 +357,6 @@ public class WriteBench implements AutoCloseable {
             public long elapsedTimeNanos() {
                 return elapsedTimeNanos;
             }
-
-            @Override
-            public boolean equals(Object obj) {
-                if (obj == this)
-                    return true;
-                if (obj == null || obj.getClass() != this.getClass())
-                    return false;
-                var that = (Result) obj;
-                return this.count == that.count &&
-                    this.costNanos == that.costNanos &&
-                    this.maxCostNanos == that.maxCostNanos &&
-                    this.elapsedTimeNanos == that.elapsedTimeNanos;
-            }
-
-            @Override
-            public int hashCode() {
-                return Objects.hash(count, costNanos, maxCostNanos, elapsedTimeNanos);
-            }
-
-            @Override
-            public String toString() {
-                return "Result[" +
-                    "count=" + count + ", " +
-                    "costNanos=" + costNanos + ", " +
-                    "maxCostNanos=" + maxCostNanos + ", " +
-                    "elapsedTimeNanos=" + elapsedTimeNanos + ']';
-            }
-
         }
     }
 
