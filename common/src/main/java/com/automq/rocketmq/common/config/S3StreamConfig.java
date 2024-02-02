@@ -43,6 +43,8 @@ public class S3StreamConfig {
     private int streamSetObjectCompactionForceSplitPeriod = 120;
     private int streamSetObjectCompactionMaxObjectNum = 500;
     private int streamSplitSizeThreshold = 16777216;
+    private String checksumForUpload = null;
+    private boolean enableChecksumForGetObject = false;
 
     public String s3Endpoint() {
         return s3Endpoint;
@@ -134,5 +136,13 @@ public class S3StreamConfig {
 
     public int streamSplitSizeThreshold() {
         return streamSplitSizeThreshold;
+    }
+
+    public String checksumForUpload() {
+        return checksumForUpload;
+    }
+
+    public boolean isEnableChecksumForGetObject() {
+        return enableChecksumForGetObject;
     }
 }
