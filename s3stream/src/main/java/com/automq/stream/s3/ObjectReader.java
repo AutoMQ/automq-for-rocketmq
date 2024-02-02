@@ -200,12 +200,14 @@ public class ObjectReader implements AutoCloseable {
         private final ByteBuf buf;
         private final int size;
         private final int count;
+        private DataBlockIndex[] dataBlockIndices;
 
         public IndexBlock(S3ObjectMetadata s3ObjectMetadata, ByteBuf buf) {
             this.s3ObjectMetadata = s3ObjectMetadata;
             this.buf = buf;
             this.size = buf.readableBytes();
             this.count = buf.readableBytes() / INDEX_BLOCK_UNIT_SIZE;
+            this.dataBlockIndices = new DataBlockIndex[count];
         }
 
         public Iterator<DataBlockIndex> iterator() {
@@ -227,6 +229,12 @@ public class ObjectReader implements AutoCloseable {
             if (index < 0 || index >= count) {
                 throw new IllegalArgumentException("index" + index + " is out of range [0, " + count + ")");
             }
+
+            // the buf is readonly so just check if the entry have been parsed.
+            if (dataBlockIndices[index] != null) {
+                return dataBlockIndices[index];
+            }
+
             int base = index * INDEX_BLOCK_UNIT_SIZE;
             long streamId = buf.getLong(base);
             long startOffset = buf.getLong(base + 8);
@@ -234,7 +242,12 @@ public class ObjectReader implements AutoCloseable {
             int recordCount = buf.getInt(base + 20);
             long blockPosition = buf.getLong(base + 24);
             int blockSize = buf.getInt(base + 32);
-            return new DataBlockIndex(streamId, startOffset, endOffsetDelta, recordCount, blockPosition, blockSize);
+
+            DataBlockIndex idx =
+                    new DataBlockIndex(streamId, startOffset, endOffsetDelta, recordCount, blockPosition, blockSize);
+            dataBlockIndices[index] = idx;
+
+            return idx;
         }
 
         public FindIndexResult find(long streamId, long startOffset, long endOffset) {
