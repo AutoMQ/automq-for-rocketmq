@@ -120,7 +120,7 @@ class S3ObjectManagerTest {
 
     @Test
     void commitStreamObject() {
-        CompactStreamObjectRequest request = new CompactStreamObjectRequest(1L, 1000, 2000, 100, 1000, List.of(10L));
+        CompactStreamObjectRequest request = new CompactStreamObjectRequest(1L, 1000, 2000, 0L, 100, 1000, List.of(10L));
         when(metadataService.compactStreamObject(any(), any())).thenReturn(CompletableFuture.completedFuture(null));
 
         objectManager.compactStreamObject(request);

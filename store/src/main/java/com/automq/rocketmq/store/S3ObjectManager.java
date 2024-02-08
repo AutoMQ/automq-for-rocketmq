@@ -101,6 +101,7 @@ public class S3ObjectManager implements ObjectManager {
     @Override
     public CompletableFuture<Void> compactStreamObject(CompactStreamObjectRequest request) {
         // Build S3StreamObject
+        //TODO: implement stream epoch verification
         S3StreamObject.Builder builder = S3StreamObject.newBuilder();
         builder.setStreamId(request.getStreamId());
         builder.setStartOffset(request.getStartOffset());
