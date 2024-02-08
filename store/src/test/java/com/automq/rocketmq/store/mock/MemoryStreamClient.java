@@ -80,6 +80,11 @@ public class MemoryStreamClient implements StreamClient {
         }
 
         @Override
+        public long streamEpoch() {
+            return 0;
+        }
+
+        @Override
         public long startOffset() {
             return startOffset.get();
         }
