@@ -174,6 +174,8 @@ public class S3Storage implements Storage {
                     while (!outOfOrderRecords.isEmpty()) {
                         StreamRecordBatch peek = outOfOrderRecords.peek();
                         if (peek.getBaseOffset() == expectNextOffset) {
+                            // should never happen, log it.
+                            logger.error("recover out of order record, streamId={}, expectNextOffset={}, record={}", streamId, expectNextOffset, peek);
                             cacheBlock.put(peek);
                             outOfOrderRecords.poll();
                             expectNextOffset = peek.getLastOffset();
@@ -191,12 +193,16 @@ public class S3Storage implements Storage {
                     streamOutOfOrderRecords.put(streamId, outOfOrderRecords);
                 }
                 outOfOrderRecords.add(streamRecordBatch);
-                // TODO update log
-                logger.error("unexpected WAL record, streamId={}, expectNextOffset={}, record={}", streamId, expectNextOffset, streamRecordBatch);
             }
         }
         // release all out of order records.
-        streamOutOfOrderRecords.values().forEach(queue -> queue.forEach(StreamRecordBatch::release));
+        streamOutOfOrderRecords.values().forEach(queue -> {
+            if (queue.isEmpty()) {
+                return;
+            }
+            logger.info("drop discontinuous records, records={}", queue);
+            queue.forEach(StreamRecordBatch::release);
+        });
 
         if (logEndOffset >= 0L) {
             cacheBlock.confirmOffset(logEndOffset);
