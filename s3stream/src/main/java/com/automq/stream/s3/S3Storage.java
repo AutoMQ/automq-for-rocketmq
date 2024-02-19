@@ -144,7 +144,7 @@ public class S3Storage implements Storage {
         LogCache.LogCacheBlock cacheBlock = new LogCache.LogCacheBlock(1024L * 1024 * 1024);
         long logEndOffset = -1L;
         Map<Long, Long> streamNextOffsets = new HashMap<>();
-        Map<Long, Queue<StreamRecordBatch>> streamOutOfOrderRecords = new HashMap<>();
+        Map<Long, Queue<StreamRecordBatch>> streamDiscontinuousRecords = new HashMap<>();
         while (it.hasNext()) {
             WriteAheadLog.RecoverResult recoverResult = it.next();
             logEndOffset = recoverResult.recordOffset();
@@ -164,20 +164,20 @@ public class S3Storage implements Storage {
             }
 
             Long expectNextOffset = streamNextOffsets.get(streamId);
-            Queue<StreamRecordBatch> outOfOrderRecords = streamOutOfOrderRecords.get(streamId);
+            Queue<StreamRecordBatch> discontinuousRecords = streamDiscontinuousRecords.get(streamId);
             if (expectNextOffset == null || expectNextOffset == streamRecordBatch.getBaseOffset()) {
                 // continuous record, put it into cache.
                 cacheBlock.put(streamRecordBatch);
                 expectNextOffset = streamRecordBatch.getLastOffset();
-                // try to put out of order records into cache.
-                if (outOfOrderRecords != null) {
-                    while (!outOfOrderRecords.isEmpty()) {
-                        StreamRecordBatch peek = outOfOrderRecords.peek();
+                // check if there are some out of order records in the queue.
+                if (discontinuousRecords != null) {
+                    while (!discontinuousRecords.isEmpty()) {
+                        StreamRecordBatch peek = discontinuousRecords.peek();
                         if (peek.getBaseOffset() == expectNextOffset) {
                             // should never happen, log it.
                             logger.error("[BUG] recover an out of order record, streamId={}, expectNextOffset={}, record={}", streamId, expectNextOffset, peek);
                             cacheBlock.put(peek);
-                            outOfOrderRecords.poll();
+                            discontinuousRecords.poll();
                             expectNextOffset = peek.getLastOffset();
                         } else {
                             break;
@@ -187,16 +187,16 @@ public class S3Storage implements Storage {
                 // update next offset.
                 streamNextOffsets.put(streamRecordBatch.getStreamId(), expectNextOffset);
             } else {
-                // unexpected record, put it into out of order records.
-                if (outOfOrderRecords == null) {
-                    outOfOrderRecords = new PriorityQueue<>(Comparator.comparingLong(StreamRecordBatch::getBaseOffset));
-                    streamOutOfOrderRecords.put(streamId, outOfOrderRecords);
+                // unexpected record, put it into discontinuous records queue.
+                if (discontinuousRecords == null) {
+                    discontinuousRecords = new PriorityQueue<>(Comparator.comparingLong(StreamRecordBatch::getBaseOffset));
+                    streamDiscontinuousRecords.put(streamId, discontinuousRecords);
                 }
-                outOfOrderRecords.add(streamRecordBatch);
+                discontinuousRecords.add(streamRecordBatch);
             }
         }
-        // release all out of order records.
-        streamOutOfOrderRecords.values().forEach(queue -> {
+        // release all discontinuous records.
+        streamDiscontinuousRecords.values().forEach(queue -> {
             if (queue.isEmpty()) {
                 return;
             }
