@@ -245,7 +245,27 @@ public class S3StorageTest {
 
     @Test
     public void testRecoverOutOfOrderRecords() {
-        // TODO
+        List<WriteAheadLog.RecoverResult> recoverResults = List.of(
+            new TestRecoverResult(StreamRecordBatchCodec.encode(newRecord(42L, 9L))),
+            new TestRecoverResult(StreamRecordBatchCodec.encode(newRecord(42L, 10L))),
+            new TestRecoverResult(StreamRecordBatchCodec.encode(newRecord(42L, 13L))),
+            new TestRecoverResult(StreamRecordBatchCodec.encode(newRecord(42L, 11L))),
+            new TestRecoverResult(StreamRecordBatchCodec.encode(newRecord(42L, 12L))),
+            new TestRecoverResult(StreamRecordBatchCodec.encode(newRecord(42L, 14L))),
+            new TestRecoverResult(StreamRecordBatchCodec.encode(newRecord(42L, 20L)))
+        );
+
+        List<StreamMetadata> openingStreams = List.of(new StreamMetadata(42L, 0L, 0L, 10L, StreamState.OPENED));
+        LogCache.LogCacheBlock cacheBlock = S3Storage.recoverContinuousRecords(recoverResults.iterator(), openingStreams);
+        // ignore closed stream and noncontinuous records.
+        assertEquals(1, cacheBlock.records().size());
+        List<StreamRecordBatch> streamRecords = cacheBlock.records().get(42L);
+        assertEquals(5, streamRecords.size());
+        assertEquals(10L, streamRecords.get(0).getBaseOffset());
+        assertEquals(11L, streamRecords.get(1).getBaseOffset());
+        assertEquals(12L, streamRecords.get(2).getBaseOffset());
+        assertEquals(13L, streamRecords.get(3).getBaseOffset());
+        assertEquals(14L, streamRecords.get(4).getBaseOffset());
     }
 
     @Test
