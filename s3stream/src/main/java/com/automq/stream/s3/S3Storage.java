@@ -175,7 +175,7 @@ public class S3Storage implements Storage {
                         StreamRecordBatch peek = outOfOrderRecords.peek();
                         if (peek.getBaseOffset() == expectNextOffset) {
                             // should never happen, log it.
-                            logger.error("recover out of order record, streamId={}, expectNextOffset={}, record={}", streamId, expectNextOffset, peek);
+                            logger.error("[BUG] recover an out of order record, streamId={}, expectNextOffset={}, record={}", streamId, expectNextOffset, peek);
                             cacheBlock.put(peek);
                             outOfOrderRecords.poll();
                             expectNextOffset = peek.getLastOffset();
