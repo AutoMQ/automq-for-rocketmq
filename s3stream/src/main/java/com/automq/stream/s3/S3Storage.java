@@ -41,6 +41,7 @@ import io.opentelemetry.instrumentation.annotations.WithSpan;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -48,6 +49,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -142,6 +144,7 @@ public class S3Storage implements Storage {
         LogCache.LogCacheBlock cacheBlock = new LogCache.LogCacheBlock(1024L * 1024 * 1024);
         long logEndOffset = -1L;
         Map<Long, Long> streamNextOffsets = new HashMap<>();
+        Map<Long, Queue<StreamRecordBatch>> streamOutOfOrderRecords = new HashMap<>();
         while (it.hasNext()) {
             WriteAheadLog.RecoverResult recoverResult = it.next();
             logEndOffset = recoverResult.recordOffset();
@@ -159,15 +162,42 @@ public class S3Storage implements Storage {
                 recordBuf.release();
                 continue;
             }
+
             Long expectNextOffset = streamNextOffsets.get(streamId);
+            Queue<StreamRecordBatch> outOfOrderRecords = streamOutOfOrderRecords.get(streamId);
             if (expectNextOffset == null || expectNextOffset == streamRecordBatch.getBaseOffset()) {
+                // continuous record, put it into cache.
                 cacheBlock.put(streamRecordBatch);
-                streamNextOffsets.put(streamRecordBatch.getStreamId(), streamRecordBatch.getLastOffset());
+                expectNextOffset = streamRecordBatch.getLastOffset();
+                // try to put out of order records into cache.
+                if (outOfOrderRecords != null) {
+                    while (!outOfOrderRecords.isEmpty()) {
+                        StreamRecordBatch peek = outOfOrderRecords.peek();
+                        if (peek.getBaseOffset() == expectNextOffset) {
+                            cacheBlock.put(peek);
+                            outOfOrderRecords.poll();
+                            expectNextOffset = peek.getLastOffset();
+                        } else {
+                            break;
+                        }
+                    }
+                }
+                // update next offset.
+                streamNextOffsets.put(streamRecordBatch.getStreamId(), expectNextOffset);
             } else {
+                // unexpected record, put it into out of order records.
+                if (outOfOrderRecords == null) {
+                    outOfOrderRecords = new PriorityQueue<>(Comparator.comparingLong(StreamRecordBatch::getBaseOffset));
+                    streamOutOfOrderRecords.put(streamId, outOfOrderRecords);
+                }
+                outOfOrderRecords.add(streamRecordBatch);
+                // TODO update log
                 logger.error("unexpected WAL record, streamId={}, expectNextOffset={}, record={}", streamId, expectNextOffset, streamRecordBatch);
-                streamRecordBatch.release();
             }
         }
+        // release all out of order records.
+        streamOutOfOrderRecords.values().forEach(queue -> queue.forEach(StreamRecordBatch::release));
+
         if (logEndOffset >= 0L) {
             cacheBlock.confirmOffset(logEndOffset);
         }
