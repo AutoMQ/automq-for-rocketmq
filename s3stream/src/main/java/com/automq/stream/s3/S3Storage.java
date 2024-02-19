@@ -138,6 +138,32 @@ public class S3Storage implements Storage {
         return recoverContinuousRecords(it, openingStreams, LOGGER);
     }
 
+    /**
+     * Recover continuous records in each stream from the WAL, and put them into the returned {@link LogCache.LogCacheBlock}.
+     * It will filter out
+     * <ul>
+     *     <li>the records that are not in the opening streams</li>
+     *     <li>the records that have been committed</li>
+     *     <li>the records that are not continuous, which means, all records after the first discontinuous record</li>
+     * </ul>
+     *
+     * It throws {@link IllegalStateException} if the start offset of the first recovered record mismatches
+     * the end offset of any opening stream, which indicates data loss.
+     * <p>
+     * If there are out of order records (which should never happen or there is a BUG), it will try to re-order them.
+     * <p>
+     * For example, if we recover following records from the WAL in a stream:
+     * <pre>    1, 2, 3, 5, 4, 6, 10, 11</pre>
+     * and the {@link StreamMetadata#endOffset()} of this stream is 3. Then the returned {@link LogCache.LogCacheBlock}
+     * will contain records
+     * <pre>    3, 4, 5, 6</pre>
+     * Here,
+     * <ul>
+     *     <li>The record 1 and 2 are discarded because they have been committed (less than 3, the end offset of the stream)</li>
+     *     <li>The record 10 and 11 are discarded because they are not continuous (10 is not 7, the next offset of 6)</li>
+     *     <li>The record 5 and 4 are reordered because they are out of order, and we handle this bug here</li>
+     * </ul>
+     */
     static LogCache.LogCacheBlock recoverContinuousRecords(Iterator<WriteAheadLog.RecoverResult> it,
         List<StreamMetadata> openingStreams, Logger logger) {
         Map<Long, Long> openingStreamEndOffsets = openingStreams.stream().collect(Collectors.toMap(StreamMetadata::streamId, StreamMetadata::endOffset));
