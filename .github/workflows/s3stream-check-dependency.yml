@@ -23,6 +23,7 @@ jobs:
           cache: "maven"
       - uses: gradle/gradle-build-action@v2.9.0
       - name: Check Dependencies
+        working-directory: ./s3stream
         run: |
           mvn dependency:tree -DoutputType=dot -DoutputFile=maven-dependencies-raw.txt
           ./gradlew dependencies --configuration api > gradle-dependencies-raw.txt
