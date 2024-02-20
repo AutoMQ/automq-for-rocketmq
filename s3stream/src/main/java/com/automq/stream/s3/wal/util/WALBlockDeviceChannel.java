@@ -25,6 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static com.automq.stream.s3.Constants.CAPACITY_NOT_SET;
+import static com.automq.stream.s3.wal.util.WALUtil.isBlockDevice;
 
 public class WALBlockDeviceChannel implements WALChannel {
     private static final Logger LOGGER = LoggerFactory.getLogger(WALBlockDeviceChannel.class);
@@ -98,7 +99,7 @@ public class WALBlockDeviceChannel implements WALChannel {
             return "java.nio.DirectByteBuffer.<init>(long, int) not available." +
                 " Add --add-opens=java.base/java.nio=ALL-UNNAMED and -Dio.netty.tryReflectionSetAccessible=true to JVM options may fix this.";
         }
-        if (!path.startsWith(DEVICE_PREFIX)) {
+        if (!isBlockDevice(path)) {
             String reason = tryOpenFileWithDirectIO(String.format(CHECK_DIRECT_IO_AVAILABLE_FORMAT, path));
             if (null != reason) {
                 return "O_DIRECT not supported by the file system, path: " + path + ", reason: " + reason;
@@ -125,7 +126,7 @@ public class WALBlockDeviceChannel implements WALChannel {
 
     @Override
     public void open(CapacityReader reader) throws IOException {
-        if (!path.startsWith(WALChannel.DEVICE_PREFIX)) {
+        if (!isBlockDevice(path)) {
             openAndCheckFile();
         } else {
             try {
