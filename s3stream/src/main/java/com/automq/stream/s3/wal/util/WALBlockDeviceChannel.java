@@ -110,17 +110,21 @@ public class WALBlockDeviceChannel implements WALChannel {
 
     /**
      * Try to open a file with O_DIRECT flag to check whether the file system supports O_DIRECT.
-     * NOTE: The file is not actually created.
+     * The file will be deleted after the test.
      *
      * @return null if the file is opened successfully, otherwise the reason why it's not available
      */
     private static String tryOpenFileWithDirectIO(String path) {
+        File file = new File(path);
         try {
-            DirectRandomAccessFile randomAccessFile = new DirectRandomAccessFile(new File(path), "rw");
+            DirectRandomAccessFile randomAccessFile = new DirectRandomAccessFile(file, "rw");
             randomAccessFile.close();
             return null;
         } catch (IOException e) {
             return e.getMessage();
+        } finally {
+            // the file may be created in {@link DirectRandomAccessFile(File, String)}, so delete it
+            file.delete();
         }
     }
 
