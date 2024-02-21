@@ -1,0 +1,41 @@
+name: Check Dependencies of Maven and Gradle
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - reopened
+      - synchronize
+    paths:
+      - 's3stream/**'
+
+jobs:
+  check-dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+      - uses: actions/setup-java@v3
+        with:
+          distribution: "temurin"
+          java-version: "17"
+          cache: "maven"
+      - uses: gradle/gradle-build-action@v2.9.0
+      - name: Check Dependencies
+        working-directory: ./s3stream
+        run: |
+          mvn dependency:tree -DoutputType=dot -DoutputFile=maven-dependencies-raw.txt
+          ./gradlew dependencies --configuration api > gradle-dependencies-raw.txt
+          cat maven-dependencies-raw.txt | grep "com.automq.elasticstream:s3stream" | grep "\->" | grep -v ":test\" ;" | sed 's/.* -> "\(.*\):[a-z]*".*/\1/' | sed 's/jar://' | sort | uniq > maven-dependencies.txt
+          cat gradle-dependencies-raw.txt | grep "\-\-\- " | sed 's/.*--- \(.*\) (.).*/\1/' | sort | uniq > gradle-dependencies.txt
+          echo -e "\n================================\nRaw Maven Dependencies: \n================================"
+          cat maven-dependencies-raw.txt
+          echo -e "\n================================\nRaw Gradle Dependencies:\n================================"
+          cat gradle-dependencies-raw.txt
+          echo -e "\n================================\nMaven Dependencies:     \n================================"
+          cat maven-dependencies.txt
+          echo -e "\n================================\nGradle Dependencies:    \n================================"
+          cat gradle-dependencies.txt
+          echo -e "\n================================\nDiff Maven and Gradle Dependencies"
+          diff maven-dependencies.txt gradle-dependencies.txt
