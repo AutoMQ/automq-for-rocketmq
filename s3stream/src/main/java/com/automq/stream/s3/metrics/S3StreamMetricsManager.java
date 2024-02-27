@@ -12,12 +12,12 @@
 package com.automq.stream.s3.metrics;
 
 import com.automq.stream.s3.DirectByteBufAlloc;
-import com.automq.stream.s3.metrics.wrapper.CounterMetric;
 import com.automq.stream.s3.metrics.operations.S3ObjectStage;
 import com.automq.stream.s3.metrics.operations.S3Operation;
 import com.automq.stream.s3.metrics.operations.S3Stage;
-import com.automq.stream.s3.metrics.wrapper.HistogramMetric;
 import com.automq.stream.s3.metrics.wrapper.ConfigListener;
+import com.automq.stream.s3.metrics.wrapper.CounterMetric;
+import com.automq.stream.s3.metrics.wrapper.HistogramMetric;
 import com.automq.stream.s3.network.AsyncNetworkBandwidthLimiter;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.metrics.LongCounter;
@@ -285,7 +285,7 @@ public class S3StreamMetricsManager {
             .ofLongs()
             .buildWithCallback(result -> {
                 if (MetricsLevel.DEBUG.isWithin(metricsConfig.getMetricsLevel()) && DirectByteBufAlloc.directByteBufAllocMetric != null) {
-                    result.record(DirectByteBufAlloc.directByteBufAllocMetric.getUsedDirectMemory(), metricsConfig.getBaseAttributes());
+                    result.record(DirectByteBufAlloc.directByteBufAllocMetric.getUsedMemory(), metricsConfig.getBaseAttributes());
                 }
             });
     }
