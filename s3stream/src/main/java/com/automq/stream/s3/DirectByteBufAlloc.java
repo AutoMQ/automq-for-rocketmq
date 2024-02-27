@@ -84,9 +84,9 @@ public class DirectByteBufAlloc {
                     DirectByteBufAlloc.directByteBufAllocMetric = new DirectByteBufAllocMetric();
                     LOGGER.info("Direct Memory usage: {}", DirectByteBufAlloc.directByteBufAllocMetric);
                 }
-                return new WrappedByteBuf(ALLOC.directBuffer(initCapacity), () -> usage.add(-initCapacity));
+                return new WrappedByteBuf(ALLOC.heapBuffer(initCapacity), () -> usage.add(-initCapacity));
             } else {
-                return ALLOC.directBuffer(initCapacity);
+                return ALLOC.heapBuffer(initCapacity);
             }
         } catch (OutOfMemoryError e) {
             if (MEMORY_USAGE_DETECT) {
