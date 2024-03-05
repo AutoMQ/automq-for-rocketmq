@@ -144,7 +144,7 @@ public class S3Stream implements Stream {
             }, LOGGER, "append");
             pendingAppends.add(cf);
             cf.whenComplete((nil, ex) -> {
-                StreamOperationStats.getInstance().appendStreamStats.record(MetricsLevel.INFO, timerUtil.elapsedAs(TimeUnit.NANOSECONDS));
+                StreamOperationStats.getInstance().appendStreamStats.record(timerUtil.elapsedAs(TimeUnit.NANOSECONDS));
                 pendingAppends.remove(cf);
             });
             return cf;
@@ -190,7 +190,7 @@ public class S3Stream implements Stream {
             CompletableFuture<FetchResult> cf = exec(() -> fetch0(context, startOffset, endOffset, maxBytes), LOGGER, "fetch");
             pendingFetches.add(cf);
             cf.whenComplete((rs, ex) -> {
-                StreamOperationStats.getInstance().fetchStreamStats.record(MetricsLevel.INFO, timerUtil.elapsedAs(TimeUnit.NANOSECONDS));
+                StreamOperationStats.getInstance().fetchStreamStats.record(timerUtil.elapsedAs(TimeUnit.NANOSECONDS));
                 if (ex != null) {
                     Throwable cause = FutureUtil.cause(ex);
                     if (!(cause instanceof FastReadFailFastException)) {
@@ -256,7 +256,7 @@ public class S3Stream implements Stream {
                 CompletableFuture<Void> cf = new CompletableFuture<>();
                 lastPendingTrim.whenComplete((nil, ex) -> propagate(trim0(newStartOffset), cf));
                 this.lastPendingTrim = cf;
-                cf.whenComplete((nil, ex) -> StreamOperationStats.getInstance().trimStreamStats.record(MetricsLevel.INFO, timerUtil.elapsedAs(TimeUnit.NANOSECONDS)));
+                cf.whenComplete((nil, ex) -> StreamOperationStats.getInstance().trimStreamStats.record(timerUtil.elapsedAs(TimeUnit.NANOSECONDS)));
                 return cf;
             }, LOGGER, "trim");
         } finally {
@@ -307,10 +307,10 @@ public class S3Stream implements Stream {
             closeCf.whenComplete((nil, ex) -> {
                 if (ex != null) {
                     LOGGER.error("{} close fail", logIdent, ex);
-                    StreamOperationStats.getInstance().closeStreamStats(false).record(MetricsLevel.INFO, timerUtil.elapsedAs(TimeUnit.NANOSECONDS));
+                    StreamOperationStats.getInstance().closeStreamStats(false).record(timerUtil.elapsedAs(TimeUnit.NANOSECONDS));
                 } else {
                     LOGGER.info("{} closed", logIdent);
-                    StreamOperationStats.getInstance().closeStreamStats(true).record(MetricsLevel.INFO, timerUtil.elapsedAs(TimeUnit.NANOSECONDS));
+                    StreamOperationStats.getInstance().closeStreamStats(true).record(timerUtil.elapsedAs(TimeUnit.NANOSECONDS));
                 }
             });
 

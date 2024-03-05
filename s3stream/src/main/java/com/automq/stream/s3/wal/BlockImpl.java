@@ -118,6 +118,6 @@ public class BlockImpl implements Block {
 
     @Override
     public void polled() {
-        StorageOperationStats.getInstance().appendWALBlockPolledStats.record(MetricsLevel.DEBUG, timer.elapsedAs(TimeUnit.NANOSECONDS));
+        StorageOperationStats.getInstance().appendWALBlockPolledStats.record(timer.elapsedAs(TimeUnit.NANOSECONDS));
     }
 }

@@ -94,7 +94,7 @@ public class LogCache {
         } finally {
             readLock.unlock();
         }
-        StorageOperationStats.getInstance().appendLogCacheStats.record(MetricsLevel.INFO, timerUtil.elapsedAs(TimeUnit.NANOSECONDS));
+        StorageOperationStats.getInstance().appendLogCacheStats.record(timerUtil.elapsedAs(TimeUnit.NANOSECONDS));
         return full;
     }
 
@@ -145,7 +145,7 @@ public class LogCache {
 
         long timeElapsed = timerUtil.elapsedAs(TimeUnit.NANOSECONDS);
         boolean isCacheHit = !records.isEmpty() && records.get(0).getBaseOffset() <= startOffset;
-        StorageOperationStats.getInstance().readLogCacheStats(isCacheHit).record(MetricsLevel.INFO, timeElapsed);
+        StorageOperationStats.getInstance().readLogCacheStats(isCacheHit).record(timeElapsed);
         return records;
     }
 

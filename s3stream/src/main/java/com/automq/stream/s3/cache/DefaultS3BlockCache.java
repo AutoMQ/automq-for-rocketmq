@@ -105,7 +105,7 @@ public class DefaultS3BlockCache implements S3BlockCache {
 
                     long timeElapsed = timerUtil.elapsedAs(TimeUnit.NANOSECONDS);
                     boolean isCacheHit = ret.getCacheAccessType() == CacheAccessType.BLOCK_CACHE_HIT;
-                    StorageOperationStats.getInstance().readBlockCacheStats(isCacheHit).record(MetricsLevel.INFO, timeElapsed);
+                    StorageOperationStats.getInstance().readBlockCacheStats(isCacheHit).record(timeElapsed);
                     Span.fromContext(finalTraceContext.currentContext()).setAttribute("cache_hit", isCacheHit);
                     if (LOGGER.isDebugEnabled()) {
                         LOGGER.debug("[S3BlockCache] read data complete, cache hit: {}, stream={}, {}-{}, total bytes: {}",
