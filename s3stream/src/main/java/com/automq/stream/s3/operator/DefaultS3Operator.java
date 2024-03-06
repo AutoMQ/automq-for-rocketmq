@@ -325,6 +325,8 @@ public class DefaultS3Operator implements S3Operator {
                         LOGGER.debug("[S3BlockCache] getObject from path: {}, {}-{}, size: {}, cost: {} ms",
                             path, start, end, size, timerUtil.elapsedAs(TimeUnit.MILLISECONDS));
                     }
+                    LOGGER.info("[S3BlockCache] getObject from path: {}, {}-{}, size: {}, cost: {} ms",
+                        path, start, end, size, timerUtil.elapsedAs(TimeUnit.MILLISECONDS));
                     S3OperationStats.getInstance().downloadSizeTotalStats.add(MetricsLevel.INFO, size);
                     S3OperationStats.getInstance().getObjectStats(size, true).record(timerUtil.elapsedAs(TimeUnit.NANOSECONDS));
                     cf.complete(buf);
