@@ -18,11 +18,19 @@ import com.automq.stream.s3.metrics.S3StreamMetricsManager;
 import com.automq.stream.s3.metrics.operations.S3Operation;
 import com.automq.stream.s3.metrics.wrapper.CounterMetric;
 import com.automq.stream.s3.metrics.wrapper.YammerHistogramMetric;
+import com.automq.stream.utils.ThreadUtils;
+import com.automq.stream.utils.Threads;
 import com.yammer.metrics.core.MetricName;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class S3OperationStats {
+    private static final Logger LOGGER = LoggerFactory.getLogger(S3OperationStats.class);
     private volatile static S3OperationStats instance = null;
     public final CounterMetric uploadSizeTotalStats = S3StreamMetricsManager.buildS3UploadSizeMetric();
     public final CounterMetric downloadSizeTotalStats = S3StreamMetricsManager.buildS3DownloadSizeMetric();
@@ -30,6 +38,11 @@ public class S3OperationStats {
     private final Map<String, YammerHistogramMetric> getObjectFailedStats = new ConcurrentHashMap<>();
     private final Map<String, YammerHistogramMetric> putObjectSuccessStats = new ConcurrentHashMap<>();
     private final Map<String, YammerHistogramMetric> putObjectFailedStats = new ConcurrentHashMap<>();
+    private final Map<String, AtomicInteger> labelCountMap = new ConcurrentHashMap<>();
+
+    private final ScheduledExecutorService executorService = Threads.newSingleThreadScheduledExecutor(
+        ThreadUtils.createThreadFactory("debug", true), LOGGER);
+
     private final YammerHistogramMetric deleteObjectSuccessStats = S3StreamMetricsManager.buildOperationMetric(
         new MetricName(S3OperationStats.class, S3Operation.DELETE_OBJECT.getUniqueKey() + S3StreamMetricsConstant.LABEL_STATUS_SUCCESS),
         MetricsLevel.INFO, S3Operation.DELETE_OBJECT, S3StreamMetricsConstant.LABEL_STATUS_SUCCESS);
@@ -64,6 +77,11 @@ public class S3OperationStats {
         MetricsLevel.INFO, S3Operation.COMPLETE_MULTI_PART_UPLOAD, S3StreamMetricsConstant.LABEL_STATUS_FAILED);
 
     private S3OperationStats() {
+        executorService.scheduleAtFixedRate(() -> {
+            labelCountMap.forEach((k, v) -> {
+                LOGGER.info("S3OperationStats label: {}, count: {}", k, v.get());
+            });
+        }, 0, 1, TimeUnit.SECONDS);
     }
 
     public static S3OperationStats getInstance() {
@@ -79,6 +97,9 @@ public class S3OperationStats {
 
     public YammerHistogramMetric getObjectStats(long size, boolean isSuccess) {
         String label = AttributesUtils.getObjectBucketLabel(size);
+
+        labelCountMap.compute(label, (k, v) -> v == null ? new AtomicInteger(0) : v).incrementAndGet();
+
         if (isSuccess) {
             return getObjectSuccessStats.computeIfAbsent(label, name -> S3StreamMetricsManager.buildOperationMetric(
                 new MetricName(S3OperationStats.class, S3Operation.GET_OBJECT.getUniqueKey() + S3StreamMetricsConstant.LABEL_STATUS_SUCCESS),
