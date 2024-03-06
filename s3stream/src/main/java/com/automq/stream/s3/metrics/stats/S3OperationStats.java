@@ -81,11 +81,13 @@ public class S3OperationStats {
         String label = AttributesUtils.getObjectBucketLabel(size);
         if (isSuccess) {
             return getObjectSuccessStats.computeIfAbsent(label, name -> S3StreamMetricsManager.buildOperationMetric(
-                new MetricName(S3OperationStats.class, S3Operation.GET_OBJECT.getUniqueKey() + S3StreamMetricsConstant.LABEL_STATUS_SUCCESS),
+                new MetricName(S3OperationStats.class, S3Operation.GET_OBJECT.getUniqueKey()
+                    + S3StreamMetricsConstant.LABEL_STATUS_SUCCESS + label),
                 MetricsLevel.INFO, S3Operation.GET_OBJECT, S3StreamMetricsConstant.LABEL_STATUS_SUCCESS, label));
         } else {
             return getObjectFailedStats.computeIfAbsent(label, name -> S3StreamMetricsManager.buildOperationMetric(
-                new MetricName(S3OperationStats.class, S3Operation.GET_OBJECT.getUniqueKey() + S3StreamMetricsConstant.LABEL_STATUS_FAILED),
+                new MetricName(S3OperationStats.class, S3Operation.GET_OBJECT.getUniqueKey()
+                    + S3StreamMetricsConstant.LABEL_STATUS_FAILED + label),
                 MetricsLevel.INFO, S3Operation.GET_OBJECT, S3StreamMetricsConstant.LABEL_STATUS_FAILED, label));
         }
     }
@@ -94,11 +96,13 @@ public class S3OperationStats {
         String label = AttributesUtils.getObjectBucketLabel(size);
         if (isSuccess) {
             return putObjectSuccessStats.computeIfAbsent(label, name -> S3StreamMetricsManager.buildOperationMetric(
-                new MetricName(S3OperationStats.class, S3Operation.PUT_OBJECT.getUniqueKey() + S3StreamMetricsConstant.LABEL_STATUS_SUCCESS),
+                new MetricName(S3OperationStats.class, S3Operation.PUT_OBJECT.getUniqueKey()
+                    + S3StreamMetricsConstant.LABEL_STATUS_SUCCESS + label),
                 MetricsLevel.INFO, S3Operation.PUT_OBJECT, S3StreamMetricsConstant.LABEL_STATUS_SUCCESS, label));
         } else {
             return putObjectFailedStats.computeIfAbsent(label, name -> S3StreamMetricsManager.buildOperationMetric(
-                new MetricName(S3OperationStats.class, S3Operation.PUT_OBJECT.getUniqueKey() + S3StreamMetricsConstant.LABEL_STATUS_FAILED),
+                new MetricName(S3OperationStats.class, S3Operation.PUT_OBJECT.getUniqueKey() +
+                    S3StreamMetricsConstant.LABEL_STATUS_FAILED + label),
                 MetricsLevel.INFO, S3Operation.PUT_OBJECT, S3StreamMetricsConstant.LABEL_STATUS_FAILED, label));
         }
     }
@@ -107,11 +111,13 @@ public class S3OperationStats {
         String label = AttributesUtils.getObjectBucketLabel(size);
         if (isSuccess) {
             return uploadPartSuccessStats.computeIfAbsent(label, name -> S3StreamMetricsManager.buildOperationMetric(
-                new MetricName(S3OperationStats.class, S3Operation.UPLOAD_PART.getUniqueKey() + S3StreamMetricsConstant.LABEL_STATUS_SUCCESS),
+                new MetricName(S3OperationStats.class, S3Operation.UPLOAD_PART.getUniqueKey() +
+                    S3StreamMetricsConstant.LABEL_STATUS_SUCCESS + label),
                 MetricsLevel.INFO, S3Operation.UPLOAD_PART, S3StreamMetricsConstant.LABEL_STATUS_SUCCESS, label));
         } else {
             return uploadPartFailedStats.computeIfAbsent(label, name -> S3StreamMetricsManager.buildOperationMetric(
-                new MetricName(S3OperationStats.class, S3Operation.UPLOAD_PART.getUniqueKey() + S3StreamMetricsConstant.LABEL_STATUS_FAILED),
+                new MetricName(S3OperationStats.class, S3Operation.UPLOAD_PART.getUniqueKey() +
+                    S3StreamMetricsConstant.LABEL_STATUS_FAILED + label),
                 MetricsLevel.INFO, S3Operation.UPLOAD_PART, S3StreamMetricsConstant.LABEL_STATUS_FAILED, label));
         }
     }

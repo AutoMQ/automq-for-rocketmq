@@ -17,6 +17,7 @@
 
 package com.automq.stream.s3.metrics.wrapper;
 
+import com.automq.stream.s3.metrics.S3StreamMetricsConstant;
 import io.opentelemetry.api.metrics.Meter;
 import io.opentelemetry.api.metrics.ObservableDoubleGauge;
 import io.opentelemetry.api.metrics.ObservableLongGauge;
@@ -34,7 +35,7 @@ public class HistogramInstrument {
 
     public HistogramInstrument(Meter meter, String name, String desc, String unit) {
         this.histograms = new CopyOnWriteArrayList<>();
-        this.count = meter.gaugeBuilder(name)
+        this.count = meter.gaugeBuilder(name + S3StreamMetricsConstant.COUNT_METRIC_NAME_SUFFIX)
             .setDescription(desc + " (count)")
             .ofLongs()
             .buildWithCallback(result -> {
@@ -44,9 +45,10 @@ public class HistogramInstrument {
                     }
                 });
             });
-        this.sum = meter.gaugeBuilder(name)
+        this.sum = meter.gaugeBuilder(name + S3StreamMetricsConstant.SUM_METRIC_NAME_SUFFIX)
             .setDescription(desc + " (sum)")
             .ofLongs()
+            .setUnit(unit)
             .buildWithCallback(result -> {
                 histograms.forEach(histogram -> {
                     if (histogram.shouldRecord()) {
@@ -54,7 +56,7 @@ public class HistogramInstrument {
                     }
                 });
             });
-        this.histP50Value = meter.gaugeBuilder(name)
+        this.histP50Value = meter.gaugeBuilder(name + S3StreamMetricsConstant.P50_METRIC_NAME_SUFFIX)
             .setDescription(desc + " (50th percentile)")
             .setUnit(unit)
             .buildWithCallback(result -> {
@@ -64,7 +66,7 @@ public class HistogramInstrument {
                     }
                 });
             });
-        this.histP99Value = meter.gaugeBuilder(name)
+        this.histP99Value = meter.gaugeBuilder(name + S3StreamMetricsConstant.P99_METRIC_NAME_SUFFIX)
             .setDescription(desc + " (99th percentile)")
             .setUnit(unit)
             .buildWithCallback(result -> {
@@ -74,7 +76,7 @@ public class HistogramInstrument {
                     }
                 });
             });
-        this.histMeanValue = meter.gaugeBuilder(name)
+        this.histMeanValue = meter.gaugeBuilder(name + S3StreamMetricsConstant.MEAN_METRIC_NAME_SUFFIX)
             .setDescription(desc + " (mean)")
             .setUnit(unit)
             .buildWithCallback(result -> {
@@ -84,7 +86,7 @@ public class HistogramInstrument {
                     }
                 });
             });
-        this.histMaxValue = meter.gaugeBuilder(name)
+        this.histMaxValue = meter.gaugeBuilder(name + S3StreamMetricsConstant.MAX_METRIC_NAME_SUFFIX)
             .setDescription(desc + " (max)")
             .setUnit(unit)
             .buildWithCallback(result -> {
