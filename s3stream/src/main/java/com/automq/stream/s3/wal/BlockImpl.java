@@ -12,7 +12,6 @@
 package com.automq.stream.s3.wal;
 
 import com.automq.stream.s3.ByteBufAlloc;
-import com.automq.stream.s3.metrics.MetricsLevel;
 import com.automq.stream.s3.metrics.TimerUtil;
 import com.automq.stream.s3.metrics.stats.StorageOperationStats;
 import com.automq.stream.s3.wal.util.WALUtil;

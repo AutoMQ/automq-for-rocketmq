@@ -22,7 +22,6 @@ import com.automq.stream.s3.metrics.MetricsLevel;
 import com.yammer.metrics.core.MetricName;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.metrics.LongCounter;
-import io.opentelemetry.api.metrics.LongHistogram;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
