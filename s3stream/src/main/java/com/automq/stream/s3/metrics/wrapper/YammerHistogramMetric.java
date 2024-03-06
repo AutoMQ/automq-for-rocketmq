@@ -17,8 +17,10 @@ import com.automq.stream.s3.metrics.S3StreamMetricsManager;
 import com.yammer.metrics.core.Histogram;
 import com.yammer.metrics.core.MetricName;
 import io.opentelemetry.api.common.Attributes;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class YammerHistogramMetric extends ConfigurableMetrics {
+    private final AtomicLong count = new AtomicLong(0);
     private final Histogram histogram;
     private final MetricsLevel currentMetricsLevel;
 
@@ -57,6 +59,7 @@ public class YammerHistogramMetric extends ConfigurableMetrics {
     }
 
     public void record(long value) {
+        count.incrementAndGet();
         histogram.update(value);
     }
 
