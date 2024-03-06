@@ -69,7 +69,6 @@ public class S3StreamMetricsConstant {
     public static final String OPERATION_LATENCY_METRIC_NAME = "operation_latency";
     public static final String OBJECT_COUNT_METRIC_NAME = "object_count";
     public static final String OBJECT_STAGE_COST_METRIC_NAME = "object_stage_cost";
-    public static final String OBJECT_UPLOAD_SIZE_METRIC_NAME = "object_upload_size";
     public static final String NETWORK_INBOUND_USAGE_METRIC_NAME = "network_inbound_usage";
     public static final String NETWORK_OUTBOUND_USAGE_METRIC_NAME = "network_outbound_usage";
     public static final String NETWORK_INBOUND_AVAILABLE_BANDWIDTH_METRIC_NAME = "network_inbound_available_bandwidth";

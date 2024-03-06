@@ -64,7 +64,7 @@ public class MetricsWrapperTest {
         yammerHistogramMetric = new YammerHistogramMetric(Mockito.mock(MetricName.class), MetricsLevel.DEBUG, new MetricsConfig(),
             Attributes.builder().put("extra", "v").build());
         Assertions.assertFalse(yammerHistogramMetric.shouldRecord());
-        yammerHistogramMetric.onConfigChange(new MetricsConfig(MetricsLevel.INFO, null));
+        yammerHistogramMetric.onConfigChange(new MetricsConfig(MetricsLevel.DEBUG, null));
         Assertions.assertTrue(yammerHistogramMetric.shouldRecord());
     }
 }
