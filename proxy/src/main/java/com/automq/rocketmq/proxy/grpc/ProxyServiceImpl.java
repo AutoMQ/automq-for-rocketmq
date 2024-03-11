@@ -15,6 +15,9 @@ import apache.rocketmq.common.v1.Code;
 import apache.rocketmq.proxy.v1.ConsumerClientConnection;
 import apache.rocketmq.proxy.v1.ConsumerClientConnectionReply;
 import apache.rocketmq.proxy.v1.ConsumerClientConnectionRequest;
+import apache.rocketmq.proxy.v1.ConsumerStatusReply;
+import apache.rocketmq.proxy.v1.ConsumerStatusRequest;
+import apache.rocketmq.proxy.v1.ConsumerSubInfo;
 import apache.rocketmq.proxy.v1.ProducerClientConnection;
 import apache.rocketmq.proxy.v1.ProducerClientConnectionReply;
 import apache.rocketmq.proxy.v1.ProducerClientConnectionRequest;
@@ -32,11 +35,13 @@ import com.automq.rocketmq.common.model.generated.FlatMessage;
 import com.automq.rocketmq.proxy.service.ExtendMessageService;
 import com.automq.rocketmq.store.api.MessageStore;
 import com.automq.rocketmq.store.model.StoreContext;
+import com.google.protobuf.ByteString;
 import com.google.protobuf.TextFormat;
 import io.grpc.stub.StreamObserver;
 import io.netty.channel.Channel;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.rocketmq.broker.client.ClientChannelInfo;
 import org.apache.rocketmq.broker.client.ConsumerGroupInfo;
@@ -44,8 +49,17 @@ import org.apache.rocketmq.broker.client.ConsumerManager;
 import org.apache.rocketmq.broker.client.ProducerManager;
 import org.apache.rocketmq.common.MQVersion;
 import org.apache.rocketmq.common.utils.NetworkUtil;
+import org.apache.rocketmq.proxy.common.ProxyContext;
 import org.apache.rocketmq.proxy.grpc.v2.channel.GrpcClientChannel;
 import org.apache.rocketmq.proxy.processor.channel.ChannelProtocolType;
+import org.apache.rocketmq.proxy.service.ServiceManager;
+import org.apache.rocketmq.proxy.service.relay.ProxyRelayResult;
+import org.apache.rocketmq.proxy.service.relay.ProxyRelayService;
+import org.apache.rocketmq.remoting.protocol.RemotingCommand;
+import org.apache.rocketmq.remoting.protocol.RequestCode;
+import org.apache.rocketmq.remoting.protocol.body.ConsumerRunningInfo;
+import org.apache.rocketmq.remoting.protocol.header.GetConsumerRunningInfoRequestHeader;
+import org.apache.rocketmq.remoting.protocol.heartbeat.SubscriptionData;
 import org.slf4j.Logger;
 
 public class ProxyServiceImpl extends ProxyServiceGrpc.ProxyServiceImplBase {
@@ -58,12 +72,16 @@ public class ProxyServiceImpl extends ProxyServiceGrpc.ProxyServiceImplBase {
     private final ProducerManager producerManager;
     private final ConsumerManager consumerManager;
 
+    private final ServiceManager serviceManager;
+
     public ProxyServiceImpl(MessageStore messageStore, ExtendMessageService messageService,
-        ProducerManager producerManager, ConsumerManager consumerManager) {
+        ProducerManager producerManager, ConsumerManager consumerManager,
+                            ServiceManager serviceManager) {
         this.messageStore = messageStore;
         this.messageService = messageService;
         this.producerManager = producerManager;
         this.consumerManager = consumerManager;
+        this.serviceManager = serviceManager;
     }
 
     @Override
@@ -200,6 +218,82 @@ public class ProxyServiceImpl extends ProxyServiceGrpc.ProxyServiceImplBase {
         }
         responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
+    }
+
+
+    @Override
+    public void consumerStatus(ConsumerStatusRequest request, StreamObserver<ConsumerStatusReply> responseObserver) {
+        GetConsumerRunningInfoRequestHeader header = new GetConsumerRunningInfoRequestHeader();
+        header.setConsumerGroup(request.getGroup());
+        try {
+
+            ConsumerStatusReply.Builder consumerStatusReplyBuilder = ConsumerStatusReply.newBuilder();
+
+            //1.request to client to get info
+            GetConsumerRunningInfoRequestHeader requestHeader = new GetConsumerRunningInfoRequestHeader();
+            requestHeader.setConsumerGroup(request.getGroup());
+            requestHeader.setClientId(request.getClientId());
+            requestHeader.setJstackEnable(request.getJstackEnable());
+
+            ProxyRelayService proxyRelayService = serviceManager.getProxyRelayService();
+            CompletableFuture<ProxyRelayResult<ConsumerRunningInfo>> completableFuture
+                    = proxyRelayService.processGetConsumerRunningInfo(ProxyContext.create(),
+                    RemotingCommand.createRequestCommand(RequestCode.GET_CONSUMER_RUNNING_INFO, requestHeader), header);
+            ProxyRelayResult<ConsumerRunningInfo> result = completableFuture.get();
+            ConsumerRunningInfo consumerRunningInfo = result.getResult();
+            consumerStatusReplyBuilder.setConsumerRunningInfo(ByteString.copyFrom(consumerRunningInfo.encode()));
+
+            //2.get consumer group info
+            ConsumerGroupInfo groupInfo = consumerManager.getConsumerGroupInfo(request.getGroup(), true);
+            if (groupInfo == null) {
+                responseObserver.onNext(ConsumerStatusReply.newBuilder()
+                        .setStatus(Status
+                                .newBuilder()
+                                .setCode(Code.BAD_REQUEST)
+                                .setMessage("Consumer group not found: " + request.getGroup())
+                                .build())
+                        .build());
+                responseObserver.onCompleted();
+                return;
+            }
+
+            //3.assemble info from response
+            consumerStatusReplyBuilder
+                    .setConsumeType(groupInfo.getConsumeType().getTypeCN())
+                    .setMessageModel(groupInfo.getMessageModel().getModeCN())
+                    .setConsumeFromWhere(groupInfo.getConsumeFromWhere().name());
+
+            if (groupInfo.getChannelInfoTable() != null && !groupInfo.getChannelInfoTable().isEmpty()) {
+                for (ClientChannelInfo info : groupInfo.getChannelInfoTable().values()) {
+                    String protocolType = ChannelProtocolType.REMOTING.name();
+                    if (info.getChannel() instanceof GrpcClientChannel) {
+                        protocolType = ChannelProtocolType.GRPC_V2.name();
+                    }
+                    consumerStatusReplyBuilder.addConnection(ConsumerClientConnection.newBuilder()
+                            .setClientId(info.getClientId())
+                            .setProtocol(protocolType)
+                            .setAddress(NetworkUtil.socketAddress2String(info.getChannel().remoteAddress()))
+                            .setLanguage(info.getLanguage().name())
+                            .setVersion(MQVersion.getVersionDesc(info.getVersion()))
+                            .setLastUpdateTime(info.getLastUpdateTimestamp())
+                            .build());
+                }
+            }
+
+            if (groupInfo.getSubscriptionTable() != null && !groupInfo.getSubscriptionTable().isEmpty()) {
+                for (SubscriptionData data : groupInfo.getSubscriptionTable().values()) {
+                    consumerStatusReplyBuilder.addConsumerSubInfo(ConsumerSubInfo.newBuilder()
+                            .setTopic(data.getTopic())
+                            .setSubExpression(data.getSubString())
+                            .build());
+                }
+            }
+
+            responseObserver.onNext(consumerStatusReplyBuilder.build());
+            responseObserver.onCompleted();
+        } catch (Exception e) {
+            LOGGER.error("Failed to get topic message type for {}", "", e);
+        }
     }
 
     @Override
