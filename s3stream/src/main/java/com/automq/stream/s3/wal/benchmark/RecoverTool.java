@@ -11,9 +11,14 @@
 
 package com.automq.stream.s3.wal.benchmark;
 
+import com.automq.stream.s3.StreamRecordBatchCodec;
+import com.automq.stream.s3.model.StreamRecordBatch;
 import com.automq.stream.s3.wal.BlockWALService;
 import com.automq.stream.s3.wal.WALHeader;
+import io.netty.buffer.ByteBuf;
 import java.io.IOException;
+import java.util.function.Function;
+import java.util.stream.StreamSupport;
 import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.Namespace;
@@ -32,7 +37,7 @@ public class RecoverTool extends BlockWALService implements AutoCloseable {
     }
 
     public static void main(String[] args) throws IOException {
-        Namespace ns = parseArgs(WriteBench.Config.parser(), args);
+        Namespace ns = parseArgs(Config.parser(), args);
         Config config = new Config(ns);
 
         try (RecoverTool tool = new RecoverTool(config)) {
@@ -43,12 +48,41 @@ public class RecoverTool extends BlockWALService implements AutoCloseable {
     private void run() {
         WALHeader header = super.tryReadWALHeader();
         System.out.println(header);
-        super.recover().forEachRemaining(System.out::println);
+
+        Iterable<RecoverResult> recordsSupplier = super::recover;
+        Function<ByteBuf, StreamRecordBatch> decoder = StreamRecordBatchCodec::decode;
+        StreamSupport.stream(recordsSupplier.spliterator(), false)
+            .map(it -> new RecoverResultWrapper(it, decoder.andThen(StreamRecordBatch::toString)))
+            .forEach(System.out::println);
     }
 
     @Override
     public void close() {
         super.shutdownGracefully();
+    }
+
+    /**
+     * A wrapper for {@link RecoverResult} to provide a function to convert {@link RecoverResult#record} to string
+     */
+    public static class RecoverResultWrapper {
+        private final RecoverResult inner;
+        /**
+         * A function to convert {@link RecoverResult#record} to string
+         */
+        private final Function<ByteBuf, String> stringer;
+
+        public RecoverResultWrapper(RecoverResult inner, Function<ByteBuf, String> stringer) {
+            this.inner = inner;
+            this.stringer = stringer;
+        }
+
+        @Override
+        public String toString() {
+            return String.format("%s{", inner.getClass().getSimpleName())
+                + String.format("record=(%d)", inner.record().readableBytes()) + stringer.apply(inner.record())
+                + ", offset=" + inner.recordOffset()
+                + '}';
+        }
     }
 
     public static class Config {
