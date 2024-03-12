@@ -53,7 +53,8 @@ public class RecoverTool extends BlockWALService implements AutoCloseable {
         Function<ByteBuf, StreamRecordBatch> decoder = StreamRecordBatchCodec::decode;
         StreamSupport.stream(recordsSupplier.spliterator(), false)
             .map(it -> new RecoverResultWrapper(it, decoder.andThen(StreamRecordBatch::toString)))
-            .forEach(System.out::println);
+            .peek(System.out::println)
+            .forEach(RecoverResultWrapper::release);
     }
 
     @Override
@@ -74,6 +75,10 @@ public class RecoverTool extends BlockWALService implements AutoCloseable {
         public RecoverResultWrapper(RecoverResult inner, Function<ByteBuf, String> stringer) {
             this.inner = inner;
             this.stringer = stringer;
+        }
+
+        public void release() {
+            inner.record().release();
         }
 
         @Override
