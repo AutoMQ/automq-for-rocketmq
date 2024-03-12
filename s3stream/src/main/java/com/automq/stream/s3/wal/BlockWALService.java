@@ -813,7 +813,10 @@ public class BlockWALService implements WriteAheadLog {
         }
     }
 
-    class RecoverIterator implements Iterator<RecoverResult> {
+    /**
+     * Protected for testing purpose.
+     */
+    protected class RecoverIterator implements Iterator<RecoverResult> {
         private final long windowLength;
         private final long skipRecordAtOffset;
         private long nextRecoverOffset;

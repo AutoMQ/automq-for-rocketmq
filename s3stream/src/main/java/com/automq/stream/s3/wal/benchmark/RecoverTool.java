@@ -17,6 +17,7 @@ import com.automq.stream.s3.wal.BlockWALService;
 import com.automq.stream.s3.wal.WALHeader;
 import io.netty.buffer.ByteBuf;
 import java.io.IOException;
+import java.util.Iterator;
 import java.util.function.Function;
 import java.util.stream.StreamSupport;
 import net.sourceforge.argparse4j.ArgumentParsers;
@@ -41,20 +42,28 @@ public class RecoverTool extends BlockWALService implements AutoCloseable {
         Config config = new Config(ns);
 
         try (RecoverTool tool = new RecoverTool(config)) {
-            tool.run();
+            tool.run(config);
         }
     }
 
-    private void run() {
+    private void run(Config config) {
         WALHeader header = super.tryReadWALHeader();
         System.out.println(header);
 
-        Iterable<RecoverResult> recordsSupplier = super::recover;
+        Iterable<RecoverResult> recordsSupplier = () -> recover(header, config);
         Function<ByteBuf, StreamRecordBatch> decoder = StreamRecordBatchCodec::decode;
+        Function<ByteBuf, String> stringer = decoder.andThen(StreamRecordBatch::toString);
         StreamSupport.stream(recordsSupplier.spliterator(), false)
-            .map(it -> new RecoverResultWrapper(it, decoder.andThen(StreamRecordBatch::toString)))
+            .map(it -> new RecoverResultWrapper(it, stringer))
             .peek(System.out::println)
             .forEach(RecoverResultWrapper::release);
+    }
+
+    private Iterator<RecoverResult> recover(WALHeader header, Config config) {
+        long recoverOffset = config.offset != null ? config.offset : header.getTrimOffset();
+        long windowLength = header.getSlidingWindowMaxLength();
+        long skipRecordAtOffset = config.skipTrimmed ? header.getTrimOffset() : -1;
+        return new RecoverIterator(recoverOffset, windowLength, skipRecordAtOffset);
     }
 
     @Override
@@ -92,9 +101,13 @@ public class RecoverTool extends BlockWALService implements AutoCloseable {
 
     public static class Config {
         final String path;
+        final Long offset;
+        final Boolean skipTrimmed;
 
         Config(Namespace ns) {
             this.path = ns.getString("path");
+            this.offset = ns.getLong("offset");
+            this.skipTrimmed = ns.getBoolean("skipTrimmed");
         }
 
         static ArgumentParser parser() {
@@ -106,6 +119,14 @@ public class RecoverTool extends BlockWALService implements AutoCloseable {
             parser.addArgument("-p", "--path")
                 .required(true)
                 .help("Path of the WAL file");
+            parser.addArgument("--offset")
+                .type(Long.class)
+                .help("Offset to start recovering, default to the trimmed offset in the WAL header");
+            parser.addArgument("--skip-trimmed")
+                .dest("skipTrimmed")
+                .type(Boolean.class)
+                .setDefault(true)
+                .help("Whether to skip the record at the trimmed offset");
             return parser;
         }
     }
