@@ -126,6 +126,20 @@ public class BlockWALService implements WriteAheadLog {
     private BlockWALService() {
     }
 
+    /**
+     * A protected constructor for testing purpose.
+     */
+    protected BlockWALService(BlockWALServiceBuilder builder) {
+        BlockWALService that = builder.build();
+        this.initialWindowSize = that.initialWindowSize;
+        this.walChannel = that.walChannel;
+        this.slidingWindowService = that.slidingWindowService;
+        this.walHeader = that.walHeader;
+        this.recoveryMode = that.recoveryMode;
+        this.nodeId = that.nodeId;
+        this.epoch = that.epoch;
+    }
+
     public static BlockWALServiceBuilder builder(String path, long capacity) {
         return new BlockWALServiceBuilder(path, capacity);
     }
@@ -291,6 +305,13 @@ public class BlockWALService implements WriteAheadLog {
         } finally {
             lock.unlock();
         }
+    }
+
+    /**
+     * Protected method for testing purpose.
+     */
+    protected WALHeader tryReadWALHeader() {
+        return tryReadWALHeader(walChannel);
     }
 
     /**
