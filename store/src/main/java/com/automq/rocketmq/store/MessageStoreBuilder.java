@@ -60,7 +60,7 @@ public class MessageStoreBuilder {
 
         // S3 object manager, such as trim expired messages, etc.
         S3Operator operator = new DefaultS3Operator(s3StreamConfig.s3Endpoint(), s3StreamConfig.s3Region(), s3StreamConfig.s3Bucket(),
-            s3StreamConfig.s3ForcePathStyle(), List.of(() -> AwsBasicCredentials.create(s3StreamConfig.s3AccessKey(), s3StreamConfig.s3SecretKey())));
+            s3StreamConfig.s3ForcePathStyle(), List.of(() -> AwsBasicCredentials.create(s3StreamConfig.s3AccessKey(), s3StreamConfig.s3SecretKey())), false);
         S3ObjectOperator objectOperator = new S3ObjectOperatorImpl(operator);
 
         TransactionService transactionService = new TransactionService(storeConfig, timerService);
