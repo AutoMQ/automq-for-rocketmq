@@ -1,0 +1,3 @@
+[submodule "automq"]
+	path = automq
+	url = git@github.com:AutoMQ/automq.git
