@@ -134,11 +134,51 @@ message ConsumerClientConnection {
   int64 last_update_time = 7;
 }
 
+
+
 message ConsumerClientConnectionReply {
   Status status = 1;
   // Producer client connection
   repeated ConsumerClientConnection connection = 2;
 }
+
+
+
+message ConsumerSubInfo {
+  // topic
+  string topic = 1;
+  // subExpression
+  string sub_expression = 2;
+}
+
+message ConsumerStatusReply {
+  Status status = 1;
+  // consumer connection
+  repeated ConsumerClientConnection connection = 2;
+
+  repeated ConsumerSubInfo consumer_sub_info = 3;
+
+  string consume_type = 4;
+
+  string message_model = 5;
+
+  string consume_from_where = 6;
+
+  bytes consumer_running_info = 7;
+}
+
+message ConsumerStatusRequest {
+  ProxyRequestContext context = 1;
+  // Consumer group name
+  string group = 2;
+
+  string client_id = 3;
+
+  bool jstack_enable = 4;
+}
+
+
+
 
 message TraceContext {
   // Trace id
@@ -172,4 +212,5 @@ service ProxyService {
   rpc producerClientConnection(ProducerClientConnectionRequest) returns (ProducerClientConnectionReply) {}
   rpc consumerClientConnection(ConsumerClientConnectionRequest) returns (ConsumerClientConnectionReply) {}
   rpc relay(RelayRequest) returns (RelayReply) {}
+  rpc consumerStatus(ConsumerStatusRequest) returns (ConsumerStatusReply) {}
 }

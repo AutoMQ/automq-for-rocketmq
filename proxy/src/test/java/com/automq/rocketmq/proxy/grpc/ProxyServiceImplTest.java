@@ -12,16 +12,20 @@
 package com.automq.rocketmq.proxy.grpc;
 
 import apache.rocketmq.common.v1.Code;
+import apache.rocketmq.proxy.v1.ConsumerClientConnection;
+import apache.rocketmq.proxy.v1.ConsumerClientConnectionRequest;
 import apache.rocketmq.proxy.v1.ProxyServiceGrpc;
 import apache.rocketmq.proxy.v1.Status;
 import com.automq.rocketmq.common.config.BrokerConfig;
 import com.automq.rocketmq.common.model.FlatMessageExt;
 import com.automq.rocketmq.proxy.grpc.client.GrpcProxyClient;
 import com.automq.rocketmq.proxy.mock.MockMessageUtil;
+import com.automq.rocketmq.proxy.service.DefaultServiceManager;
 import com.automq.rocketmq.proxy.service.ExtendMessageService;
 import com.automq.rocketmq.store.api.MessageStore;
 import com.automq.rocketmq.store.model.message.PutResult;
 import java.lang.reflect.Field;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentMap;
 import org.apache.rocketmq.broker.client.ConsumerManager;
@@ -51,7 +55,8 @@ class ProxyServiceImplTest {
         ExtendMessageService messageService = mock(ExtendMessageService.class);
         ProducerManager producerManager = mock(ProducerManager.class);
         ConsumerManager consumerManager = mock(ConsumerManager.class);
-        ProxyServiceImpl server = new ProxyServiceImpl(messageStore, messageService, producerManager, consumerManager);
+        ProxyServiceImpl server = new ProxyServiceImpl(messageStore, messageService,
+                producerManager, consumerManager, new DefaultServiceManager(any(),any(),any(),any(),any(),any(),any()));
         grpcServerRule.getServiceRegistry().addService(server);
 
         ProxyServiceGrpc.ProxyServiceFutureStub stub = ProxyServiceGrpc.newFutureStub(grpcServerRule.getChannel());
@@ -68,5 +73,15 @@ class ProxyServiceImplTest {
         FlatMessageExt messageExt = MockMessageUtil.buildMessage(0, 1, "");
         Status status = proxyClient.relayMessage(TARGET, messageExt.message()).join();
         assertEquals(Code.OK, status.getCode());
+    }
+
+
+    @Test
+    void consumerConnection() {
+        final String groupName = "";
+
+        ConsumerClientConnectionRequest request = ConsumerClientConnectionRequest.newBuilder().setGroup(groupName).build();
+        List<ConsumerClientConnection> list = proxyClient.consumerClientConnection(TARGET, request).join();
+
     }
 }
